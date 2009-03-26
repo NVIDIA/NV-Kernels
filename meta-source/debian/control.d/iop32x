@@ -1,0 +1,33 @@
+Package: linux-headers-iop32x
+Architecture: armel
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-iop32x
+Description: IOP32x-based systems Linux kernel headers
+ This package will always depend on the latest iop32x kernel headers
+ available.
+
+Package: linux-image-iop32x
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-iop32x, linux-firmware
+Description: IOP32x-based systems Linux kernel image
+ This package will always depend on the latest iop32x kernel image
+ available.
+
+Package: linux-iop32x
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-iop32x (= ${binary:Version})
+Description: Complete IOP32x-based systems Linux kernel
+ This package will always depend on the latest complete iop32x Linux kernel
+ available.
+
+Package: linux-backports-modules-RELEASE_NAME-iop32x
+Architecture: armel
+Depends: linux-backports-modules-${kernel-abi-version}-iop32x
+Description: Backported drivers for IOP32x-based systems kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.

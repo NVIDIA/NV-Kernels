@@ -1,0 +1,33 @@
+Package: linux-headers-virtual
+Architecture: i386 amd64
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-server
+Description: Linux kernel headers for virtual machines
+ This package will always depend on the latest kernel headers available
+ for virtual machines (which are the same headers as for the server flavour).
+
+Package: linux-image-virtual
+Architecture: i386 amd64
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-virtual, linux-firmware
+Description: Linux kernel image for virtual machines
+ This package will always depend on the latest kernel image available
+ for virtual machines.
+
+Package: linux-virtual
+Architecture: i386 amd64
+Section: metapackages
+Priority: optional
+Depends: linux-image-virtual (= ${binary:Version})
+Description: Complete Linux kernel for virtual machines
+ This package will always depend on the latest complete Linux kernel available
+ for virtual machines.
+
+Package: linux-backports-modules-RELEASE_NAME-virtual
+Architecture: amd64 i386
+Depends: linux-backports-modules-${kernel-abi-version}-server
+Description: Backported drivers for virtual kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.

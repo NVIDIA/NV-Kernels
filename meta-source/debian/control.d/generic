@@ -1,0 +1,42 @@
+Package: linux-headers-generic
+Architecture: i386 amd64
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-generic
+Description: Generic Linux kernel headers
+ This package will always depend on the latest generic kernel headers
+ available.
+
+Package: linux-image-generic
+Architecture: i386 amd64
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-generic, linux-firmware
+Description: Generic Linux kernel image
+ This package will always depend on the latest generic kernel image
+ available.
+
+Package: linux-restricted-modules-generic
+Architecture: i386 amd64
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-restricted-modules-${kernel-abi-version}-generic
+Description: Restricted Linux modules for generic kernels
+ This package will always depend on the latest restricted modules available
+ for generic kernels.
+
+Package: linux-generic
+Architecture: i386 amd64
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-image-generic (= ${binary:Version}), linux-restricted-modules-generic (= ${binary:Version})
+Description: Complete Generic Linux kernel
+ This package will always depend on the latest complete generic Linux kernel
+ available.
+
+Package: linux-backports-modules-RELEASE_NAME-generic
+Architecture: amd64 i386
+Depends: linux-backports-modules-${kernel-abi-version}-generic
+Description: Backported drivers for generic kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.

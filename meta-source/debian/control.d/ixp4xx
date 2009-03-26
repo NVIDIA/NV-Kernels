@@ -1,0 +1,33 @@
+Package: linux-headers-ixp4xx
+Architecture: armel
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-ixp4xx
+Description: IXP4xx-based systems Linux kernel headers
+ This package will always depend on the latest ixp4xx kernel headers
+ available.
+
+Package: linux-image-ixp4xx
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-ixp4xx, linux-firmware
+Description: IXP4xx-based systems Linux kernel image
+ This package will always depend on the latest ixp4xx kernel image
+ available.
+
+Package: linux-ixp4xx
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-ixp4xx (= ${binary:Version})
+Description: Complete IXP4xx-based systems Linux kernel
+ This package will always depend on the latest complete ixp4xx Linux kernel
+ available.
+
+Package: linux-backports-modules-RELEASE_NAME-ixp4xx
+Architecture: armel
+Depends: linux-backports-modules-${kernel-abi-version}-ixp4xx
+Description: Backported drivers for IXP4xx-based systems kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.

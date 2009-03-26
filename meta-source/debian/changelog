@@ -1,0 +1,195 @@
+linux-meta (2.6.28.11.13) jaunty; urgency=low
+
+  * Use *-lpia as the target for generic metapackage dependencies on lpia.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Sat, 21 Mar 2009 09:30:39 +0000
+
+linux-meta (2.6.28.11.12) jaunty; urgency=low
+
+  * Build linux, linux-image, linux-restricted-modules, and
+    linux-backports-modules-jaunty for lpia, since there is only one kernel
+    flavour there.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 20 Mar 2009 16:24:37 +0000
+
+linux-meta (2.6.28.11.11) jaunty; urgency=low
+
+  * ABI Bump
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 18 Mar 2009 17:57:43 +0000
+
+linux-meta (2.6.28.10.10) jaunty; urgency=low
+
+  * ABI Bump
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 16 Mar 2009 17:21:20 +0000
+
+linux-meta (2.6.28.9.9) jaunty; urgency=low
+
+  * ABI Bump
+  * Added imx51 and mv78xx0 flavours.
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 10 Mar 2009 16:45:39 +0000
+
+linux-meta (2.6.28.8.8) jaunty; urgency=low
+
+  * Added LPIA arch meta packages.
+  * ABI Bump
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 17 Feb 2009 03:04:15 +0000
+
+linux-meta (2.6.28.7.7) jaunty; urgency=low
+
+  * ABI bump 
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 09 Feb 2009 13:15:43 +0000
+
+linux-meta (2.6.28.6.6) jaunty; urgency=low
+
+  * ABI bump
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 28 Jan 2009 12:55:38 +0000
+
+linux-meta (2.6.28.5.5) jaunty; urgency=low
+
+  * ABI bump
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Fri, 23 Jan 2009 06:00:08 +0000
+
+linux-meta (2.6.28.4.4) jaunty; urgency=low
+
+  * ABI bump
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Sun, 28 Dec 2008 17:08:29 +0000
+
+linux-meta (2.6.28.3.3) jaunty; urgency=low
+
+  * ABI bump
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 16 Dec 2008 20:33:41 +0000
+
+linux-meta (2.6.28.2.2) jaunty; urgency=low
+
+  * Fix lrm meta packages s/intrepid/jaunty/
+
+ -- Ben Collins <ben.collins@canonical.com>  Fri, 05 Dec 2008 14:47:47 -0500
+
+linux-meta (2.6.28.2.1) jaunty; urgency=low
+
+  * 2.6.28 first upload, -2 ABI
+  * Add armel flavours, no lrm
+
+ -- Ben Collins <ben.collins@canonical.com>  Fri, 05 Dec 2008 13:46:01 -0500
+
+linux-meta (2.6.27.7.11) intrepid; urgency=low
+
+  * lbm-virtual should depend on the -server binary package
+
+ -- Ben Collins <ben.collins@canonical.com>  Fri, 24 Oct 2008 10:14:48 -0400
+
+linux-meta (2.6.27.7.10) intrepid; urgency=low
+
+  * Add linux-source meta package. LP: #253904
+
+ -- Ben Collins <ben.collins@canonical.com>  Thu, 16 Oct 2008 12:29:01 -0400
+
+linux-meta (2.6.27.7.9) intrepid; urgency=low
+
+  * linux-image-<flav> now depends on linux-firmware for upgrades
+
+ -- Ben Collins <ben.collins@canonical.com>  Wed, 15 Oct 2008 07:52:02 -0400
+
+linux-meta (2.6.27.7.8) intrepid; urgency=low
+
+  * ABI bump.
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Fri, 10 Oct 2008 09:44:01 -0600
+
+linux-meta (2.6.27.6.7) intrepid; urgency=low
+
+  * ABI bump.
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 07 Oct 2008 12:51:59 +0000
+
+linux-meta (2.6.27.5.6) intrepid; urgency=low
+
+  [ Soren Hansen ]
+
+  * Re-add meta packages for virtual kernel flavour (LP: #276292)
+  * Remove "restricted/" from linux-server's Section. It has no dependencies
+    in restricted.
+
+ -- Ben Collins <ben.collins@canonical.com>  Tue, 07 Oct 2008 06:10:08 -0400
+
+linux-meta (2.6.27.5.5) intrepid; urgency=low
+
+  * ABI bump.
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Sun, 05 Oct 2008 17:13:11 +0000
+
+linux-meta (2.6.27.4.4) intrepid; urgency=low
+
+  * ABI bump.
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 22 Sep 2008 08:52:04 -0600
+
+linux-meta (2.6.27.3.3) intrepid; urgency=low
+
+  * ABI bump.
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 11 Sep 2008 12:00:45 -0600
+
+linux-meta (2.6.27.2.2) intrepid; urgency=low
+
+  * ABI bump.
+
+ -- Ben Collins <ben.collins@canonical.com>  Fri, 29 Aug 2008 10:39:57 -0400
+
+linux-meta (2.6.27.1.1) intrepid; urgency=low
+
+  * Version/ABI bump.
+
+ -- Ben Collins <ben.collins@canonical.com>  Wed, 27 Aug 2008 12:23:04 -0400
+
+linux-meta (2.6.26.5.7) intrepid; urgency=low
+
+  * ABI Bump
+
+ -- Ben Collins <ben.collins@canonical.com>  Tue, 29 Jul 2008 10:49:54 -0400
+
+linux-meta (2.6.26.4.6) intrepid; urgency=low
+
+  * Change linux-crashdump-FLAV to just linux-crashdump, since it is not
+    indepedent of kernel flavour.
+  * Remove debug meta packages since they are no longer publicly built (they
+    are now ddeb's)
+
+ -- Ben Collins <ben.collins@canonical.com>  Sat, 26 Jul 2008 15:05:00 -0400
+
+linux-meta (2.6.26.4.5) intrepid; urgency=low
+
+  * ABI bump.
+
+ -- Ben Collins <ben.collins@canonical.com>  Tue, 15 Jul 2008 12:25:02 -0400
+
+linux-meta (2.6.26.3.4) intrepid; urgency=low
+
+  * ABI bump
+  * Remove dep on linux-image-debug from linux-crashdump
+  * Overrides .3.3 that cjwatson did.
+
+ -- Ben Collins <ben.collins@canonical.com>  Mon, 23 Jun 2008 14:33:13 -0400
+
+linux-meta (2.6.26.2.2) intrepid; urgency=low
+
+  * ABI bump
+  * Add linux-crashdump-* packages. They depend on a matching
+    linux-image-debug, kexec-tools and makedumpfile.
+
+ -- Ben Collins <ben.collins@canonical.com>  Thu, 19 Jun 2008 14:05:35 -0400
+
+linux-meta (2.6.26.1.1) intrepid; urgency=low
+
+  * Initial package for intrepid.
+
+ -- Ben Collins <ben.collins@canonical.com>  Fri, 13 Jun 2008 06:47:07 -0400

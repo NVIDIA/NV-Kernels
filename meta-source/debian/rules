@@ -1,0 +1,86 @@
+#!/usr/bin/make -f
+#
+# debian/rules for kernel-source.
+#
+# GNU copyright 1997 to 1999 by Joey Hess.
+# Copyright (c) 1999-2004 Herbert Xu <herbert@gondor.apana.org.au>
+# Copyright (c) 2004 Jens Schmalzing <jensen@debian.org>
+#
+
+RELEASE_NAME=jaunty
+
+KERNEL_VERSION=$(shell dpkg-parsechangelog | grep ^Version | sed -e \
+	's/Version: \([0-9]*\.[0-9]*\.[0-9]*\)\..*/\1/')
+KERNEL_ABI=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"."); print v[4];}')
+KERNEL_ABI_VERSION=$(KERNEL_VERSION)-$(KERNEL_ABI)
+
+GENERIC_i386=generic
+GENERIC_amd64=generic
+GENERIC_lpia=lpia
+
+GENERIC=$(value GENERIC_$(shell dpkg-architecture -qDEB_HOST_ARCH))
+GENERIC_DEP=$(if $(GENERIC),$(GENERIC),)
+
+control_files := debian/control.common $(shell LC_ALL=C ls -d debian/control.d/*)
+
+SHELL := sh -e
+
+build:
+	dh_testdir
+
+clean: debian/control
+	dh_testdir
+	dh_testroot
+	dh_clean
+
+debian/control: $(control_files)
+	rm -f debian/control.tmp
+	for i in $^; do \
+		sed 's/RELEASE_NAME/$(RELEASE_NAME)/g' $$i >> debian/control.tmp; \
+		echo >> debian/control.tmp; \
+	done
+	rm -f $@
+	mv debian/control.tmp $@
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+
+gencontrol_flags = -Vkernel-version=$(KERNEL_VERSION)
+gencontrol_flags += -Vkernel-abi-version=$(KERNEL_ABI_VERSION)
+gencontrol_flags += -Vgeneric-depends=$(GENERIC_DEP)
+
+# Build architecture-independent files here.
+binary-indep: debian/control install
+	dh_testdir
+	dh_testroot
+
+	dh_installdirs -i
+	dh_installdocs -i
+	dh_installchangelogs -i
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i -- $(gencontrol_flags)
+	dh_md5sums -i
+	dh_builddeb -i
+
+# Build architecture-dependent files here.
+binary-arch: debian/control install
+	dh_testdir
+	dh_testroot
+
+	dh_installdirs -s
+	dh_installdocs -s
+	dh_installchangelogs -s
+	dh_compress -s
+	dh_fixperms -s
+	dh_installdeb -s
+	dh_gencontrol -s -- $(gencontrol_flags)
+	dh_md5sums -s
+	dh_builddeb -s
+
+binary: binary-indep binary-arch
+
+.PHONY: build clean binary-indep binary-arch binary install

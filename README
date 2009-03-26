@@ -1,0 +1,18 @@
+The toplevel makefile in this directory is used to create the upload source
+for linux-ports-meta. By convention the directory name is supposed to be the
+name of the package with version number attached.
+In order to fullfill that convention and prevent git from being useless
+(since the renaming produces big diffs), a soft-link is created before
+calling dpkk-buildpackage.
+
+The versioning scheme in debian/changelog must be k.k.k.a.m, where
+k is the kernel version a is the ABI version and m is the version
+of the linux-meta package.
+
+You can create an upload set by calling:
+
+	make source
+
+Afterwards the temporary stuff can be removed by calling:
+
+	make clean

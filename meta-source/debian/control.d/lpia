@@ -1,0 +1,42 @@
+Package: linux-headers-lpia
+Architecture: lpia
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-lpia
+Description: Generic Linux kernel headers
+ This package will always depend on the latest lpia kernel headers
+ available.
+
+Package: linux-image-lpia
+Architecture: lpia
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-lpia, linux-firmware
+Description: Generic Linux kernel image
+ This package will always depend on the latest lpia kernel image
+ available.
+
+Package: linux-restricted-modules-lpia
+Architecture: lpia
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-restricted-modules-${kernel-abi-version}-lpia
+Description: Restricted Linux modules for lpia kernels
+ This package will always depend on the latest restricted modules available
+ for lpia kernels.
+
+Package: linux-lpia
+Architecture: lpia
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-image-lpia (= ${binary:Version}), linux-restricted-modules-lpia (= ${binary:Version})
+Description: Complete Generic Linux kernel
+ This package will always depend on the latest complete lpia Linux kernel
+ available.
+
+Package: linux-backports-modules-RELEASE_NAME-lpia
+Architecture: lpia
+Depends: linux-backports-modules-${kernel-abi-version}-lpia
+Description: Backported drivers for lpia kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.

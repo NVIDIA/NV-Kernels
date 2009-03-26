@@ -1,0 +1,431 @@
+Source: linux-meta
+Section: devel
+Priority: optional
+Maintainer: Ubuntu Kernel Team <kernel-team@lists.ubuntu.com>
+Standards-Version: 3.6.1
+Build-Depends: dpkg (>= 1.13.19), debhelper (>= 3), gawk
+
+Package: linux
+Architecture: i386 amd64 lpia
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-image (= ${binary:Version}), linux-restricted-modules (= ${binary:Version})
+Description: Generic complete Linux kernel.
+ This package will always depend on the latest generic complete Linux kernel
+ available.
+
+Package: linux-source
+Architecture: all
+Section: devel
+Priority: optional
+Depends: linux-source-${kernel-version}
+Description: Linux kernel source with Ubuntu patches
+ This package will always depend on the latest Linux kernel source code
+ available. The Ubuntu patches have been applied.
+
+Package: linux-image
+Architecture: i386 amd64 lpia
+Section: metapackages
+Priority: optional
+Depends: linux-image-${generic-depends} (= ${binary:Version})
+Description: Generic Linux kernel image.
+ This package will always depend on the latest generic Linux kernel image
+ available.
+
+Package: linux-restricted-modules
+Architecture: i386 amd64 lpia
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-restricted-modules-${generic-depends} (= ${binary:Version})
+Description: Generic Linux restricted modules.
+ This package will always depend on the latest generic Linux restricted
+ modules available.
+
+Package: linux-backports-modules-jaunty
+Architecture: i386 amd64 lpia
+Section: metapackages
+Priority: optional
+Depends: linux-backports-modules-jaunty-${generic-depends} (= ${binary:Version})
+Description: Generic Linux backported drivers.
+ This package will always depend on the latest generic Linux backported
+ drivers available.
+
+Package: linux-doc
+Architecture: all
+Section: doc
+Priority: optional
+Depends: linux-doc-${kernel-version}
+Description: Linux kernel documentation
+ This package will always depend on the latest Linux kernel documentation
+ available.
+
+Package: linux-crashdump
+Architecture: i386 amd64
+Section: devel
+Depends: kexec-tools, makedumpfile, grub (>= 0.97-29ubuntu24)
+Description: Linux kernel crashdump setup for the latest generic kernel
+ This package installs all the needed infrstracture to get crashdumps from
+ your running system. If you are experiencing kernel crashes that cannot
+ be debugged normally (because the problem is infrequent or panic's the
+ system in such a way as to make information gathering impossible), then
+ you can install this package to automatically enable capture of the
+ vmcore on crashes.
+
+Package: linux-headers-generic
+Architecture: i386 amd64
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-generic
+Description: Generic Linux kernel headers
+ This package will always depend on the latest generic kernel headers
+ available.
+
+Package: linux-image-generic
+Architecture: i386 amd64
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-generic, linux-firmware
+Description: Generic Linux kernel image
+ This package will always depend on the latest generic kernel image
+ available.
+
+Package: linux-restricted-modules-generic
+Architecture: i386 amd64
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-restricted-modules-${kernel-abi-version}-generic
+Description: Restricted Linux modules for generic kernels
+ This package will always depend on the latest restricted modules available
+ for generic kernels.
+
+Package: linux-generic
+Architecture: i386 amd64
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-image-generic (= ${binary:Version}), linux-restricted-modules-generic (= ${binary:Version})
+Description: Complete Generic Linux kernel
+ This package will always depend on the latest complete generic Linux kernel
+ available.
+
+Package: linux-backports-modules-jaunty-generic
+Architecture: amd64 i386
+Depends: linux-backports-modules-${kernel-abi-version}-generic
+Description: Backported drivers for generic kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
+Package: linux-headers-imx51
+Architecture: armel
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-imx51
+Description: Versatile-based systems systems Linux kernel headers
+ This package will always depend on the latest imx51 kernel headers
+ available.
+
+Package: linux-image-imx51
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-imx51, linux-firmware
+Description: Versatile-based systems systems Linux kernel image
+ This package will always depend on the latest imx51 kernel image
+ available.
+
+Package: linux-imx51
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-imx51 (= ${binary:Version})
+Description: Complete Versatile-based systems systems Linux kernel
+ This package will always depend on the latest complete imx51 Linux kernel
+ available.
+
+Package: linux-backports-modules-jaunty-imx51
+Architecture: armel
+Depends: linux-backports-modules-${kernel-abi-version}-imx51
+Description: Backported drivers for Versatile-based systems systems kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
+Package: linux-headers-iop32x
+Architecture: armel
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-iop32x
+Description: IOP32x-based systems Linux kernel headers
+ This package will always depend on the latest iop32x kernel headers
+ available.
+
+Package: linux-image-iop32x
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-iop32x, linux-firmware
+Description: IOP32x-based systems Linux kernel image
+ This package will always depend on the latest iop32x kernel image
+ available.
+
+Package: linux-iop32x
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-iop32x (= ${binary:Version})
+Description: Complete IOP32x-based systems Linux kernel
+ This package will always depend on the latest complete iop32x Linux kernel
+ available.
+
+Package: linux-backports-modules-jaunty-iop32x
+Architecture: armel
+Depends: linux-backports-modules-${kernel-abi-version}-iop32x
+Description: Backported drivers for IOP32x-based systems kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
+Package: linux-headers-ixp4xx
+Architecture: armel
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-ixp4xx
+Description: IXP4xx-based systems Linux kernel headers
+ This package will always depend on the latest ixp4xx kernel headers
+ available.
+
+Package: linux-image-ixp4xx
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-ixp4xx, linux-firmware
+Description: IXP4xx-based systems Linux kernel image
+ This package will always depend on the latest ixp4xx kernel image
+ available.
+
+Package: linux-ixp4xx
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-ixp4xx (= ${binary:Version})
+Description: Complete IXP4xx-based systems Linux kernel
+ This package will always depend on the latest complete ixp4xx Linux kernel
+ available.
+
+Package: linux-backports-modules-jaunty-ixp4xx
+Architecture: armel
+Depends: linux-backports-modules-${kernel-abi-version}-ixp4xx
+Description: Backported drivers for IXP4xx-based systems kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
+Package: linux-headers-lpia
+Architecture: lpia
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-lpia
+Description: Generic Linux kernel headers
+ This package will always depend on the latest lpia kernel headers
+ available.
+
+Package: linux-image-lpia
+Architecture: lpia
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-lpia, linux-firmware
+Description: Generic Linux kernel image
+ This package will always depend on the latest lpia kernel image
+ available.
+
+Package: linux-restricted-modules-lpia
+Architecture: lpia
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-restricted-modules-${kernel-abi-version}-lpia
+Description: Restricted Linux modules for lpia kernels
+ This package will always depend on the latest restricted modules available
+ for lpia kernels.
+
+Package: linux-lpia
+Architecture: lpia
+Section: restricted/metapackages
+Priority: optional
+Depends: linux-image-lpia (= ${binary:Version}), linux-restricted-modules-lpia (= ${binary:Version})
+Description: Complete Generic Linux kernel
+ This package will always depend on the latest complete lpia Linux kernel
+ available.
+
+Package: linux-backports-modules-jaunty-lpia
+Architecture: lpia
+Depends: linux-backports-modules-${kernel-abi-version}-lpia
+Description: Backported drivers for lpia kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
+Package: linux-headers-mv78xx0
+Architecture: armel
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-mv78xx0
+Description: Versatile-based systems systems Linux kernel headers
+ This package will always depend on the latest mv78xx0 kernel headers
+ available.
+
+Package: linux-image-mv78xx0
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-mv78xx0, linux-firmware
+Description: Versatile-based systems systems Linux kernel image
+ This package will always depend on the latest mv78xx0 kernel image
+ available.
+
+Package: linux-mv78xx0
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-mv78xx0 (= ${binary:Version})
+Description: Complete Versatile-based systems systems Linux kernel
+ This package will always depend on the latest complete mv78xx0 Linux kernel
+ available.
+
+Package: linux-backports-modules-jaunty-mv78xx0
+Architecture: armel
+Depends: linux-backports-modules-${kernel-abi-version}-mv78xx0
+Description: Backported drivers for Versatile-based systems systems kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
+Package: linux-headers-orion5x
+Architecture: armel
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-orion5x
+Description: Orion5x-based systems Linux kernel headers
+ This package will always depend on the latest orion5x kernel headers
+ available.
+
+Package: linux-image-orion5x
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-orion5x, linux-firmware
+Description: Orion5x-based systems Linux kernel image
+ This package will always depend on the latest orion5x kernel image
+ available.
+
+Package: linux-orion5x
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-orion5x (= ${binary:Version})
+Description: Complete Orion5x-based systems Linux kernel
+ This package will always depend on the latest complete orion5x Linux kernel
+ available.
+
+Package: linux-backports-modules-jaunty-orion5x
+Architecture: armel
+Depends: linux-backports-modules-${kernel-abi-version}-orion5x
+Description: Backported drivers for Orion5x-based systems kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
+Package: linux-headers-server
+Architecture: i386 amd64
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-server
+Description: Linux kernel headers on Server Equipment.
+ This package will always depend on the latest kernel headers available
+ for Server Equipment.
+
+Package: linux-image-server
+Architecture: i386 amd64
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-server, linux-firmware
+Description: Linux kernel image on Server Equipment.
+ This package will always depend on the latest kernel image available
+ for Server Equipment.
+
+Package: linux-server
+Architecture: i386 amd64
+Section: metapackages
+Priority: optional
+Depends: linux-image-server (= ${binary:Version})
+Description: Complete Linux kernel on Server Equipment.
+ This package will always depend on the latest complete Linux kernel available
+ for Server Equipment.
+
+Package: linux-backports-modules-jaunty-server
+Architecture: amd64 i386
+Depends: linux-backports-modules-${kernel-abi-version}-server
+Description: Backported drivers for server kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
+Package: linux-headers-versatile
+Architecture: armel
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-versatile
+Description: Versatile-based systems systems Linux kernel headers
+ This package will always depend on the latest versatile kernel headers
+ available.
+
+Package: linux-image-versatile
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-versatile, linux-firmware
+Description: Versatile-based systems systems Linux kernel image
+ This package will always depend on the latest versatile kernel image
+ available.
+
+Package: linux-versatile
+Architecture: armel
+Section: metapackages
+Priority: optional
+Depends: linux-image-versatile (= ${binary:Version})
+Description: Complete Versatile-based systems systems Linux kernel
+ This package will always depend on the latest complete versatile Linux kernel
+ available.
+
+Package: linux-backports-modules-jaunty-versatile
+Architecture: armel
+Depends: linux-backports-modules-${kernel-abi-version}-versatile
+Description: Backported drivers for Versatile-based systems systems kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
+Package: linux-headers-virtual
+Architecture: i386 amd64
+Section: devel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-server
+Description: Linux kernel headers for virtual machines
+ This package will always depend on the latest kernel headers available
+ for virtual machines (which are the same headers as for the server flavour).
+
+Package: linux-image-virtual
+Architecture: i386 amd64
+Section: metapackages
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-virtual, linux-firmware
+Description: Linux kernel image for virtual machines
+ This package will always depend on the latest kernel image available
+ for virtual machines.
+
+Package: linux-virtual
+Architecture: i386 amd64
+Section: metapackages
+Priority: optional
+Depends: linux-image-virtual (= ${binary:Version})
+Description: Complete Linux kernel for virtual machines
+ This package will always depend on the latest complete Linux kernel available
+ for virtual machines.
+
+Package: linux-backports-modules-jaunty-virtual
+Architecture: amd64 i386
+Depends: linux-backports-modules-${kernel-abi-version}-server
+Description: Backported drivers for virtual kernel image
+ This empty package allows people to keep their backported modules
+ up-to-date when upgrading their Linux kernel.
+
