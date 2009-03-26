@@ -1,5 +1,5 @@
 The toplevel makefile in this directory is used to create the upload source
-for linux-ports-meta. By convention the directory name is supposed to be the
+for linux-meta. By convention the directory name is supposed to be the
 name of the package with version number attached.
 In order to fullfill that convention and prevent git from being useless
 (since the renaming produces big diffs), a soft-link is created before

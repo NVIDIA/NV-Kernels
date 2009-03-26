@@ -1,33 +1,53 @@
 Package: linux-headers-virtual
-Architecture: i386 amd64
-Section: devel
+Architecture: i386 amd64 ppc64el
+Section: kernel
 Priority: optional
-Depends: linux-headers-${kernel-abi-version}-server
-Description: Linux kernel headers for virtual machines
- This package will always depend on the latest kernel headers available
- for virtual machines (which are the same headers as for the server flavour).
+Depends: ${misc:Depends}, linux-headers-generic (= ${binary:Version})
+Description: Transitional package.
+ This package will always depend on linux-headers-generic.
 
 Package: linux-image-virtual
-Architecture: i386 amd64
-Section: metapackages
+Architecture: i386 amd64 ppc64el
+Section: kernel
 Priority: optional
-Depends: linux-image-${kernel-abi-version}-virtual, linux-firmware
-Description: Linux kernel image for virtual machines
- This package will always depend on the latest kernel image available
- for virtual machines.
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic
+Description: This package will always depend on the latest minimal generic kernel image.
+ This package will always depend on the latest minimal generic kernel image
+ used for virtual instances.
+
+Package: linux-tools-virtual
+Architecture: i386 amd64
+Section: kernel
+Priority: optional
+Provides: linux-tools
+Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-generic
+Description: This package will always depend on the latest minimal generic kernel tools.
+ This package will always depend on the latest minimal generic kernel tools
+ used for virtual instances.
+
+Package: linux-cloud-tools-virtual
+Architecture: i386 amd64
+Section: kernel
+Priority: optional
+Provides: linux-cloud-tools
+Depends: ${misc:Depends}, linux-cloud-tools-${kernel-abi-version}-generic
+Description: This package will always depend on the latest minimal generic kernel cloud tools.
+ This package will always depend on the latest minimal generic kernel cloud tools
+ used for virtual instances.
 
 Package: linux-virtual
-Architecture: i386 amd64
-Section: metapackages
+Architecture: i386 amd64 ppc64el
+Section: kernel
 Priority: optional
-Depends: linux-image-virtual (= ${binary:Version})
-Description: Complete Linux kernel for virtual machines
- This package will always depend on the latest complete Linux kernel available
- for virtual machines.
+Depends: ${misc:Depends}, linux-image-virtual (= ${binary:Version}), linux-headers-virtual (= ${binary:Version})
+Description: Minimal Generic Linux kernel and headers
+ This package will always depend on linux-image-virtual and
+ linux-headers-virtual.
 
-Package: linux-backports-modules-RELEASE_NAME-virtual
-Architecture: amd64 i386
-Depends: linux-backports-modules-${kernel-abi-version}-server
-Description: Backported drivers for virtual kernel image
- This empty package allows people to keep their backported modules
- up-to-date when upgrading their Linux kernel.
+Package: linux-image-extra-virtual
+Architecture: i386 amd64
+Section: kernel
+Priority: optional
+Depends: ${misc:Depends}, linux-image-generic (= ${binary:Version})
+Description: Transitional package.
+ This package will always depend on linux-image-generic.

@@ -1,195 +1,436 @@
-linux-meta (2.6.28.11.13) jaunty; urgency=low
+linux-meta (3.16.0.23.24) utopic; urgency=low
 
-  * Use *-lpia as the target for generic metapackage dependencies on lpia.
+  * linux ABI 3.16.0-23
 
- -- Colin Watson <cjwatson@ubuntu.com>  Sat, 21 Mar 2009 09:30:39 +0000
+ -- Andy Whitcroft <apw@canonical.com>  Thu, 16 Oct 2014 14:35:15 +0200
 
-linux-meta (2.6.28.11.12) jaunty; urgency=low
+linux-meta (3.16.0.22.23) utopic; urgency=low
 
-  * Build linux, linux-image, linux-restricted-modules, and
-    linux-backports-modules-jaunty for lpia, since there is only one kernel
-    flavour there.
+  [ Andy Whitcroft ]
+  * UBUNTU: enable linux-cloud on i386.
+   - LP: #1367399
 
- -- Colin Watson <cjwatson@ubuntu.com>  Fri, 20 Mar 2009 16:24:37 +0000
+  [ Tim Gardner ]
 
-linux-meta (2.6.28.11.11) jaunty; urgency=low
+  * linux ABI 3.16.0-22 
 
-  * ABI Bump
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 09 Oct 2014 13:52:21 +0100
 
- -- Tim Gardner <tim.gardner@canonical.com>  Wed, 18 Mar 2009 17:57:43 +0000
+linux-meta (3.16.0.21.22) utopic; urgency=medium
 
-linux-meta (2.6.28.10.10) jaunty; urgency=low
+  * UBUNTU: Make linux-crashdump build for ppc64el
+    -LP: #1341475
+  * linux ABI 3.16.0-21
 
-  * ABI Bump
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 06 Oct 2014 16:47:04 +0100
 
- -- Tim Gardner <tim.gardner@canonical.com>  Mon, 16 Mar 2009 17:21:20 +0000
+linux-meta (3.16.0.20.21) utopic; urgency=medium
 
-linux-meta (2.6.28.9.9) jaunty; urgency=low
+  * linux ABI 3.16.0-20
 
-  * ABI Bump
-  * Added imx51 and mv78xx0 flavours.
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 01 Oct 2014 11:01:48 -0600
 
- -- Tim Gardner <tim.gardner@canonical.com>  Tue, 10 Mar 2009 16:45:39 +0000
+linux-meta (3.16.0.19.20) utopic; urgency=medium
 
-linux-meta (2.6.28.8.8) jaunty; urgency=low
+  * linux ABI 3.16.0-19
 
-  * Added LPIA arch meta packages.
-  * ABI Bump
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 30 Sep 2014 07:42:43 -0600
 
- -- Tim Gardner <tim.gardner@canonical.com>  Tue, 17 Feb 2009 03:04:15 +0000
+linux-meta (3.16.0.18.19) utopic; urgency=medium
 
-linux-meta (2.6.28.7.7) jaunty; urgency=low
+  * linux ABI 3.16.0-18
 
-  * ABI bump 
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 24 Sep 2014 19:21:22 -0600
 
- -- Tim Gardner <tim.gardner@canonical.com>  Mon, 09 Feb 2009 13:15:43 +0000
+linux-meta (3.16.0.17.18) utopic; urgency=medium
 
-linux-meta (2.6.28.6.6) jaunty; urgency=low
+  * linux ABI 3.16.0-17
 
-  * ABI bump
+ -- Tim Gardner <tim.gardner@canonical.com>  Fri, 19 Sep 2014 10:51:15 -0600
 
- -- Tim Gardner <tim.gardner@canonical.com>  Wed, 28 Jan 2009 12:55:38 +0000
+linux-meta (3.16.0.16.17) utopic; urgency=medium
 
-linux-meta (2.6.28.5.5) jaunty; urgency=low
+  * linux ABI 3.16.0-16
 
-  * ABI bump
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 17 Sep 2014 12:41:57 -0600
 
- -- Tim Gardner <tim.gardner@canonical.com>  Fri, 23 Jan 2009 06:00:08 +0000
+linux-meta (3.16.0.15.16) utopic; urgency=medium
 
-linux-meta (2.6.28.4.4) jaunty; urgency=low
+  * linux ABI 3.16.0-15
 
-  * ABI bump
+ -- Tim Gardner <tim.gardner@canonical.com>  Fri, 12 Sep 2014 12:55:11 -0600
 
- -- Tim Gardner <tim.gardner@canonical.com>  Sun, 28 Dec 2008 17:08:29 +0000
+linux-meta (3.16.0.14.15) utopic; urgency=medium
 
-linux-meta (2.6.28.3.3) jaunty; urgency=low
+  * linux ABI 3.16.0-14
 
-  * ABI bump
+ -- Tim Gardner <tim.gardner@canonical.com>  Sat, 06 Sep 2014 16:43:12 -0700
 
- -- Tim Gardner <tim.gardner@canonical.com>  Tue, 16 Dec 2008 20:33:41 +0000
+linux-meta (3.16.0.13.14) utopic; urgency=medium
 
-linux-meta (2.6.28.2.2) jaunty; urgency=low
+  * linux ABI 3.16.0-13
 
-  * Fix lrm meta packages s/intrepid/jaunty/
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 04 Sep 2014 15:50:29 -0700
 
- -- Ben Collins <ben.collins@canonical.com>  Fri, 05 Dec 2008 14:47:47 -0500
+linux-meta (3.16.0.12.13) utopic; urgency=low
 
-linux-meta (2.6.28.2.1) jaunty; urgency=low
+  * linux ABI 3.16.0-12
 
-  * 2.6.28 first upload, -2 ABI
-  * Add armel flavours, no lrm
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 29 Aug 2014 13:07:40 +0100
 
- -- Ben Collins <ben.collins@canonical.com>  Fri, 05 Dec 2008 13:46:01 -0500
+linux-meta (3.16.0.11.12) utopic; urgency=medium
 
-linux-meta (2.6.27.7.11) intrepid; urgency=low
+  * linux ABI 3.16.0-11
 
-  * lbm-virtual should depend on the -server binary package
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 25 Aug 2014 13:58:39 -0600
 
- -- Ben Collins <ben.collins@canonical.com>  Fri, 24 Oct 2008 10:14:48 -0400
+linux-meta (3.16.0.10.11) utopic; urgency=medium
 
-linux-meta (2.6.27.7.10) intrepid; urgency=low
+  * linux ABI 3.16.0-10
 
-  * Add linux-source meta package. LP: #253904
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 21 Aug 2014 10:20:15 -0600
 
- -- Ben Collins <ben.collins@canonical.com>  Thu, 16 Oct 2008 12:29:01 -0400
+linux-meta (3.16.0.9.10) utopic; urgency=medium
 
-linux-meta (2.6.27.7.9) intrepid; urgency=low
+  * linux ABI 3.16.0-9
 
-  * linux-image-<flav> now depends on linux-firmware for upgrades
+ -- Tim Gardner <tim.gardner@canonical.com>  Fri, 15 Aug 2014 09:20:06 -0600
 
- -- Ben Collins <ben.collins@canonical.com>  Wed, 15 Oct 2008 07:52:02 -0400
+linux-meta (3.16.0.8.9) utopic; urgency=medium
 
-linux-meta (2.6.27.7.8) intrepid; urgency=low
+  * linux ABI 3.16.0-8
 
-  * ABI bump.
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 13 Aug 2014 11:10:24 -0600
 
- -- Tim Gardner <tim.gardner@canonical.com>  Fri, 10 Oct 2008 09:44:01 -0600
+linux-meta (3.16.0.7.8) utopic; urgency=medium
 
-linux-meta (2.6.27.6.7) intrepid; urgency=low
+  * linux ABI 3.16.0-7
 
-  * ABI bump.
+ -- Tim Gardner <tim.gardner@canonical.com>  Sat, 09 Aug 2014 07:46:44 -0600
 
- -- Tim Gardner <tim.gardner@canonical.com>  Tue, 07 Oct 2008 12:51:59 +0000
+linux-meta (3.16.0.6.7) utopic; urgency=medium
 
-linux-meta (2.6.27.5.6) intrepid; urgency=low
+  * linux ABI 3.16.0-6
 
-  [ Soren Hansen ]
+ -- Tim Gardner <tim.gardner@canonical.com>  Sun, 27 Jul 2014 20:03:50 -0600
 
-  * Re-add meta packages for virtual kernel flavour (LP: #276292)
-  * Remove "restricted/" from linux-server's Section. It has no dependencies
-    in restricted.
+linux-meta (3.16.0.5.6) utopic; urgency=medium
 
- -- Ben Collins <ben.collins@canonical.com>  Tue, 07 Oct 2008 06:10:08 -0400
+  * linux ABI 3.16.0-5
 
-linux-meta (2.6.27.5.5) intrepid; urgency=low
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 21 Jul 2014 11:01:35 -0600
 
-  * ABI bump.
+linux-meta (3.16.0.4.5) utopic; urgency=medium
 
- -- Tim Gardner <tim.gardner@canonical.com>  Sun, 05 Oct 2008 17:13:11 +0000
+  * linux ABI 3.16.0-4
 
-linux-meta (2.6.27.4.4) intrepid; urgency=low
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 14 Jul 2014 07:58:39 -0400
 
-  * ABI bump.
+linux-meta (3.16.0.3.4) utopic; urgency=medium
 
- -- Tim Gardner <tim.gardner@canonical.com>  Mon, 22 Sep 2008 08:52:04 -0600
+  * linux ABI 3.16.0-3
 
-linux-meta (2.6.27.3.3) intrepid; urgency=low
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 10 Jul 2014 10:34:21 +0100
 
-  * ABI bump.
+linux-meta (3.16.0.2.3) utopic; urgency=medium
 
- -- Tim Gardner <tim.gardner@canonical.com>  Thu, 11 Sep 2008 12:00:45 -0600
+  * Make thermald a bare metal dependency 
+    -LP: #1333322
 
-linux-meta (2.6.27.2.2) intrepid; urgency=low
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 09 Jul 2014 13:02:29 +0100
 
-  * ABI bump.
+linux-meta (3.16.0.2.2) utopic; urgency=medium
 
- -- Ben Collins <ben.collins@canonical.com>  Fri, 29 Aug 2008 10:39:57 -0400
+  * linux ABI 3.15.0-2
 
-linux-meta (2.6.27.1.1) intrepid; urgency=low
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 07 Jul 2014 16:33:54 +0100
 
-  * Version/ABI bump.
+linux-meta (3.16.0.1.1) utopic; urgency=medium
 
- -- Ben Collins <ben.collins@canonical.com>  Wed, 27 Aug 2008 12:23:04 -0400
+  * linux ABI 3.15.0-1
 
-linux-meta (2.6.26.5.7) intrepid; urgency=low
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 30 Jun 2014 13:37:06 -0600
 
-  * ABI Bump
+linux-meta (3.15.0.6.7) utopic; urgency=low
 
- -- Ben Collins <ben.collins@canonical.com>  Tue, 29 Jul 2008 10:49:54 -0400
+  * linux ABI 3.15.0-6
+  * ppc64el/arm64: add linux-tools-generic
+    - LP: #1326050
 
-linux-meta (2.6.26.4.6) intrepid; urgency=low
+ -- Andy Whitcroft <apw@canonical.com>  Wed, 04 Jun 2014 12:48:40 +0100
 
-  * Change linux-crashdump-FLAV to just linux-crashdump, since it is not
-    indepedent of kernel flavour.
-  * Remove debug meta packages since they are no longer publicly built (they
-    are now ddeb's)
+linux-meta (3.15.0.5.6) utopic; urgency=medium
 
- -- Ben Collins <ben.collins@canonical.com>  Sat, 26 Jul 2008 15:05:00 -0400
+  * linux ABI 3.15.0-5
 
-linux-meta (2.6.26.4.5) intrepid; urgency=low
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 02 Jun 2014 10:39:13 -0600
 
-  * ABI bump.
+linux-meta (3.15.0.4.5) utopic; urgency=low
 
- -- Ben Collins <ben.collins@canonical.com>  Tue, 15 Jul 2008 12:25:02 -0400
+  * linux ABI 3.15.0-4
 
-linux-meta (2.6.26.3.4) intrepid; urgency=low
+ -- Andy Whitcroft <apw@canonical.com>  Wed, 28 May 2014 14:36:37 +0100
 
-  * ABI bump
-  * Remove dep on linux-image-debug from linux-crashdump
-  * Overrides .3.3 that cjwatson did.
+linux-meta (3.15.0.3.4) utopic; urgency=medium
 
- -- Ben Collins <ben.collins@canonical.com>  Mon, 23 Jun 2008 14:33:13 -0400
+  * linux ABI 3.15.0-3
 
-linux-meta (2.6.26.2.2) intrepid; urgency=low
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 26 May 2014 09:49:29 +0200
 
-  * ABI bump
-  * Add linux-crashdump-* packages. They depend on a matching
-    linux-image-debug, kexec-tools and makedumpfile.
+linux-meta (3.15.0.2.3) utopic; urgency=medium
 
- -- Ben Collins <ben.collins@canonical.com>  Thu, 19 Jun 2008 14:05:35 -0400
+  * linux ABI 3.15.0-2
 
-linux-meta (2.6.26.1.1) intrepid; urgency=low
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 22 May 2014 09:18:58 -0700
 
-  * Initial package for intrepid.
+linux-meta (3.15.0.1.2) utopic; urgency=medium
 
- -- Ben Collins <ben.collins@canonical.com>  Fri, 13 Jun 2008 06:47:07 -0400
+  * linux ABI 3.15.0-1
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Sat, 10 May 2014 09:23:27 -0600
+
+linux-meta (3.15.0.0.1) utopic; urgency=medium
+
+  * linux ABI 3.15.0-0
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 06 May 2014 09:42:51 -0500
+
+linux-meta (3.13.0.24.30) trusty; urgency=low
+
+  * Add linux-firmware as a dependency of linux-signed-image. Otherwise linux-firmware
+    does not get installed on UEFI server images.
+    - LP: #1309415
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 23 Apr 2014 06:57:52 -0600
+
+linux-meta (3.13.0.24.29) trusty; urgency=low
+
+  * Spelling correction to make translations easier: infrstracture ==> infrastructure
+    - LP: #1264679
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 21 Apr 2014 09:08:35 -0600
+
+linux-meta (3.13.0.24.28) trusty; urgency=low
+
+  * linux ABI 3.13.0-24
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 09 Apr 2014 12:23:01 -0600
+
+linux-meta (3.13.0.23.27) trusty; urgency=low
+
+  * linux ABI 3.13.0-23
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 03 Apr 2014 12:32:53 -0600
+
+linux-meta (3.13.0.22.26) trusty; urgency=low
+
+  * linux ABI 3.13.0-22
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 02 Apr 2014 13:46:46 -0600
+
+linux-meta (3.13.0.21.25) trusty; urgency=low
+
+  * linux ABI 3.13.0-21
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 31 Mar 2014 16:09:46 -0600
+
+linux-meta (3.13.0.20.24) trusty; urgency=low
+
+  [ Andy Whitcroft ]
+
+  * hv-kvp-daemon-init -- transition to linux-cloud-tools
+  * hv-kvp-daemon-init -- move to oldlibs
+  * hv-kvp-daemon-init -- allow to be satisfied by any cloud tools
+  * hv-kvp-daemon-init -- fix title and description
+
+  [ Tim Gardner ]
+
+  * linux ABI 3.13.0-20
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 27 Mar 2014 19:23:52 -0600
+
+linux-meta (3.13.0.19.23) trusty; urgency=low
+
+  * linux ABI 3.13.0-19
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Fri, 21 Mar 2014 08:23:02 -0600
+
+linux-meta (3.13.0.18.22) trusty; urgency=low
+
+  * linux ABI 3.13.0-18
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 17 Mar 2014 14:51:53 -0600
+
+linux-meta (3.13.0.17.21) trusty; urgency=low
+
+  * linux ABI 3.13.0-17
+
+ -- Andy Whitcroft <apw@canonical.com>  Tue, 11 Mar 2014 09:14:40 +0000
+
+linux-meta (3.13.0.16.20) trusty; urgency=low
+
+  * linux ABI 3.13.0-16
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 04 Mar 2014 16:00:58 -0700
+
+linux-meta (3.13.0.15.19) trusty; urgency=low
+
+  * linux ABI 3.13.0-15
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 03 Mar 2014 08:54:07 -0700
+
+linux-meta (3.13.0.14.18) trusty; urgency=low
+
+  * linux ABI 3.13.0-14
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 27 Feb 2014 15:33:28 -0700
+
+linux-meta (3.13.0.13.17) trusty; urgency=low
+
+  * linux ABI 3.13.0-13
+
+ -- Andy Whitcroft <apw@canonical.com>  Tue, 25 Feb 2014 18:17:13 +0000
+
+linux-meta (3.13.0.12.16) trusty; urgency=low
+
+  * linux ABI 3.13.0-12
+
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 21 Feb 2014 17:44:20 +0000
+
+linux-meta (3.13.0.11.15) trusty; urgency=medium
+
+  * linux ABI 3.13.0-11
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 19 Feb 2014 12:55:46 -0700
+
+linux-meta (3.13.0.10.14) trusty; urgency=low
+
+  * linux ABI 3.13.0-10
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 18 Feb 2014 16:04:38 -0700
+
+linux-meta (3.13.0.9.13) trusty; urgency=low
+
+  * linux ABI 3.13.0-9
+
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 14 Feb 2014 15:47:07 +0000
+
+linux-meta (3.13.0.8.12) trusty; urgency=low
+
+  * linux ABI 3.13.0-8
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 06 Feb 2014 18:59:51 -0700
+
+linux-meta (3.13.0.7.11) trusty; urgency=low
+
+  * linux ABI 3.13.0-7
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 03 Feb 2014 14:18:10 -0700
+
+linux-meta (3.13.0.6.10) trusty; urgency=low
+
+  * linux ABI 3.13.0-6
+  * Add powerpc meta packages.
+  * Add lowlatency meta packages.
+
+ -- Andy Whitcroft <apw@canonical.com>  Thu, 30 Jan 2014 16:55:34 +0000
+
+linux-meta (3.13.0.5.9) trusty; urgency=low
+
+  * linux ABI 3.13.0-5
+
+ -- Andy Whitcroft <apw@canonical.com>  Mon, 20 Jan 2014 18:47:04 +0000
+
+linux-meta (3.13.0.4.8) trusty; urgency=low
+
+  * The various LTS linux-tools packages should depend on
+    linux-tools-{generic,generic-lpae}, not just linux-tools which
+    is a virtual 'Provides' package.
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Fri, 17 Jan 2014 12:59:07 -0700
+
+linux-meta (3.13.0.4.7) trusty; urgency=low
+
+  * linux ABI 3.13.0-4
+  * UBUNTU: Added upgrade paths from Precise Trusty LTS
+  * UBUNTU: Added upgrade paths from Precise Saucy LTS
+  * UBUNTU: Added upgrade paths from Precise Raring LTS
+  * UBUNTU: Added upgrade paths from Precise Quantal LTS
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 16 Jan 2014 11:06:17 -0700
+
+linux-meta (3.13.0.3.6) trusty; urgency=low
+
+  * linux ABI 3.13.0-3
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 13 Jan 2014 12:07:52 -0700
+
+linux-meta (3.13.0.2.5) trusty; urgency=low
+
+  * Wack the non-flavour binary packages, we never use them and they just
+    create confusion.
+
+ -- Andy Whitcroft <apw@canonical.com>  Sat, 11 Jan 2014 13:51:52 +0000
+
+linux-meta (3.13.0.2.4) trusty; urgency=low
+
+  * linux ABI 3.13.0-2
+
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 10 Jan 2014 14:22:44 +0000
+
+linux-meta (3.13.0.1.3) trusty; urgency=low
+
+  * linux ABI 3.13.0-1
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 07 Jan 2014 12:53:27 -0700
+
+linux-meta (3.13.0.0.2) trusty; urgency=low
+
+  * Handle -extra split on ppc64el -generic.
+  * Build -virtual metapackages on ppc64el.
+  * Add ppc64el meta packages.
+
+ -- Andy Whitcroft <apw@canonical.com>  Sat, 28 Dec 2013 10:32:09 +0000
+
+linux-meta (3.13.0.0.1) trusty; urgency=low
+
+  * linux ABI 3.13.0-0
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 25 Nov 2013 12:13:38 -0700
+
+linux-meta (3.12.0.4.6) trusty; urgency=low
+
+  * linux ABI 3.12.0-4
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 21 Nov 2013 15:02:41 -0700
+
+linux-meta (3.12.0.3.5) trusty; urgency=low
+
+  * linux ABI 3.12.0-3
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 18 Nov 2013 14:17:40 -0700
+
+linux-meta (3.12.0.2.4) trusty; urgency=low
+
+  * linux ABI 3.12.0-2
+
+ -- Andy Whitcroft <apw@canonical.com>  Wed, 06 Nov 2013 22:07:14 +0000
+
+linux-meta (3.12.0.1.3) trusty; urgency=low
+
+  * Add arm64 -generic.
+
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 01 Nov 2013 12:07:45 -0700
+
+linux-meta (3.12.0.1.2) trusty; urgency=low
+
+  * linux ABI 3.12.0-1
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 29 Oct 2013 12:42:28 -0600
+
+linux-meta (3.12.0.0.1) trusty; urgency=low
+
+  * linux ABI 3.12.0-0
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Fri, 18 Oct 2013 12:49:24 -0600
+

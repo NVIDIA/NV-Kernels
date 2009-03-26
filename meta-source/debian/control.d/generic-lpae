@@ -1,0 +1,37 @@
+Package: linux-headers-generic-lpae
+Architecture: armhf
+Section: kernel
+Priority: optional
+Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-generic-lpae
+Description: Generic Linux kernel headers
+ This package will always depend on the latest generic-lpae kernel headers
+ available.
+
+Package: linux-image-generic-lpae
+Architecture: armhf
+Section: kernel
+Priority: optional
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic-lpae, linux-firmware, thermald [i386 amd64]
+Description: Generic Linux kernel image
+ This package will always depend on the latest generic-lpae kernel image
+ available.
+
+Package: linux-tools-generic-lpae
+Architecture: armhf
+Section: kernel
+Priority: optional
+Provides: linux-tools
+Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-generic-lpae
+Description: Generic Linux kernel tools
+ This package will always depend on the latest generic-lpae kernel tools
+ available.
+
+Package: linux-generic-lpae
+Architecture: armhf
+Section: kernel
+Priority: optional
+Depends: ${misc:Depends}, linux-image-generic-lpae (= ${binary:Version}), linux-headers-generic-lpae (= ${binary:Version})
+Description: Complete Generic Linux kernel and headers
+ This package will always depend on the latest complete generic-lpae Linux kernel
+ and headers.
+

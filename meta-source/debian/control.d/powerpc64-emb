@@ -1,0 +1,37 @@
+Package: linux-headers-powerpc64-emb
+Architecture: powerpc
+Section: kernel
+Priority: optional
+Depends: linux-headers-${kernel-abi-version}-powerpc64-emb
+Description: Linux kernel headers on PowerPC64 Embedded CPUs.
+ This package will always depend on the latest kernel headers available
+ for PowerPC64 Embedded CPUs support.
+
+Package: linux-image-powerpc64-emb
+Architecture: powerpc
+Section: kernel
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-powerpc64-emb, linux-firmware
+Description: Linux kernel image on PowerPC64 Embedded CPUs.
+ This package will always depend on the latest kernel image available
+ for PowerPC64 Embedded CPUs support.
+
+Package: linux-tools-powerpc64-emb
+Architecture: powerpc
+Section: kernel
+Priority: optional
+Provides: linux-tools
+Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-powerpc64-emb
+Description: Linux kernel tools for PowerPC64 Embedded CPUs.
+ This package will always depend on the PowerPC64 Embedded kernel tools
+ available.
+
+Package: linux-powerpc64-emb
+Architecture: powerpc
+Section: kernel
+Priority: optional
+Depends: linux-image-powerpc64-emb, linux-headers-powerpc64-emb
+Description: Complete Linux kernel on PowerPC64 Embedded CPUs.
+ This package will always depend on the latest complete Linux kernel and headers
+ for PowerPC64 Embedded CPUs support.
+
