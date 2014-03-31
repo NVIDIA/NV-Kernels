@@ -9307,7 +9307,7 @@ int kvm_arch_init(void *opaque)
 		return -EOPNOTSUPP;
 	}
 	if (ops->disabled_by_bios()) {
-		pr_err_ratelimited("kvm: support for '%s' disabled by bios\n",
+		pr_warn_ratelimited("kvm: support for '%s' disabled by bios\n",
 				   ops->runtime_ops->name);
 		return -EOPNOTSUPP;
 	}
