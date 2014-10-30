@@ -11,7 +11,8 @@ Package: linux-image-lowlatency
 Architecture: i386 amd64
 Section: kernel
 Priority: optional
-Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware, thermald [i386 amd64]
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware
+Recommends: thermald [i386 amd64]
 Description: lowlatency Linux kernel image
  This package will always depend on the latest lowlatency kernel image
  available.

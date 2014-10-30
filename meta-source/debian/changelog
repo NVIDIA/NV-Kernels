@@ -1,3 +1,12 @@
+linux-meta (3.18.0.1.2) UNRELEASED; urgency=low
+
+  [ Andy Whitcroft ]
+
+  * downgrade thermald to a Recommends: so that it can be removed when
+    it is not needed.  (LP: #1387144)
+
+ -- Andy Whitcroft <apw@canonical.com>  Thu, 30 Oct 2014 11:37:25 +0000
+
 linux-meta (3.18.0.1.1) vivid; urgency=medium
 
   * linux ABI 3.18.0-1

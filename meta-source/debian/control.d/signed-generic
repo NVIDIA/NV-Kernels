@@ -2,7 +2,8 @@ Package: linux-signed-image-generic
 Architecture: amd64
 Section: kernel
 Priority: optional
-Depends: ${misc:Depends}, linux-signed-image-${kernel-abi-version}-generic, linux-firmware, thermald [i386 amd64]
+Depends: ${misc:Depends}, linux-signed-image-${kernel-abi-version}-generic, linux-firmware
+Recommends: thermald [i386 amd64]
 Description: Signed Generic Linux kernel image
  This package will always depend on the latest generic kernel image
  available.  Signed with the Ubuntu EFI key.
