@@ -1,4 +1,6 @@
-linux-meta (3.18.0.1.2) UNRELEASED; urgency=low
+linux-meta (3.18.0.2.2) vivid; urgency=low
+
+  * linux ABI 3.18.0-2
 
   [ Andy Whitcroft ]
 
