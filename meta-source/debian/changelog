@@ -1,3 +1,15 @@
+linux-meta (3.18.0.11.11) vivid; urgency=low
+
+  [ Kamal Mostafa ]
+
+  * [Packaging] force "dpkg-source -I -i" behavior
+
+  [ Leann Ogasawara ]
+
+  * linux ABI 3.18.0-11
+
+ -- Leann Ogasawara <leann.ogasawara@canonical.com>  Fri, 23 Jan 2015 13:13:46 -0800
+
 linux-meta (3.18.0.10.10) vivid; urgency=low
 
   * linux ABI 3.18.0-10
