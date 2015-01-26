@@ -1,3 +1,15 @@
+linux-meta (3.19.0.3.2) vivid; urgency=low
+
+  [ Kamal Mostafa ]
+
+  * [Packaging] force "dpkg-source -I -i" behavior
+
+  [ Andy Whitcroft]
+
+  * linux ABI 3.19.0-3
+
+ -- Andy Whitcroft <apw@canonical.com>  Mon, 26 Jan 2015 12:02:06 +0000
+
 linux-meta (3.19.0.2.1) vivid; urgency=low
 
   * linux ABI 3.19.0-2
