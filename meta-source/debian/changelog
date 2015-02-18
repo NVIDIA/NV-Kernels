@@ -1,3 +1,9 @@
+linux-meta (3.18.0.14.14) vivid; urgency=low
+
+  * linux ABI 3.18.0-14
+
+ -- Leann Ogasawara <leann.ogasawara@canonical.com>  Tue, 17 Feb 2015 19:43:48 -0800
+
 linux-meta (3.18.0.13.13) vivid; urgency=low
 
   * linux ABI 3.18.0-13
