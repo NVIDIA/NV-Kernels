@@ -1,3 +1,9 @@
+linux-meta (3.19.0.7.6) vivid; urgency=low
+
+  * linux ABI 3.19.0-7
+
+ -- Andy Whitcroft <apw@canonical.com>  Thu, 26 Feb 2015 20:42:56 +0000
+
 linux-meta (3.19.0.6.5) vivid; urgency=low
 
   * linux ABI 3.19.0-6
