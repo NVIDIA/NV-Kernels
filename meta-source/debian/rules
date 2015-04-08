@@ -7,7 +7,12 @@
 # Copyright (c) 2004 Jens Schmalzing <jensen@debian.org>
 #
 
-RELEASE_NAME=saucy
+# Pull out the source suffix, we intend to maintain an -lts-<series> suffix
+# but otherwise assume this main packages are not intended to have a suffix
+# so that linux-meta and linux-meta-ti-omap4 will behave normally, but
+# linux-meta-lts-vivid will add the series suffix.
+SOURCE=$(shell dpkg-parsechangelog | sed -ne 's/^Source: *//p')
+SUFFIX=$(shell dpkg-parsechangelog | sed -ne 's/^Source: *linux-meta-lts/-lts/p')
 
 # 5 digit versions (2.6.38.<abi>.<upload>, 3 digit kernel base versions (2.6.38)
 KERNEL_VERSION=$(shell dpkg-parsechangelog | grep ^Version | sed -e \
@@ -43,7 +48,10 @@ clean: debian/control
 debian/control: $(control_files)
 	rm -f debian/control.tmp
 	for i in $^; do \
-		sed 's/RELEASE_NAME/$(RELEASE_NAME)/g' $$i >> debian/control.tmp; \
+		sed \
+			-e 's/\(^Source: *\).*/\1$(SOURCE)/' \
+			-e 's/\(^Package:.*\)/\1$(SUFFIX)/' \
+			$$i >> debian/control.tmp; \
 		echo >> debian/control.tmp; \
 	done
 	rm -f $@
