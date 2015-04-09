@@ -1,3 +1,12 @@
+linux-meta (3.19.0.13.12) vivid; urgency=low
+
+  [ Andy Whitcroft ]
+
+  * rejig so we correctly link to our own packages
+  * make the meta-source trivially backportable
+
+ -- Leann Ogasawara <leann.ogasawara@canonical.com>  Thu, 09 Apr 2015 07:46:50 -0700
+
 linux-meta (3.19.0.12.11) vivid; urgency=low
 
   * linux ABI 3.29.0-12
