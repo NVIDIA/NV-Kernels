@@ -1,4 +1,4 @@
-Package: linux-headers-powerpc-e500mc
+Package: linux-headers-powerpc-e500mc@SUFFIX@
 Architecture: powerpc
 Section: kernel
 Priority: optional
@@ -7,7 +7,7 @@ Description: Linux kernel headers on Freescale Power e500mc.
  This package will always depend on the latest kernel headers available
  for Freescale Power e500mc support.
 
-Package: linux-image-powerpc-e500mc
+Package: linux-image-powerpc-e500mc@SUFFIX@
 Architecture: powerpc
 Section: kernel
 Priority: optional
@@ -16,7 +16,7 @@ Description: Linux kernel image on Freescale Power e500mc.
  This package will always depend on the latest kernel image available
  for Freescale Power e500mc support.
 
-Package: linux-tools-powerpc-e500mc
+Package: linux-tools-powerpc-e500mc@SUFFIX@
 Architecture: powerpc
 Section: kernel
 Priority: optional
@@ -26,11 +26,11 @@ Description: Linux kernel tools for Freescale Power e500mc.
  This package will always depend on the latest e500mc kernel tools
  available.
 
-Package: linux-powerpc-e500mc
+Package: linux-powerpc-e500mc@SUFFIX@
 Architecture: powerpc
 Section: kernel
 Priority: optional
-Depends: linux-image-powerpc-e500mc, linux-headers-powerpc-e500mc
+Depends: linux-image-powerpc-e500mc@SUFFIX@, linux-headers-powerpc-e500mc@SUFFIX@
 Description: Complete Linux kernel on Freescale Power e500mc.
  This package will always depend on the latest complete Linux kernel and headers
  for Freescale Power e500mc support.

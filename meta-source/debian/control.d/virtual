@@ -1,12 +1,12 @@
-Package: linux-headers-virtual
+Package: linux-headers-virtual@SUFFIX@
 Architecture: i386 amd64 ppc64el
 Section: kernel
 Priority: optional
-Depends: ${misc:Depends}, linux-headers-generic (= ${binary:Version})
+Depends: ${misc:Depends}, linux-headers-generic@SUFFIX@ (= ${binary:Version})
 Description: Transitional package.
  This package will always depend on linux-headers-generic.
 
-Package: linux-image-virtual
+Package: linux-image-virtual@SUFFIX@
 Architecture: i386 amd64 ppc64el
 Section: kernel
 Priority: optional
@@ -15,7 +15,7 @@ Description: This package will always depend on the latest minimal generic kerne
  This package will always depend on the latest minimal generic kernel image
  used for virtual instances.
 
-Package: linux-tools-virtual
+Package: linux-tools-virtual@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
 Priority: optional
@@ -25,7 +25,7 @@ Description: This package will always depend on the latest minimal generic kerne
  This package will always depend on the latest minimal generic kernel tools
  used for virtual instances.
 
-Package: linux-cloud-tools-virtual
+Package: linux-cloud-tools-virtual@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
 Priority: optional
@@ -35,19 +35,19 @@ Description: This package will always depend on the latest minimal generic kerne
  This package will always depend on the latest minimal generic kernel cloud tools
  used for virtual instances.
 
-Package: linux-virtual
+Package: linux-virtual@SUFFIX@
 Architecture: i386 amd64 ppc64el
 Section: kernel
 Priority: optional
-Depends: ${misc:Depends}, linux-image-virtual (= ${binary:Version}), linux-headers-virtual (= ${binary:Version})
+Depends: ${misc:Depends}, linux-image-virtual@SUFFIX@ (= ${binary:Version}), linux-headers-virtual@SUFFIX@ (= ${binary:Version})
 Description: Minimal Generic Linux kernel and headers
  This package will always depend on linux-image-virtual and
  linux-headers-virtual.
 
-Package: linux-image-extra-virtual
+Package: linux-image-extra-virtual@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
 Priority: optional
-Depends: ${misc:Depends}, linux-image-generic (= ${binary:Version})
+Depends: ${misc:Depends}, linux-image-generic@SUFFIX@ (= ${binary:Version})
 Description: Transitional package.
  This package will always depend on linux-image-generic.

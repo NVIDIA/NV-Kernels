@@ -1,4 +1,4 @@
-Package: linux-headers-lowlatency
+Package: linux-headers-lowlatency@SUFFIX@
 Architecture: i386 amd64
 Section: devel
 Priority: optional
@@ -7,7 +7,7 @@ Description: lowlatency Linux kernel headers
  This package will always depend on the latest lowlatency kernel headers
  available.
 
-Package: linux-image-lowlatency
+Package: linux-image-lowlatency@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
 Priority: optional
@@ -17,7 +17,7 @@ Description: lowlatency Linux kernel image
  This package will always depend on the latest lowlatency kernel image
  available.
 
-Package: linux-tools-lowlatency
+Package: linux-tools-lowlatency@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
 Priority: optional
@@ -27,7 +27,7 @@ Description: lowlatency Linux kernel tools
  This package will always depend on the latest lowlatency kernel tools
  available.
 
-Package: linux-cloud-tools-lowlatency
+Package: linux-cloud-tools-lowlatency@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
 Priority: optional
@@ -37,11 +37,11 @@ Description: lowlatency Linux kernel cloud tools
  This package will always depend on the latest lowlatency kernel cloud tools
  available.
 
-Package: linux-lowlatency
+Package: linux-lowlatency@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
 Priority: optional
-Depends: ${misc:Depends}, linux-image-lowlatency (= ${binary:Version}), linux-headers-lowlatency (= ${binary:Version})
+Depends: ${misc:Depends}, linux-image-lowlatency@SUFFIX@ (= ${binary:Version}), linux-headers-lowlatency@SUFFIX@ (= ${binary:Version})
 Description: Complete lowlatency Linux kernel
  This package will always depend on the latest complete lowlatency Linux kernel
  available.

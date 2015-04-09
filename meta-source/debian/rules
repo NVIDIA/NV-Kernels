@@ -49,8 +49,7 @@ debian/control: $(control_files)
 	rm -f debian/control.tmp
 	for i in $^; do \
 		sed \
-			-e 's/\(^Source: *\).*/\1$(SOURCE)/' \
-			-e 's/\(^Package:.*\)/\1$(SUFFIX)/' \
+			-e 's/@SUFFIX@/$(SUFFIX)/g' \
 			$$i >> debian/control.tmp; \
 		echo >> debian/control.tmp; \
 	done
