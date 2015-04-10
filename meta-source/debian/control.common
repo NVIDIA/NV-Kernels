@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Ubuntu Kernel Team <kernel-team@lists.ubuntu.com>
 Standards-Version: 3.6.1
 Build-Depends: dpkg (>= 1.13.19), debhelper (>= 5), gawk
-Vcs-Git: http://kernel.ubuntu.com/git-repos/ubuntu/ubuntu-RELEASE_NAME-meta.git
+Vcs-Git: http://kernel.ubuntu.com/git-repos/ubuntu/ubuntu-@SERIES@-meta.git
 
 Package: linux-source@SUFFIX@
 Architecture: all

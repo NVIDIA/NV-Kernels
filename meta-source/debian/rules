@@ -11,6 +11,7 @@
 # but otherwise assume this main packages are not intended to have a suffix
 # so that linux-meta and linux-meta-ti-omap4 will behave normally, but
 # linux-meta-lts-vivid will add the series suffix.
+SERIES=$(shell dpkg-parsechangelog | sed -ne 's/^Distribution: *//p' | sed -e 's/-\(security\|updates\|proposed\)$$//')
 SOURCE=$(shell dpkg-parsechangelog | sed -ne 's/^Source: *//p')
 SUFFIX=$(shell dpkg-parsechangelog | sed -ne 's/^Source: *linux-meta-lts/-lts/p')
 
@@ -49,6 +50,7 @@ debian/control: $(control_files)
 	rm -f debian/control.tmp
 	for i in $^; do \
 		sed \
+			-e 's/@SERIES@/$(SERIES)/g' \
 			-e 's/@SUFFIX@/$(SUFFIX)/g' \
 			$$i >> debian/control.tmp; \
 		echo >> debian/control.tmp; \
