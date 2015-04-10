@@ -1,3 +1,11 @@
+linux-meta (3.19.0.14.13) vivid; urgency=low
+
+  [ Andy Whitcroft ]
+
+  * future proof VCS links
+
+ -- Leann Ogasawara <leann.ogasawara@canonical.com>  Fri, 10 Apr 2015 10:40:45 -0700
+
 linux-meta (3.19.0.13.12) vivid; urgency=low
 
   [ Andy Whitcroft ]
