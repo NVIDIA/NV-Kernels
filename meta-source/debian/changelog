@@ -1,3 +1,9 @@
+linux-meta (3.19.0.16.15) vivid; urgency=medium
+
+  * linux ABI 3.29.0-16
+
+ -- Luis Henriques <luis.henriques@canonical.com>  Thu, 30 Apr 2015 12:45:15 +0100
+
 linux-meta (3.19.0.15.14) vivid; urgency=low
 
   * linux ABI 3.29.0-15
