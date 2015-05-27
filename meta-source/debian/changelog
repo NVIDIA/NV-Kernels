@@ -1,3 +1,9 @@
+linux-meta (4.0.0.1.1) wily; urgency=low
+
+  * linux ABI 4.0.0-1
+
+ -- Leann Ogasawara <leann.ogasawara@canonical.com>  Tue, 09 Jun 2015 05:33:29 -0700
+
 linux-meta (3.19.0.16.15) vivid; urgency=medium
 
   * linux ABI 3.29.0-16
