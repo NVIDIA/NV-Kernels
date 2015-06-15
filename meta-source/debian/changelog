@@ -1,3 +1,9 @@
+linux-meta (4.0.0.2.3) wily; urgency=low
+
+  * linux ABI 4.0.0-2
+
+ -- Leann Ogasawara <leann.ogasawara@canonical.com>  Mon, 15 Jun 2015 15:08:17 -0700
+
 linux-meta (4.0.0.1.2) wily; urgency=medium
 
   * Fixes ppc64el build failure, add OverlayFS V1 support.
