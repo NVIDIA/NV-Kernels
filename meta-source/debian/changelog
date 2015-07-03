@@ -1,6 +1,7 @@
-linux-meta (4.0.0.4.6) UNRELEASED; urgency=low
+linux-meta (4.0.0.4.6) wily; urgency=low
 
   * fix up Vcs-Git: to point to launchpad
+  * linux ABI 4.0.0-4
 
  -- Andy Whitcroft <apw@canonical.com>  Fri, 03 Jul 2015 16:23:39 +0100
 
