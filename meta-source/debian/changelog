@@ -1,3 +1,9 @@
+linux-meta (4.2.0.10.10) wily; urgency=medium
+
+  * linux ABI 4.2.0-10
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 10 Sep 2015 12:22:56 -0600
+
 linux-meta (4.2.0.9.9) wily; urgency=medium
 
   * linux ABI 4.2.0-9
