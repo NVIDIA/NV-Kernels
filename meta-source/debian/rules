@@ -52,6 +52,7 @@ debian/control: $(control_files)
 		sed \
 			-e 's/@SERIES@/$(SERIES)/g' \
 			-e 's/@SUFFIX@/$(SUFFIX)/g' \
+			-e 's/@kernel-abi-version@/$(KERNEL_ABI_VERSION)/g' \
 			$$i >> debian/control.tmp; \
 		echo >> debian/control.tmp; \
 	done
