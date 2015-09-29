@@ -1,5 +1,6 @@
-linux-meta (4.2.0.12.13) UNRELEASED; urgency=low
+linux-meta (4.2.0.13.13) wily; urgency=low
 
+  * linux ABI 4.2.0-13
   * add linux-signed-lowlatency packages.  (LP: #1500910)
 
  -- Andy Whitcroft <apw@canonical.com>  Tue, 29 Sep 2015 15:58:35 +0100
