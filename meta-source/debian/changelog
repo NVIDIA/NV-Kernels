@@ -1,3 +1,10 @@
+linux-meta (4.2.0.13.14) UNRELEASED; urgency=low
+
+  * move linux-signed linux-image-extra-* dependencies over to linux-meta.
+    (LP: #1501235)
+
+ -- Andy Whitcroft <apw@canonical.com>  Wed, 30 Sep 2015 09:58:31 +0100
+
 linux-meta (4.2.0.13.13) wily; urgency=low
 
   * linux ABI 4.2.0-13
