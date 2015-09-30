@@ -1,4 +1,4 @@
-linux-meta (4.2.0.13.14) UNRELEASED; urgency=low
+linux-meta (4.2.0.13.14) wily; urgency=low
 
   * move linux-signed linux-image-extra-* dependencies over to linux-meta.
     (LP: #1501235)
