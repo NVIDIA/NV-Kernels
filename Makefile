@@ -16,7 +16,7 @@ all: source
 source: clean
 	ln -s meta-source $(META_NAME)-$(META_VERSION)
 	cd $(META_NAME)-$(META_VERSION); \
-	dpkg-buildpackage -S -sa -rfakeroot -I.git -I.gitignore -i'\.git.*' -v$(LAST_VERSION)
+	dpkg-buildpackage -d -S -sa -rfakeroot -I.git -I.gitignore -i'\.git.*' -v$(LAST_VERSION)
 
 binary: clean
 	ln -s meta-source $(META_NAME)-$(META_VERSION)
