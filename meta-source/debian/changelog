@@ -1,3 +1,10 @@
+linux-meta (4.2.0.14.15) wily; urgency=medium
+
+  * linux ABI 4.2.0-14
+  * Makefile: ignore dependencies when building the package
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 01 Oct 2015 12:07:00 -0600
+
 linux-meta (4.2.0.13.14) wily; urgency=low
 
   * move linux-signed linux-image-extra-* dependencies over to linux-meta.
