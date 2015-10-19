@@ -1,4 +1,4 @@
-linux-meta (4.2.0.16.18) UNRELEASED; urgency=low
+linux-meta (4.2.0.16.18) wily; urgency=low
 
   * temporarily add virtualbox-guest-modules [i386 amd64 x32] provides
     to fix vbox installs.  (See LP: 1507588)
