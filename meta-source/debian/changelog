@@ -1,3 +1,10 @@
+linux-meta (4.2.0.16.19) UNRELEASED; urgency=low
+
+  * Revert temporary addition of virtualbox-guest-modules [i386 amd64
+    x32] provides.  (LP: #1507588)
+
+ -- Andy Whitcroft <apw@canonical.com>  Mon, 19 Oct 2015 15:36:32 +0100
+
 linux-meta (4.2.0.16.18) wily; urgency=low
 
   * temporarily add virtualbox-guest-modules [i386 amd64 x32] provides

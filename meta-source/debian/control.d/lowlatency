@@ -12,7 +12,6 @@ Architecture: i386 amd64
 Section: kernel
 Priority: optional
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware
-Provides: virtualbox-guest-modules [i386 amd64 x32]
 Recommends: thermald [i386 amd64]
 Description: lowlatency Linux kernel image
  This package will always depend on the latest lowlatency kernel image
