@@ -1,3 +1,9 @@
+linux-meta (4.4.0.0.2) UNRELEASED; urgency=low
+
+  * s390x: add s390x to -generic and -virtual.
+
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 18 Dec 2015 11:21:14 +0000
+
 linux-meta (4.4.0.0.1) xenial; urgency=medium
 
   * linux ABI 4.4.0-0
