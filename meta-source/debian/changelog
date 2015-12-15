@@ -1,6 +1,7 @@
 linux-meta (4.4.0.0.2) UNRELEASED; urgency=low
 
   * s390x: add s390x to -generic and -virtual.
+  * s390x: add s390x to build dependancies to hold off testing.
 
  -- Andy Whitcroft <apw@canonical.com>  Fri, 18 Dec 2015 11:21:14 +0000
 
