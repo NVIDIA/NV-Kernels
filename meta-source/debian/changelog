@@ -1,4 +1,4 @@
-linux-meta (4.4.0.0.2) UNRELEASED; urgency=low
+linux-meta (4.4.0.0.2) xenial; urgency=low
 
   * s390x: add s390x to -generic and -virtual.
   * s390x: add s390x to build dependancies to hold off testing.
