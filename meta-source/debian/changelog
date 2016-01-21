@@ -1,3 +1,9 @@
+linux-meta (4.4.0.1.0) xenial; urgency=medium
+
+  * linux ABI 4.4.0-1
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 21 Jan 2016 15:06:42 -0700
+
 linux-meta (4.4.0.0.2) xenial; urgency=low
 
   * s390x: add s390x to -generic and -virtual.
