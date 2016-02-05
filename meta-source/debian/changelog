@@ -1,3 +1,10 @@
+linux-meta (4.4.0.4.3) xenial; urgency=low
+
+  * linux ABI 4.4.0-4
+  * ensure we rebuild debian/control on clean
+
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 05 Feb 2016 18:04:46 +0000
+
 linux-meta (4.4.0.3.2) xenial; urgency=medium
 
   * linux ABI 4.4.0-3
