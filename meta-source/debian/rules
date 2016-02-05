@@ -59,6 +59,8 @@ debian/control: $(control_files)
 	rm -f $@
 	mv debian/control.tmp $@
 
+.PHONY: debian/control
+
 install: build
 	dh_testdir
 	dh_testroot
