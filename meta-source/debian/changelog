@@ -1,3 +1,9 @@
+linux-meta (4.4.0.5.4) xenial; urgency=medium
+
+  * * linux ABI 4.4.0-5
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 11 Feb 2016 12:15:14 -0700
+
 linux-meta (4.4.0.4.3) xenial; urgency=low
 
   * linux ABI 4.4.0-4
