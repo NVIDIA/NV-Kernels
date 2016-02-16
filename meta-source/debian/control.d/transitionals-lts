@@ -1,0 +1,1255 @@
+Package: linux-tools-lts-utopic
+Architecture: i386 amd64 armhf arm64 ppc64el powerpc
+Section: oldlibs
+Depends: linux-tools-generic [i386 amd64 armhf arm64 ppc64el], linux-tools-powerpc-smp [powerpc]
+Description: Linux kernel versioned Tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-generic-lts-utopic
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-generic
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-generic-lts-utopic
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-image-generic
+Description: Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-generic-lts-utopic
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-generic
+Description: Generic Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-generic-lts-utopic
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-generic
+Description: Generic Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-generic-lts-utopic
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-generic
+Description: Complete Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-generic-lpae-lts-utopic
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-generic-lpae
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-generic-lpae-lts-utopic
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-image-generic-lpae
+Description: Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-generic-lpae-lts-utopic
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-generic-lpae
+Description: Generic Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-generic-lpae-lts-utopic
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-generic-lpae
+Description: Complete Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-lowlatency-lts-utopic
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-lowlatency
+Description: lowlatency Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-lowlatency-lts-utopic
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-image-lowlatency
+Description: lowlatency Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-lowlatency-lts-utopic
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-lowlatency
+Description: lowlatency Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-lowlatency-lts-utopic
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-lowlatency
+Description: lowlatency Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-lowlatency-lts-utopic
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-lowlatency
+Description: Complete lowlatency Linux kernel (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc-e500mc-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc-e500mc
+Description: Linux kernel headers on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc-e500mc-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc-e500mc
+Description: Linux kernel image on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc-e500mc-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc-e500mc
+Description: Linux kernel tools for Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc-e500mc-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc-e500mc
+Description: Complete Linux kernel on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc-smp-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc-smp
+Description: Linux kernel headers on PowerPC SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc-smp-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc-smp
+Description: Linux kernel image on PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc-smp-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc-smp
+Description: Linux kernel tools for PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc-smp-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc-smp
+Description: Complete Linux kernel on PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc64-emb-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc64-emb
+Description: Linux kernel headers on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc64-emb-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc64-emb
+Description: Linux kernel image on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc64-emb-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc64-emb
+Description: Linux kernel tools for PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc64-emb-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc64-emb
+Description: Complete Linux kernel on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc64-smp-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc64-smp
+Description: Linux kernel headers on PowerPC64 SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc64-smp-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc64-smp
+Description: Linux kernel image on PowerPC64 SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc64-smp-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc64-smp
+Description: Linux kernel tools for PowerPC64 SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc64-smp-lts-utopic
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc64-smp
+Description: Complete Linux kernel on PowerPC64 SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-image-generic-lts-utopic
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-image-generic
+Description: Signed Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-generic-lts-utopic
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-generic
+Description: Complete Signed Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-virtual-lts-utopic
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-virtual
+Description: Transitional package. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-virtual-lts-utopic
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-image-virtual
+Description: This package will always depend on the latest minimal generic kernel image. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-virtual-lts-utopic
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-virtual
+Description: This package will always depend on the latest minimal generic kernel tools. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-virtual-lts-utopic
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-virtual
+Description: This package will always depend on the latest minimal generic kernel cloud tools. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-virtual-lts-utopic
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-virtual
+Description: Minimal Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-extra-virtual-lts-utopic
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-image-extra-virtual
+Description: Transitional package. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-generic-lts-vivid
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-generic
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-generic-lts-vivid
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-image-generic
+Description: Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-generic-lts-vivid
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-generic
+Description: Generic Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-generic-lts-vivid
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-generic
+Description: Generic Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-generic-lts-vivid
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-generic
+Description: Complete Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-generic-lpae-lts-vivid
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-generic-lpae
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-generic-lpae-lts-vivid
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-image-generic-lpae
+Description: Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-generic-lpae-lts-vivid
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-generic-lpae
+Description: Generic Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-generic-lpae-lts-vivid
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-generic-lpae
+Description: Complete Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-lowlatency-lts-vivid
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-lowlatency
+Description: lowlatency Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-lowlatency-lts-vivid
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-image-lowlatency
+Description: lowlatency Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-lowlatency-lts-vivid
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-lowlatency
+Description: lowlatency Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-lowlatency-lts-vivid
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-lowlatency
+Description: lowlatency Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-lowlatency-lts-vivid
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-lowlatency
+Description: Complete lowlatency Linux kernel (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc-e500mc-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc-e500mc
+Description: Linux kernel headers on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc-e500mc-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc-e500mc
+Description: Linux kernel image on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc-e500mc-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc-e500mc
+Description: Linux kernel tools for Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc-e500mc-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc-e500mc
+Description: Complete Linux kernel on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc-smp-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc-smp
+Description: Linux kernel headers on PowerPC SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc-smp-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc-smp
+Description: Linux kernel image on PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc-smp-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc-smp
+Description: Linux kernel tools for PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc-smp-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc-smp
+Description: Complete Linux kernel on PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc64-emb-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc64-emb
+Description: Linux kernel headers on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc64-emb-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc64-emb
+Description: Linux kernel image on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc64-emb-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc64-emb
+Description: Linux kernel tools for PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc64-emb-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc64-emb
+Description: Complete Linux kernel on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc64-smp-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc64-smp
+Description: Linux kernel headers on PowerPC64 SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc64-smp-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc64-smp
+Description: Linux kernel image on PowerPC64 SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc64-smp-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc64-smp
+Description: Linux kernel tools for PowerPC64 SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc64-smp-lts-vivid
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc64-smp
+Description: Complete Linux kernel on PowerPC64 SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-image-generic-lts-vivid
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-image-generic
+Description: Signed Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-generic-lts-vivid
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-generic
+Description: Complete Signed Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-virtual-lts-vivid
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-virtual
+Description: Transitional package. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-virtual-lts-vivid
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-image-virtual
+Description: This package will always depend on the latest minimal generic kernel image. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-virtual-lts-vivid
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-virtual
+Description: This package will always depend on the latest minimal generic kernel tools. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-virtual-lts-vivid
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-virtual
+Description: This package will always depend on the latest minimal generic kernel cloud tools. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-virtual-lts-vivid
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-virtual
+Description: Minimal Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-extra-virtual-lts-vivid
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-image-extra-virtual
+Description: Transitional package. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-generic-lts-wily
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-generic
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-generic-lts-wily
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-image-generic
+Description: Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-generic-lts-wily
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-generic
+Description: Generic Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-generic-lts-wily
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-generic
+Description: Generic Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-generic-lts-wily
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-generic
+Description: Complete Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-generic-lpae-lts-wily
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-generic-lpae
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-generic-lpae-lts-wily
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-image-generic-lpae
+Description: Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-generic-lpae-lts-wily
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-generic-lpae
+Description: Generic Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-generic-lpae-lts-wily
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-generic-lpae
+Description: Complete Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-lowlatency-lts-wily
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-lowlatency
+Description: lowlatency Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-lowlatency-lts-wily
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-image-lowlatency
+Description: lowlatency Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-lowlatency-lts-wily
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-lowlatency
+Description: lowlatency Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-lowlatency-lts-wily
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-lowlatency
+Description: lowlatency Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-lowlatency-lts-wily
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-lowlatency
+Description: Complete lowlatency Linux kernel (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc-e500mc-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc-e500mc
+Description: Linux kernel headers on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc-e500mc-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc-e500mc
+Description: Linux kernel image on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc-e500mc-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc-e500mc
+Description: Linux kernel tools for Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc-e500mc-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc-e500mc
+Description: Complete Linux kernel on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc-smp-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc-smp
+Description: Linux kernel headers on PowerPC SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc-smp-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc-smp
+Description: Linux kernel image on PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc-smp-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc-smp
+Description: Linux kernel tools for PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc-smp-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc-smp
+Description: Complete Linux kernel on PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc64-emb-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc64-emb
+Description: Linux kernel headers on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc64-emb-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc64-emb
+Description: Linux kernel image on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc64-emb-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc64-emb
+Description: Linux kernel tools for PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc64-emb-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc64-emb
+Description: Complete Linux kernel on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc64-smp-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc64-smp
+Description: Linux kernel headers on PowerPC64 SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc64-smp-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc64-smp
+Description: Linux kernel image on PowerPC64 SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc64-smp-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc64-smp
+Description: Linux kernel tools for PowerPC64 SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc64-smp-lts-wily
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc64-smp
+Description: Complete Linux kernel on PowerPC64 SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-image-generic-lts-wily
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-image-generic
+Description: Signed Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-generic-lts-wily
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-generic
+Description: Complete Signed Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-image-lowlatency-lts-wily
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-image-lowlatency
+Description: Signed Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-lowlatency-lts-wily
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-lowlatency
+Description: Complete Signed Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-virtual-lts-wily
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-virtual
+Description: Transitional package. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-virtual-lts-wily
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-image-virtual
+Description: This package will always depend on the latest minimal generic kernel image. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-virtual-lts-wily
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-virtual
+Description: This package will always depend on the latest minimal generic kernel tools. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-virtual-lts-wily
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-virtual
+Description: This package will always depend on the latest minimal generic kernel cloud tools. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-virtual-lts-wily
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-virtual
+Description: Minimal Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-extra-virtual-lts-wily
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-image-extra-virtual
+Description: Transitional package. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-generic-lts-xenial
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-generic
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-generic-lts-xenial
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-image-generic
+Description: Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-generic-lts-xenial
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-generic
+Description: Generic Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-generic-lts-xenial
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-generic
+Description: Generic Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-generic-lts-xenial
+Architecture: i386 amd64 armhf arm64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-generic
+Description: Complete Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-generic-lpae-lts-xenial
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-generic-lpae
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-generic-lpae-lts-xenial
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-image-generic-lpae
+Description: Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-generic-lpae-lts-xenial
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-generic-lpae
+Description: Generic Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-generic-lpae-lts-xenial
+Architecture: armhf
+Section: oldlibs
+Priority: optional
+Depends: linux-generic-lpae
+Description: Complete Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-lowlatency-lts-xenial
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-lowlatency
+Description: lowlatency Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-lowlatency-lts-xenial
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-image-lowlatency
+Description: lowlatency Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-lowlatency-lts-xenial
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-lowlatency
+Description: lowlatency Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-lowlatency-lts-xenial
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-lowlatency
+Description: lowlatency Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-lowlatency-lts-xenial
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-lowlatency
+Description: Complete lowlatency Linux kernel (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc-e500mc-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc-e500mc
+Description: Linux kernel headers on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc-e500mc-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc-e500mc
+Description: Linux kernel image on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc-e500mc-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc-e500mc
+Description: Linux kernel tools for Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc-e500mc-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc-e500mc
+Description: Complete Linux kernel on Freescale Power e500mc. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc-smp-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc-smp
+Description: Linux kernel headers on PowerPC SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc-smp-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc-smp
+Description: Linux kernel image on PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc-smp-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc-smp
+Description: Linux kernel tools for PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc-smp-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc-smp
+Description: Complete Linux kernel on PowerPC SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc64-emb-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc64-emb
+Description: Linux kernel headers on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc64-emb-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc64-emb
+Description: Linux kernel image on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc64-emb-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc64-emb
+Description: Linux kernel tools for PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc64-emb-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc64-emb
+Description: Complete Linux kernel on PowerPC64 Embedded CPUs. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-powerpc64-smp-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-powerpc64-smp
+Description: Linux kernel headers on PowerPC64 SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-powerpc64-smp-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-image-powerpc64-smp
+Description: Linux kernel image on PowerPC64 SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-powerpc64-smp-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-powerpc64-smp
+Description: Linux kernel tools for PowerPC64 SMP (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-powerpc64-smp-lts-xenial
+Architecture: powerpc
+Section: oldlibs
+Priority: optional
+Depends: linux-powerpc64-smp
+Description: Complete Linux kernel on PowerPC64 SMP. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-image-generic-lts-xenial
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-image-generic
+Description: Signed Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-generic-lts-xenial
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-generic
+Description: Complete Signed Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-image-lowlatency-lts-xenial
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-image-lowlatency
+Description: Signed Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-signed-lowlatency-lts-xenial
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-signed-lowlatency
+Description: Complete Signed Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-headers-virtual-lts-xenial
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-virtual
+Description: Transitional package. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-virtual-lts-xenial
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-image-virtual
+Description: This package will always depend on the latest minimal generic kernel image. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-tools-virtual-lts-xenial
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-virtual
+Description: This package will always depend on the latest minimal generic kernel tools. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-cloud-tools-virtual-lts-xenial
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-cloud-tools-virtual
+Description: This package will always depend on the latest minimal generic kernel cloud tools. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-virtual-lts-xenial
+Architecture: i386 amd64 ppc64el
+Section: oldlibs
+Priority: optional
+Depends: linux-virtual
+Description: Minimal Generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+
+Package: linux-image-extra-virtual-lts-xenial
+Architecture: i386 amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-image-extra-virtual
+Description: Transitional package. (dummy transitional package)
+ Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
+

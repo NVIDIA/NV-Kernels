@@ -1,3 +1,10 @@
+linux-meta (4.4.0.5.5) UNRELEASED; urgency=low
+
+  * Add 14.04 to 16.04 transitional packages (LP: #1526931):
+   - add packages for all of the lts backport packages.
+
+ -- Andy Whitcroft <apw@canonical.com>  Tue, 16 Feb 2016 13:53:23 +0000
+
 linux-meta (4.4.0.5.4) xenial; urgency=medium
 
   * * linux ABI 4.4.0-5
