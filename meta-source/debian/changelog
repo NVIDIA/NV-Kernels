@@ -1,10 +1,14 @@
-linux-meta (4.4.0.5.5) UNRELEASED; urgency=low
+linux-meta (4.4.0.6.5) xenial; urgency=low
 
+  [ Andy Whitcroft ]
   * Add 14.04 to 16.04 transitional packages (LP: #1526931):
    - add packages for the HWE auto upgrade packages.
    - add packages for all of the lts backport packages.
 
- -- Andy Whitcroft <apw@canonical.com>  Tue, 16 Feb 2016 13:53:23 +0000
+  [ Tim Gardner ]
+  * linux ABI 4.4.0-6 
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 16 Feb 2016 13:20:37 -0700
 
 linux-meta (4.4.0.5.4) xenial; urgency=medium
 
