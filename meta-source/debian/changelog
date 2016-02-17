@@ -1,4 +1,4 @@
-linux-meta (4.4.0.6.7) UNRELEASED; urgency=low
+linux-meta (4.4.0.6.7) xenial; urgency=low
 
   * Drop linux-cloud-tools-virtual for ppc64el and s390x as we actually
     do not generate those currently.
