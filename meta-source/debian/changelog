@@ -1,3 +1,10 @@
+linux-meta (4.4.0.6.7) UNRELEASED; urgency=low
+
+  * Drop linux-cloud-tools-virtual for ppc64el and s390x as we actually
+    do not generate those currently.
+
+ -- Andy Whitcroft <apw@canonical.com>  Wed, 17 Feb 2016 15:57:15 +0000
+
 linux-meta (4.4.0.6.6) xenial; urgency=low
 
   * virtual: add linux-tools-virtual, linux-cloud-tools-virtual, and
