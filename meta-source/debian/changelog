@@ -1,4 +1,4 @@
-linux-meta (4.4.0.6.6) UNRELEASED; urgency=low
+linux-meta (4.4.0.6.6) xenial; urgency=low
 
   * virtual: add linux-tools-virtual, linux-cloud-tools-virtual, and
     linux-image-extra-virtual linkage for ppc64el and s390x.
