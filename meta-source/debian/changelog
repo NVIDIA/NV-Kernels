@@ -2,6 +2,8 @@ linux-meta (4.4.0.6.6) UNRELEASED; urgency=low
 
   * virtual: add linux-tools-virtual, linux-cloud-tools-virtual, and
     linux-image-extra-virtual linkage for ppc64el and s390x.
+  * transitional packages: drop updates for transitional which were
+    uninstallable in Trusty and have no candidates in Xenial.
 
  -- Andy Whitcroft <apw@canonical.com>  Wed, 17 Feb 2016 13:45:59 +0000
 
