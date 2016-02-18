@@ -1,3 +1,9 @@
+linux-meta (4.4.0.7.8) xenial; urgency=medium
+
+  * linux ABI 4.4.0-7
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 18 Feb 2016 13:38:25 -0700
+
 linux-meta (4.4.0.6.7) xenial; urgency=low
 
   * Drop linux-cloud-tools-virtual for ppc64el and s390x as we actually
