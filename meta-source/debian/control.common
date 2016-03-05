@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: Ubuntu Kernel Team <kernel-team@lists.ubuntu.com>
 Standards-Version: 3.6.1
 Build-Depends: dpkg (>= 1.13.19), debhelper (>= 5), gawk,
+ linux-headers-@kernel-abi-version@,
  linux-headers-@kernel-abi-version@-generic [i386 amd64 armhf arm64 ppc64el s390x],
  linux-headers-@kernel-abi-version@-powerpc-smp [powerpc],
 Vcs-Git: git://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux-meta/+git/@SERIES@
