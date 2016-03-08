@@ -1,3 +1,10 @@
+linux-meta (4.4.0.12.13) xenial; urgency=medium
+
+  * linux ABI 4.4.0-12
+  * Build-Depends: on the common headers to ensure we wait for _all to build
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Tue, 08 Mar 2016 13:16:50 -0700
+
 linux-meta (4.4.0.11.12) xenial; urgency=medium
 
   * linux ABI 4.4.0-11
