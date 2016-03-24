@@ -1,6 +1,7 @@
-linux-meta (4.4.0.15.17) UNRELEASED; urgency=low
+linux-meta (4.4.0.16.17) xenial; urgency=low
 
   * add linux-crashdump to s390x and armhf.  (LP: #1560015)
+  * linux ABI 4.4.0-16
 
  -- Andy Whitcroft <apw@canonical.com>  Mon, 21 Mar 2016 12:39:08 +0000
 
