@@ -1,3 +1,9 @@
+linux-meta (4.6.0.6.1) yakkety; urgency=medium
+
+  * linux ABI 4.6.0-6
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 18 May 2016 07:18:19 -0600
+
 linux-meta (4.4.0.20.21) xenial; urgency=medium
 
   * linux ABI 4.4.0-20
