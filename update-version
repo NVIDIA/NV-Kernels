@@ -1,0 +1,85 @@
+#!/bin/bash
+
+tag_prefix="Ubuntu-"
+
+if [ "$#" -ne 1 ]; then
+	echo "Usage: $0 <linux-source-directory>" 1>&2
+	exit 1
+fi
+master_dir="$1"
+
+# Work out the master kernel version.
+if [ -f "$master_dir/debian/debian.env" ]; then
+	branch=`sed -ne 's/DEBIAN=//p' <"$master_dir/debian/debian.env"`
+	changelog="-l$branch/changelog"
+else
+	changelog=""
+fi
+master_version=`(cd "$master_dir" && LC_ALL=C dpkg-parsechangelog -S Version $changelog)`
+
+# Work out our current version taking into account closed sections.
+here_series=$( LC_ALL=C dpkg-parsechangelog -S Distribution )
+if [ "$here_series" = "UNRELEASED" ]; then
+	here_version=$( LC_ALL=C dpkg-parsechangelog -o 1 -S Version )
+	here_series=$( LC_ALL=C dpkg-parsechangelog -c 1 -S Distribution )
+else
+	here_version=$( LC_ALL=C dpkg-parsechangelog -S Version )
+fi
+
+# Ensure we have the appropriate tag.
+here_tagversion=$( echo "$tag_prefix$here_version" | sed -e 's/~/_/g' )
+count=$( git for-each-ref "refs/tags/$here_tagversion" | wc -l )
+if [ "$count" != 1 ]; then
+	echo "$0: $here_tagversion: tag not found" 1>&2
+	exit 1
+fi
+
+# We need to ensure the ABI number matches our master source.
+# extract both for comparison.
+here_abi=${here_version%.*}
+master_abi=$(echo ${master_version%.*} | sed -e 's/-/./g')
+master_abi_human=${master_version%.*}
+
+# Extract the upload number from the _previous_ upload and increment it.
+here_upload=${here_version##*.}
+here_upload=$(( $here_upload + 1 ))
+here_newversion="$master_abi.$here_upload"
+
+#echo "here_version<$here_version> here_abi<$here_abi> here_newversion<$here_newversion>"
+#echo "master_version<$master_version> master_abi<$master_abi>"
+
+# First insert any primary changes.
+marker="__CHANGELOG_FRAGMENT_MARKER__"
+dch --newversion "$here_newversion" "$marker"
+
+# Prepare the the blank changelog.
+tmp="/tmp/$$.msg"
+
+# If the parent represents an ABI bump include that.
+if dpkg --compare-versions "$here_abi" lt "$master_abi"; then
+	echo "Updated to ABI: $master_abi"
+	[ -f "$tmp" ] && echo "" >>"$tmp"
+	echo "  * Bump ABI $master_abi_human" >>"$tmp"
+fi
+
+# Format any existing commits.
+count=$( git log --oneline "$here_tagversion".. | wc -l )
+if [ "$count" != 0 ]; then
+	[ -f "$tmp" ] && echo "" >>"$tmp"
+	git log "$here_tagversion".. | "debian/scripts/misc/git-ubuntu-log" >>"$tmp"
+fi
+
+# Insert official changelog fragment.
+sed -i -e '/^  \* '"$marker"'/{
+r '"$tmp"'
+d
+}' debian/changelog
+rm -f "$tmp"
+
+# Close this changelog entry.
+dch --distribution "$here_series" --release ''
+
+# Emit final closing commands.
+echo "git commit -s -m 'UBUNTU: $tag_prefix$here_newversion' debian/changelog"
+here_tagversion=$( echo "$tag_prefix$here_newversion" | sed -e 's/~/_/g' )
+echo "git tag -s -m '$tag_prefix$here_newversion' '$here_tagversion'"
