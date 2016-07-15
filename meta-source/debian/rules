@@ -38,9 +38,6 @@ control_files := debian/control.common $(shell LC_ALL=C ls -d debian/control.d/*
 
 SHELL := sh -e
 
-build:
-	dh_testdir
-
 clean: debian/control
 	dh_testdir
 	dh_testroot
@@ -61,45 +58,35 @@ debian/control: $(control_files)
 
 .PHONY: debian/control
 
-install: build
-	dh_testdir
-	dh_testroot
-	dh_clean -k
-
 gencontrol_flags = -Vkernel-version=$(KERNEL_VERSION)
 gencontrol_flags += -Vkernel-abi-version=$(KERNEL_ABI_VERSION)
 gencontrol_flags += -Vgeneric-depends=$(GENERIC_DEP)
 
-# Build architecture-independent files here.
-binary-indep: debian/control install
+build-%:
+	:
+
+install-%: build-%
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+
+binary-arch: t=-a
+binary-indep: t=-i
+binary-%: debian/control install-%
 	dh_testdir
 	dh_testroot
 
-	dh_installdirs -i
-	dh_installdocs -i
-	dh_installchangelogs -i
-	dh_compress -i
-	dh_fixperms -i
-	dh_installdeb -i
-	dh_gencontrol -i -- $(gencontrol_flags)
-	dh_md5sums -i
-	dh_builddeb -i
+	dh_installdirs $(t)
+	dh_installdocs $(t)
+	dh_installchangelogs $(t)
+	dh_compress $(t)
+	dh_fixperms $(t)
+	dh_installdeb $(t)
+	dh_gencontrol $(t) -- $(gencontrol_flags)
+	dh_md5sums $(t)
+	dh_builddeb $(t)
 
-# Build architecture-dependent files here.
-binary-arch: debian/control install
-	dh_testdir
-	dh_testroot
-
-	dh_installdirs -s
-	dh_installdocs -s
-	dh_installchangelogs -s
-	dh_compress -s
-	dh_fixperms -s
-	dh_installdeb -s
-	dh_gencontrol -s -- $(gencontrol_flags)
-	dh_md5sums -s
-	dh_builddeb -s
-
+build: build-indep build-arch
 binary: binary-indep binary-arch
 
-.PHONY: build clean binary-indep binary-arch binary install
+.PHONY: clean
