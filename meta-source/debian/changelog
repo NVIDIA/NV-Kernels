@@ -1,3 +1,9 @@
+linux-meta (4.6.0.9.5) yakkety; urgency=low
+
+  * build-arch and build-indep are now manditory targets (LP: #1603504)
+
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 15 Jul 2016 18:09:50 +0100
+
 linux-meta (4.6.0.9.4) yakkety; urgency=low
 
   * linux ABI 4.6.0-9
