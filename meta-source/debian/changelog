@@ -1,4 +1,4 @@
-linux-meta (4.6.0.9.6) UNRELEASED; urgency=low
+linux-meta (4.6.0.9.6) yakkety; urgency=low
 
   * switch powerpc flavour from -powerpc-smp to -generic.
   * drop LTS transtional packages.
