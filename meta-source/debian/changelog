@@ -1,6 +1,7 @@
 linux-meta (4.6.0.9.6) UNRELEASED; urgency=low
 
   * switch powerpc flavour from -powerpc-smp to -generic.
+  * drop LTS transtional packages.
 
  -- Andy Whitcroft <apw@canonical.com>  Sun, 17 Jul 2016 19:35:04 +0100
 
