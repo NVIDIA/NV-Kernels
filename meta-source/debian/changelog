@@ -1,3 +1,9 @@
+linux-meta (4.6.0.9.6) UNRELEASED; urgency=low
+
+  * switch powerpc flavour from -powerpc-smp to -generic.
+
+ -- Andy Whitcroft <apw@canonical.com>  Sun, 17 Jul 2016 19:35:04 +0100
+
 linux-meta (4.6.0.9.5) yakkety; urgency=low
 
   * build-arch and build-indep are now manditory targets (LP: #1603504)
