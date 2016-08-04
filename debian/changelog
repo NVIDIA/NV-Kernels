@@ -1,3 +1,15 @@
+linux-meta (4.6.0.10.7) yakkety; urgency=medium
+
+  * Bump ABI 4.6.0-10
+
+  * ensure all items are included in changelog and standardise packaging
+    (LP: #1601954)
+    - simplify meta package packaging
+    - add git-ubuntu-log for changelog formatting
+    - add update-version to simplify updates
+
+ -- Leann Ogasawara <leann.ogasawara@canonical.com>  Thu, 04 Aug 2016 11:43:37 -0700
+
 linux-meta (4.6.0.9.6) yakkety; urgency=low
 
   * switch powerpc flavour from -powerpc-smp to -generic.
