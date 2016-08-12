@@ -1,3 +1,10 @@
+linux-meta (4.6.0.10.8) yakkety; urgency=medium
+
+  * Fix the powerpc64-smp -> generic transition and add virtual.
+  * Update to Standards-Version 3.9.8, and fix-ups where needed.
+
+ -- Adam Conrad <adconrad@ubuntu.com>  Fri, 12 Aug 2016 16:09:01 -0600
+
 linux-meta (4.6.0.10.7) yakkety; urgency=medium
 
   * Bump ABI 4.6.0-10
