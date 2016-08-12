@@ -1,31 +1,40 @@
 Package: linux-headers-powerpc-smp@SUFFIX@
 Architecture: powerpc
-Section: oldlibs
+Section: kernel
 Priority: optional
-Depends: linux-headers-generic
-Description: Linux kernel headers on PowerPC SMP (dummy transitional package)
- Transitional package for upgraded from 16.04 to 16.10 (Xenial to Yakkety)
+Depends: linux-headers-${kernel-abi-version}-powerpc-smp
+Description: Linux kernel headers on PowerPC SMP
+ This package will always depend on the latest kernel headers available
+ for PowerPC with SMP support.
+ SMP (symmetric multi-processing) is needed if you have multiple processors.
 
 Package: linux-image-powerpc-smp@SUFFIX@
 Architecture: powerpc
-Section: oldlibs
+Section: kernel
 Priority: optional
-Depends: linux-image-generic
-Description: Linux kernel image on PowerPC SMP (dummy transitional package)
- Transitional package for upgraded from 16.04 to 16.10 (Xenial to Yakkety)
+Depends: linux-image-${kernel-abi-version}-powerpc-smp, linux-firmware
+Description: Linux kernel image on PowerPC SMP.
+ This package will always depend on the latest kernel image available
+ for PowerPC with SMP support.
+ SMP (symmetric multi-processing) is needed if you have multiple processors.
 
 Package: linux-tools-powerpc-smp@SUFFIX@
 Architecture: powerpc
-Section: oldlibs
+Section: kernel
 Priority: optional
-Depends: linux-tools-powerpc
-Description: Linux kernel tools for PowerPC SMP (dummy transitional package)
- Transitional package for upgraded from 16.04 to 16.10 (Xenial to Yakkety)
+Provides: linux-tools
+Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-powerpc-smp
+Description: Linux kernel tools for PowerPC SMP.
+ This package will always depend on the latest PowerPC SMP kernel tools
+ available.
 
 Package: linux-powerpc-smp@SUFFIX@
 Architecture: powerpc
-Section: oldlibs
+Section: kernel
 Priority: optional
-Depends: linux-image-powerpc, linux-headers-powerpc
-Description: Complete Linux kernel on PowerPC SMP (dummy transitional package)
- Transitional package for upgraded from 16.04 to 16.10 (Xenial to Yakkety)
+Depends: linux-image-powerpc-smp@SUFFIX@, linux-headers-powerpc-smp@SUFFIX@
+Description: Complete Linux kernel on PowerPC SMP.
+ This package will always depend on the latest complete Linux kernel and headers
+ for PowerPC with SMP support.
+ SMP (symmetric multi-processing) is needed if you have multiple processors.
+
