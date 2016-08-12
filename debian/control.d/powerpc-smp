@@ -1,8 +1,7 @@
 Package: linux-headers-powerpc-smp@SUFFIX@
 Architecture: powerpc
 Section: kernel
-Priority: optional
-Depends: linux-headers-${kernel-abi-version}-powerpc-smp
+Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-powerpc-smp
 Description: Linux kernel headers on PowerPC SMP
  This package will always depend on the latest kernel headers available
  for PowerPC with SMP support.
@@ -11,8 +10,7 @@ Description: Linux kernel headers on PowerPC SMP
 Package: linux-image-powerpc-smp@SUFFIX@
 Architecture: powerpc
 Section: kernel
-Priority: optional
-Depends: linux-image-${kernel-abi-version}-powerpc-smp, linux-firmware
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-powerpc-smp, linux-firmware
 Description: Linux kernel image on PowerPC SMP.
  This package will always depend on the latest kernel image available
  for PowerPC with SMP support.
@@ -21,7 +19,6 @@ Description: Linux kernel image on PowerPC SMP.
 Package: linux-tools-powerpc-smp@SUFFIX@
 Architecture: powerpc
 Section: kernel
-Priority: optional
 Provides: linux-tools
 Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-powerpc-smp
 Description: Linux kernel tools for PowerPC SMP.
@@ -31,8 +28,7 @@ Description: Linux kernel tools for PowerPC SMP.
 Package: linux-powerpc-smp@SUFFIX@
 Architecture: powerpc
 Section: kernel
-Priority: optional
-Depends: linux-image-powerpc-smp@SUFFIX@, linux-headers-powerpc-smp@SUFFIX@
+Depends: ${misc:Depends}, linux-image-powerpc-smp@SUFFIX@, linux-headers-powerpc-smp@SUFFIX@
 Description: Complete Linux kernel on PowerPC SMP.
  This package will always depend on the latest complete Linux kernel and headers
  for PowerPC with SMP support.

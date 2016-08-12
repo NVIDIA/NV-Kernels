@@ -1,7 +1,6 @@
 Package: linux-signed-image-generic@SUFFIX@
 Architecture: amd64
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-signed-image-${kernel-abi-version}-generic, linux-image-extra-${kernel-abi-version}-generic, linux-firmware
 Recommends: thermald [i386 amd64]
 Description: Signed Generic Linux kernel image
@@ -11,7 +10,6 @@ Description: Signed Generic Linux kernel image
 Package: linux-signed-generic@SUFFIX@
 Architecture: amd64
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-signed-image-generic@SUFFIX@ (= ${binary:Version}), linux-headers-generic@SUFFIX@ (= ${binary:Version})
 Description: Complete Signed Generic Linux kernel and headers
  This package will always depend on the latest complete generic Linux kernel

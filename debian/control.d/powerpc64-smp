@@ -1,32 +1,28 @@
 Package: linux-headers-powerpc64-smp@SUFFIX@
 Architecture: powerpc
 Section: oldlibs
-Priority: optional
-Depends: linux-headers-generic
+Depends: ${misc:Depends}, linux-headers-generic
 Description: Linux kernel headers on PowerPC64 SMP (dummy transitional package)
  Transitional package for upgrades from 16.04 to 16.10 through 18.04.
 
 Package: linux-image-powerpc64-smp@SUFFIX@
 Architecture: powerpc
 Section: oldlibs
-Priority: optional
-Depends: linux-image-generic
+Depends: ${misc:Depends}, linux-image-generic
 Description: Linux kernel image on PowerPC64 SMP (dummy transitional package)
  Transitional package for upgrades from 16.04 to 16.10 through 18.04.
 
 Package: linux-tools-powerpc64-smp@SUFFIX@
 Architecture: powerpc
 Section: oldlibs
-Priority: optional
-Depends: linux-tools-generic
+Depends: ${misc:Depends}, linux-tools-generic
 Description: Linux kernel tools for PowerPC64 SMP (dummy transitional package)
  Transitional package for upgrades from 16.04 to 16.10 through 18.04.
 
 Package: linux-powerpc64-smp@SUFFIX@
 Architecture: powerpc
 Section: oldlibs
-Priority: optional
-Depends: linux-generic
+Depends: ${misc:Depends}, linux-generic
 Description: Complete Linux kernel on PowerPC64 SMP (dummy transitional package)
  Transitional package for upgrades from 16.04 to 16.10 through 18.04.
 

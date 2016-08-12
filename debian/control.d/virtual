@@ -1,44 +1,39 @@
 Package: linux-headers-virtual@SUFFIX@
 Architecture: i386 amd64 powerpc ppc64el s390x
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-headers-generic@SUFFIX@ (= ${binary:Version})
-Description: Transitional package.
+Description: Virtual Linux kernel headers
  This package will always depend on linux-headers-generic.
 
 Package: linux-image-virtual@SUFFIX@
 Architecture: i386 amd64 powerpc ppc64el s390x
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic
-Description: This package will always depend on the latest minimal generic kernel image.
+Description: Virtual Linux kernel image
  This package will always depend on the latest minimal generic kernel image
  used for virtual instances.
 
 Package: linux-tools-virtual@SUFFIX@
 Architecture: i386 amd64 powerpc ppc64el s390x
 Section: kernel
-Priority: optional
 Provides: linux-tools
 Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-generic
-Description: This package will always depend on the latest minimal generic kernel tools.
+Description: Virtual Linux kernel tools
  This package will always depend on the latest minimal generic kernel tools
  used for virtual instances.
 
 Package: linux-cloud-tools-virtual@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
-Priority: optional
 Provides: linux-cloud-tools
 Depends: ${misc:Depends}, linux-cloud-tools-${kernel-abi-version}-generic
-Description: This package will always depend on the latest minimal generic kernel cloud tools.
+Description: Virtual Linux kernel cloud tools
  This package will always depend on the latest minimal generic kernel cloud tools
  used for virtual instances.
 
 Package: linux-virtual@SUFFIX@
 Architecture: i386 amd64 powerpc ppc64el s390x
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-image-virtual@SUFFIX@ (= ${binary:Version}), linux-headers-virtual@SUFFIX@ (= ${binary:Version})
 Description: Minimal Generic Linux kernel and headers
  This package will always depend on linux-image-virtual and
@@ -47,7 +42,6 @@ Description: Minimal Generic Linux kernel and headers
 Package: linux-image-extra-virtual@SUFFIX@
 Architecture: i386 amd64 powerpc ppc64el s390x
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-image-generic@SUFFIX@ (= ${binary:Version})
-Description: Transitional package.
+Description: Extra drivers for Virtual Linux kernel image
  This package will always depend on linux-image-generic.

@@ -68,7 +68,7 @@ build-%:
 install-%: build-%
 	dh_testdir
 	dh_testroot
-	dh_clean -k
+	dh_prep
 
 binary-arch: t=-a
 binary-indep: t=-i

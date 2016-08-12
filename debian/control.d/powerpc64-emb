@@ -1,8 +1,7 @@
 Package: linux-headers-powerpc64-emb@SUFFIX@
 Architecture: powerpc
 Section: kernel
-Priority: optional
-Depends: linux-headers-${kernel-abi-version}-powerpc64-emb
+Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-powerpc64-emb
 Description: Linux kernel headers on PowerPC64 Embedded CPUs.
  This package will always depend on the latest kernel headers available
  for PowerPC64 Embedded CPUs support.
@@ -10,8 +9,7 @@ Description: Linux kernel headers on PowerPC64 Embedded CPUs.
 Package: linux-image-powerpc64-emb@SUFFIX@
 Architecture: powerpc
 Section: kernel
-Priority: optional
-Depends: linux-image-${kernel-abi-version}-powerpc64-emb, linux-firmware
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-powerpc64-emb, linux-firmware
 Description: Linux kernel image on PowerPC64 Embedded CPUs.
  This package will always depend on the latest kernel image available
  for PowerPC64 Embedded CPUs support.
@@ -19,7 +17,6 @@ Description: Linux kernel image on PowerPC64 Embedded CPUs.
 Package: linux-tools-powerpc64-emb@SUFFIX@
 Architecture: powerpc
 Section: kernel
-Priority: optional
 Provides: linux-tools
 Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-powerpc64-emb
 Description: Linux kernel tools for PowerPC64 Embedded CPUs.
@@ -29,8 +26,7 @@ Description: Linux kernel tools for PowerPC64 Embedded CPUs.
 Package: linux-powerpc64-emb@SUFFIX@
 Architecture: powerpc
 Section: kernel
-Priority: optional
-Depends: linux-image-powerpc64-emb@SUFFIX@, linux-headers-powerpc64-emb@SUFFIX@
+Depends: ${misc:Depends}, linux-image-powerpc64-emb@SUFFIX@, linux-headers-powerpc64-emb@SUFFIX@
 Description: Complete Linux kernel on PowerPC64 Embedded CPUs.
  This package will always depend on the latest complete Linux kernel and headers
  for PowerPC64 Embedded CPUs support.

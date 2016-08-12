@@ -1,19 +1,17 @@
 Package: linux-signed-image-lowlatency@SUFFIX@
 Architecture: amd64
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-signed-image-${kernel-abi-version}-lowlatency, linux-firmware
 Recommends: thermald [i386 amd64]
-Description: Signed Generic Linux kernel image
+Description: Signed Lowlatency Linux kernel image
  This package will always depend on the latest lowlatency kernel image
  available.  Signed with the Ubuntu EFI key.
 
 Package: linux-signed-lowlatency@SUFFIX@
 Architecture: amd64
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-signed-image-lowlatency@SUFFIX@ (= ${binary:Version}), linux-headers-lowlatency@SUFFIX@ (= ${binary:Version})
-Description: Complete Signed Generic Linux kernel and headers
+Description: Complete Signed Lowlatency Linux kernel and headers
  This package will always depend on the latest complete lowlatency Linux kernel
  and headers.  Signed with the Ubuntu EFI key.
 

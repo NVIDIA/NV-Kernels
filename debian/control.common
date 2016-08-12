@@ -2,16 +2,14 @@ Source: linux-meta@SUFFIX@
 Section: devel
 Priority: optional
 Maintainer: Ubuntu Kernel Team <kernel-team@lists.ubuntu.com>
-Standards-Version: 3.6.1
-Build-Depends: dpkg (>= 1.13.19), debhelper (>= 5), gawk,
+Standards-Version: 3.9.8
+Build-Depends: dpkg (>= 1.13.19), debhelper (>= 9), gawk,
  linux-headers-@kernel-abi-version@,
  linux-headers-@kernel-abi-version@-generic,
 Vcs-Git: git://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux-meta/+git/@SERIES@
 
 Package: linux-source@SUFFIX@
 Architecture: all
-Section: devel
-Priority: optional
 Depends: ${misc:Depends}, linux-source-${kernel-version}
 Description: Linux kernel source with Ubuntu patches
  This package will always depend on the latest Linux kernel source code
@@ -19,7 +17,6 @@ Description: Linux kernel source with Ubuntu patches
 
 Package: linux-crashdump@SUFFIX@
 Architecture: i386 amd64 armhf ppc64el s390x
-Section: devel
 Depends: ${misc:Depends}, kdump-tools, grub-pc (>= 1.96+20090611-1ubuntu2) [i386 amd64] | grub-efi-ia32 [i386 amd64] | grub-efi-amd64 [i386 amd64] | grub (>= 0.97-29ubuntu24) [i386 amd64]
 Recommends: apport
 Suggests: crash

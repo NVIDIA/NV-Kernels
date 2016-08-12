@@ -1,7 +1,6 @@
 Package: linux-headers-lowlatency@SUFFIX@
 Architecture: i386 amd64
-Section: devel
-Priority: optional
+Section: kernel
 Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-lowlatency
 Description: lowlatency Linux kernel headers
  This package will always depend on the latest lowlatency kernel headers
@@ -10,7 +9,6 @@ Description: lowlatency Linux kernel headers
 Package: linux-image-lowlatency@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware
 Recommends: thermald [i386 amd64]
 Description: lowlatency Linux kernel image
@@ -20,7 +18,6 @@ Description: lowlatency Linux kernel image
 Package: linux-tools-lowlatency@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
-Priority: optional
 Provides: linux-tools
 Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-lowlatency
 Description: lowlatency Linux kernel tools
@@ -30,7 +27,6 @@ Description: lowlatency Linux kernel tools
 Package: linux-cloud-tools-lowlatency@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
-Priority: optional
 Provides: linux-cloud-tools
 Depends: ${misc:Depends}, linux-cloud-tools-${kernel-abi-version}-lowlatency
 Description: lowlatency Linux kernel cloud tools
@@ -40,7 +36,6 @@ Description: lowlatency Linux kernel cloud tools
 Package: linux-lowlatency@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-image-lowlatency@SUFFIX@ (= ${binary:Version}), linux-headers-lowlatency@SUFFIX@ (= ${binary:Version})
 Description: Complete lowlatency Linux kernel
  This package will always depend on the latest complete lowlatency Linux kernel

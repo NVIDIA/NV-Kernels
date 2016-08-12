@@ -1,31 +1,27 @@
 Package: linux-image-hwe-generic-trusty
 Architecture: i386 amd64 armhf arm64 ppc64el
 Section: oldlibs
-Priority: optional
-Depends: linux-image-generic
+Depends: ${misc:Depends}, linux-image-generic
 Description: Depends on the generic hardware enablement kernel image (dummy transitional package)
  Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
 
 Package: linux-hwe-generic-trusty
 Architecture: i386 amd64 armhf arm64 ppc64el
 Section: oldlibs
-Priority: optional
-Depends: linux-generic
+Depends: ${misc:Depends}, linux-generic
 Description: Depends on the generic hardware enablement kernel image and headers (dummy transitional packages)
  Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
 
 Package: linux-image-hwe-virtual-trusty
 Architecture: i386 amd64 ppc64el
 Section: oldlibs
-Priority: optional
-Depends: linux-image-virtual
+Depends: ${misc:Depends}, linux-image-virtual
 Description: Depends on the virtual hardware enablement kernel image (dummy transitional package)
  Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)
 
 Package: linux-hwe-virtual-trusty
 Architecture: i386 amd64 ppc64el
 Section: oldlibs
-Priority: optional
-Depends: linux-virtual
+Depends: ${misc:Depends}, linux-virtual
 Description: Depends on the virtual hardware enablement kernel image and headers (dummy transitional package)
  Transitional package for upgrades from 14.04 to 16.04 (Trusty to Xenial)

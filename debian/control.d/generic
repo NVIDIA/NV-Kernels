@@ -1,7 +1,6 @@
 Package: linux-headers-generic@SUFFIX@
 Architecture: i386 amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-generic
 Description: Generic Linux kernel headers
  This package will always depend on the latest generic kernel headers
@@ -10,7 +9,6 @@ Description: Generic Linux kernel headers
 Package: linux-image-generic@SUFFIX@
 Architecture: i386 amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic, linux-image-extra-${kernel-abi-version}-generic [i386 amd64 powerpc ppc64el s390x], linux-firmware
 Recommends: thermald [i386 amd64]
 Description: Generic Linux kernel image
@@ -20,7 +18,6 @@ Description: Generic Linux kernel image
 Package: linux-tools-generic@SUFFIX@
 Architecture: i386 amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
-Priority: optional
 Provides: linux-tools
 Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-generic
 Description: Generic Linux kernel tools
@@ -30,7 +27,6 @@ Description: Generic Linux kernel tools
 Package: linux-cloud-tools-generic@SUFFIX@
 Architecture: i386 amd64
 Section: kernel
-Priority: optional
 Provides: linux-cloud-tools
 Depends: ${misc:Depends}, linux-cloud-tools-${kernel-abi-version}-generic
 Description: Generic Linux kernel cloud tools
@@ -40,7 +36,6 @@ Description: Generic Linux kernel cloud tools
 Package: linux-generic@SUFFIX@
 Architecture: i386 amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
-Priority: optional
 Depends: ${misc:Depends}, linux-image-generic@SUFFIX@ (= ${binary:Version}), linux-headers-generic@SUFFIX@ (= ${binary:Version})
 Description: Complete Generic Linux kernel and headers
  This package will always depend on the latest complete generic Linux kernel
