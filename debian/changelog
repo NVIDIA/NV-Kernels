@@ -1,3 +1,9 @@
+linux-meta (4.8.0.2.9) yakkety; urgency=medium
+
+  * Bump ABI 4.8.0-2
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 17 Aug 2016 12:41:57 -0600
+
 linux-meta (4.6.0.10.8) yakkety; urgency=medium
 
   * Fix the powerpc64-smp -> generic transition and add virtual.
