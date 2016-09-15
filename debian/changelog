@@ -1,3 +1,9 @@
+linux-meta (4.8.0.9.16) yakkety; urgency=medium
+
+  * Bump ABI 4.8.0-9
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 14 Sep 2016 21:27:11 -0600
+
 linux-meta (4.8.0.8.15) yakkety; urgency=medium
 
   * Bump ABI 4.8.0-8
