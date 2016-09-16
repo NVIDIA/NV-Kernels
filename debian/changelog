@@ -1,3 +1,10 @@
+linux-meta (4.8.0.10.19) yakkety; urgency=medium
+
+  * Miscellaneous Ubuntu changes
+    - armhf does not have -extra split
+
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 16 Sep 2016 19:09:06 +0100
+
 linux-meta (4.8.0.10.18) yakkety; urgency=medium
 
   * Miscellaneous Ubuntu changes
