@@ -1,3 +1,10 @@
+linux-meta (4.8.0.16.26) yakkety; urgency=medium
+
+  * linux-virtual flavour missing for arm64 in yakkety (LP: #1626868)
+    - arm64 -- add virtual flavour
+
+ -- Andy Whitcroft <apw@canonical.com>  Fri, 23 Sep 2016 09:00:24 +0100
+
 linux-meta (4.8.0.16.25) yakkety; urgency=medium
 
   * Bump ABI 4.8.0-16
