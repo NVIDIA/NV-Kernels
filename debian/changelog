@@ -1,3 +1,9 @@
+linux-meta (4.8.0.17.27) yakkety; urgency=medium
+
+  * Bump ABI 4.8.0-17
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Sun, 25 Sep 2016 21:05:21 -0600
+
 linux-meta (4.8.0.16.26) yakkety; urgency=medium
 
   * linux-virtual flavour missing for arm64 in yakkety (LP: #1626868)
