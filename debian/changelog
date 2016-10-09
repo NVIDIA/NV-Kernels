@@ -1,3 +1,9 @@
+linux-meta (4.8.0.22.31) yakkety; urgency=medium
+
+  * Bump ABI 4.8.0-22
+
+ -- Andy Whitcroft <apw@canonical.com>  Sun, 09 Oct 2016 10:49:55 +0100
+
 linux-meta (4.8.0.21.30) yakkety; urgency=medium
 
   * Bump ABI 4.8.0-21
