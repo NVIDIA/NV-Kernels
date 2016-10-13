@@ -1,3 +1,9 @@
+linux-meta (4.8.0.25.34) yakkety; urgency=medium
+
+  * Bump ABI 4.8.0-25
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Wed, 12 Oct 2016 22:09:09 -0500
+
 linux-meta (4.8.0.24.33) yakkety; urgency=medium
 
   * Bump ABI 4.8.0-24
