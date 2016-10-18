@@ -1,3 +1,9 @@
+linux-meta (4.8.0.26.35) yakkety; urgency=medium
+
+  * Bump ABI 4.8.0-26
+
+ -- Stefan Bader <stefan.bader@canonical.com>  Tue, 18 Oct 2016 12:54:57 +0000
+
 linux-meta (4.8.0.25.34) yakkety; urgency=medium
 
   * Bump ABI 4.8.0-25
