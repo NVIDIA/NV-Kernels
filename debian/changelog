@@ -1,3 +1,9 @@
+linux-meta (4.9.0.4.7) zesty; urgency=medium
+
+  * Bump ABI 4.9.0-4
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Wed, 30 Nov 2016 13:45:24 -0700
+
 linux-meta (4.9.0.3.6) zesty; urgency=medium
 
   * UBUNTU: Drop powerpc64-emb pending build fixes 
