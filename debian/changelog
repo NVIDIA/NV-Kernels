@@ -1,3 +1,9 @@
+linux-meta (4.9.0.11.15) zesty; urgency=medium
+
+  * Bump ABI 4.9.0-11
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Mon, 12 Dec 2016 09:08:09 -0700
+
 linux-meta (4.9.0.10.14) zesty; urgency=medium
 
   * Fixed the kernel FTBS, so reenable powerpc64-emb 
