@@ -1,3 +1,9 @@
+linux-meta (4.10.0.3.4) zesty; urgency=medium
+
+  * Bump ABI 4.10.0-3
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Mon, 23 Jan 2017 15:51:34 -0600
+
 linux-meta (4.10.0.2.3) zesty; urgency=medium
 
   * Bump ABI 4.10.0-2
