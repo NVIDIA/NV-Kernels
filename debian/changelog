@@ -1,3 +1,12 @@
+linux-meta (4.10.0.5.6) zesty; urgency=medium
+
+  * Bump ABI 4.10.0-5
+
+  * Miscellaneous Ubuntu changes
+    - Drop powerpc flavors
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Wed, 01 Feb 2017 12:32:53 -0600
+
 linux-meta (4.10.0.4.5) zesty; urgency=medium
 
   * Bump ABI 4.10.0-4
