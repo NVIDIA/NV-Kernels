@@ -1,3 +1,9 @@
+linux-meta (4.10.0.8.10) zesty; urgency=medium
+
+  * Restored powerpc. 
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 16 Feb 2017 05:53:59 -0700
+
 linux-meta (4.10.0.8.9) zesty; urgency=medium
 
   * Bump ABI 4.10.0-8
