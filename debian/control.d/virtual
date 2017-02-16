@@ -1,12 +1,12 @@
 Package: linux-headers-virtual@SUFFIX@
-Architecture: i386 amd64 arm64 ppc64el s390x
+Architecture: i386 amd64 arm64 powerpc ppc64el s390x
 Section: kernel
 Depends: ${misc:Depends}, linux-headers-generic@SUFFIX@ (= ${binary:Version})
 Description: Virtual Linux kernel headers
  This package will always depend on linux-headers-generic.
 
 Package: linux-image-virtual@SUFFIX@
-Architecture: i386 amd64 arm64 ppc64el s390x
+Architecture: i386 amd64 arm64 powerpc ppc64el s390x
 Section: kernel
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic
 Description: Virtual Linux kernel image
@@ -14,7 +14,7 @@ Description: Virtual Linux kernel image
  used for virtual instances.
 
 Package: linux-tools-virtual@SUFFIX@
-Architecture: i386 amd64 arm64 ppc64el s390x
+Architecture: i386 amd64 arm64 powerpc ppc64el s390x
 Section: kernel
 Provides: linux-tools
 Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-generic
@@ -32,7 +32,7 @@ Description: Virtual Linux kernel cloud tools
  used for virtual instances.
 
 Package: linux-virtual@SUFFIX@
-Architecture: i386 amd64 arm64 ppc64el s390x
+Architecture: i386 amd64 arm64 powerpc ppc64el s390x
 Section: kernel
 Depends: ${misc:Depends}, linux-image-virtual@SUFFIX@ (= ${binary:Version}), linux-headers-virtual@SUFFIX@ (= ${binary:Version})
 Description: Minimal Generic Linux kernel and headers
@@ -40,7 +40,7 @@ Description: Minimal Generic Linux kernel and headers
  linux-headers-virtual.
 
 Package: linux-image-extra-virtual@SUFFIX@
-Architecture: i386 amd64 arm64 ppc64el s390x
+Architecture: i386 amd64 arm64 powerpc ppc64el s390x
 Section: kernel
 Depends: ${misc:Depends}, linux-image-generic@SUFFIX@ (= ${binary:Version})
 Description: Extra drivers for Virtual Linux kernel image
