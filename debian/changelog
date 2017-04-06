@@ -1,3 +1,9 @@
+linux-meta (4.10.0.19.21) zesty; urgency=medium
+
+  * Bump ABI 4.10.0-19
+
+ -- Tim Gardner <tim.gardner@canonical.com>  Thu, 06 Apr 2017 17:55:55 +0100
+
 linux-meta (4.10.0.18.20) zesty; urgency=medium
 
   * Bump ABI 4.10.0-18
