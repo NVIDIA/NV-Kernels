@@ -1,3 +1,9 @@
+linux-meta (4.10.0.20.22) zesty; urgency=medium
+
+  * Bump ABI 4.10.0-20
+
+ -- Stefan Bader <stefan.bader@canonical.com>  Thu, 20 Apr 2017 09:09:26 +0200
+
 linux-meta (4.10.0.19.21) zesty; urgency=medium
 
   * Bump ABI 4.10.0-19
