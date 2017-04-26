@@ -1,3 +1,9 @@
+linux-meta (4.11.0.0.0) artful; urgency=medium
+
+  * Empty stanza
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Wed, 26 Apr 2017 10:28:50 -0500
+
 linux-meta (4.10.0.20.22) zesty; urgency=medium
 
   * Bump ABI 4.10.0-20
