@@ -1,3 +1,9 @@
+linux-meta (4.12.0.7.8) artful; urgency=medium
+
+  * Bump ABI 4.12.0-7
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Fri, 14 Jul 2017 16:04:16 -0500
+
 linux-meta (4.12.0.6.7) artful; urgency=medium
 
   * Bump ABI 4.12.0-6
