@@ -1,7 +1,7 @@
 Package: linux-signed-image-lowlatency@SUFFIX@
 Architecture: amd64
 Section: kernel
-Depends: ${misc:Depends}, linux-signed-image-${kernel-abi-version}-lowlatency, linux-firmware
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware
 Recommends: thermald [i386 amd64]
 Description: Signed Lowlatency Linux kernel image
  This package will always depend on the latest lowlatency kernel image
