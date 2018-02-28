@@ -1,3 +1,9 @@
+linux-meta (4.16.0.1.2) bionic; urgency=medium
+
+  * Bump ABI 4.16.0-1
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Wed, 28 Feb 2018 10:43:47 -0600
+
 linux-meta (4.16.0.0.1) bionic; urgency=medium
 
   * Bump ABI 4.16.0-0
