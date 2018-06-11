@@ -1,3 +1,9 @@
+linux-meta (4.17.0.2.4) cosmic; urgency=medium
+
+  * Bump ABI 4.17.0-2
+
+ -- Thadeu Lima de Souza Cascardo <cascardo@canonical.com>  Mon, 11 Jun 2018 15:49:42 -0300
+
 linux-meta (4.17.0.1.3) cosmic; urgency=medium
 
   * Bump ABI 4.17.0-1
