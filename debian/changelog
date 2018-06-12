@@ -1,3 +1,14 @@
+linux-meta (4.17.0.2.5) cosmic; urgency=medium
+
+  * linux-crashdump isn't built for arm64 (LP: #1773407)
+    - Generate linux-crashdump metapackage for arm64
+
+  * need to ensure microcode updates are available to all bare-metal installs of
+    Ubuntu (LP: #1738259)
+    - Make kernel image packages depend on cpu microcode updates
+
+ -- Thadeu Lima de Souza Cascardo <cascardo@canonical.com>  Tue, 12 Jun 2018 12:12:13 -0300
+
 linux-meta (4.17.0.2.4) cosmic; urgency=medium
 
   * Bump ABI 4.17.0-2
