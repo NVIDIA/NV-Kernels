@@ -1204,9 +1204,10 @@ static struct aa_label *sk_peer_label(struct sock *sk)
 {
 	struct sock *peer_sk;
 	struct aa_sk_ctx *ctx = SK_CTX(sk);
+	struct aa_label *label = ERR_PTR(-ENOPROTOOPT);
 
 	if (ctx->peer)
-		return ctx->peer;
+		return aa_get_label(ctx->peer);
 
 	if (sk->sk_family != PF_UNIX)
 		return ERR_PTR(-ENOPROTOOPT);
@@ -1214,14 +1215,15 @@ static struct aa_label *sk_peer_label(struct sock *sk)
 	/* check for sockpair peering which does not go through
 	 * security_unix_stream_connect
 	 */
-	peer_sk = unix_peer(sk);
+	peer_sk = unix_peer_get(sk);
 	if (peer_sk) {
 		ctx = SK_CTX(peer_sk);
 		if (ctx->label)
-			return ctx->label;
+			label = aa_get_label(ctx->label);
+		sock_put(peer_sk);
 	}
 
-	return ERR_PTR(-ENOPROTOOPT);
+	return label;
 }
 
 /**
@@ -1262,6 +1264,7 @@ static int apparmor_socket_getpeersec_stream(struct socket *sock,
 done_len:
 	if (copy_to_sockptr(optlen, &slen, sizeof(slen)))
 		error = -EFAULT;
+	aa_put_label(peer);
 done:
 	end_current_label_crit_section(label);
 	kfree(name);
