@@ -16,7 +16,7 @@
 #include <linux/sizes.h>
 #include <linux/srcu.h>
 
-DECLARE_STATIC_KEY_FALSE(mpam_enabled);
+#include <asm/mpam.h>
 
 #ifdef CONFIG_MPAM_KUNIT_TEST
 #define PACKED_FOR_KUNIT __packed
