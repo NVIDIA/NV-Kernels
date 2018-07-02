@@ -16,6 +16,8 @@
 #include <linux/sizes.h>
 #include <linux/srcu.h>
 
+#include <asm/mpam.h>
+
 #define MPAM_MSC_MAX_NUM_RIS	16
 
 DECLARE_STATIC_KEY_FALSE(mpam_enabled);
