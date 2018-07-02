@@ -38,6 +38,8 @@ cpucap_is_possible(const unsigned int cap)
 		return IS_ENABLED(CONFIG_ARM64_PSEUDO_NMI);
 	case ARM64_MTE:
 		return IS_ENABLED(CONFIG_ARM64_MTE);
+	case ARM64_MPAM:
+		return IS_ENABLED(CONFIG_ARM64_MPAM);
 	case ARM64_BTI:
 		return IS_ENABLED(CONFIG_ARM64_BTI);
 	case ARM64_HAS_TLB_RANGE:
