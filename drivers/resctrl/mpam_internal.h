@@ -18,6 +18,8 @@
 #include <linux/srcu.h>
 #include <linux/types.h>
 
+#include <asm/mpam.h>
+
 #define MPAM_MSC_MAX_NUM_RIS	16
 
 
