@@ -231,7 +231,7 @@ static inline struct acpi_table_header *acpi_get_table_ret(char *signature, u32 
 		return ERR_PTR(-ENOENT);
 	return table;
 }
-DEFINE_FREE(acpi_table, struct acpi_table_header *, if (!IS_ERR(_T)) acpi_put_table(_T))
+DEFINE_FREE(acpi_table, struct acpi_table_header *, if (!IS_ERR_OR_NULL(_T)) acpi_put_table(_T))
 
 int acpi_table_parse(char *id, acpi_tbl_table_handler handler);
 int __init_or_acpilib acpi_table_parse_entries(char *id,
