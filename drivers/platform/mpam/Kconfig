@@ -1,0 +1,6 @@
+# Confusingly, this is everything but the CPU bits of MPAM. CPU here means
+# CPU resources, not containers or cgroups etc.
+config ARM_CPU_RESCTRL
+	bool
+	depends on ARM64
+	select RESCTRL_RMID_DEPENDS_ON_CLOSID
