@@ -1,0 +1,10 @@
+# Confusingly, this is everything but the CPU bits of MPAM. CPU here means
+# CPU resources, not containers or cgroups etc.
+config ARM_CPU_RESCTRL
+	bool
+	depends on ARM64
+
+config ARM64_MPAM_DRIVER_DEBUG
+	bool "Enable debug messages from the MPAM driver."
+	help
+	  Say yes here to enable debug messages from the MPAM driver.
