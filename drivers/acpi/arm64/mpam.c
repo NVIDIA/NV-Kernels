@@ -337,6 +337,13 @@ static int __init acpi_mpam_parse(void)
 	return 0;
 }
 
+/**
+ * acpi_mpam_count_msc() - Count the number of MSC described by firmware.
+ *
+ * Returns the number of of MSC, or zero for an error.
+ *
+ * This can be called before or in parallel with acpi_mpam_parse().
+ */
 int acpi_mpam_count_msc(void)
 {
 	struct acpi_table_header *table __free(acpi_table) = acpi_get_table_ret(ACPI_SIG_MPAM, 0);
