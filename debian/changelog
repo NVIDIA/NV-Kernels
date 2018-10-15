@@ -1,3 +1,9 @@
+linux-meta (4.19.0.2.3) cosmic; urgency=medium
+
+  * Bump ABI 4.19.0-2
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Mon, 15 Oct 2018 12:37:22 -0500
+
 linux-meta (4.19.0.1.2) cosmic; urgency=medium
 
   * Bump ABI 4.19.0-1
