@@ -257,6 +257,13 @@ static void early_exit_filter(struct kvm_vcpu *vcpu, u64 *exit_code)
 	}
 }
 
+/* Use the host thread's partid and pmg for world switch */
+static void __mpam_copy_el1_to_el2(void)
+{
+	if (system_supports_mpam())
+		write_sysreg_s(read_sysreg_s(SYS_MPAM1_EL1), SYS_MPAM2_EL2);
+}
+
 /* Switch to the guest for legacy non-VHE systems */
 int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 {
@@ -265,6 +272,8 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 	struct kvm_s2_mmu *mmu;
 	bool pmu_switch_needed;
 	u64 exit_code;
+
+	__mpam_copy_el1_to_el2();
 
 	/*
 	 * Having IRQs masked via PMR when entering the guest means the GIC
@@ -325,6 +334,7 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 	__timer_enable_traps(vcpu);
 
 	__debug_switch_to_guest(vcpu);
+	__mpam_guest_load();
 
 	do {
 		/* Jump in the fire! */
@@ -335,6 +345,7 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 
 	__sysreg_save_state_nvhe(guest_ctxt);
 	__sysreg32_save_state(vcpu);
+	__mpam_guest_put();
 	__timer_disable_traps(vcpu);
 	__hyp_vgic_save_state(vcpu);
 
