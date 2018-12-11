@@ -15,6 +15,7 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_hyp.h>
 #include <asm/kvm_mmu.h>
+#include <asm/mpam.h>
 
 static inline void __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
 {
@@ -241,6 +242,32 @@ static inline void __sysreg32_restore_state(struct kvm_vcpu *vcpu)
 
 	if (has_vhe() || vcpu_get_flag(vcpu, DEBUG_DIRTY))
 		write_sysreg(__vcpu_sys_reg(vcpu, DBGVCR32_EL2), dbgvcr32_el2);
+}
+
+/*
+ * The _EL0 value was written by the host's context switch, copy this into the
+ * guest's EL1.
+ */
+static inline void __mpam_guest_load(void)
+{
+	if (IS_ENABLED(CONFIG_ARM64_MPAM) && mpam_cpus_have_feature())
+		write_sysreg_el1(read_sysreg_s(SYS_MPAM0_EL1), SYS_MPAM1);
+}
+
+/*
+ * Copy the _EL2 register back to _EL1, clearing any trap bits EL2 may have set.
+ * nVHE world-switch copies the _EL1 register to _EL2. A VHE host writes to the
+ * _EL2 register as it is aliased by the hardware when TGE is set.
+ */
+static inline void __mpam_guest_put(void)
+{
+	u64 val, mask = MPAM_SYSREG_PMG_D | MPAM_SYSREG_PMG_I |
+			MPAM_SYSREG_PARTID_D | MPAM_SYSREG_PARTID_I;
+	
+	if (IS_ENABLED(CONFIG_ARM64_MPAM) && mpam_cpus_have_feature()) {
+		val = FIELD_GET(mask, read_sysreg_s(SYS_MPAM2_EL2));
+		write_sysreg_el1(val, SYS_MPAM1);
+	}
 }
 
 #endif /* __ARM64_KVM_HYP_SYSREG_SR_H__ */
