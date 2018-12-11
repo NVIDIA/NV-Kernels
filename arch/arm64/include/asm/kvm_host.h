@@ -425,6 +425,7 @@ enum vcpu_sysreg {
 	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
 	OSLSR_EL1,	/* OS Lock Status Register */
 	DISR_EL1,	/* Deferred Interrupt Status Register */
+	MPAM1_EL1,	/* Memory Parititioning And Monitoring register */
 
 	/* Performance Monitors Registers */
 	PMCR_EL0,	/* Control Register */
@@ -1544,5 +1545,18 @@ void kvm_set_vm_id_reg(struct kvm *kvm, u32 reg, u64 val);
 
 #define kvm_has_s1poe(k)				\
 	(kvm_has_feat((k), ID_AA64MMFR3_EL1, S1POE, IMP))
+
+#define kvm_has_mpam(k)				\
+	(kvm_has_feat((k), ID_AA64PFR0_EL1, MPAM, 1))
+
+static inline bool kvm_arch_has_irq_bypass(void)
+{
+	return true;
+}
+
+void compute_fgu(struct kvm *kvm, enum fgt_group_id fgt);
+void get_reg_fixed_bits(struct kvm *kvm, enum vcpu_sysreg reg, u64 *res0, u64 *res1);
+void check_feature_map(void);
+
 
 #endif /* __ARM64_KVM_HOST_H__ */
