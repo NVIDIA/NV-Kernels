@@ -1,3 +1,9 @@
+linux-meta (5.0.0.3.4) disco; urgency=medium
+
+  * Bump ABI 5.0.0-3
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Tue, 05 Feb 2019 14:30:50 -0600
+
 linux-meta (5.0.0.2.3) disco; urgency=medium
 
   * Bump ABI 5.0.0-2
