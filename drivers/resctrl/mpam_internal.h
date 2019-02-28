@@ -5,6 +5,7 @@
 #define MPAM_INTERNAL_H
 
 #include <linux/arm_mpam.h>
+#include <linux/atomic.h>
 #include <linux/bitmap.h>
 #include <linux/cpumask.h>
 #include <linux/io.h>
@@ -46,6 +47,7 @@ struct mpam_msc {
 	enum mpam_msc_iface	iface;
 	u32			nrdy_usec;
 	cpumask_t		accessibility;
+	atomic_t		online_refs;
 
 	/*
 	 * probe_lock is only taken during discovery. After discovery these
@@ -197,6 +199,7 @@ struct mpam_msc_ris {
 	u8			ris_idx;
 	u64			idr;
 	struct mpam_props	props;
+	bool			in_reset_state;
 
 	cpumask_t		affinity;
 
