@@ -157,16 +157,23 @@ static inline void mpam_mon_sel_lock_held(struct mpam_msc *msc)
  * When we compact the supported features, we don't care what they are.
  * Storing them as a bitmap makes life easy.
  */
-typedef u16 mpam_features_t;
+typedef u32 mpam_features_t;
 
 /* Bits for mpam_features_t */
 enum mpam_device_features {
-	mpam_feat_ccap_part = 0,
+	mpam_feat_cmax_softlim,
+	mpam_feat_cmax_cmax,
+	mpam_feat_cmax_cmin,
+	mpam_feat_cmax_cassoc,
 	mpam_feat_cpor_part,
 	mpam_feat_mbw_part,
 	mpam_feat_mbw_min,
 	mpam_feat_mbw_max,
 	mpam_feat_mbw_prop,
+	mpam_feat_intpri_part,
+	mpam_feat_intpri_part_0_low,
+	mpam_feat_dspri_part,
+	mpam_feat_dspri_part_0_low,
 	mpam_feat_msmon,
 	mpam_feat_msmon_csu,
 	mpam_feat_msmon_csu_capture,
@@ -176,6 +183,7 @@ enum mpam_device_features {
 	mpam_feat_msmon_mbwu_rwbw,
 	mpam_feat_msmon_mbwu_hw_nrdy,
 	mpam_feat_msmon_capt,
+	mpam_feat_partid_nrw,
 	MPAM_FEATURE_LAST,
 };
 #define MPAM_ALL_FEATURES      ((1 << MPAM_FEATURE_LAST) - 1)
@@ -186,6 +194,10 @@ struct mpam_props {
 	u16			cpbm_wd;
 	u16			mbw_pbm_bits;
 	u16			bwa_wd;
+	u16			cmax_wd;
+	u16			cassoc_wd;
+	u16			intpri_wd;
+	u16			dspri_wd;
 	u16			num_csu_mon;
 	u16			num_mbwu_mon;
 };
