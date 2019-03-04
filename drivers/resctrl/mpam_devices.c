@@ -2543,7 +2543,7 @@ static void mpam_enable_once(void)
 	       mpam_partid_max + 1, mpam_pmg_max + 1);
 }
 
-static void mpam_reset_component_locked(struct mpam_component *comp)
+void mpam_reset_component_locked(struct mpam_component *comp)
 {
 	struct mpam_vmsc *vmsc;
 
@@ -2567,7 +2567,7 @@ static void mpam_reset_component_locked(struct mpam_component *comp)
 	}
 }
 
-static void mpam_reset_class_locked(struct mpam_class *class)
+void mpam_reset_class_locked(struct mpam_class *class)
 {
 	struct mpam_component *comp;
 
@@ -2579,7 +2579,7 @@ static void mpam_reset_class_locked(struct mpam_class *class)
 		mpam_reset_component_locked(comp);
 }
 
-static void mpam_reset_class(struct mpam_class *class)
+void mpam_reset_class(struct mpam_class *class)
 {
 	cpus_read_lock();
 	mpam_reset_class_locked(class);
