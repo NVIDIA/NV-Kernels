@@ -167,6 +167,19 @@ static int mpam_resctrl_pick_domain_id(int cpu, struct mpam_component *comp)
 	}
 }
 
+void resctrl_arch_reset_all_ctrls(struct rdt_resource *r)
+{
+	struct mpam_resctrl_res *res;
+
+	lockdep_assert_cpus_held();
+
+	if (!mpam_is_enabled())
+		return;
+
+	res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+	mpam_reset_class_locked(res->class);
+}
+
 static void mpam_resctrl_domain_hdr_init(int cpu, struct mpam_component *comp,
 					 struct rdt_domain_hdr *hdr)
 {
@@ -300,6 +313,8 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 		dom = mpam_get_domain_from_cpu(cpu, res);
 		if (WARN_ON_ONCE(!dom))
 			continue;
+
+		mpam_reset_component_locked(dom->comp);
 
 		ctrl_d = &dom->resctrl_ctrl_dom;
 		ctrl_dom_empty = mpam_resctrl_offline_domain_hdr(cpu, &ctrl_d->hdr);
