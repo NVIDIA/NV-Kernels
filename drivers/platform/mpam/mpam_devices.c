@@ -2303,6 +2303,9 @@ int mpam_apply_config(struct mpam_component *comp, u16 partid,
 
 	lockdep_assert_cpus_held();
 
+	if (!memcmp(&comp->cfg[partid], cfg, sizeof(*cfg)))
+		return 0;
+
 	comp->cfg[partid] = *cfg;
 	arg.comp = comp;
 	arg.partid = partid;
