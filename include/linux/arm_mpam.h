@@ -50,4 +50,7 @@ static inline bool resctrl_arch_is_mbm_total_enabled(void)
 	return false;
 }
 
+/* reset cached configurations, then all devices */
+void resctrl_arch_reset_resources(void);
+
 #endif /* __LINUX_ARM_MPAM_H */

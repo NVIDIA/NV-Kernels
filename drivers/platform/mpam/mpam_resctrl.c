@@ -248,6 +248,33 @@ int mpam_resctrl_setup(void)
 	return err;
 }
 
+void resctrl_arch_reset_resources(void)
+{
+	int i, idx;
+	struct mpam_class *class;
+	struct mpam_resctrl_res *res;
+
+	lockdep_assert_cpus_held();
+
+	if (!mpam_is_enabled())
+		return;
+
+	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
+		res = &mpam_resctrl_exports[i];
+
+		if (!res->class)
+			continue;	// dummy resource
+
+		if (!res->resctrl_res.alloc_capable)
+			continue;
+
+		idx = srcu_read_lock(&mpam_srcu);
+		list_for_each_entry_rcu(class, &mpam_classes, classes_list)
+			mpam_reset_class(class);
+		srcu_read_unlock(&mpam_srcu, idx);
+	}
+}
+
 static struct mpam_resctrl_dom *
 mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 {
