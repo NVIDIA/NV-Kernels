@@ -248,6 +248,50 @@ int mpam_resctrl_setup(void)
 	return err;
 }
 
+u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
+			    u32 closid, enum resctrl_conf_type type)
+{
+	u32 partid;
+	struct mpam_config *cfg;
+	struct mpam_props *cprops;
+	struct mpam_resctrl_res *res;
+	struct mpam_resctrl_dom *dom;
+	enum mpam_device_features configured_by;
+
+	lockdep_assert_cpus_held();
+
+	if (!mpam_is_enabled())
+		return r->default_ctrl;
+
+	res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+	dom = container_of(d, struct mpam_resctrl_dom, resctrl_dom);
+	cprops = &res->class->props;
+
+	partid = resctrl_get_config_index(closid, type);
+	cfg = &dom->comp->cfg[partid];
+
+	switch (r->rid) {
+	case RDT_RESOURCE_L2:
+	case RDT_RESOURCE_L3:
+		configured_by = mpam_feat_cpor_part;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r) ||
+	    !mpam_has_feature(configured_by, cfg))
+		return r->default_ctrl;
+
+	switch (configured_by) {
+	case mpam_feat_cpor_part:
+		/* TODO: Scaling is not yet supported */
+		return cfg->cpbm;
+	default:
+		return -EINVAL;
+	}
+}
+
 void resctrl_arch_reset_resources(void)
 {
 	int i, idx;
