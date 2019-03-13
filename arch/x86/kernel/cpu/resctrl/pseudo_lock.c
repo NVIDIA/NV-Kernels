@@ -683,26 +683,26 @@ int rdtgroup_locksetup_enter(struct rdtgroup *rdtgrp)
 	 *
 	 * Some things to consider if you would like to enable this
 	 * support (using L3 CDP as example):
-	 * - When CDP is enabled two separate resources are exposed,
+	 * - When CDP is enabled two separate schema are exposed,
 	 *   L3DATA and L3CODE, but they are actually on the same cache.
 	 *   The implication for pseudo-locking is that if a
-	 *   pseudo-locked region is created on a domain of one
-	 *   resource (eg. L3CODE), then a pseudo-locked region cannot
-	 *   be created on that same domain of the other resource
+	 *   pseudo-locked region is created on the domain using one
+	 *   schema (eg. L3CODE), then a pseudo-locked region cannot
+	 *   be created on that same domain of the other schema
 	 *   (eg. L3DATA). This is because the creation of a
 	 *   pseudo-locked region involves a call to wbinvd that will
 	 *   affect all cache allocations on particular domain.
 	 * - Considering the previous, it may be possible to only
-	 *   expose one of the CDP resources to pseudo-locking and
+	 *   expose one of the CDP schema to pseudo-locking and
 	 *   hide the other. For example, we could consider to only
 	 *   expose L3DATA and since the L3 cache is unified it is
-	 *   still possible to place instructions there are execute it.
+	 *   still possible to fetch and execute instructions through it.
 	 * - If only one region is exposed to pseudo-locking we should
 	 *   still keep in mind that availability of a portion of cache
-	 *   for pseudo-locking should take into account both resources.
-	 *   Similarly, if a pseudo-locked region is created in one
-	 *   resource, the portion of cache used by it should be made
-	 *   unavailable to all future allocations from both resources.
+	 *   for pseudo-locking should take into account both schema.
+	 *   Similarly, if a pseudo-locked region is created using one
+	 *   schema, the portion of cache used by it should be made
+	 *   unavailable to all future allocations.
 	 */
 	if (resctrl_arch_get_cdp_enabled(RDT_RESOURCE_L3) ||
 	    resctrl_arch_get_cdp_enabled(RDT_RESOURCE_L2)) {
