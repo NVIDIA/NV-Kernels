@@ -15,6 +15,7 @@
  * Software Developer Manual June 2016, volume 3, section 17.17.
  */
 
+#include <linux/cpu.h>
 #include <linux/module.h>
 #include <linux/percpu.h>
 #include <linux/sizes.h>
@@ -483,6 +484,9 @@ static void add_rmid_to_limbo(struct rmid_entry *entry)
 	u32 idx;
 
 	lockdep_assert_held(&rdtgroup_mutex);
+
+	/* Walking r->domains, ensure it can't race with cpuhp */
+	lockdep_assert_cpus_held();
 
 	idx = resctrl_arch_rmid_idx_encode(entry->closid, entry->rmid);
 
