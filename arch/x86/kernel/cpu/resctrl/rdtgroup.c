@@ -4174,7 +4174,9 @@ int __init resctrl_init(void)
 	seq_buf_init(&last_cmd_status, last_cmd_status_buf,
 		     sizeof(last_cmd_status_buf));
 
-	rdtgroup_setup_default();
+	ret = resctrl_mon_resource_init();
+	if (ret)
+		return ret;
 
 	ret = sysfs_create_mount_point(fs_kobj, "resctrl");
 	if (ret)
