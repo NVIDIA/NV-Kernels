@@ -840,6 +840,7 @@ bool rdtgroup_cbm_overlaps_pseudo_locked(struct rdt_domain *d, unsigned long cbm
 bool rdtgroup_pseudo_locked_in_hierarchy(struct rdt_domain *d)
 {
 	cpumask_var_t cpu_with_psl;
+	enum resctrl_res_level i;
 	struct rdt_resource *r;
 	struct rdt_domain *d_i;
 	bool ret = false;
@@ -854,7 +855,11 @@ bool rdtgroup_pseudo_locked_in_hierarchy(struct rdt_domain *d)
 	 * First determine which cpus have pseudo-locked regions
 	 * associated with them.
 	 */
-	for_each_alloc_capable_rdt_resource(r) {
+	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
+		r = resctrl_arch_get_resource(i);
+		if (!r->alloc_capable)
+			continue;
+
 		list_for_each_entry(d_i, &r->domains, list) {
 			if (d_i->plr)
 				cpumask_or(cpu_with_psl, cpu_with_psl,
