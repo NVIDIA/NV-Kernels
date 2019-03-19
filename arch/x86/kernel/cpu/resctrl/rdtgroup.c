@@ -2891,6 +2891,14 @@ static int reset_all_ctrls(struct rdt_resource *r)
 	return 0;
 }
 
+void resctrl_arch_reset_resources(void)
+{
+	struct rdt_resource *r;
+
+	for_each_capable_rdt_resource(r)
+		reset_all_ctrls(r);
+}
+
 /*
  * Move tasks from one to the other group. If @from is NULL, then all tasks
  * in the systems are moved unconditionally (used for teardown).
@@ -3000,16 +3008,14 @@ static void rmdir_all_sub(void)
 
 static void rdt_kill_sb(struct super_block *sb)
 {
-	struct rdt_resource *r;
-
 	cpus_read_lock();
 	mutex_lock(&rdtgroup_mutex);
 
 	rdt_disable_ctx();
 
-	/*Put everything back to default values. */
-	for_each_alloc_capable_rdt_resource(r)
-		reset_all_ctrls(r);
+	/* Put everything back to default values. */
+	resctrl_arch_reset_resources();
+
 	rmdir_all_sub();
 	rdt_pseudo_lock_release();
 	rdtgroup_default.mode = RDT_MODE_SHAREABLE;
