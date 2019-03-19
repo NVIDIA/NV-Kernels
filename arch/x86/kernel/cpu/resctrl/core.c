@@ -404,8 +404,8 @@ void rdt_ctrl_update(void *arg)
  * caller, return the first domain whose id is bigger than the input id.
  * The domain list is sorted by id in ascending order.
  */
-struct rdt_domain *rdt_find_domain(struct rdt_resource *r, int id,
-				   struct list_head **pos)
+static struct rdt_domain *rdt_find_domain(struct rdt_resource *r, int id,
+					  struct list_head **pos)
 {
 	struct rdt_domain *d;
 	struct list_head *l;
@@ -427,6 +427,11 @@ struct rdt_domain *rdt_find_domain(struct rdt_resource *r, int id,
 		*pos = l;
 
 	return NULL;
+}
+
+struct rdt_domain *resctrl_arch_find_domain(struct rdt_resource *r, int id)
+{
+	return rdt_find_domain(r, id, NULL);
 }
 
 static void setup_default_ctrlval(struct rdt_resource *r, u32 *dc)
