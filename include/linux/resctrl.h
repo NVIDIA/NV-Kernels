@@ -220,6 +220,19 @@ struct resctrl_schema {
 	u32				num_closid;
 };
 
+struct resctrl_cpu_sync
+{
+	u32 closid;
+	u32 rmid;
+};
+
+/*
+ * Update and re-load this CPUs defaults. Called via IPI, takes a pointer to
+ * struct resctrl_cpu_sync, or NULL.
+ */
+void resctrl_arch_sync_cpu_defaults(void *info);
+
+
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid);
