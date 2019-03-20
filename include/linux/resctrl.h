@@ -5,6 +5,7 @@
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/pid.h>
+#include <linux/resctrl_types.h>
 
 /* CLOSID, RMID value used by the default control group */
 #define RESCTRL_RESERVED_CLOSID		0
@@ -23,40 +24,6 @@ int proc_resctrl_show(struct seq_file *m,
 
 /* max value for struct rdt_domain's mbps_val */
 #define MBA_MAX_MBPS   U32_MAX
-
-/**
- * enum resctrl_conf_type - The type of configuration.
- * @CDP_NONE:	No prioritisation, both code and data are controlled or monitored.
- * @CDP_CODE:	Configuration applies to instruction fetches.
- * @CDP_DATA:	Configuration applies to reads and writes.
- */
-enum resctrl_conf_type {
-	CDP_NONE,
-	CDP_CODE,
-	CDP_DATA,
-};
-
-enum resctrl_res_level {
-	RDT_RESOURCE_L3,
-	RDT_RESOURCE_L2,
-	RDT_RESOURCE_MBA,
-	RDT_RESOURCE_SMBA,
-
-	/* Must be the last */
-	RDT_NUM_RESOURCES,
-};
-
-#define CDP_NUM_TYPES	(CDP_DATA + 1)
-
-/*
- * Event IDs, the values match those used to program IA32_QM_EVTSEL before
- * reading IA32_QM_CTR on RDT systems.
- */
-enum resctrl_event_id {
-	QOS_L3_OCCUP_EVENT_ID		= 0x01,
-	QOS_L3_MBM_TOTAL_EVENT_ID	= 0x02,
-	QOS_L3_MBM_LOCAL_EVENT_ID	= 0x03,
-};
 
 /**
  * struct resctrl_staged_config - parsed configuration to be applied
