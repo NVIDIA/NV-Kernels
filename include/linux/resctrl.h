@@ -274,6 +274,24 @@ static inline u32 resctrl_get_config_index(u32 closid,
 }
 
 /*
+ * Caller must be in a RCU read-side critical section, or hold the
+ * cpuhp read lock to prevent the struct rdt_domain being freed.
+ */
+static inline struct rdt_domain *
+resctrl_get_domain_from_cpu(int cpu, struct rdt_resource *r)
+{
+	struct rdt_domain *d;
+
+	list_for_each_entry_rcu(d, &r->domains, list) {
+		/* Find the domain that contains this CPU */
+		if (cpumask_test_cpu(cpu, &d->cpu_mask))
+			return d;
+	}
+
+	return NULL;
+}
+
+/*
  * Update the ctrl_val and apply this config right now.
  * Must be called on one of the domain's CPUs.
  */
