@@ -2,6 +2,7 @@
 #ifndef _RESCTRL_H
 #define _RESCTRL_H
 
+#include <linux/cpu.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/pid.h>
@@ -269,6 +270,33 @@ static inline u32 resctrl_get_config_index(u32 closid,
 	case CDP_DATA:
 			return (closid * 2);
 	}
+}
+
+/*
+ * Caller must be in a RCU read-side critical section, or hold the
+ * cpuhp read lock to prevent the struct rdt_domain being freed.
+ */
+static inline struct rdt_domain *
+resctrl_get_domain_from_cpu(int cpu, struct rdt_resource *r)
+{
+	struct rdt_domain *d;
+
+	/*
+	 * Walking r->domains, ensure it can't race with cpuhp.
+	 * Because this is called via IPI by rdt_ctrl_update(), assertions
+	 * about locks this thread holds will lead to false positives. Check
+	 * someone is holding the CPUs lock.
+	 */
+	if (IS_ENABLED(CONFIG_LOCKDEP))
+		lockdep_is_cpus_held();
+
+	list_for_each_entry_rcu(d, &r->domains, list) {
+		/* Find the domain that contains this CPU */
+		if (cpumask_test_cpu(cpu, &d->cpu_mask))
+			return d;
+	}
+
+	return NULL;
 }
 
 /*
