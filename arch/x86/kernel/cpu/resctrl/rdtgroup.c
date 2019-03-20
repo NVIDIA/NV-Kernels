@@ -2065,9 +2065,14 @@ static struct rftype *rdtgroup_get_rftype_by_name(const char *name)
 	return NULL;
 }
 
-void __init thread_throttle_mode_init(void)
+static void __init thread_throttle_mode_init(void)
 {
+	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_MBA);
 	struct rftype *rft;
+
+	if (!r->alloc_capable ||
+	    r->membw.throttle_mode == THREAD_THROTTLE_UNDEFINED)
+		return;
 
 	rft = rdtgroup_get_rftype_by_name("thread_throttle_mode");
 	if (!rft)
@@ -2236,7 +2241,7 @@ static int rdtgroup_create_info_dir(struct kernfs_node *parent_kn)
 		if (!r->mon_capable)
 			continue;
 
-		fflags =  r->fflags | RF_MON_INFO;
+		fflags =  r->fflags | RFTYPE_MON_INFO;
 		sprintf(name, "%s_MON", r->name);
 		ret = rdtgroup_mkdir_info_resdir(r, name, fflags);
 		if (ret)
@@ -4236,6 +4241,8 @@ int __init resctrl_init(void)
 	ret = resctrl_mon_resource_init();
 	if (ret)
 		return ret;
+
+	thread_throttle_mode_init();
 
 	rdtgroup_setup_default();
 
