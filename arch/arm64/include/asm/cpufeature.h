@@ -839,7 +839,7 @@ static inline bool system_supports_lpa2(void)
 	return cpus_have_final_cap(ARM64_HAS_LPA2);
 }
 
-static inline bool cpus_support_mpam(void)
+static __always_inline bool cpus_support_mpam(void)
 {
 	return alternative_has_cap_unlikely(ARM64_MPAM);
 }
