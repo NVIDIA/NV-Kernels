@@ -537,6 +537,23 @@ static bool trap_oslar_el1(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static bool workaround_bad_mpam_abi(struct kvm_vcpu *vcpu,
+				    struct sys_reg_params *p,
+				    const struct sys_reg_desc *r)
+{
+	/*
+	 * The ID register can't be removed without breaking migration,
+	 * but MPAMIDR_EL1 can advertise all-zeroes, indicating there are zero
+	 * PARTID/PMG supported by the CPU, allowing the other two trapped
+	 * registers (MPAM1_EL1 and MPAM0_EL1) to be treated as RAZ/WI.
+	 * Emulating MPAM1_EL1 as RAZ/WI means the guest sees the MPAMEN bit
+	 * as clear, and realises MPAM isn't usable on this CPU.
+	 */
+	p->regval = 0;
+
+	return true;
+}
+
 static bool trap_oslsr_el1(struct kvm_vcpu *vcpu,
 			   struct sys_reg_params *p,
 			   const struct sys_reg_desc *r)
@@ -2428,8 +2445,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ SYS_DESC(SYS_LOREA_EL1), trap_loregion },
 	{ SYS_DESC(SYS_LORN_EL1), trap_loregion },
 	{ SYS_DESC(SYS_LORC_EL1), trap_loregion },
+	{ SYS_DESC(SYS_MPAMIDR_EL1), workaround_bad_mpam_abi },
 	{ SYS_DESC(SYS_LORID_EL1), trap_loregion },
 
+	{ SYS_DESC(SYS_MPAM1_EL1), workaround_bad_mpam_abi },
+	{ SYS_DESC(SYS_MPAM0_EL1), workaround_bad_mpam_abi },
 	{ SYS_DESC(SYS_VBAR_EL1), access_rw, reset_val, VBAR_EL1, 0 },
 	{ SYS_DESC(SYS_DISR_EL1), NULL, reset_val, DISR_EL1, 0 },
 
