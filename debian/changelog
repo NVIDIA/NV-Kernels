@@ -1,3 +1,15 @@
+linux-meta (5.0.0.9.10) disco; urgency=medium
+
+  * Bump ABI 5.0.0-9
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync git-ubuntu-log
+
+  * bionic: fork out linux-snapdragon into its own topic kernel (LP: #1820868)
+    - remove snapdragon meta packages
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Thu, 04 Apr 2019 14:41:40 -0500
+
 linux-meta (5.0.0.8.9) disco; urgency=medium
 
   * Bump ABI 5.0.0-8
