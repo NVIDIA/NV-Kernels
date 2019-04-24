@@ -1,3 +1,9 @@
+linux-meta (5.0.0.14.15) disco; urgency=medium
+
+  * Bump ABI 5.0.0-14
+
+ -- Stefan Bader <stefan.bader@canonical.com>  Wed, 24 Apr 2019 16:57:54 +0200
+
 linux-meta (5.0.0.13.14) disco; urgency=medium
 
   * Bump ABI 5.0.0-13
