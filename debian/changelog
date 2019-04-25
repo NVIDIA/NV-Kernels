@@ -1,3 +1,9 @@
+linux-meta (5.1.0.1.1) eoan; urgency=medium
+
+  * Bump ABI 5.1.0-1
+
+ -- Thadeu Lima de Souza Cascardo <cascardo@canonical.com>  Thu, 25 Apr 2019 12:04:29 -0300
+
 linux-meta (5.0.0.14.15) disco; urgency=medium
 
   * Bump ABI 5.0.0-14
