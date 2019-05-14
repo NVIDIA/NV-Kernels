@@ -1,3 +1,9 @@
+linux-meta (5.1.0.2.2) eoan; urgency=medium
+
+  * Bump ABI 5.1.0-2
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Tue, 14 May 2019 12:38:24 -0500
+
 linux-meta (5.1.0.1.1) eoan; urgency=medium
 
   * Bump ABI 5.1.0-1
