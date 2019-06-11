@@ -39,4 +39,8 @@ int mpam_register_requestor(u16 partid_max, u8 pmg_max);
 int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
 		    enum mpam_class_types type, u8 class_id, int component_id);
 
+
+bool resctrl_arch_alloc_capable(void);
+bool resctrl_arch_mon_capable(void);
+
 #endif /* __LINUX_ARM_MPAM_H */
