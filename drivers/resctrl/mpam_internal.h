@@ -13,6 +13,7 @@
 #include <linux/llist.h>
 #include <linux/mailbox_client.h>
 #include <linux/mutex.h>
+#include <linux/resctrl.h>
 #include <linux/sizes.h>
 #include <linux/spinlock.h>
 #include <linux/srcu.h>
@@ -338,6 +339,17 @@ struct mpam_msc_ris {
 	struct mpam_garbage	garbage;
 };
 
+struct mpam_resctrl_dom {
+	struct mpam_component	*ctrl_comp;
+	struct rdt_ctrl_domain	resctrl_ctrl_dom;
+	struct rdt_mon_domain	resctrl_mon_dom;
+};
+
+struct mpam_resctrl_res {
+	struct mpam_class	*class;
+	struct rdt_resource	resctrl_res;
+};
+
 static inline int mpam_alloc_csu_mon(struct mpam_class *class)
 {
 	struct mpam_props *cprops = &class->props;
@@ -391,6 +403,16 @@ void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx);
 
 int mpam_get_cpumask_from_cache_id(unsigned long cache_id, u32 cache_level,
 				   cpumask_t *affinity);
+
+#ifdef CONFIG_RESCTRL_FS
+int mpam_resctrl_setup(void);
+int mpam_resctrl_online_cpu(unsigned int cpu);
+int mpam_resctrl_offline_cpu(unsigned int cpu);
+#else
+static inline int mpam_resctrl_setup(void) { return 0; }
+static inline int mpam_resctrl_online_cpu(unsigned int cpu) { return 0; }
+static inline int mpam_resctrl_offline_cpu(unsigned int cpu) { return 0; }
+#endif /* CONFIG_RESCTRL_FS */
 
 /*
  * MPAM MSCs have the following register layout. See:
