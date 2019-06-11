@@ -239,6 +239,16 @@ struct mpam_msc_ris {
 	struct msmon_mbwu_state	*mbwu_state;
 };
 
+struct mpam_resctrl_dom {
+	struct mpam_component	*comp;
+	struct rdt_domain	resctrl_dom;
+};
+
+struct mpam_resctrl_res {
+	struct mpam_class	*class;
+	struct rdt_resource	resctrl_res;
+};
+
 static inline int mpam_alloc_csu_mon(struct mpam_class *class)
 {
 	struct mpam_props *cprops = &class->props;
@@ -289,6 +299,11 @@ int mpam_apply_config(struct mpam_component *comp, u16 partid,
 int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 		    enum mpam_device_features, u64 *val);
 void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx);
+
+int mpam_resctrl_online_cpu(unsigned int cpu);
+int mpam_resctrl_offline_cpu(unsigned int cpu);
+
+int mpam_resctrl_setup(void);
 
 /*
  * MPAM MSCs have the following register layout. See:
