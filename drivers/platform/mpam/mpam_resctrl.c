@@ -27,6 +27,7 @@ static struct mpam_resctrl_res mpam_resctrl_exports[RDT_NUM_RESOURCES];
 
 static bool exposed_alloc_capable;
 static bool exposed_mon_capable;
+static struct mpam_class *mbm_local_class;
 
 bool resctrl_arch_alloc_capable(void)
 {
@@ -36,6 +37,11 @@ bool resctrl_arch_alloc_capable(void)
 bool resctrl_arch_mon_capable(void)
 {
 	return exposed_mon_capable;
+}
+
+bool resctrl_arch_is_mbm_local_enabled(void)
+{
+	return mbm_local_class;
 }
 
 /*
@@ -56,14 +62,134 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 	return &mpam_resctrl_exports[l].resctrl_res;
 }
 
+static bool cache_has_usable_cpor(struct mpam_class *class)
+{
+	struct mpam_props *cprops = &class->props;
+
+	if (!mpam_has_feature(mpam_feat_cpor_part, cprops))
+		return false;
+
+	/* TODO: Scaling is not yet supported */
+	return (class->props.cpbm_wd <= RESCTRL_MAX_CBM);
+}
+
+static bool cache_has_usable_csu(struct mpam_class *class)
+{
+	struct mpam_props *cprops;
+
+	if (!class)
+		return false;
+
+	cprops = &class->props;
+
+	if (!mpam_has_feature(mpam_feat_msmon_csu, cprops))
+		return false;
+
+	/*
+	 * CSU counters settle on the value, so we can get away with
+	 * having only one.
+	 */
+	if (!cprops->num_csu_mon)
+		return false;
+
+	return (mpam_partid_max > 1) || (mpam_pmg_max != 0);
+}
+
+bool resctrl_arch_is_llc_occupancy_enabled(void)
+{
+	return cache_has_usable_csu(mpam_resctrl_exports[RDT_RESOURCE_L3].class);
+}
+
+/* Test whether we can export MPAM_CLASS_CACHE:{2,3}? */
+static void mpam_resctrl_pick_caches(void)
+{
+	int idx;
+	struct mpam_class *class;
+	struct mpam_resctrl_res *res;
+
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_rcu(class, &mpam_classes, classes_list) {
+		bool has_cpor = cache_has_usable_cpor(class);
+
+		if (class->type != MPAM_CLASS_CACHE) {
+			pr_debug("pick_caches: Class is not a cache\n");
+			continue;
+		}
+
+		if (class->level != 2 && class->level != 3) {
+			pr_debug("pick_caches: not L2 or L3\n");
+			continue;
+		}
+
+		if (class->level == 2 && !has_cpor) {
+			pr_debug("pick_caches: L2 missing CPOR\n");
+			continue;
+		}
+		else if (!has_cpor && !cache_has_usable_csu(class)) {
+			pr_debug("pick_caches: Cache misses CPOR and CSU\n");
+			continue;
+		}
+
+		if (!cpumask_equal(&class->affinity, cpu_possible_mask)) {
+			pr_debug("pick_caches: Class has missing CPUs\n");
+			continue;
+		}
+
+		if (class->level == 2) {
+			res = &mpam_resctrl_exports[RDT_RESOURCE_L2];
+			res->resctrl_res.name = "L2";
+		} else {
+			res = &mpam_resctrl_exports[RDT_RESOURCE_L3];
+			res->resctrl_res.name = "L3";
+		}
+		res->class = class;
+	}
+	srcu_read_unlock(&mpam_srcu, idx);
+}
+
 static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 {
-	/* TODO: initialise the resctrl resources */
+	struct mpam_class *class = res->class;
+	struct rdt_resource *r = &res->resctrl_res;
+
+	/* Is this one of the two well-known caches? */
+	if (res->resctrl_res.rid == RDT_RESOURCE_L2 ||
+	    res->resctrl_res.rid == RDT_RESOURCE_L3) {
+		/* TODO: Scaling is not yet supported */
+		r->cache.cbm_len = class->props.cpbm_wd;
+		r->cache.arch_has_sparse_bitmasks = true;
+
+		/* mpam_devices will reject empty bitmaps */
+		r->cache.min_cbm_bits = 1;
+
+		/* TODO: kill these properties off as they are derivatives */
+		r->format_str = "%d=%0*x";
+		r->fflags = RFTYPE_RES_CACHE;
+		r->default_ctrl = BIT_MASK(class->props.cpbm_wd) - 1;
+		r->data_width = (class->props.cpbm_wd + 3) / 4;
+
+		/*
+		 * Which bits are shared with other ...things...
+		 * Unknown devices use partid-0 which uses all the bitmap
+		 * fields. Until we configured the SMMU and GIC not to do this
+		 * 'all the bits' is the correct answer here.
+		 */
+		r->cache.shareable_bits = r->default_ctrl;
+
+		if (mpam_has_feature(mpam_feat_cpor_part, &class->props)) {
+			r->alloc_capable = true;
+			exposed_alloc_capable = true;
+		}
+
+		if (class->level == 3 && cache_has_usable_csu(class)) {
+			r->mon_capable = true;
+			exposed_mon_capable = true;
+		}
+	}
 
 	return 0;
 }
 
-/* Called with the mpam classes lock held */
 int mpam_resctrl_setup(void)
 {
 	int err = 0;
@@ -78,7 +204,7 @@ int mpam_resctrl_setup(void)
 		res->resctrl_res.rid = i;
 	}
 
-	/* TODO: pick MPAM classes to map to resctrl resources */
+	mpam_resctrl_pick_caches();
 
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
 		res = &mpam_resctrl_exports[i];
@@ -103,7 +229,8 @@ int mpam_resctrl_setup(void)
 			 */
 			pr_warn("Number of PMG is not a power of 2! resctrl may misbehave");
 		}
-		err = resctrl_init();
+
+		/* TODO: call resctrl_init() */
 	}
 
 	return err;
