@@ -1,3 +1,12 @@
+linux-meta (5.3.0.0.1) eoan; urgency=medium
+
+  * Bump ABI 5.3.0-0
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync git-ubuntu-log
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Tue, 23 Jul 2019 20:50:31 -0500
+
 linux-meta (5.2.0.9.10) eoan; urgency=medium
 
   * Bump ABI 5.2.0-9
