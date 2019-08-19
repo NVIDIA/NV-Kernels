@@ -1,3 +1,9 @@
+linux-meta (5.3.0.7.8) eoan; urgency=medium
+
+  * Bump ABI 5.3.0-7
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 19 Aug 2019 17:31:21 +0200
+
 linux-meta (5.3.0.6.7) eoan; urgency=medium
 
   * Bump ABI 5.3.0-6
