@@ -27,7 +27,6 @@ KERNEL_ABI=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"."); prin
 
 KERNEL_ABI_VERSION=$(KERNEL_VERSION)-$(KERNEL_ABI)
 
-GENERIC_i386=generic
 GENERIC_amd64=generic
 GENERIC_armhf=generic
 

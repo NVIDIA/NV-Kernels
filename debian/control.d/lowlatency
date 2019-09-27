@@ -1,5 +1,5 @@
 Package: linux-headers-lowlatency@SUFFIX@
-Architecture: i386 amd64
+Architecture: amd64
 Section: kernel
 Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-lowlatency
 Description: lowlatency Linux kernel headers
@@ -7,16 +7,16 @@ Description: lowlatency Linux kernel headers
  available.
 
 Package: linux-image-lowlatency@SUFFIX@
-Architecture: i386 amd64
+Architecture: amd64
 Section: kernel
-Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware, intel-microcode [amd64 i386], amd64-microcode [amd64 i386]
-Recommends: thermald [i386 amd64]
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware, intel-microcode [amd64], amd64-microcode [amd64]
+Recommends: thermald [amd64]
 Description: lowlatency Linux kernel image
  This package will always depend on the latest lowlatency kernel image
  available.
 
 Package: linux-tools-lowlatency@SUFFIX@
-Architecture: i386 amd64
+Architecture: amd64
 Section: kernel
 Provides: linux-tools
 Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-lowlatency
@@ -25,7 +25,7 @@ Description: lowlatency Linux kernel tools
  available.
 
 Package: linux-cloud-tools-lowlatency@SUFFIX@
-Architecture: i386 amd64
+Architecture: amd64
 Section: kernel
 Provides: linux-cloud-tools
 Depends: ${misc:Depends}, linux-cloud-tools-${kernel-abi-version}-lowlatency
@@ -34,7 +34,7 @@ Description: lowlatency Linux kernel cloud tools
  available.
 
 Package: linux-lowlatency@SUFFIX@
-Architecture: i386 amd64
+Architecture: amd64
 Section: kernel
 Depends: ${misc:Depends}, linux-image-lowlatency@SUFFIX@ (= ${binary:Version}), linux-headers-lowlatency@SUFFIX@ (= ${binary:Version})
 Description: Complete lowlatency Linux kernel

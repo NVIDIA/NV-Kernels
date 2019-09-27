@@ -17,8 +17,8 @@ Description: Linux kernel source with Ubuntu patches
  available. The Ubuntu patches have been applied.
 
 Package: linux-crashdump@SUFFIX@
-Architecture: i386 amd64 arm64 armhf ppc64el s390x
-Depends: ${misc:Depends}, kdump-tools, grub-pc (>= 1.96+20090611-1ubuntu2) [i386 amd64] | grub-efi-ia32 [i386 amd64] | grub-efi-amd64 [i386 amd64] | grub-efi-arm64 [arm64] | grub (>= 0.97-29ubuntu24) [i386 amd64]
+Architecture: amd64 arm64 armhf ppc64el s390x
+Depends: ${misc:Depends}, kdump-tools, grub-pc (>= 1.96+20090611-1ubuntu2) [amd64] | grub-efi-ia32 [amd64] | grub-efi-amd64 [amd64] | grub-efi-arm64 [arm64] | grub (>= 0.97-29ubuntu24) [amd64]
 Recommends: apport
 Suggests: crash
 Description: Linux kernel crashdump setup for the latest generic kernel
