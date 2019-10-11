@@ -9,7 +9,7 @@ Description: Linux kernel headers for the Qualcomm Snapdragon 410c architecture
 Package: linux-image-snapdragon@SUFFIX@
 Architecture: arm64
 Section: kernel
-Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-snapdragon, linux-modules-extra-${kernel-abi-version}-snapdragon, linux-firmware
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-snapdragon, linux-firmware
 Description: Linux kernel image for the Qualcomm Snapdragon 410c architecture
  This package will always depend on the latest kernel image available
  for ARM64 Qualcomm Snapdragon 410c systems.
