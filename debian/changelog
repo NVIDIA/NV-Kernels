@@ -1,3 +1,9 @@
+linux-meta (5.4.0.3.4) focal; urgency=medium
+
+  * Bump ABI 5.4.0-3
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Mon, 28 Oct 2019 13:53:16 -0500
+
 linux-meta (5.4.0.2.3) eoan; urgency=medium
 
   * Bump ABI 5.4.0-2
