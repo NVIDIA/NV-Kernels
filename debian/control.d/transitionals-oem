@@ -1,0 +1,38 @@
+Package: linux-image-oem
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-image-generic
+Description: Depends on the generic kernel image (dummy transitional package)
+ Transitional package for upgrades from linux-oem to generic
+
+Package: linux-oem
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-generic
+Description: Depends on the generic kernel image and headers (dummy transitional packages)
+ Transitional package for upgrades from linux-oem to generic
+
+Package: linux-oem-tools-host
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-tools-host
+Description: Linux kernel VM host tools (dummy transitional packages)
+ Transitional package for upgrades from linux-oem to generic
+
+Package: linux-tools-oem
+Architecture: amd64
+Section: oldlibs
+Depends: linux-tools-generic
+Description: Linux kernel versioned Tools (dummy transitional package)
+ Transitional package for upgrades from linux-oem to generic
+
+Package: linux-headers-oem
+Architecture: amd64
+Section: oldlibs
+Priority: optional
+Depends: linux-headers-generic
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from linux-oem to generic
