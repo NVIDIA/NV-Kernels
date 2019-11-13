@@ -1,3 +1,12 @@
+linux-meta (5.4.0.5.6) focal; urgency=medium
+
+  * Bump ABI 5.4.0-5
+
+  * Transition OEM & OSP1 kernel users to generic (LP: #1850612)
+    - Transition OEM and OSP1 kernel users to generic
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Wed, 13 Nov 2019 14:27:01 -0800
+
 linux-meta (5.4.0.4.5) focal; urgency=medium
 
   * Bump ABI 5.4.0-4
