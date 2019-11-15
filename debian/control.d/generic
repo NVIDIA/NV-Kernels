@@ -1,4 +1,4 @@
-Package: linux-headers-generic@SUFFIX@
+Package: linux-headers-generic${variant:suffix}
 Architecture: amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
 Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-generic
@@ -6,7 +6,7 @@ Description: Generic Linux kernel headers
  This package will always depend on the latest generic kernel headers
  available.
 
-Package: linux-image-generic@SUFFIX@
+Package: linux-image-generic${variant:suffix}
 Architecture: amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic, linux-modules-extra-${kernel-abi-version}-generic [amd64 arm64 powerpc ppc64el s390x], linux-firmware, intel-microcode [amd64], amd64-microcode [amd64]
@@ -15,7 +15,7 @@ Description: Generic Linux kernel image
  This package will always depend on the latest generic kernel image
  available.
 
-Package: linux-tools-generic@SUFFIX@
+Package: linux-tools-generic${variant:suffix}
 Architecture: amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
 Provides: linux-tools
@@ -24,7 +24,7 @@ Description: Generic Linux kernel tools
  This package will always depend on the latest generic kernel tools
  available.
 
-Package: linux-cloud-tools-generic@SUFFIX@
+Package: linux-cloud-tools-generic${variant:suffix}
 Architecture: amd64
 Section: kernel
 Provides: linux-cloud-tools
@@ -33,10 +33,10 @@ Description: Generic Linux kernel cloud tools
  This package will always depend on the latest generic kernel cloud tools
  available.
 
-Package: linux-generic@SUFFIX@
+Package: linux-generic${variant:suffix}
 Architecture: amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
-Depends: ${misc:Depends}, linux-image-generic@SUFFIX@ (= ${binary:Version}), linux-headers-generic@SUFFIX@ (= ${binary:Version})
+Depends: ${misc:Depends}, linux-image-generic${variant:suffix} (= ${binary:Version}), linux-headers-generic${variant:suffix} (= ${binary:Version})
 Description: Complete Generic Linux kernel and headers
  This package will always depend on the latest complete generic Linux kernel
  and headers.

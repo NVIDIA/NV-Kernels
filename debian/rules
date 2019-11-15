@@ -7,26 +7,31 @@
 # Copyright (c) 2004 Jens Schmalzing <jensen@debian.org>
 #
 
-# Pull out the source suffix, we intend to maintain an -lts-<series> suffix
-# but otherwise assume this main packages are not intended to have a suffix
-# so that linux-meta and linux-meta-ti-omap4 will behave normally, but
-# linux-meta-lts-vivid will add the series suffix.
 SERIES=$(shell dpkg-parsechangelog | sed -ne 's/^Distribution: *//p' | sed -e 's/-\(security\|updates\|proposed\)$$//')
 SOURCE=$(shell dpkg-parsechangelog | sed -ne 's/^Source: *//p')
-SUFFIX=$(shell dpkg-parsechangelog | sed -ne 's/^Source: *linux-meta-lts/-lts/p')
+KERNEL_SOURCE=$(shell echo "$(SOURCE)" | sed -e 's/-meta//')
+
+VARIANT_PROVIDES=$(shell echo "$(SOURCE)" | sed -e 's/linux-meta-//')
 
 # 5 digit versions (2.6.38.<abi>.<upload>, 3 digit kernel base versions (2.6.38)
 KERNEL_VERSION=$(shell dpkg-parsechangelog -SVersion | cut -d. -f1-3)
 KERNEL_ABI=$(shell dpkg-parsechangelog -SVersion | cut -d. -f4)
 
-# 4 digit versions (3.0.<abi>.<upload>), 2 digit kernel base versions (3.0)
-#KERNEL_VERSION=$(shell dpkg-parsechangelog | grep ^Version | sed -e \
-	's/Version: \([0-9]*\.[0-9]*\)\..*/\1/')
-#KERNEL_ABI=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"."); print v[3];}')
-
 KERNEL_ABI_VERSION=$(KERNEL_VERSION)-$(KERNEL_ABI)
 
-control_files := debian/control.common $(shell LC_ALL=C ls -d debian/control.d/*)
+# Get variants, assumng primary if debian/variants is not present
+variants = --
+ifneq (,$(wildcard debian/variants))
+	variants := $(shell cat debian/variants)
+endif
+
+control_files := debian/control.common
+# control files only wanted for the primary variant
+primary_control_files := debian/control.d/primary $(shell LC_ALL=C ls -d debian/control.d/transitionals-*)
+ifneq ($(filter --,$(variants)),)
+	control_files += $(primary_control_files)
+endif
+control_files += $(filter-out $(primary_control_files),$(shell LC_ALL=C ls -d debian/control.d/*))
 
 SHELL := sh -e
 
@@ -35,18 +40,30 @@ clean: debian/control
 	dh_testroot
 	dh_clean
 
+define variant_payload
+variant="$$(echo '$(variant)' | sed -e 's/--//')"; \
+sed -e "s/\$${variant:suffix}/$$variant/g" -e "s/\$${variant:provides\(\|-image\|-headers\)}/$${variant_provides:+linux\1-$$variant_provides}/" <$$i; \
+variant_provides=''; \
+echo "";
+endef
+
 debian/control: $(control_files)
-	rm -f debian/control.tmp
 	for i in $^; do \
-		sed \
-			-e 's/@SERIES@/$(SERIES)/g' \
-			-e 's/@SUFFIX@/$(SUFFIX)/g' \
-			-e 's/@kernel-abi-version@/$(KERNEL_ABI_VERSION)/g' \
-			$$i >> debian/control.tmp; \
-		echo >> debian/control.tmp; \
-	done
+		if grep -q "{variant:" $$i; then \
+			variant_provides="$(VARIANT_PROVIDES)"; \
+			$(foreach variant,$(variants),$(variant_payload)) \
+		else \
+			cat $$i; \
+			echo ""; \
+		fi; \
+	done | sed \
+		-e 's/@SERIES@/$(SERIES)/g' \
+		-e 's/@kernel-abi-version@/$(KERNEL_ABI_VERSION)/g' \
+		-e 's/SRCPKGNAME/$(SOURCE)/g' \
+		-e 's/@KERNEL_SOURCE@/$(KERNEL_SOURCE)/g' \
+	    >$@.tmp
 	rm -f $@
-	mv debian/control.tmp $@
+	mv $@.tmp $@
 
 .PHONY: debian/control
 

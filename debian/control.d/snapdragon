@@ -1,4 +1,4 @@
-Package: linux-headers-snapdragon@SUFFIX@
+Package: linux-headers-snapdragon${variant:suffix}
 Architecture: arm64
 Section: kernel
 Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-snapdragon
@@ -6,7 +6,7 @@ Description: Linux kernel headers for the Qualcomm Snapdragon 410c architecture
  This package will always depend on the latest kernel headers available
  for ARM64 Qualcomm Snapdragon 410c systems.
 
-Package: linux-image-snapdragon@SUFFIX@
+Package: linux-image-snapdragon${variant:suffix}
 Architecture: arm64
 Section: kernel
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-snapdragon, linux-firmware
@@ -14,7 +14,7 @@ Description: Linux kernel image for the Qualcomm Snapdragon 410c architecture
  This package will always depend on the latest kernel image available
  for ARM64 Qualcomm Snapdragon 410c systems.
 
-Package: linux-tools-snapdragon@SUFFIX@
+Package: linux-tools-snapdragon${variant:suffix}
 Architecture: arm64
 Section: kernel
 Provides: linux-tools
@@ -23,10 +23,10 @@ Description: Linux kernel tools for the Qualcomm Snapdragon 410c architecture
  This package will always depend on the latest kernel tools available
  for ARM64 Qualcomm Snapdragon 410c systems.
 
-Package: linux-snapdragon@SUFFIX@
+Package: linux-snapdragon${variant:suffix}
 Architecture: arm64
 Section: kernel
-Depends: ${misc:Depends}, linux-image-snapdragon@SUFFIX@ (= ${binary:Version}), linux-headers-snapdragon@SUFFIX@ (= ${binary:Version})
+Depends: ${misc:Depends}, linux-image-snapdragon${variant:suffix} (= ${binary:Version}), linux-headers-snapdragon${variant:suffix} (= ${binary:Version})
 Description: Complete Linux kernel and headers for the Qualcomm Snapdragon 410c architecture
  This package will always depend on the latest complete Linux kernel and
  headers available for ARM64 Qualcomm Snapdragon 410c systems.
