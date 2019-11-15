@@ -1,0 +1,191 @@
+Package: linux-headers-generic-hwe-18.04-edge
+Architecture: amd64 armhf arm64 ppc64el s390x
+Section: oldlibs
+Depends: linux-headers-generic
+Description: Generic Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-image-generic-hwe-18.04-edge
+Architecture: amd64 armhf arm64 ppc64el s390x
+Section: oldlibs
+Depends: linux-image-generic
+Description: Generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-tools-generic-hwe-18.04-edge
+Architecture: amd64 armhf arm64 ppc64el s390x
+Section: oldlibs
+Depends: linux-tools-generic
+Description: Generic Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-cloud-tools-generic-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-cloud-tools-generic
+Description: Generic Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-generic-hwe-18.04-edge
+Architecture: amd64 armhf arm64 ppc64el s390x
+Section: oldlibs
+Depends: linux-generic
+Description: Complete generic Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-headers-generic-lpae-hwe-18.04-edge
+Architecture: armhf
+Section: oldlibs
+Depends: linux-headers-generic-lpae
+Description: Generic LPAE Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-image-generic-lpae-hwe-18.04-edge
+Architecture: armhf
+Section: oldlibs
+Depends: linux-image-generic-lpae
+Description: Generic LPAE Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-tools-generic-lpae-hwe-18.04-edge
+Architecture: armhf
+Section: oldlibs
+Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-generic-lpae
+Description: Generic LPAE Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-generic-lpae-hwe-18.04-edge
+Architecture: armhf
+Section: oldlibs
+Depends: linux-generic-lpae
+Description: Complet generic LPAE Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-headers-lowlatency-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-headers-lowlatency
+Description: Lowlatency Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-image-lowlatency-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-image-lowlatency
+Description: Lowlatency Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-tools-lowlatency-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-tools-lowlatency
+Description: Lowlatency Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-cloud-tools-lowlatency-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-cloud-tools-lowlatency
+Description: Lowlatency Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-lowlatency-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-lowlatency
+Description: Complete lowlatency Linux kernel (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-signed-image-generic-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-signed-image-generic
+Description: Signed generic Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-signed-generic-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-signed-generic
+Description: Complete signed generic Linux kernel image and headers (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-signed-image-lowlatency-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-signed-image-lowlatency
+Description: Signed lowlatency Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-signed-lowlatency-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-signed-lowlatency
+Description: Complete signed lowlatency Linux kernel image and headers (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-headers-virtual-hwe-18.04-edge
+Architecture: amd64 arm64 ppc64el s390x
+Section: oldlibs
+Depends: linux-headers-virtual
+Description: Virtual Linux kernel headers (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-image-virtual-hwe-18.04-edge
+Architecture: amd64 arm64 ppc64el s390x
+Section: oldlibs
+Depends: linux-image-virtual
+Description: Virtual Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-tools-virtual-hwe-18.04-edge
+Architecture: amd64 arm64 ppc64el s390x
+Section: oldlibs
+Depends: linux-tools-virtual
+Description: Virtual Linux kernel tools (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-cloud-tools-virtual-hwe-18.04-edge
+Architecture: amd64
+Section: oldlibs
+Depends: linux-cloud-tools-virtual
+Description: Virtual Linux kernel cloud tools (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-virtual-hwe-18.04-edge
+Architecture: amd64 arm64 ppc64el s390x
+Section: oldlibs
+Depends: linux-virtual
+Description: Complete virtual Linux kernel and headers (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
+
+Package: linux-image-extra-virtual-hwe-18.04-edge
+Architecture: amd64 arm64 ppc64el s390x
+Section: oldlibs
+Depends: linux-image-extra-virtual
+Description: Extra drivers for virtual Linux kernel image (dummy transitional package)
+ Transitional package for upgrades from 18.04 to 20.04. Will be removed
+ in 20.10.
