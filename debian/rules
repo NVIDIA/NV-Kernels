@@ -16,9 +16,8 @@ SOURCE=$(shell dpkg-parsechangelog | sed -ne 's/^Source: *//p')
 SUFFIX=$(shell dpkg-parsechangelog | sed -ne 's/^Source: *linux-meta-lts/-lts/p')
 
 # 5 digit versions (2.6.38.<abi>.<upload>, 3 digit kernel base versions (2.6.38)
-KERNEL_VERSION=$(shell dpkg-parsechangelog | grep ^Version | sed -e \
-	's/Version: \([0-9]*\.[0-9]*\.[0-9]*\)\..*/\1/')
-KERNEL_ABI=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"."); print v[4];}')
+KERNEL_VERSION=$(shell dpkg-parsechangelog -SVersion | cut -d. -f1-3)
+KERNEL_ABI=$(shell dpkg-parsechangelog -SVersion | cut -d. -f4)
 
 # 4 digit versions (3.0.<abi>.<upload>), 2 digit kernel base versions (3.0)
 #KERNEL_VERSION=$(shell dpkg-parsechangelog | grep ^Version | sed -e \
