@@ -1,3 +1,15 @@
+linux-meta (5.4.0.8.9) focal; urgency=medium
+
+  * Bump ABI 5.4.0-8
+
+  * Miscellaneous Ubuntu changes
+    - [Debian] Remove unneeded control templates
+    - [Packaging] Remove signed transitional packages
+    - [Packaging] Add transitional packages for 18.04 hwe/hwe-edge upgrades
+    - [Packaging] Add note about removing oem transitional packages in 20.10
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 06 Dec 2019 17:17:52 +0100
+
 linux-meta (5.4.0.7.8) focal; urgency=medium
 
   * Bump ABI 5.4.0-7
