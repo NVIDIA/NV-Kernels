@@ -1,3 +1,18 @@
+linux-meta-5.5 (5.5.0.3.12) focal; urgency=medium
+
+  * Bump ABI 5.5.0-3
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+
+  * Miscellaneous Ubuntu changes
+    - [Debian] Remove unused generic-depends substitution
+    - [Debian] Simplify getting kernel version and abi
+    - [Debian] Use variant information to generate debian/control
+    - [Packaging] Change source package to linux-meta-5.5
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 08 Jan 2020 11:32:07 +0100
+
 linux-meta-5.5 (5.5.0.2.11) focal; urgency=medium
 
   * Empty entry.
