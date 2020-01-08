@@ -1,3 +1,12 @@
+linux-meta-5.5 (5.5.0.4.13) focal; urgency=medium
+
+  * Bump ABI 5.5.0-4
+
+  * Miscellaneous upstream changes
+    - update-version: Fix tagging a variant.
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 08 Jan 2020 17:07:03 +0100
+
 linux-meta-5.5 (5.5.0.3.12) focal; urgency=medium
 
   * Bump ABI 5.5.0-3
