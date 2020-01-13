@@ -1,3 +1,9 @@
+linux-meta-5.5 (5.5.0.5.14) focal; urgency=medium
+
+  * Bump ABI 5.5.0-5
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 13 Jan 2020 17:12:45 +0100
+
 linux-meta-5.5 (5.5.0.4.13) focal; urgency=medium
 
   * Bump ABI 5.5.0-4
