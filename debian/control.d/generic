@@ -1,6 +1,7 @@
 Package: linux-headers-generic${variant:suffix}
 Architecture: amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
+Provides: ${variant:provides-headers}
 Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-generic
 Description: Generic Linux kernel headers
  This package will always depend on the latest generic kernel headers
@@ -9,6 +10,7 @@ Description: Generic Linux kernel headers
 Package: linux-image-generic${variant:suffix}
 Architecture: amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
+Provides: ${variant:provides-image}
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic, linux-modules-extra-${kernel-abi-version}-generic [amd64 arm64 powerpc ppc64el s390x], linux-firmware, intel-microcode [amd64], amd64-microcode [amd64]
 Recommends: thermald [amd64]
 Description: Generic Linux kernel image
@@ -36,6 +38,7 @@ Description: Generic Linux kernel cloud tools
 Package: linux-generic${variant:suffix}
 Architecture: amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
+Provides: ${variant:provides}
 Depends: ${misc:Depends}, linux-image-generic${variant:suffix} (= ${binary:Version}), linux-headers-generic${variant:suffix} (= ${binary:Version})
 Description: Complete Generic Linux kernel and headers
  This package will always depend on the latest complete generic Linux kernel
