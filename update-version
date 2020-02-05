@@ -34,6 +34,31 @@ if [ "$count" != 1 ]; then
 	exit 1
 fi
 
+# Update things from the primary package.
+for thing in \
+	debian/dkms-versions \
+	debian/scripts/misc/git-ubuntu-log
+do
+	from="$master_dir/$thing"
+	to="$thing"
+
+	if [ -f "$from" ]; then
+		cp -p "$from" "$to" || exit 1
+		git add "$to" || exit 1
+	else
+		rm -f "$to"
+		git rm --ignore-unmatch "$to" || exit 1
+	fi
+	if ! git diff --exit-code HEAD -- "$thing" >/dev/null; then
+		msg="UBUNTU: [Packaging] resync $thing from main package
+
+BugLink: http://bugs.launchpad.net/bugs/1786013"
+		git commit -m "$msg" -s -- "$thing"
+	else
+		echo "$thing: no changes from master"
+	fi
+done
+
 # We need to ensure the ABI number matches our master source.
 # extract both for comparison.
 here_abi=${here_version%.*}
