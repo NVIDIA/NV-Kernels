@@ -10,6 +10,7 @@ Package: linux-image-snapdragon${variant:suffix}
 Architecture: arm64
 Section: kernel
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-snapdragon, linux-firmware
+Provides: ${dkms:wireguard-modules}
 Description: Linux kernel image for the Qualcomm Snapdragon 410c architecture
  This package will always depend on the latest kernel image available
  for ARM64 Qualcomm Snapdragon 410c systems.

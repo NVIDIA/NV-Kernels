@@ -40,6 +40,11 @@ clean: debian/control
 	dh_testroot
 	dh_clean
 
+# Versions of dkms packages.
+dkms_zfs_linux_version=$(shell gawk '/^zfs-linux / { print $$2; }' debian/dkms-versions)
+dkms_vbox_guest_version=$(shell gawk '/^virtualbox/ { print $$2; }' debian/dkms-versions)
+dkms_wireguard_version=$(shell gawk '/^wireguard-linux-compat / { print $$2; }' debian/dkms-versions)
+
 define variant_payload
 variant="$$(echo '$(variant)' | sed -e 's/--//')"; \
 sed -e "s/\$${variant:suffix}/$$variant/g" -e "s/\$${variant:provides\(\|-image\|-headers\)}/$${variant_provides:+linux\1-$$variant_provides}/" <$$i; \
@@ -50,7 +55,7 @@ endef
 debian/control: $(control_files)
 	for i in $^; do \
 		if grep -q "{variant:" $$i; then \
-			variant_provides="$(VARIANT_PROVIDES)"; \
+			variant_provides="$(VARIANT_PROVIDES),"; \
 			$(foreach variant,$(variants),$(variant_payload)) \
 		else \
 			cat $$i; \
@@ -69,6 +74,9 @@ debian/control: $(control_files)
 
 gencontrol_flags = -Vkernel-version=$(KERNEL_VERSION)
 gencontrol_flags += -Vkernel-abi-version=$(KERNEL_ABI_VERSION)
+gencontrol_flags += -Vdkms:zfs-modules="zfs-modules (= $(dkms_zfs_linux_version)),"
+gencontrol_flags += -Vdkms:wireguard-modules="wireguard-modules (= $(dkms_wireguard_version)),"
+gencontrol_flags += -Vdkms:virtualbox-guest-modules="virtualbox-guest-modules (= $(dkms_vbox_guest_version)),"
 
 build-%:
 	:
