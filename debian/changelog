@@ -1,3 +1,22 @@
+linux-meta-5.6 (5.6.0.3.4) focal; urgency=medium
+
+  * Bump ABI 5.6.0-3
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+    - [Packaging] update variants
+    - [Packaging] update variants
+
+  * installing linux-modules-nvidia does not remove nvidia-dkms, and the kernel
+    prioritizes the wrong version of the module from disk (LP: #1856414)
+    - [Packaging] expose versioned provides for contained dkms binaries
+    - [Packaging] update-version -- add dkms-versions data to sync list
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] Remove snapdragon meta packages
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 04 Mar 2020 08:22:13 +0100
+
 linux-meta-5.6 (5.6.0.2.3) focal; urgency=medium
 
   * Bump ABI 5.6.0-2
