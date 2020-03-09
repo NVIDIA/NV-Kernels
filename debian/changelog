@@ -1,3 +1,12 @@
+linux-meta-5.6 (5.6.0.4.5) focal; urgency=medium
+
+  * Bump ABI 5.6.0-4
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 09 Mar 2020 11:14:23 +0100
+
 linux-meta-5.6 (5.6.0.3.4) focal; urgency=medium
 
   * Bump ABI 5.6.0-3
