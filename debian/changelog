@@ -1,3 +1,13 @@
+linux-meta-5.6 (5.6.0.6.7) focal; urgency=medium
+
+  * Bump ABI 5.6.0-6
+
+  * Remove linux-firmware dependency from kernel meta packages for s390x
+    (LP: #1867656)
+    - generic: on s390x, do not depend on linux-firmware, not used.
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Thu, 26 Mar 2020 09:54:31 +0100
+
 linux-meta-5.6 (5.6.0.5.6) focal; urgency=medium
 
   * Bump ABI 5.6.0-5
