@@ -39,9 +39,9 @@ clean: debian/control
 	dh_clean
 
 # Versions of dkms packages.
-dkms_zfs_linux_version=$(shell gawk '^zfs-linux/ { print $$2; }' debian/dkms-versions)
-dkms_virtualbox_version=$(shell gawk '^virtualbox/ { print $$2; }' debian/dkms-versions)
-dkms_wireguard_version=$(shell gawk '^wireguard-linux-compat/ { print $$2; }' debian/dkms-versions)
+dkms_zfs_linux_version=$(shell gawk '/^zfs-linux/ { print $$2; }' debian/dkms-versions)
+dkms_virtualbox_version=$(shell gawk '/^virtualbox/ { print $$2; }' debian/dkms-versions)
+dkms_wireguard_version=$(shell gawk '/^wireguard-linux-compat/ { print $$2; }' debian/dkms-versions)
 
 debian/control: tp_key=test:provides\(-full\|-image\|-headers\|-modules-extra\)
 debian/control: $(control_files)
