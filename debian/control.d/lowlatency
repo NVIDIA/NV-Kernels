@@ -37,6 +37,7 @@ Description: lowlatency Linux kernel cloud tools
 Package: linux-lowlatency${variant:suffix}
 Architecture: amd64
 Section: kernel
+Provides: ${test:provides-full-lowlatency}
 Depends: ${misc:Depends}, linux-image-lowlatency${variant:suffix} (= ${binary:Version}), linux-headers-lowlatency${variant:suffix} (= ${binary:Version})
 Description: Complete lowlatency Linux kernel
  This package will always depend on the latest complete lowlatency Linux kernel

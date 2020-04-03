@@ -28,6 +28,7 @@ Description: Generic LPAE Linux kernel tools
 Package: linux-generic-lpae${variant:suffix}
 Architecture: armhf
 Section: kernel
+Provides: ${test:provides-full-generic-lpae}
 Depends: ${misc:Depends}, linux-image-generic-lpae${variant:suffix} (= ${binary:Version}), linux-headers-generic-lpae${variant:suffix} (= ${binary:Version})
 Description: Complete Generic LPAE Linux kernel and headers
  This package will always depend on the latest complete generic-lpae Linux kernel

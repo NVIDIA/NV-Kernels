@@ -7,11 +7,9 @@
 # Copyright (c) 2004 Jens Schmalzing <jensen@debian.org>
 #
 
-SERIES=$(shell dpkg-parsechangelog | sed -ne 's/^Distribution: *//p' | sed -e 's/-\(security\|updates\|proposed\)$$//')
-SOURCE=$(shell dpkg-parsechangelog | sed -ne 's/^Source: *//p')
+SERIES=$(shell dpkg-parsechangelog -SDistribution | sed -e 's/-\(security\|updates\|proposed\)$$//')
+SOURCE=$(shell dpkg-parsechangelog -SSource)
 KERNEL_SOURCE=$(shell echo "$(SOURCE)" | sed -e 's/-meta//')
-
-VARIANT_PROVIDES=$(shell echo "$(SOURCE)" | sed -e 's/linux-meta-//')
 
 # 5 digit versions (2.6.38.<abi>.<upload>, 3 digit kernel base versions (2.6.38)
 KERNEL_VERSION=$(shell dpkg-parsechangelog -SVersion | cut -d. -f1-3)
@@ -19,7 +17,7 @@ KERNEL_ABI=$(shell dpkg-parsechangelog -SVersion | cut -d. -f4)
 
 KERNEL_ABI_VERSION=$(KERNEL_VERSION)-$(KERNEL_ABI)
 
-# Get variants, assumng primary if debian/variants is not present
+# Get variants, assuming primary if debian/variants is not present
 variants = --
 ifneq (,$(wildcard debian/variants))
 	variants := $(shell cat debian/variants)
@@ -41,30 +39,33 @@ clean: debian/control
 	dh_clean
 
 # Versions of dkms packages.
-dkms_zfs_linux_version=$(shell gawk '/^zfs-linux / { print $$2; }' debian/dkms-versions)
-dkms_vbox_guest_version=$(shell gawk '/^virtualbox/ { print $$2; }' debian/dkms-versions)
-dkms_wireguard_version=$(shell gawk '/^wireguard-linux-compat / { print $$2; }' debian/dkms-versions)
+dkms_zfs_linux_version=$(shell gawk '^zfs-linux/ { print $$2; }' debian/dkms-versions)
+dkms_virtualbox_version=$(shell gawk '^virtualbox/ { print $$2; }' debian/dkms-versions)
+dkms_wireguard_version=$(shell gawk '^wireguard-linux-compat/ { print $$2; }' debian/dkms-versions)
 
-define variant_payload
-variant="$$(echo '$(variant)' | sed -e 's/--//')"; \
-sed -e "s/\$${variant:suffix}/$$variant/g" -e "s/\$${variant:provides\(\|-image\|-headers\)}/$${variant_provides:+linux\1-$$variant_provides}/" <$$i; \
-variant_provides=''; \
-echo "";
-endef
-
+debian/control: tp_key=test:provides\(-full\|-image\|-headers\|-modules-extra\)
 debian/control: $(control_files)
 	for i in $^; do \
 		if grep -q "{variant:" $$i; then \
-			variant_provides="$(VARIANT_PROVIDES),"; \
-			$(foreach variant,$(variants),$(variant_payload)) \
+			variant_first='yes'; \
+			for variant in $(variants); do \
+				variant="$$(echo "$$variant" | sed -e 's/--//')"; \
+				sed \
+					-e "s/\$${variant:suffix}/$$variant/g" \
+					-e "s/\(\$${$(tp_key)[^}]*}\)/$${variant_first:+\1}/g" \
+					<$$i; \
+				echo ""; \
+				variant_first=''; \
+			done; \
 		else \
 			cat $$i; \
 			echo ""; \
 		fi; \
 	done | sed \
+		-e 's/\$${$(tp_key)\([^}]*\)}/kernel-testing--$(KERNEL_SOURCE)-\1-\2,/g' \
 		-e 's/@SERIES@/$(SERIES)/g' \
-		-e 's/@kernel-abi-version@/$(KERNEL_ABI_VERSION)/g' \
-		-e 's/SRCPKGNAME/$(SOURCE)/g' \
+		-e 's/@KERNEL_ABI_VERSION@/$(KERNEL_ABI_VERSION)/g' \
+		-e 's/@SRCPKGNAME@/$(SOURCE)/g' \
 		-e 's/@KERNEL_SOURCE@/$(KERNEL_SOURCE)/g' \
 	    >$@.tmp
 	rm -f $@
@@ -75,8 +76,8 @@ debian/control: $(control_files)
 gencontrol_flags = -Vkernel-version=$(KERNEL_VERSION)
 gencontrol_flags += -Vkernel-abi-version=$(KERNEL_ABI_VERSION)
 gencontrol_flags += -Vdkms:zfs-modules="zfs-modules (= $(dkms_zfs_linux_version)),"
-gencontrol_flags += -Vdkms:wireguard-modules="wireguard-modules (= $(dkms_wireguard_version)),"
-gencontrol_flags += -Vdkms:virtualbox-guest-modules="virtualbox-guest-modules (= $(dkms_vbox_guest_version)),"
+gencontrol_flags += -Vdkms:virtualbox-guest-modules="virtualbox-guest-modules (= $(dkms_virtualbox_version)),"
+gencontrol_flags += -Vdkms:wireguard-linux-compat-modules="wireguard-modules (= $(dkms_wireguard_version)),"
 
 build-%:
 	:

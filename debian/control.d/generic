@@ -37,6 +37,7 @@ Description: Generic Linux kernel cloud tools
 Package: linux-generic${variant:suffix}
 Architecture: amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
+Provides: ${test:provides-full-generic} ${test:provides-full-preferred}
 Depends: ${misc:Depends}, linux-image-generic${variant:suffix} (= ${binary:Version}), linux-headers-generic${variant:suffix} (= ${binary:Version})
 Description: Complete Generic Linux kernel and headers
  This package will always depend on the latest complete generic Linux kernel
