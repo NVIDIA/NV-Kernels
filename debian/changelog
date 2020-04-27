@@ -1,3 +1,9 @@
+linux-meta-5.7 (5.7.0.1.2) groovy; urgency=medium
+
+  * Bump ABI 5.7.0-1
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 27 Apr 2020 15:55:25 +0200
+
 linux-meta-5.7 (5.7.0.0.1) groovy; urgency=medium
 
   * Empty entry.
