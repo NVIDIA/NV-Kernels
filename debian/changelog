@@ -1,3 +1,15 @@
+linux-meta-5.7 (5.7.0.2.3) groovy; urgency=medium
+
+  * Bump ABI 5.7.0-2
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+  * wireguard-tools should NOT recommend wireguard-dkms (LP: #1873288)
+    - [Config] correct brown-paper-bag in wireguard provides
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 04 May 2020 14:31:02 +0200
+
 linux-meta-5.7 (5.7.0.1.2) groovy; urgency=medium
 
   * Bump ABI 5.7.0-1
