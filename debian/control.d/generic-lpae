@@ -9,7 +9,7 @@ Description: Generic LPAE Linux kernel headers
 Package: linux-image-generic-lpae${variant:suffix}
 Architecture: armhf
 Section: kernel
-Provides: ${dkms:wireguard-linux-compat-modules}
+Provides:
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic-lpae, linux-firmware
 Recommends: thermald [amd64]
 Description: Generic LPAE Linux kernel image

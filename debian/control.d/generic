@@ -9,7 +9,7 @@ Description: Generic Linux kernel headers
 Package: linux-image-generic${variant:suffix}
 Architecture: amd64 armhf arm64 powerpc ppc64el s390x
 Section: kernel
-Provides: ${dkms:zfs-modules} ${dkms:virtualbox-guest-modules} ${dkms:wireguard-linux-compat-modules}
+Provides: ${dkms:zfs-modules} ${dkms:virtualbox-guest-modules}
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic, linux-modules-extra-${kernel-abi-version}-generic [amd64 arm64 powerpc ppc64el s390x], linux-firmware [amd64 armhf arm64 ppc64el], intel-microcode [amd64], amd64-microcode [amd64]
 Recommends: thermald [amd64]
 Description: Generic Linux kernel image

@@ -10,7 +10,7 @@ Package: linux-image-lowlatency${variant:suffix}
 Architecture: amd64
 Section: kernel
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware, intel-microcode [amd64], amd64-microcode [amd64]
-Provides: ${dkms:zfs-modules} ${dkms:virtualbox-guest-modules} ${dkms:wireguard-linux-compat-modules}
+Provides: ${dkms:zfs-modules} ${dkms:virtualbox-guest-modules}
 Recommends: thermald [amd64]
 Description: lowlatency Linux kernel image
  This package will always depend on the latest lowlatency kernel image

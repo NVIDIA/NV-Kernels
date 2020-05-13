@@ -9,7 +9,7 @@ Package: linux-image-virtual${variant:suffix}
 Architecture: amd64 arm64 powerpc ppc64el s390x
 Section: kernel
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic
-Provides: ${dkms:zfs-modules} ${dkms:virtualbox-guest-modules} ${dkms:wireguard-linux-compat-modules}
+Provides: ${dkms:zfs-modules} ${dkms:virtualbox-guest-modules}
 Description: Virtual Linux kernel image
  This package will always depend on the latest minimal generic kernel image
  used for virtual instances.
