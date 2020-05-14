@@ -25,7 +25,7 @@ endif
 
 control_files := debian/control.common
 # control files only wanted for the primary variant
-primary_control_files := debian/control.d/primary $(shell LC_ALL=C ls -d debian/control.d/transitionals-*)
+primary_control_files := debian/control.d/primary $(shell LC_ALL=C ls -d debian/control.d/transitionals-* 2>/dev/null)
 ifneq ($(filter --,$(variants)),)
 	control_files += $(primary_control_files)
 endif
