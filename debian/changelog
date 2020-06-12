@@ -1,3 +1,12 @@
+linux-meta-5.7 (5.7.0.8.10) groovy; urgency=medium
+
+  * Bump ABI 5.7.0-8
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Fri, 12 Jun 2020 14:07:26 +0200
+
 linux-meta-5.7 (5.7.0.7.9) groovy; urgency=medium
 
   * Bump ABI 5.7.0-7
