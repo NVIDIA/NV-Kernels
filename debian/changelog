@@ -1,3 +1,18 @@
+linux-meta-5.8 (5.8.0.0.1) groovy; urgency=medium
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+    - [Packaging] update variants
+
+  * Miscellaneous Ubuntu changes
+    - Prevent errors when primary control files are not present
+    - [Debian] Get wireguard version from kernel module
+    - [Packaging] Add back Provides: wireguard-linux-compat-modules
+    - [Debian] Use kernel version for virtualbox Provides:
+    - [Packaging] Change source package name to linux-meta-5.8
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Wed, 17 Jun 2020 11:56:06 -0500
+
 linux-meta-5.8 (5.8.0.0.0) groovy; urgency=medium
 
   * Empty entry.
