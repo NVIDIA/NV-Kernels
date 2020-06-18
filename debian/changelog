@@ -1,3 +1,9 @@
+linux-meta-5.8 (5.8.0.1.2) groovy; urgency=medium
+
+  * Bump ABI 5.8.0-1
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Wed, 17 Jun 2020 19:35:40 -0500
+
 linux-meta-5.8 (5.8.0.0.1) groovy; urgency=medium
 
   * Packaging resync (LP: #1786013)
