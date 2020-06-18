@@ -1,3 +1,10 @@
+linux-meta-5.8 (5.8.0.1.3) groovy; urgency=medium
+
+  * Miscellaneous Ubuntu changes
+    - [Debian] Don't use brace expansion for matching control files
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Thu, 18 Jun 2020 07:53:24 -0500
+
 linux-meta-5.8 (5.8.0.1.2) groovy; urgency=medium
 
   * Bump ABI 5.8.0-1
