@@ -1,3 +1,9 @@
+linux-meta (5.8.0.10.12) groovy; urgency=medium
+
+  * Bump ABI 5.8.0-10
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Tue, 28 Jul 2020 18:25:13 -0500
+
 linux-meta (5.8.0.9.11) groovy; urgency=medium
 
   * Bump ABI 5.8.0-9
