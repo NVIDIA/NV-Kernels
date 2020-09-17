@@ -1,3 +1,14 @@
+linux-meta-5.9 (5.9.0.0.1) groovy; urgency=medium
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+    - [Packaging] resync debian/dkms-versions from main package
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] Add transitional packages for linux-oem-20.04
+
+ -- Seth Forshee <seth.forshee@canonical.com>  Thu, 17 Sep 2020 15:04:55 -0500
+
 linux-meta-5.9 (5.9.0.0.0) groovy; urgency=medium
 
   * Empty entry.
