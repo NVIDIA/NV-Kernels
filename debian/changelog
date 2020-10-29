@@ -1,4 +1,4 @@
-linux-meta-5.10 (5.10.0.0.1) groovy; urgency=medium
+linux-meta-5.10 (5.10.0.0.1) hirsute; urgency=medium
 
   * Packaging resync (LP: #1786013)
     - [Packaging] resync debian/dkms-versions from main package
