@@ -1,3 +1,9 @@
+linux-meta (5.11.0.4.5) hirsute; urgency=medium
+
+  * Bump ABI 5.11.0-4
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Thu, 14 Jan 2021 12:54:55 +0100
+
 linux-meta (5.11.0.3.4) hirsute; urgency=medium
 
   * Bump ABI 5.11.0-3
