@@ -112,6 +112,55 @@ static inline void mpam_mon_sel_lock_init(struct mpam_msc *msc)
 	raw_spin_lock_init(&msc->_mon_sel_lock);
 }
 
+/*
+ * When we compact the supported features, we don't care what they are.
+ * Storing them as a bitmap makes life easy.
+ */
+typedef u16 mpam_features_t;
+
+/* Bits for mpam_features_t */
+enum mpam_device_features {
+	mpam_feat_ccap_part = 0,
+	mpam_feat_cpor_part,
+	mpam_feat_mbw_part,
+	mpam_feat_mbw_min,
+	mpam_feat_mbw_max,
+	mpam_feat_mbw_prop,
+	mpam_feat_msmon,
+	mpam_feat_msmon_csu,
+	mpam_feat_msmon_csu_capture,
+	mpam_feat_msmon_csu_hw_nrdy,
+	mpam_feat_msmon_mbwu,
+	mpam_feat_msmon_mbwu_capture,
+	mpam_feat_msmon_mbwu_rwbw,
+	mpam_feat_msmon_mbwu_hw_nrdy,
+	mpam_feat_msmon_capt,
+	MPAM_FEATURE_LAST,
+};
+static_assert(BITS_PER_TYPE(mpam_features_t) >= MPAM_FEATURE_LAST);
+
+struct mpam_props {
+	mpam_features_t		features;
+
+	u16			cpbm_wd;
+	u16			mbw_pbm_bits;
+	u16			bwa_wd;
+	u16			num_csu_mon;
+	u16			num_mbwu_mon;
+};
+
+static inline bool mpam_has_feature(enum mpam_device_features feat,
+				    struct mpam_props *props)
+{
+	return (1 << feat) & props->features;
+}
+
+static inline void mpam_set_feature(enum mpam_device_features feat,
+				    struct mpam_props *props)
+{
+	props->features |= (1 << feat);
+}
+
 struct mpam_class {
 	/* mpam_components in this class */
 	struct list_head	components;
@@ -151,6 +200,8 @@ struct mpam_vmsc {
 	/* mpam_msc_ris in this vmsc */
 	struct list_head	ris;
 
+	struct mpam_props	props;
+
 	/* All RIS in this vMSC are members of this MSC */
 	struct mpam_msc		*msc;
 
@@ -162,6 +213,8 @@ struct mpam_vmsc {
 
 struct mpam_msc_ris {
 	u8			ris_idx;
+	u64			idr;
+	struct mpam_props	props;
 
 	cpumask_t		affinity;
 
