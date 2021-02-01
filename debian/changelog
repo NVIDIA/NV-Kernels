@@ -1,3 +1,12 @@
+linux-meta (5.11.0.7.8) hirsute; urgency=medium
+
+  * Bump ABI 5.11.0-7
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 01 Feb 2021 11:57:04 +0100
+
 linux-meta (5.11.0.6.7) hirsute; urgency=medium
 
   * Bump ABI 5.11.0-6
