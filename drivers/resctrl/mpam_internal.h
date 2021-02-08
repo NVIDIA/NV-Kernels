@@ -32,6 +32,10 @@ struct mpam_garbage {
 	struct platform_device	*pdev;
 };
 
+/* Bit positions for error_irq_flags */
+#define	MPAM_ERROR_IRQ_REQUESTED  0
+#define	MPAM_ERROR_IRQ_HW_ENABLED 1
+
 struct mpam_msc {
 	/* member of mpam_all_msc */
 	struct list_head        all_msc_list;
@@ -46,6 +50,11 @@ struct mpam_msc {
 	struct pcc_mbox_chan	*pcc_chan;
 	u32			nrdy_usec;
 	cpumask_t		accessibility;
+	bool			has_extd_esr;
+
+	int				reenable_error_ppi;
+	struct mpam_msc * __percpu	*error_dev_id;
+
 	atomic_t		online_refs;
 
 	/*
@@ -54,6 +63,7 @@ struct mpam_msc {
 	 */
 	struct mutex		probe_lock;
 	bool			probed;
+	unsigned long		error_irq_flags;
 	u16			partid_max;
 	u8			pmg_max;
 	unsigned long		ris_idxs;
