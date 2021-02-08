@@ -50,7 +50,7 @@ static bool frob_irq(struct platform_device *pdev, int intid, u32 flags,
 
 	else
 		*irq = acpi_register_gsi(&pdev->dev, intid, sense,
-					 ACPI_ACTIVE_LOW);
+					 ACPI_ACTIVE_HIGH);
 	if (*irq <= 0) {
 		pr_err_once("Failed to register interrupt 0x%x with ACPI\n",
 			    intid);
