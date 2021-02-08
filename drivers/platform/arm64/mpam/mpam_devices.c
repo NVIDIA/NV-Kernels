@@ -14,6 +14,9 @@
 #include <linux/device.h>
 #include <linux/errno.h>
 #include <linux/gfp.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/irqdesc.h>
 #include <linux/list.h>
 #include <linux/lockdep.h>
 #include <linux/mutex.h>
@@ -61,6 +64,12 @@ static DEFINE_SPINLOCK(partid_max_lock);
  * was not brought online at boot, this can happen surprisingly late.
  */
 static DECLARE_WORK(mpam_enable_work, &mpam_enable);
+
+/*
+ * All mpam error interrupts indicate a software bug. On receipt, disable the
+ * driver.
+ */
+static DECLARE_WORK(mpam_broken_work, &mpam_disable);
 
 /*
  * An MSC is a physical container for controls and monitors, each identified by
@@ -157,6 +166,24 @@ static u64 mpam_msc_read_idr(struct mpam_msc *msc)
 		idr_high = mpam_read_partsel_reg(msc, IDR + 4);
 
 	return (idr_high << 32) | idr_low;
+}
+
+static void mpam_msc_zero_esr(struct mpam_msc *msc)
+{
+	__mpam_write_reg(msc, MPAMF_ESR, 0);
+	if (msc->has_extd_esr)
+		__mpam_write_reg(msc, MPAMF_ESR + 4, 0);
+}
+
+static u64 mpam_msc_read_esr(struct mpam_msc *msc)
+{
+	u64 esr_high = 0, esr_low;
+
+	esr_low = __mpam_read_reg(msc, MPAMF_ESR);
+	if (msc->has_extd_esr)
+		esr_high = __mpam_read_reg(msc, MPAMF_ESR + 4);
+
+	return (esr_high << 32) | esr_low;
 }
 
 static void __mpam_part_sel_raw(u32 partsel, struct mpam_msc *msc)
@@ -405,11 +432,11 @@ static void mpam_msc_destroy(struct mpam_msc *msc)
 
 	lockdep_assert_held(&mpam_list_lock);
 
-	list_del_rcu(&msc->glbl_list);
-	platform_set_drvdata(pdev, NULL);
-
 	list_for_each_entry_safe(ris, tmp, &msc->ris, msc_list)
 		mpam_ris_destroy(ris);
+
+	list_del_rcu(&msc->glbl_list);
+	platform_set_drvdata(pdev, NULL);
 
 	add_to_garbage(msc);
 	msc->garbage.pdev = pdev;
@@ -828,6 +855,7 @@ static int mpam_msc_hw_probe(struct mpam_msc *msc)
 		pmg_max = FIELD_GET(MPAMF_IDR_PMG_MAX, idr);
 		msc->partid_max = min(msc->partid_max, partid_max);
 		msc->pmg_max = min(msc->pmg_max, pmg_max);
+		msc->has_extd_esr = FIELD_GET(MPAMF_IDR_HAS_EXT_ESR, idr);
 
 		ris = mpam_get_or_create_ris(msc, ris_idx);
 		if (IS_ERR(ris))
@@ -974,6 +1002,13 @@ static void mpam_reset_msc(struct mpam_msc *msc, bool online)
 	mpam_mon_sel_outer_unlock(msc);
 }
 
+static void _enable_percpu_irq(void *_irq)
+{
+	int *irq = _irq;
+
+	enable_percpu_irq(*irq, IRQ_TYPE_NONE);
+}
+
 static int mpam_cpu_online(unsigned int cpu)
 {
 	int idx;
@@ -983,6 +1018,9 @@ static int mpam_cpu_online(unsigned int cpu)
 	list_for_each_entry_srcu(msc, &mpam_all_msc, glbl_list, srcu_read_lock_held(&mpam_srcu)) {
 		if (!cpumask_test_cpu(cpu, &msc->accessibility))
 			continue;
+
+		if (msc->reenable_error_ppi)
+			_enable_percpu_irq(&msc->reenable_error_ppi);
 
 		if (atomic_fetch_inc(&msc->online_refs) == 0)
 			mpam_reset_msc(msc, true);
@@ -1032,6 +1070,9 @@ static int mpam_cpu_offline(unsigned int cpu)
 		if (!cpumask_test_cpu(cpu, &msc->accessibility))
 			continue;
 
+		if (msc->reenable_error_ppi)
+			disable_percpu_irq(msc->reenable_error_ppi);
+
 		if (atomic_dec_and_test(&msc->online_refs))
 			mpam_reset_msc(msc, false);
 	}
@@ -1056,6 +1097,51 @@ static void mpam_register_cpuhp_callbacks(int (*online)(unsigned int online),
 		mpam_cpuhp_state = 0;
 	}
 	mutex_unlock(&mpam_cpuhp_state_lock);
+}
+
+static int __setup_ppi(struct mpam_msc *msc)
+{
+	int cpu;
+
+	msc->error_dev_id = alloc_percpu_gfp(struct mpam_msc *, GFP_KERNEL);
+	if (!msc->error_dev_id)
+		return -ENOMEM;
+
+	for_each_cpu(cpu, &msc->accessibility) {
+		struct mpam_msc *empty = *per_cpu_ptr(msc->error_dev_id, cpu);
+
+		if (empty) {
+			pr_err_once("%s shares PPI with %s!\n",
+				    dev_name(&msc->pdev->dev),
+				    dev_name(&empty->pdev->dev));
+			return -EBUSY;
+		}
+		*per_cpu_ptr(msc->error_dev_id, cpu) = msc;
+	}
+
+	return 0;
+}
+
+static int mpam_msc_setup_error_irq(struct mpam_msc *msc)
+{
+	int irq;
+
+	irq = platform_get_irq_byname_optional(msc->pdev, "error");
+	if (irq <= 0)
+		return 0;
+
+	/* Allocate and initialise the percpu device pointer for PPI */
+	if (irq_is_percpu(irq))
+		return __setup_ppi(msc);
+
+	/* sanity check: shared interrupts can be routed anywhere? */
+	if (!cpumask_equal(&msc->accessibility, cpu_possible_mask)) {
+		pr_err_once("msc:%u is a private resource with a shared error interrupt",
+			    msc->id);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 static int mpam_dt_count_msc(void)
@@ -1265,6 +1351,10 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			err = -EINVAL;
 			break;
 		}
+
+		err = mpam_msc_setup_error_irq(msc);
+		if (err)
+			break;
 
 		if (device_property_read_u32(&pdev->dev, "pcc-channel",
 					     &msc->pcc_subspace_id))
@@ -1548,11 +1638,193 @@ static void mpam_enable_merge_features(struct list_head *all_classes_list)
 	}
 }
 
+static char *mpam_errcode_names[16] = {
+	[0] = "No error",
+	[1] = "PARTID_SEL_Range",
+	[2] = "Req_PARTID_Range",
+	[3] = "MSMONCFG_ID_RANGE",
+	[4] = "Req_PMG_Range",
+	[5] = "Monitor_Range",
+	[6] = "intPARTID_Range",
+	[7] = "Unexpected_INTERNAL",
+	[8] = "Undefined_RIS_PART_SEL",
+	[9] = "RIS_No_Control",
+	[10] = "Undefined_RIS_MON_SEL",
+	[11] = "RIS_No_Monitor",
+	[12 ... 15] = "Reserved"
+};
+
+static int mpam_enable_msc_ecr(void *_msc)
+{
+	struct mpam_msc *msc = _msc;
+
+	__mpam_write_reg(msc, MPAMF_ECR, 1);
+
+	return 0;
+}
+
+static int mpam_disable_msc_ecr(void *_msc)
+{
+	struct mpam_msc *msc = _msc;
+
+	__mpam_write_reg(msc, MPAMF_ECR, 0);
+
+	return 0;
+}
+
+static irqreturn_t __mpam_irq_handler(int irq, struct mpam_msc *msc)
+{
+	u64 reg;
+	u16 partid;
+	u8 errcode, pmg, ris;
+
+	if (WARN_ON_ONCE(!msc) ||
+	    WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(),
+					   &msc->accessibility)))
+		return IRQ_NONE;
+
+	reg = mpam_msc_read_esr(msc);
+
+	errcode = FIELD_GET(MPAMF_ESR_ERRCODE, reg);
+	if (!errcode)
+		return IRQ_NONE;
+
+	/* Clear level triggered irq */
+	mpam_msc_zero_esr(msc);
+
+	partid = FIELD_GET(MPAMF_ESR_PARTID_OR_MON, reg);
+	pmg = FIELD_GET(MPAMF_ESR_PMG, reg);
+	ris = FIELD_GET(MPAMF_ESR_PMG, reg);
+
+	pr_err("error irq from msc:%u '%s', partid:%u, pmg: %u, ris: %u\n",
+	       msc->id, mpam_errcode_names[errcode], partid, pmg, ris);
+
+	if (irq_is_percpu(irq)) {
+		mpam_disable_msc_ecr(msc);
+		schedule_work(&mpam_broken_work);
+		return IRQ_HANDLED;
+	}
+
+	return IRQ_WAKE_THREAD;
+}
+
+static irqreturn_t mpam_ppi_handler(int irq, void *dev_id)
+{
+	struct mpam_msc *msc = *(struct mpam_msc **)dev_id;
+
+	return __mpam_irq_handler(irq, msc);
+}
+
+static irqreturn_t mpam_spi_handler(int irq, void *dev_id)
+{
+	struct mpam_msc *msc = dev_id;
+
+	return __mpam_irq_handler(irq, msc);
+}
+
+static irqreturn_t mpam_disable_thread(int irq, void *dev_id);
+
+static int mpam_register_irqs(void)
+{
+	int err, irq, idx;
+	struct mpam_msc *msc;
+
+	lockdep_assert_cpus_held();
+
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_srcu(msc, &mpam_all_msc, glbl_list, srcu_read_lock_held(&mpam_srcu)) {
+		irq = platform_get_irq_byname_optional(msc->pdev, "error");
+		if (irq <= 0)
+			continue;
+
+		/* The MPAM spec says the interrupt can be SPI, PPI or LPI */
+		/* We anticipate sharing the interrupt with other MSCs */
+		if (irq_is_percpu(irq)) {
+			err = request_percpu_irq(irq, &mpam_ppi_handler,
+						 "mpam:msc:error",
+						 msc->error_dev_id);
+			if (err)
+				return err;
+
+			msc->reenable_error_ppi = irq;
+			smp_call_function_many(&msc->accessibility,
+					       &_enable_percpu_irq, &irq,
+					       true);
+		} else {
+			err = devm_request_threaded_irq(&msc->pdev->dev, irq,
+							&mpam_spi_handler,
+							&mpam_disable_thread,
+							IRQF_SHARED,
+							"mpam:msc:error", msc);
+			if (err)
+				return err;
+		}
+
+		msc->error_irq_requested = true;
+		mpam_touch_msc(msc, mpam_enable_msc_ecr, msc);
+		msc->error_irq_hw_enabled = true;
+	}
+	srcu_read_unlock(&mpam_srcu, idx);
+
+	return 0;
+}
+
+static void mpam_unregister_irqs(void)
+{
+	int irq, idx;
+	struct mpam_msc *msc;
+
+	cpus_read_lock();
+	/* take the lock as free_irq() can sleep */
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_srcu(msc, &mpam_all_msc, glbl_list, srcu_read_lock_held(&mpam_srcu)) {
+		irq = platform_get_irq_byname_optional(msc->pdev, "error");
+		if (irq <= 0)
+			continue;
+
+		if (msc->error_irq_hw_enabled) {
+			mpam_touch_msc(msc, mpam_disable_msc_ecr, msc);
+			msc->error_irq_hw_enabled = false;
+		}
+
+		if (msc->error_irq_requested) {
+			if (irq_is_percpu(irq)) {
+				msc->reenable_error_ppi = 0;
+				free_percpu_irq(irq, msc->error_dev_id);
+			} else {
+				devm_free_irq(&msc->pdev->dev, irq, msc);
+			}
+			msc->error_irq_requested = false;
+		}
+	}
+	srcu_read_unlock(&mpam_srcu, idx);
+	cpus_read_unlock();
+}
+
 static void mpam_enable_once(void)
 {
+	int err;
+
+	/*
+	 * If all the MSC have been probed, enabling the IRQs happens next.
+	 * That involves cross-calling to a CPU that can reach the MSC, and
+	 * the locks must be taken in this order:
+	 */
+	cpus_read_lock();
 	mutex_lock(&mpam_list_lock);
 	mpam_enable_merge_features(&mpam_classes);
+
+	err = mpam_register_irqs();
+	if (err)
+		pr_warn("Failed to register irqs: %d\n", err);
+
 	mutex_unlock(&mpam_list_lock);
+	cpus_read_unlock();
+
+	if (err) {
+		schedule_work(&mpam_broken_work);
+		return;
+	}
 
 	mutex_lock(&mpam_cpuhp_state_lock);
 	cpuhp_remove_state(mpam_cpuhp_state);
@@ -1621,16 +1893,39 @@ static void mpam_reset_class(struct mpam_class *class)
  * All of MPAMs errors indicate a software bug, restore any modified
  * controls to their reset values.
  */
-void mpam_disable(void)
+static irqreturn_t mpam_disable_thread(int irq, void *dev_id)
 {
 	int idx;
 	struct mpam_class *class;
+	struct mpam_msc *msc, *tmp;
+
+	mutex_lock(&mpam_cpuhp_state_lock);
+	if (mpam_cpuhp_state) {
+		cpuhp_remove_state(mpam_cpuhp_state);
+		mpam_cpuhp_state = 0;
+	}
+	mutex_unlock(&mpam_cpuhp_state_lock);
+
+	mpam_unregister_irqs();
 
 	idx = srcu_read_lock(&mpam_srcu);
 	list_for_each_entry_srcu(class, &mpam_classes, classes_list,
 				 srcu_read_lock_held(&mpam_srcu))
 		mpam_reset_class(class);
 	srcu_read_unlock(&mpam_srcu, idx);
+
+	mutex_lock(&mpam_list_lock);
+	list_for_each_entry_safe(msc, tmp, &mpam_all_msc, glbl_list)
+		mpam_msc_destroy(msc);
+	mutex_unlock(&mpam_list_lock);
+	mpam_free_garbage();
+
+	return IRQ_HANDLED;
+}
+
+void mpam_disable(struct work_struct *ignored)
+{
+	mpam_disable_thread(0, NULL);
 }
 
 /*
@@ -1644,7 +1939,6 @@ void mpam_enable(struct work_struct *work)
 	struct mpam_msc *msc;
 	bool all_devices_probed = true;
 
-	/* Have we probed all the hw devices? */
 	mutex_lock(&mpam_list_lock);
 	list_for_each_entry(msc, &mpam_all_msc, glbl_list) {
 		mutex_lock(&msc->probe_lock);
