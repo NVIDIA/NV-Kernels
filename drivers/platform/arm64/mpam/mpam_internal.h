@@ -46,6 +46,11 @@ struct mpam_msc
 	struct pcc_mbox_chan	*pcc_chan;
 	u32			nrdy_usec;
 	cpumask_t		accessibility;
+	bool			has_extd_esr;
+
+	int				reenable_error_ppi;
+	struct mpam_msc * __percpu	*error_dev_id;
+
 	atomic_t		online_refs;
 
 	/*
@@ -54,6 +59,8 @@ struct mpam_msc
 	 */
 	struct mutex		probe_lock;
 	bool			probed;
+	bool			error_irq_requested;
+	bool			error_irq_hw_enabled;
 	u16			partid_max;
 	u8			pmg_max;
 	unsigned long		ris_idxs[128 / BITS_PER_LONG];
@@ -284,7 +291,7 @@ extern u8 mpam_pmg_max;
 
 /* Scheduled work callback to enable mpam once all MSC have been probed */
 void mpam_enable(struct work_struct *work);
-void mpam_disable(void);
+void mpam_disable(struct work_struct *work);
 
 /*
  * MPAM MSCs have the following register layout. See:
