@@ -284,6 +284,7 @@ extern u8 mpam_pmg_max;
 
 /* Scheduled work callback to enable mpam once all MSC have been probed */
 void mpam_enable(struct work_struct *work);
+void mpam_disable(void);
 
 /*
  * MPAM MSCs have the following register layout. See:
