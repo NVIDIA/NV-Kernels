@@ -916,8 +916,6 @@ static int mpam_reset_ris(void *arg)
 	u16 partid, partid_max;
 	struct mpam_msc_ris *ris = arg;
 
-	mpam_assert_srcu_read_lock_held();
-
 	if (ris->in_reset_state)
 		return 0;
 
@@ -1573,6 +1571,66 @@ static void mpam_enable_once(void)
 
 	printk(KERN_INFO "MPAM enabled with %u partid and %u pmg\n",
 		READ_ONCE(mpam_partid_max) + 1, mpam_pmg_max + 1);
+}
+
+static void mpam_reset_component_locked(struct mpam_component *comp)
+{
+	int idx;
+	struct mpam_msc *msc;
+	struct mpam_vmsc *vmsc;
+	struct mpam_msc_ris *ris;
+
+	might_sleep();
+	lockdep_assert_cpus_held();
+
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_rcu(vmsc, &comp->vmsc, comp_list) {
+		msc = vmsc->msc;
+
+		list_for_each_entry_rcu(ris, &vmsc->ris, vmsc_list) {
+			if (!ris->in_reset_state)
+				mpam_touch_msc(msc, mpam_reset_ris, ris);
+			ris->in_reset_state = true;
+		}
+	}
+	srcu_read_unlock(&mpam_srcu, idx);
+}
+
+static void mpam_reset_class_locked(struct mpam_class *class)
+{
+	int idx;
+	struct mpam_component *comp;
+
+	lockdep_assert_cpus_held();
+
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_rcu(comp, &class->components, class_list)
+		mpam_reset_component_locked(comp);
+	srcu_read_unlock(&mpam_srcu, idx);
+}
+
+static void mpam_reset_class(struct mpam_class *class)
+{
+	cpus_read_lock();
+	mpam_reset_class_locked(class);
+	cpus_read_unlock();
+}
+
+/*
+ * Called in response to an error IRQ.
+ * All of MPAMs errors indicate a software bug, restore any modified
+ * controls to their reset values.
+ */
+void mpam_disable(void)
+{
+	int idx;
+	struct mpam_class *class;
+
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_srcu(class, &mpam_classes, classes_list,
+				 srcu_read_lock_held(&mpam_srcu))
+		mpam_reset_class(class);
+	srcu_read_unlock(&mpam_srcu, idx);
 }
 
 /*
