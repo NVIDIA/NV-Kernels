@@ -102,11 +102,7 @@ struct mpam_props
 	u16			num_mbwu_mon;
 };
 
-static inline bool mpam_has_feature(enum mpam_device_features feat,
-				    struct mpam_props *props)
-{
-	return (1<<feat) & props->features;
-}
+#define mpam_has_feature(_feat, x)	((1<<_feat) & (x)->features)
 
 static inline void mpam_set_feature(enum mpam_device_features feat,
 				    struct mpam_props *props)
@@ -136,6 +132,15 @@ struct mpam_class
 	struct list_head	classes_list;
 };
 
+struct mpam_config {
+	/* Which configuration values are valid. 0 is used for reset */
+	mpam_features_t		features;
+
+	u32	cpbm;
+	u32	mbw_pbm;
+	u16	mbw_max;
+};
+
 struct mpam_component
 {
 	u32			comp_id;
@@ -144,6 +149,12 @@ struct mpam_component
 	struct list_head	ris;
 
 	cpumask_t		affinity;
+
+	/*
+	 * Array of configuration values, indexed by partid.
+	 * Read from cpuhp callbacks, hold the cpuhp lock when writing.
+	 */
+	struct mpam_config	*cfg;
 
 	/* member of mpam_class:components */
 	struct list_head	class_list;
@@ -183,6 +194,9 @@ extern u8 mpam_pmg_max;
 /* Scheduled work callback to enable mpam once all MSC have been probed */
 void mpam_enable(struct work_struct *work);
 void mpam_disable(struct work_struct *work);
+
+int mpam_apply_config(struct mpam_component *comp, u16 partid,
+		      struct mpam_config *cfg);
 
 /*
  * MPAM MSCs have the following register layout. See:
