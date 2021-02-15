@@ -1,3 +1,15 @@
+linux-meta (5.11.0.9.10) hirsute; urgency=medium
+
+  * Bump ABI 5.11.0-9
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] Add arm64 generic-64k flavour support
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 15 Feb 2021 16:34:34 +0100
+
 linux-meta (5.11.0.8.9) hirsute; urgency=medium
 
   * Bump ABI 5.11.0-8
