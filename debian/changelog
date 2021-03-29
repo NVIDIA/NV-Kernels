@@ -1,3 +1,12 @@
+linux-meta-unstable (5.12.0.5.5) hirsute; urgency=medium
+
+  * Bump ABI 5.12.0-5
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 29 Mar 2021 15:05:13 +0200
+
 linux-meta-unstable (5.12.0.4.4) hirsute; urgency=medium
 
   * Bump ABI 5.12.0-4
