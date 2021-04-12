@@ -1,3 +1,9 @@
+linux-meta-unstable (5.12.0.7.7) hirsute; urgency=medium
+
+  * Bump ABI 5.12.0-7
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 12 Apr 2021 13:27:48 +0200
+
 linux-meta-unstable (5.12.0.6.6) hirsute; urgency=medium
 
   * Bump ABI 5.12.0-6
