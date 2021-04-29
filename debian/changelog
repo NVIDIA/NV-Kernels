@@ -1,3 +1,15 @@
+linux-meta-unstable (5.12.0.10.10) impish; urgency=medium
+
+  * Bump ABI 5.12.0-10
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+  * Miscellaneous Ubuntu changes
+    - [packaging] move to impish
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Thu, 29 Apr 2021 12:35:00 +0200
+
 linux-meta-unstable (5.12.0.9.9) impish; urgency=medium
 
   * Bump ABI 5.12.0-9
