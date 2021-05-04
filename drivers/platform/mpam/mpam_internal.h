@@ -30,6 +30,7 @@ struct mpam_msc
 	cpumask_t		accessibility;
 
 	struct mutex		lock;
+	bool			probed;
 	unsigned long		ris_idxs[128 / BITS_PER_LONG];
 	u32			ris_max;
 
@@ -97,6 +98,8 @@ struct mpam_msc_ris
 extern struct list_head mpam_classes;
 extern struct srcu_struct mpam_srcu;
 
+/* Scheduled work callback to enable mpam once all MSC have been probed */
+void mpam_enable(struct work_struct *work);
 
 /*
  * MPAM MSCs have the following register layout. See:
@@ -196,7 +199,7 @@ extern struct srcu_struct mpam_srcu;
 
 /* MPAMF_MBWUMON_IDR - MPAM memory bandwidth usage monitor ID register */
 #define MPAMF_MBWUMON_IDR_NUM_MON       GENMASK(15, 0)
-#define MPAMF_MBWUMON_IDR_RWBW           BIT(28)
+#define MPAMF_MBWUMON_IDR_HAS_RWBW      BIT(28)
 #define MPAMF_MBWUMON_IDR_LWD           BIT(29)
 #define MPAMF_MBWUMON_IDR_HAS_LONG      BIT(30)
 #define MPAMF_MBWUMON_IDR_HAS_CAPTURE   BIT(31)
