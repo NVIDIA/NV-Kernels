@@ -49,6 +49,7 @@ struct mpam_msc {
 	 * properties become read-only and the lists are protected by SRCU.
 	 */
 	struct mutex		probe_lock;
+	bool			probed;
 	unsigned long		ris_idxs[128 / BITS_PER_LONG];
 	u32			ris_max;
 
@@ -59,14 +60,14 @@ struct mpam_msc {
 	 * part_sel_lock protects access to the MSC hardware registers that are
 	 * affected by MPAMCFG_PART_SEL. (including the ID registers that vary
 	 * by RIS).
-	 * If needed, take msc->lock first.
+	 * If needed, take msc->probe_lock first.
 	 */
 	struct mutex		part_sel_lock;
 
 	/*
 	 * mon_sel_lock protects access to the MSC hardware registers that are
 	 * affeted by MPAMCFG_MON_SEL.
-	 * If needed, take msc->lock first.
+	 * If needed, take msc->probe_lock first.
 	 */
 	struct mutex		outer_mon_sel_lock;
 	spinlock_t		inner_mon_sel_lock;
@@ -146,6 +147,9 @@ struct mpam_msc_ris {
 /* List of all classes - protected by srcu*/
 extern struct srcu_struct mpam_srcu;
 extern struct list_head mpam_classes;
+
+/* Scheduled work callback to enable mpam once all MSC have been probed */
+void mpam_enable(struct work_struct *work);
 
 /*
  * MPAM MSCs have the following register layout. See:
@@ -256,7 +260,7 @@ extern struct list_head mpam_classes;
 
 /* MPAMF_MBWUMON_IDR - MPAM memory bandwidth usage monitor ID register */
 #define MPAMF_MBWUMON_IDR_NUM_MON       GENMASK(15, 0)
-#define MPAMF_MBWUMON_IDR_RWBW           BIT(28)
+#define MPAMF_MBWUMON_IDR_HAS_RWBW      BIT(28)
 #define MPAMF_MBWUMON_IDR_LWD           BIT(29)
 #define MPAMF_MBWUMON_IDR_HAS_LONG      BIT(30)
 #define MPAMF_MBWUMON_IDR_HAS_CAPTURE   BIT(31)
