@@ -34,10 +34,7 @@ static inline int acpi_mpam_parse_resources(struct mpam_msc *msc,
 static inline int acpi_mpam_count_msc(void) { return -EINVAL; }
 #endif
 
-static inline int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
-		    enum mpam_class_types type, u8 class_id, int component_id)
-{
-	return -EINVAL;
-}
+int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
+		    enum mpam_class_types type, u8 class_id, int component_id);
 
 #endif /* __LINUX_ARM_MPAM_H */

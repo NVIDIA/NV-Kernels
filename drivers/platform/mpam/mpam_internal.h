@@ -11,6 +11,7 @@
 #include <linux/mutex.h>
 #include <linux/resctrl.h>
 #include <linux/sizes.h>
+#include <linux/srcu.h>
 
 struct mpam_msc
 {
@@ -44,5 +45,56 @@ struct mpam_msc
 	void __iomem *		mapped_hwpage;
 	size_t			mapped_hwpage_sz;
 };
+
+struct mpam_class
+{
+	/* mpam_components in this class */
+	struct list_head	components;
+
+	cpumask_t		affinity;
+
+	u8			level;
+	enum mpam_class_types	type;
+
+	/* member of mpam_classes */
+	struct list_head	classes_list;
+};
+
+struct mpam_component
+{
+	u32			comp_id;
+
+	/* mpam_msc_ris in this component */
+	struct list_head	ris;
+
+	cpumask_t		affinity;
+
+	/* member of mpam_class:components */
+	struct list_head	class_list;
+
+	/* parent: */
+	struct mpam_class	*class;
+};
+
+struct mpam_msc_ris
+{
+	u8			ris_idx;
+
+	cpumask_t		affinity;
+
+	/* member of mpam_component:ris */
+	struct list_head	comp_list;
+
+	/* member of mpam_msc:ris */
+	struct list_head	msc_list;
+
+	/* parents: */
+	struct mpam_msc		*msc;
+	struct mpam_component	*comp;
+};
+
+/* List of all classes */
+extern struct list_head mpam_classes;
+extern struct srcu_struct mpam_srcu;
 
 #endif /* MPAM_INTERNAL_H */
