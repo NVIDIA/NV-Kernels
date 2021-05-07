@@ -1132,8 +1132,184 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 	return err;
 }
 
+/* Any of these features mean the BWA_WD field is valid. */
+static bool mpam_has_bwa_wd_feature(struct mpam_props *props)
+{
+	if (mpam_has_feature(mpam_feat_mbw_min, props))
+		return true;
+	if (mpam_has_feature(mpam_feat_mbw_max, props))
+		return true;
+	if (mpam_has_feature(mpam_feat_mbw_prop, props))
+		return true;
+	return false;
+}
+
+/* On mismatch, parent is modified */
+static void __props_mismatch(struct mpam_props *parent,
+			     struct mpam_props *child)
+{
+	/* Clear incompatible features */
+	if (mpam_has_feature(mpam_feat_cpor_part, child) &&
+	    (parent->cpbm_wd != child->cpbm_wd))
+		mpam_clear_feature(mpam_feat_cpor_part, &parent->features);
+
+	if (mpam_has_feature(mpam_feat_mbw_part, child) &&
+	    (parent->mbw_pbm_bits != child->mbw_pbm_bits))
+		mpam_clear_feature(mpam_feat_mbw_part, &parent->features);
+
+	/* bwa_wd is a count of bits, fewer bits means less precision */
+	if (mpam_has_bwa_wd_feature(child) && (parent->bwa_wd != child->bwa_wd))
+		parent->bwa_wd = min(parent->bwa_wd, child->bwa_wd);
+
+	/* For num properties, take the minimum */
+	if (mpam_has_feature(mpam_feat_msmon_csu, child) &&
+	    (parent->num_csu_mon != child->num_csu_mon))
+		parent->num_csu_mon = min(parent->num_csu_mon, child->num_csu_mon);
+	if (mpam_has_feature(mpam_feat_msmon_mbwu, child) &&
+	    (parent->num_mbwu_mon != child->num_mbwu_mon))
+		parent->num_mbwu_mon = min(parent->num_mbwu_mon, child->num_mbwu_mon);
+}
+
+/*
+ * If a vmsc doesn't match class feature/configuration, do the right thing(tm).
+ * For 'num' properties we can just take the minimum.
+ * For properties where the mismatched unused bits would make a difference, we
+ * nobble the class feature, as we can't configure all the resources.
+ * e.g. The L3 cache is composed of two resources with 13 and 17 portion
+ * bitmaps respectively.
+ */
+static void
+__class_props_mismatch(struct mpam_class *class, struct mpam_vmsc *vmsc)
+{
+	struct mpam_props *cprops = &class->props;
+	struct mpam_props *vprops = &vmsc->props;
+
+	lockdep_assert_held(&mpam_list_lock); /* we modify class */
+
+	pr_debug("%s: Merging features for class:0x%lx &= vmsc:0x%lx\n",
+		 dev_name(&vmsc->msc->pdev->dev),
+		 (long)cprops->features, (long)vprops->features);
+
+	/* Clear missing features */
+	cprops->features &= vprops->features;
+
+	__props_mismatch(cprops, vprops);
+}
+
+static void
+__vmsc_props_mismatch(struct mpam_vmsc *vmsc, struct mpam_msc_ris *ris)
+{
+	struct mpam_props *rprops = &ris->props;
+	struct mpam_props *vprops = &vmsc->props;
+
+	lockdep_assert_held(&mpam_list_lock); /* we modify vmsc */
+
+	pr_debug("%s: Merging features for vmsc:0x%lx |= ris:0x%lx\n",
+		 dev_name(&vmsc->msc->pdev->dev),
+		 (long)vprops->features, (long)rprops->features);
+
+	/* Merge features for resources in the vMSC */
+	vprops->features |= rprops->features;
+
+	__props_mismatch(vprops, rprops);
+}
+
+/*
+ * Copy the first component's first vMSC's properties and features to the
+ * class. __class_props_mismatch() will remove conflicts.
+ * It is not possible to have a class with no components, or a component with
+ * no resources. The vMSC properties have already been built.
+ */
+static void mpam_enable_init_class_features(struct mpam_class *class)
+{
+	struct mpam_vmsc *vmsc;
+	struct mpam_component *comp;
+
+	comp = list_first_entry_or_null(&class->components,
+					struct mpam_component, class_list);
+	if (WARN_ON(!comp))
+		return;
+
+	vmsc = list_first_entry_or_null(&comp->vmsc,
+				       struct mpam_vmsc, comp_list);
+	if (WARN_ON(!vmsc))
+		return;
+
+	class->props = vmsc->props;
+}
+
+static void mpam_enable_init_vmsc_features(struct mpam_vmsc *vmsc)
+{
+	struct mpam_msc_ris *ris;
+
+	ris = list_first_entry_or_null(&vmsc->ris,
+				       struct mpam_msc_ris, vmsc_list);
+	if (WARN_ON(!ris))
+		return;
+
+	vmsc->props = ris->props;
+}
+
+static void mpam_enable_merge_vmsc_features(struct mpam_component *comp)
+{
+	struct mpam_vmsc *vmsc;
+	struct mpam_msc_ris *ris;
+	struct mpam_class *class = comp->class;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		mpam_enable_init_vmsc_features(vmsc);
+
+		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+			__vmsc_props_mismatch(vmsc, ris);
+			class->nrdy_usec = max(class->nrdy_usec,
+					       vmsc->msc->nrdy_usec);
+		}
+	}
+}
+
+static void mpam_enable_merge_class_features(struct mpam_component *comp)
+{
+	struct mpam_vmsc *vmsc;
+	struct mpam_class *class = comp->class;
+
+	list_for_each_entry(vmsc, &comp->vmsc, comp_list)
+		__class_props_mismatch(class, vmsc);
+}
+
+/*
+ * Merge all the common resource features into class.
+ * vmsc features are bitwise-or'd together, this must be done first.
+ * Next the class features are the bitwise-and of all the vmsc features.
+ * Other features are the min/max as appropriate.
+ *
+ * To avoid walking the whole tree twice, the class->nrdy_usec property is
+ * updated when working with the vmsc as it is a max(), and doesn't need
+ * initialising first.
+ */
+static void mpam_enable_merge_features(void)
+{
+	struct mpam_class *class;
+	struct mpam_component *comp;
+
+	lockdep_assert_held(&mpam_list_lock);
+
+	list_for_each_entry(class, &mpam_classes, classes_list) {
+		list_for_each_entry(comp, &class->components, class_list)
+			mpam_enable_merge_vmsc_features(comp);
+
+		mpam_enable_init_class_features(class);
+
+		list_for_each_entry(comp, &class->components, class_list)
+			mpam_enable_merge_class_features(comp);
+	}
+}
+
 static void mpam_enable_once(void)
 {
+	mutex_lock(&mpam_list_lock);
+	mpam_enable_merge_features();
+	mutex_unlock(&mpam_list_lock);
+
 	mutex_lock(&mpam_cpuhp_state_lock);
 	cpuhp_remove_state(mpam_cpuhp_state);
 	mpam_cpuhp_state = 0;
