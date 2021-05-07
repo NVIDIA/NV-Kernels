@@ -937,8 +937,95 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 	return err;
 }
 
+/*
+ * If a resource doesn't match class feature/configuration, do the right thing.
+ * For 'num' properties we can just take the minimum.
+ * For properties where the mismatched unused bits would make a difference, we
+ * nobble the class feature, as we can't configure all the resources.
+ * e.g. The L3 cache is composed of two resources with 13 and 17 portion
+ * bitmaps respectively.
+ */
+static void
+__resource_props_mismatch(struct mpam_msc_ris *ris, struct mpam_class *class)
+{
+	struct mpam_props *cprops = &class->props;
+	struct mpam_props *rprops = &ris->props;
+
+	lockdep_assert_held(&mpam_list_lock); /* we modify class */
+
+	/* Clear missing features */
+	cprops->features &= rprops->features;
+
+	/* Clear incompatible features */
+	if (cprops->cpbm_wd != rprops->cpbm_wd)
+		mpam_clear_feature(mpam_feat_cpor_part, &cprops->features);
+	if (cprops->mbw_pbm_bits != rprops->mbw_pbm_bits)
+		mpam_clear_feature(mpam_feat_mbw_part, &cprops->features);
+
+	/* bwa_wd is a count of bits, fewer bits means less precision */
+	if (cprops->bwa_wd != rprops->bwa_wd)
+		cprops->bwa_wd = min(cprops->bwa_wd, rprops->bwa_wd);
+
+	/* For num properties, take the minimum */
+	if (cprops->num_csu_mon != rprops->num_csu_mon)
+		cprops->num_csu_mon = min(cprops->num_csu_mon, rprops->num_csu_mon);
+	if (cprops->num_mbwu_mon != rprops->num_mbwu_mon)
+		cprops->num_mbwu_mon = min(cprops->num_mbwu_mon, rprops->num_mbwu_mon);
+}
+
+/*
+ * Copy the first component's first resources's properties and features to the
+ * class. __resource_props_mismatch() will remove conflicts.
+ * It is not possible to have a class with no components, or a component with
+ * no resources.
+ */
+static void mpam_enable_init_class_features(struct mpam_class *class)
+{
+	struct mpam_msc_ris *ris;
+	struct mpam_component *comp;
+
+	comp = list_first_entry_or_null(&class->components,
+					struct mpam_component, class_list);
+	if (WARN_ON(!comp))
+		return;
+
+	ris = list_first_entry_or_null(&comp->ris,
+				       struct mpam_msc_ris, comp_list);
+	if (WARN_ON(!ris))
+		return;
+
+	class->props = ris->props;
+}
+
+/* Merge all the common resource features into class. */
+static void mpam_enable_merge_features(void)
+{
+	struct mpam_msc_ris *ris;
+	struct mpam_class *class;
+	struct mpam_component *comp;
+
+	lockdep_assert_held(&mpam_list_lock);
+
+	list_for_each_entry(class, &mpam_classes, classes_list) {
+		mpam_enable_init_class_features(class);
+
+		list_for_each_entry(comp, &class->components, class_list) {
+			list_for_each_entry(ris, &comp->ris, comp_list) {
+				__resource_props_mismatch(ris, class);
+
+				class->nrdy_usec = max(class->nrdy_usec,
+						     ris->msc->nrdy_usec);
+			}
+		}
+	}
+}
+
 static void mpam_enable_once(void)
 {
+	mutex_lock(&mpam_list_lock);
+	mpam_enable_merge_features();
+	mutex_unlock(&mpam_list_lock);
+
 	mutex_lock(&mpam_cpuhp_state_lock);
 	cpuhp_remove_state(mpam_cpuhp_state);
 	mpam_cpuhp_state = 0;
