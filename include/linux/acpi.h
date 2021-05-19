@@ -1496,6 +1496,7 @@ int find_acpi_cpu_topology_package(unsigned int cpu);
 int find_acpi_cpu_topology_hetero_id(unsigned int cpu);
 int find_acpi_cache_level_from_id(u32 cache_id);
 int acpi_pptt_get_cpus_from_container(u32 acpi_cpu_id, cpumask_t *cpus);
+int acpi_pptt_get_cpumask_from_cache_id(u32 cache_id, cpumask_t *cpus);
 #else
 static inline int acpi_pptt_cpu_is_thread(unsigned int cpu)
 {
@@ -1523,6 +1524,11 @@ static inline int find_acpi_cache_level_from_id(u32 cache_id)
 }
 static inline int acpi_pptt_get_cpus_from_container(u32 acpi_cpu_id,
 						    cpumask_t *cpus)
+{
+	return -EINVAL;
+}
+static inline int acpi_pptt_get_cpumask_from_cache_id(u32 cache_id,
+						      cpumask_t *cpus)
 {
 	return -EINVAL;
 }
