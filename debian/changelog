@@ -1,3 +1,9 @@
+linux-meta-unstable (5.13.0.6.17) impish; urgency=medium
+
+  * Bump ABI 5.13.0-6
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 07 Jun 2021 13:22:43 +0200
+
 linux-meta-unstable (5.13.0.5.16) impish; urgency=medium
 
   * Bump ABI 5.13.0-5
