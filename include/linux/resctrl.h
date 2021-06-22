@@ -40,6 +40,9 @@ int proc_resctrl_show(struct seq_file *m,
  */
 #define RESCTRL_MAX_CBM			32
 
+extern unsigned int resctrl_rmid_realloc_limit;
+extern unsigned int resctrl_rmid_realloc_threshold;
+
 /**
  * struct pseudo_lock_region - pseudo-lock region information
  * @s:			Resctrl schema for the resource to which this
