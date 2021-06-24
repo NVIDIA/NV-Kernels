@@ -125,6 +125,22 @@ static void __mpam_write_reg(struct mpam_msc *msc, u16 reg, u32 val)
 	__mpam_write_reg(msc, MPAMCFG_##reg, val);		\
 })
 
+#define mpam_read_monsel_reg(msc, reg)			\
+({							\
+	u32 ____ret;					\
+							\
+	lockdep_assert_held_once(&msc->mon_sel_lock);	\
+	____ret = __mpam_read_reg(msc, MSMON_##reg);	\
+							\
+	____ret;					\
+})
+
+#define mpam_write_monsel_reg(msc, reg, val)			\
+({								\
+	lockdep_assert_held_once(&msc->mon_sel_lock);		\
+	__mpam_write_reg(msc, MSMON_##reg, val);		\
+})
+
 static u64 mpam_msc_read_idr(struct mpam_msc *msc)
 {
 	u64 idr_high = 0, idr_low;
@@ -725,6 +741,209 @@ static int mpam_msc_hw_probe(struct mpam_msc *msc)
 	msc->probed = true;
 
 	return 0;
+}
+
+struct mon_read
+{
+	struct mpam_msc_ris		*ris;
+	struct mon_cfg			*ctx;
+	enum mpam_device_features	type;
+	u64				*val;
+	int				err;
+};
+
+static void gen_msmon_ctl_flt_vals(struct mon_read *m, u32 *ctl_val,
+				   u32 *flt_val)
+{
+	struct mon_cfg *ctx = m->ctx;
+
+	switch (m->type) {
+	case mpam_feat_msmon_csu:
+		*ctl_val = MSMON_CFG_MBWU_CTL_TYPE_CSU;
+		break;
+	case mpam_feat_msmon_mbwu:
+		*ctl_val = MSMON_CFG_MBWU_CTL_TYPE_MBWU;
+		break;
+	default:
+		return;
+	}
+
+	/*
+	 * For CSU counters its implementation-defined what happens when not
+	 * filtering by partid.
+	 */
+	*ctl_val |= MSMON_CFG_x_CTL_MATCH_PARTID;
+
+	*flt_val = FIELD_PREP(MSMON_CFG_MBWU_FLT_PARTID, ctx->partid);
+	if (m->ctx->match_pmg) {
+		*ctl_val |= MSMON_CFG_x_CTL_MATCH_PMG;
+		*flt_val |= FIELD_PREP(MSMON_CFG_MBWU_FLT_PMG, ctx->pmg);
+	}
+
+	if (mpam_has_feature(mpam_feat_msmon_mbwu_rwbw, &m->ris->props))
+		*flt_val |= FIELD_PREP(MSMON_CFG_MBWU_FLT_RWBW, ctx->opts);
+}
+
+static void read_msmon_ctl_flt_vals(struct mon_read *m, u32 *ctl_val,
+				    u32 *flt_val)
+{
+	struct mpam_msc *msc = m->ris->msc;
+
+	switch (m->type) {
+	case mpam_feat_msmon_csu:
+		*ctl_val = mpam_read_monsel_reg(msc, CFG_CSU_CTL);
+		*flt_val = mpam_read_monsel_reg(msc, CFG_CSU_FLT);
+		break;
+	case mpam_feat_msmon_mbwu:
+		*ctl_val = mpam_read_monsel_reg(msc, CFG_MBWU_CTL);
+		*flt_val = mpam_read_monsel_reg(msc, CFG_MBWU_FLT);
+		break;
+	default:
+		return;
+	}
+}
+
+static void write_msmon_ctl_flt_vals(struct mon_read *m, u32 ctl_val,
+				     u32 flt_val)
+{
+	struct mpam_msc *msc = m->ris->msc;
+
+	/*
+	 * Write the ctl_val with the enable bit cleared, reset the counter,
+	 * then enable counter.
+	 */
+	switch (m->type) {
+	case mpam_feat_msmon_csu:
+		mpam_write_monsel_reg(msc, CFG_CSU_FLT, flt_val);
+		mpam_write_monsel_reg(msc, CFG_CSU_CTL, ctl_val);
+		mpam_write_monsel_reg(msc, CSU, 0);
+		mpam_write_monsel_reg(msc, CFG_CSU_CTL, ctl_val|MSMON_CFG_x_CTL_EN);
+		break;
+	case mpam_feat_msmon_mbwu:
+		mpam_write_monsel_reg(msc, CFG_MBWU_FLT, flt_val);
+		mpam_write_monsel_reg(msc, CFG_MBWU_CTL, ctl_val);
+		mpam_write_monsel_reg(msc, MBWU, 0);
+		mpam_write_monsel_reg(msc, CFG_MBWU_CTL, ctl_val|MSMON_CFG_x_CTL_EN);
+		break;
+	default:
+		return;
+	}
+}
+
+static void __ris_msmon_read(void *arg)
+{
+	u64 now;
+	bool nrdy = false;
+	unsigned long flags;
+	struct mon_read *m = arg;
+	struct mon_cfg *ctx = m->ctx;
+	struct mpam_msc_ris *ris = m->ris;
+	struct mpam_msc *msc = m->ris->msc;
+	u32 mon_sel, ctl_val, flt_val, cur_ctl, cur_flt;
+
+	lockdep_assert_held(&msc->lock);
+
+	spin_lock_irqsave(&msc->mon_sel_lock, flags);
+	mon_sel = FIELD_PREP(MSMON_CFG_MON_SEL_MON_SEL, ctx->mon) |
+		  FIELD_PREP(MSMON_CFG_MON_SEL_RIS, ris->ris_idx);
+	mpam_write_monsel_reg(msc, CFG_MON_SEL, mon_sel);
+
+	/*
+	 * Read the existing configuration to avoid re-writing the same values.
+	 * This saves waiting for 'nrdy' on subsequent reads.
+	 */
+	read_msmon_ctl_flt_vals(m, &cur_ctl, &cur_flt);
+	gen_msmon_ctl_flt_vals(m, &ctl_val, &flt_val);
+	if (cur_flt != flt_val || cur_ctl != (ctl_val | MSMON_CFG_x_CTL_EN))
+		write_msmon_ctl_flt_vals(m, ctl_val, flt_val);
+
+	switch (m->type) {
+	case mpam_feat_msmon_csu:
+		now = mpam_read_monsel_reg(msc, CSU);
+		break;
+	case mpam_feat_msmon_mbwu:
+		now = mpam_read_monsel_reg(msc, MBWU);
+		break;
+	default:
+		return;
+	}
+	spin_unlock_irqrestore(&msc->mon_sel_lock, flags);
+
+	nrdy = now & MSMON___NRDY;
+	if (nrdy) {
+		m->err = -EBUSY;
+		return;
+	}
+
+	now = FIELD_GET(MSMON___VALUE, now);
+	*(m->val) += now;
+}
+
+static int _msmon_read(struct mpam_component *comp, struct mon_read *arg)
+{
+	int err, idx;
+	struct mpam_msc *msc;
+	struct mpam_msc_ris *ris;
+
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_rcu(ris, &comp->ris, comp_list) {
+		arg->ris = ris;
+
+		msc = ris->msc;
+		mutex_lock(&msc->lock);
+		err = smp_call_function_any(&msc->accessibility,
+					    __ris_msmon_read, arg, true);
+		mutex_unlock(&msc->lock);
+		if (!err && arg->err)
+			err = arg->err;
+		if (err)
+			break;
+	}
+	srcu_read_unlock(&mpam_srcu, idx);
+
+	return err;
+}
+
+int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
+		    enum mpam_device_features type, u64 *val)
+{
+	int err;
+	struct mon_read arg;
+	u64 wait_jiffies = 0;
+	struct mpam_props *cprops = &comp->class->props;
+
+	might_sleep();
+
+	if (!mpam_is_enabled())
+		return -EIO;
+
+	if (!mpam_has_feature(type, cprops))
+		return -EOPNOTSUPP;
+
+	memset(&arg, 0, sizeof(arg));
+	arg.ctx = ctx;
+	arg.type = type;
+	arg.val = val;
+	*val = 0;
+
+	err = _msmon_read(comp, &arg);
+	if (err == -EBUSY)
+		wait_jiffies = usecs_to_jiffies(comp->class->nrdy_usec);
+
+	while (wait_jiffies)
+		wait_jiffies = schedule_timeout_uninterruptible(wait_jiffies);
+
+	if (err == -EBUSY) {
+		memset(&arg, 0, sizeof(arg));
+		arg.ctx = ctx;
+		arg.type = type;
+		arg.val = val;
+		*val = 0;
+
+		err = _msmon_read(comp, &arg);
+	}
+
+	return err;
 }
 
 static void mpam_reset_msc_bitmap(struct mpam_msc *msc, u16 reg, u16 wd)
