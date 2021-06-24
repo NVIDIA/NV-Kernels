@@ -62,6 +62,7 @@ struct mpam_msc
 	 * If needed, take msc->lock first.
 	 */
 	spinlock_t		part_sel_lock;
+	spinlock_t		mon_sel_lock;
 	void __iomem *		mapped_hwpage;
 	size_t			mapped_hwpage_sz;
 };
@@ -194,6 +195,21 @@ struct mpam_msc_ris
 	struct mpam_component	*comp;
 };
 
+/* The values for MSMON_CFG_MBWU_FLT.RWBW */
+enum mon_filter_options {
+	COUNT_BOTH	= 0,
+	COUNT_WRITE	= 1,
+	COUNT_READ	= 2,
+};
+
+struct mon_cfg {
+	u16                     mon;
+	u8                      pmg;
+	bool                    match_pmg;
+	u32                     partid;
+	enum mon_filter_options opts;
+};
+
 static inline int mpam_alloc_csu_mon(struct mpam_class *class)
 {
 	struct mpam_props *cprops = &class->props;
@@ -240,6 +256,9 @@ void mpam_disable(struct work_struct *work);
 
 int mpam_apply_config(struct mpam_component *comp, u16 partid,
 		      struct mpam_config *cfg);
+
+int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
+		    enum mpam_device_features, u64 *val);
 
 /*
  * MPAM MSCs have the following register layout. See:
