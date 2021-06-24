@@ -196,6 +196,22 @@ static inline void mpam_clear_feature(enum mpam_device_features feat,
 	*supported &= ~(1 << feat);
 }
 
+/* The values for MSMON_CFG_MBWU_FLT.RWBW */
+enum mon_filter_options {
+	COUNT_BOTH	= 0,
+	COUNT_WRITE	= 1,
+	COUNT_READ	= 2,
+};
+
+struct mon_cfg {
+	u16                     mon;
+	u8                      pmg;
+	bool                    match_pmg;
+	bool			csu_exclude_clean;
+	u32                     partid;
+	enum mon_filter_options opts;
+};
+
 struct mpam_class {
 	/* mpam_components in this class */
 	struct list_head	components;
@@ -342,6 +358,9 @@ void mpam_disable(struct work_struct *work);
 
 int mpam_apply_config(struct mpam_component *comp, u16 partid,
 		      struct mpam_config *cfg);
+
+int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
+		    enum mpam_device_features, u64 *val);
 
 int mpam_get_cpumask_from_cache_id(unsigned long cache_id, u32 cache_level,
 				   cpumask_t *affinity);
