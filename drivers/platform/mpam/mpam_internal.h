@@ -17,6 +17,9 @@
 
 DECLARE_STATIC_KEY_FALSE(mpam_enabled);
 
+/* Value to indicate the allocated monitor is derived from the RMID index. */
+#define USE_RMID_IDX	(U16_MAX + 1)
+
 static inline bool mpam_is_enabled(void)
 {
 	return static_branch_likely(&mpam_enabled);
