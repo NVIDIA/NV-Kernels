@@ -5,7 +5,16 @@
 #define __LINUX_ARM_MPAM_H
 
 #include <linux/acpi.h>
+#include <linux/resctrl_types.h>
 #include <linux/types.h>
+
+/*
+ * The value of the MPAM1_EL1 sysreg when a task is in the default group.
+ * This is used by the context switch code to use the resctrl CPU property
+ * instead. The value is modified when CDP is enabled/disabled by mounting
+ * the resctrl filesystem.
+ */
+extern u64 mpam_resctrl_default_group;
 
 struct mpam_msc;
 
@@ -53,4 +62,8 @@ static inline bool resctrl_arch_is_mbm_total_enabled(void)
 /* reset cached configurations, then all devices */
 void resctrl_arch_reset_resources(void);
 
+bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level ignored);
+int resctrl_arch_set_cdp_enabled(enum resctrl_res_level ignored, bool enable);
+bool resctrl_arch_match_closid(struct task_struct *tsk, u32 closid);
+bool resctrl_arch_match_rmid(struct task_struct *tsk, u32 closid, u32 rmid);
 #endif /* __LINUX_ARM_MPAM_H */

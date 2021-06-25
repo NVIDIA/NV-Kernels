@@ -19,6 +19,8 @@
 
 #include "mpam_internal.h"
 
+u64 mpam_resctrl_default_group;
+
 /*
  * The classes we've picked to map to resctrl resources.
  * Class pointer may be NULL.
@@ -28,6 +30,12 @@ static struct mpam_resctrl_res mpam_resctrl_exports[RDT_NUM_RESOURCES];
 static bool exposed_alloc_capable;
 static bool exposed_mon_capable;
 static struct mpam_class *mbm_local_class;
+
+/*
+ * MPAM emulates CDP by setting different PARTID in the I/D fields of MPAM1_EL1.
+ * This applies globally to all traffic the CPU generates.
+ */
+static bool cdp_enabled;
 
 bool resctrl_arch_alloc_capable(void)
 {
@@ -44,6 +52,36 @@ bool resctrl_arch_is_mbm_local_enabled(void)
 	return mbm_local_class;
 }
 
+bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level ignored)
+{
+	return cdp_enabled;
+}
+
+int resctrl_arch_set_cdp_enabled(enum resctrl_res_level ignored, bool enable)
+{
+	u64 regval;
+	u32 partid, partid_i, partid_d;
+
+	cdp_enabled = enable;
+
+	partid = RESCTRL_RESERVED_CLOSID;
+
+	if (enable) {
+		partid_d = resctrl_get_config_index(partid, CDP_CODE);
+		partid_i = resctrl_get_config_index(partid, CDP_DATA);
+		regval = FIELD_PREP(MPAM_SYSREG_PARTID_D, partid_d) |
+			 FIELD_PREP(MPAM_SYSREG_PARTID_I, partid_i);
+
+	} else {
+		regval = FIELD_PREP(MPAM_SYSREG_PARTID_D, partid) |
+			 FIELD_PREP(MPAM_SYSREG_PARTID_I, partid);
+	}
+
+	WRITE_ONCE(mpam_resctrl_default_group, regval);
+
+	return 0;
+}
+
 /*
  * MSC may raise an error interrupt if it sees an out or range partid/pmg,
  * and go on to truncate the value. Regardless of what the hardware supports,
@@ -52,6 +90,30 @@ bool resctrl_arch_is_mbm_local_enabled(void)
 u32 resctrl_arch_get_num_closid(struct rdt_resource *ignored)
 {
 	return min((u32)mpam_partid_max + 1, (u32)RESCTRL_MAX_CLOSID);
+}
+
+bool resctrl_arch_match_closid(struct task_struct *tsk, u32 closid)
+{
+	u64 regval = mpam_get_regval(tsk);
+	u32 tsk_closid = FIELD_GET(MPAM_SYSREG_PARTID_D, regval);
+
+	if (cdp_enabled)
+		tsk_closid >>= 1;
+
+	return tsk_closid == closid;
+}
+
+/* The task's pmg is not unique, the partid must be considered too */
+bool resctrl_arch_match_rmid(struct task_struct *tsk, u32 closid, u32 rmid)
+{
+	u64 regval = mpam_get_regval(tsk);
+	u32 tsk_closid = FIELD_GET(MPAM_SYSREG_PARTID_D, regval);
+	u32 tsk_rmid = FIELD_GET(MPAM_SYSREG_PMG_D, regval);
+
+	if (cdp_enabled)
+		tsk_closid >>= 1;
+
+	return (tsk_closid == closid) && (tsk_rmid == rmid);
 }
 
 struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
