@@ -51,4 +51,9 @@ static inline bool resctrl_arch_is_mbm_total_enabled(void)
 	return false;
 }
 
+void resctrl_arch_set_cpu_default_closid(int cpu, u32 closid);
+void resctrl_arch_set_closid_rmid(struct task_struct *tsk, u32 closid, u32 rmid);
+void resctrl_arch_set_cpu_default_closid_rmid(int cpu, u32 closid, u32 rmid);
+void resctrl_arch_sched_in(struct task_struct *tsk);
+
 #endif /* __LINUX_ARM_MPAM_H */
