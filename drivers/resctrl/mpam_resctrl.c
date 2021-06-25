@@ -366,6 +366,109 @@ void resctrl_arch_mon_ctx_free(struct rdt_resource *r,
 	resctrl_arch_mon_ctx_free_no_wait(evtid, mon_idx);
 }
 
+int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
+			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
+			   u64 *val, void *arch_mon_ctx)
+{
+	int err;
+	u64 cdp_val;
+	struct mon_cfg cfg;
+	enum mpam_device_features type;
+	struct mpam_resctrl_dom *l3_dom;
+	struct mpam_component *mon_comp;
+	u32 mon_idx = *(u32 *)arch_mon_ctx;
+	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[eventid];
+
+	resctrl_arch_rmid_read_context_check();
+
+	if (!mon->class)
+		return -EINVAL;
+
+	l3_dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
+	mon_comp = l3_dom->mon_comp[eventid];
+
+	switch (eventid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		type = mpam_feat_msmon_csu;
+		break;
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		type = mpam_feat_msmon_mbwu;
+		break;
+	default:
+	case QOS_NUM_EVENTS:
+		return -EINVAL;
+	}
+
+	cfg.mon = mon_idx;
+	if (cfg.mon == USE_RMID_IDX) {
+		cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid);
+		cfg.mon = mon->mbwu_idx_to_mon[cfg.mon];
+		if (cfg.mon == -1)
+			return -EINVAL;
+	}
+
+	cfg.match_pmg = true;
+	cfg.pmg = rmid;
+
+	if (irqs_disabled()) {
+		/* Check if we can access this domain without an IPI */
+		err = -EIO;
+	} else {
+		if (cdp_enabled) {
+			cfg.partid = closid << 1;
+			err = mpam_msmon_read(mon_comp, &cfg, type, val);
+			if (err)
+				return err;
+
+			cfg.partid += 1;
+			err = mpam_msmon_read(mon_comp, &cfg, type, &cdp_val);
+			if (!err)
+				*val += cdp_val;
+		} else {
+			cfg.partid = closid;
+			err = mpam_msmon_read(mon_comp, &cfg, type, val);
+		}
+	}
+
+	return err;
+}
+
+/* Called via IPI. Call with read_cpus_lock() held. */
+void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_mon_domain *d,
+			     u32 closid, u32 rmid, enum resctrl_event_id eventid)
+{
+	struct mon_cfg cfg;
+	struct mpam_resctrl_dom *l3_dom;
+	struct mpam_component *mon_comp;
+	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[eventid];
+
+	if (eventid == QOS_L3_OCCUP_EVENT_ID)
+		return;
+
+	l3_dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
+	mon_comp = l3_dom->mon_comp[eventid];
+
+	cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid);
+	cfg.mon = mon->mbwu_idx_to_mon[cfg.mon];
+	if (cfg.mon == -1)
+		return;
+
+	cfg.match_pmg = true;
+	cfg.pmg = rmid;
+
+	if (cdp_enabled) {
+		cfg.partid = closid << 1;
+		mpam_msmon_reset_mbwu(mon_comp, &cfg);
+
+		cfg.partid += 1;
+		mpam_msmon_reset_mbwu(mon_comp, &cfg);
+	} else {
+		cfg.partid = closid;
+		mpam_msmon_reset_mbwu(mon_comp, &cfg);
+	}
+}
+
 static bool cache_has_usable_cpor(struct mpam_class *class)
 {
 	struct mpam_props *cprops = &class->props;
