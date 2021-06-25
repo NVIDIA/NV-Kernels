@@ -40,6 +40,11 @@ static inline int acpi_mpam_count_msc(void) { return -EINVAL; }
 int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
 		    enum mpam_class_types type, u8 class_id, int component_id);
 
+static inline unsigned int resctrl_arch_round_mon_val(unsigned int val)
+{
+	return val;
+}
+
 bool resctrl_arch_alloc_capable(void);
 bool resctrl_arch_mon_capable(void);
 bool resctrl_arch_is_llc_occupancy_enabled(void);

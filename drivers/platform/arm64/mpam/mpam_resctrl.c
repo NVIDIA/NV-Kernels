@@ -369,6 +369,128 @@ void resctrl_arch_mon_ctx_free(struct rdt_resource *r,
 	resctrl_arch_mon_ctx_free_no_wait(evtid, mon_idx);
 }
 
+/*
+ * A simpler version of __topology_matches_l3() that doesn't allocate memory,
+ * but relies on the L3 component existing,
+ */
+static struct mpam_component *
+find_equivalent_component(struct mpam_component *l3_comp,
+			  struct mpam_class *victim)
+{
+	struct mpam_component *victim_comp;
+
+	list_for_each_entry(victim_comp, &victim->components, class_list) {
+		if (cpumask_equal(&l3_comp->affinity, &victim_comp->affinity))
+			return victim_comp;
+	}
+
+	return NULL;
+}
+
+int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
+			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
+			   u64 *val, void *arch_mon_ctx)
+{
+	int err;
+	u64 cdp_val;
+	struct mon_cfg cfg;
+	struct mpam_resctrl_res *l3;
+	enum mpam_device_features type;
+	struct mpam_resctrl_dom *l3_dom;
+	struct mpam_component *mon_comp;
+	u32 mon_idx = *(u32 *)arch_mon_ctx;
+	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[eventid];
+
+	resctrl_arch_rmid_read_context_check();
+
+	if (!mon->class)
+		return -EINVAL;
+
+	l3 = container_of(r, struct mpam_resctrl_res, resctrl_res);
+	l3_dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
+
+	/*
+	 * Is this event backed by the L3 control resource passed in by
+	 * resctrl?
+	 */
+	if (mon->class == l3->class) {
+		mon_comp = l3_dom->comp;
+	} else {
+		mon_comp = find_equivalent_component(l3_dom->comp, mon->class);
+		if (WARN_ON_ONCE(!mon_comp))
+			return -EINVAL;
+	}
+
+	switch (eventid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		type = mpam_feat_msmon_csu;
+		break;
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		type = mpam_feat_msmon_mbwu;
+		break;
+	default:
+	case QOS_NUM_EVENTS:
+		return -EINVAL;
+	}
+
+	cfg.mon = mon_idx;
+	if (cfg.mon == USE_RMID_IDX)
+		cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid);
+
+	cfg.match_pmg = true;
+	cfg.pmg = rmid;
+
+	if (irqs_disabled()) {
+		/* Check if we can access this domain without an IPI */
+		err = -EIO;
+	} else {
+		if (cdp_enabled) {
+			cfg.partid = closid << 1;
+			err = mpam_msmon_read(mon_comp, &cfg, type, val);
+			if (err)
+				return err;
+
+			cfg.partid += 1;
+			err = mpam_msmon_read(mon_comp, &cfg, type, &cdp_val);
+			if (!err)
+				*val += cdp_val;
+		} else {
+			cfg.partid = closid;
+			err = mpam_msmon_read(mon_comp, &cfg, type, val);
+		}
+	}
+
+	return err;
+}
+
+void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_mon_domain *d,
+			     u32 closid, u32 rmid, enum resctrl_event_id eventid)
+{
+	struct mon_cfg cfg;
+	struct mpam_resctrl_dom *dom;
+
+	if (eventid != QOS_L3_MBM_LOCAL_EVENT_ID)
+		return;
+
+	cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid);
+	cfg.match_pmg = true;
+	cfg.pmg = rmid;
+
+	dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
+
+	if (cdp_enabled) {
+		cfg.partid = closid << 1;
+		mpam_msmon_reset_mbwu(dom->comp, &cfg);
+
+		cfg.partid += 1;
+		mpam_msmon_reset_mbwu(dom->comp, &cfg);
+	} else {
+		cfg.partid = closid;
+		mpam_msmon_reset_mbwu(dom->comp, &cfg);
+	}
+}
+
 static bool cache_has_usable_cpor(struct mpam_class *class)
 {
 	struct mpam_props *cprops = &class->props;
