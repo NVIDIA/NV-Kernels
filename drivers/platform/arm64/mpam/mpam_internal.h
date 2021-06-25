@@ -24,6 +24,9 @@
 #define PACKED_FOR_KUNIT
 #endif
 
+/* Value to indicate the allocated monitor is derived from the RMID index. */
+#define USE_RMID_IDX		(U16_MAX + 1)
+
 static inline bool mpam_is_enabled(void)
 {
 	return static_branch_likely(&mpam_enabled);
