@@ -22,6 +22,8 @@
 
 u64 mpam_resctrl_default_group;
 
+DECLARE_WAIT_QUEUE_HEAD(resctrl_mon_ctx_waiters);	// temporary
+
 /*
  * The classes we've picked to map to resctrl resources.
  * Class pointer may be NULL.
@@ -38,6 +40,10 @@ static struct mpam_class *mbm_total_class;
  * This applies globally to all traffic the CPU generates.
  */
 static bool cdp_enabled;
+
+/* A dummy mon context to use when the monitors were allocated up front */
+u32 __mon_is_rmid_idx = USE_RMID_IDX;
+void *mon_is_rmid_idx = &__mon_is_rmid_idx;
 
 bool resctrl_arch_alloc_capable(void)
 {
@@ -230,6 +236,52 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 		return NULL;
 
 	return &mpam_resctrl_exports[l].resctrl_res;
+}
+
+void *resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r, int evtid)
+{
+	struct mpam_resctrl_res *res;
+	u32 *ret = kmalloc(sizeof(*ret), GFP_KERNEL);
+
+	if (!ret)
+		return ERR_PTR(-ENOMEM);
+
+	switch (evtid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		*ret = mpam_alloc_csu_mon(res->class);
+		return ret;
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		return mon_is_rmid_idx;
+	}
+
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
+void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid,
+			       void *arch_mon_ctx)
+{
+	struct mpam_resctrl_res *res;
+	u32 mon = *(u32 *)arch_mon_ctx;
+
+	if (mon == USE_RMID_IDX)
+		return;
+	kfree(arch_mon_ctx);
+	arch_mon_ctx = NULL;
+
+	res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+	switch (evtid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		mpam_free_csu_mon(res->class, mon);
+		wake_up(&resctrl_mon_ctx_waiters);
+		return;
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+		return;
+	}
 }
 
 static bool cache_has_usable_cpor(struct mpam_class *class)
