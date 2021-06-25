@@ -4,6 +4,7 @@
 #ifndef __ASM__MPAM_H
 #define __ASM__MPAM_H
 
+#include <linux/arm_mpam.h>
 #include <linux/bitops.h>
 #include <linux/bitfield.h>
 #include <linux/init.h>
@@ -19,6 +20,14 @@ DECLARE_STATIC_KEY_FALSE(arm64_mpam_has_hcr);
 DECLARE_STATIC_KEY_FALSE(mpam_enabled);
 DECLARE_PER_CPU(u64, arm64_mpam_default);
 DECLARE_PER_CPU(u64, arm64_mpam_current);
+
+/*
+ * The value of the MPAM1_EL1 sysreg when a task is in the default group.
+ * This is used by the context switch code to use the resctrl CPU property
+ * instead. The value is modified when CDP is enabled/disabled by mounting
+ * the resctrl filesystem.
+ */
+extern u64 arm64_mpam_global_default;
 
 /* check whether all CPUs have MPAM virtualisation support */
 static __always_inline bool mpam_cpus_have_mpam_hcr(void)
@@ -108,7 +117,7 @@ static inline void mpam_thread_switch(struct task_struct *tsk)
 	    !static_branch_likely(&mpam_enabled))
 		return;
 
-	if (!regval)
+	if (regval == READ_ONCE(arm64_mpam_global_default))
 		regval = READ_ONCE(per_cpu(arm64_mpam_default, cpu));
 
 	oldregval = READ_ONCE(per_cpu(arm64_mpam_current, cpu));
