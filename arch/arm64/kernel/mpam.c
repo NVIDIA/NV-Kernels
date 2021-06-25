@@ -12,6 +12,8 @@ DEFINE_STATIC_KEY_FALSE(mpam_enabled);
 DEFINE_PER_CPU(u64, arm64_mpam_default);
 DEFINE_PER_CPU(u64, arm64_mpam_current);
 
+u64 arm64_mpam_global_default;
+
 static int mpam_pm_notifier(struct notifier_block *self,
 			    unsigned long cmd, void *v)
 {
