@@ -20,6 +20,8 @@
 
 #include "mpam_internal.h"
 
+DECLARE_WAIT_QUEUE_HEAD(resctrl_mon_ctx_waiters);
+
 /*
  * The classes we've picked to map to resctrl resources, wrapped
  * in with their resctrl structure.
@@ -46,12 +48,23 @@ static bool exposed_mon_capable;
  */
 static bool cdp_enabled;
 
+/*
+ * L3 local/total may come from different classes - what is the number of MBWU
+ * 'on L3'?
+ */
+static unsigned int l3_num_allocated_mbwu = ~0;
+
 /* Whether this num_mbw_mon could result in a free_running system */
 static int __mpam_monitors_free_running(u16 num_mbwu_mon)
 {
 	if (num_mbwu_mon >= resctrl_arch_system_num_rmid_idx())
 		return resctrl_arch_system_num_rmid_idx();
 	return 0;
+}
+
+static int mpam_monitors_free_running(void)
+{
+	return __mpam_monitors_free_running(l3_num_allocated_mbwu);
 }
 
 bool resctrl_arch_alloc_capable(void)
@@ -267,6 +280,93 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 		return NULL;
 
 	return &mpam_resctrl_controls[l].resctrl_res;
+}
+
+static int resctrl_arch_mon_ctx_alloc_no_wait(enum resctrl_event_id evtid)
+{
+	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[evtid];
+
+	if (!mon->class)
+		return -EINVAL;
+
+	switch (evtid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		return mpam_alloc_csu_mon(mon->class);
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		if (mpam_monitors_free_running()) {
+			/*
+			 * Monitor is pre-allocated in mon->allocated_mbwu[idx]
+			 * but the idx isn't known yet...
+			 */
+			return USE_RMID_IDX;
+		}
+
+		return mpam_alloc_mbwu_mon(mon->class);
+	default:
+	case QOS_NUM_EVENTS:
+		return -EOPNOTSUPP;
+	}
+}
+
+void *resctrl_arch_mon_ctx_alloc(struct rdt_resource *r,
+				 enum resctrl_event_id evtid)
+{
+	DEFINE_WAIT(wait);
+	int *ret;
+
+	ret = kmalloc(sizeof(*ret), GFP_KERNEL);
+	if (!ret)
+		return ERR_PTR(-ENOMEM);
+
+	do {
+		prepare_to_wait(&resctrl_mon_ctx_waiters, &wait,
+				TASK_INTERRUPTIBLE);
+		*ret = resctrl_arch_mon_ctx_alloc_no_wait(evtid);
+		if (*ret == -ENOSPC)
+			schedule();
+	} while (*ret == -ENOSPC && !signal_pending(current));
+	finish_wait(&resctrl_mon_ctx_waiters, &wait);
+
+	return ret;
+}
+
+static void resctrl_arch_mon_ctx_free_no_wait(enum resctrl_event_id evtid,
+					      u32 mon_idx)
+{
+	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[evtid];
+
+	if (!mon->class)
+		return;
+
+	switch (evtid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		mpam_free_csu_mon(mon->class, mon_idx);
+		wake_up(&resctrl_mon_ctx_waiters);
+		return;
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+		if (mpam_monitors_free_running()) {
+			WARN_ON_ONCE(mon_idx != USE_RMID_IDX);
+			return;
+		}
+		mpam_free_mbwu_mon(mon->class, mon_idx);
+		wake_up(&resctrl_mon_ctx_waiters);
+	default:
+	case QOS_NUM_EVENTS:
+		return;
+	}
+}
+
+void resctrl_arch_mon_ctx_free(struct rdt_resource *r,
+			       enum resctrl_event_id evtid, void *arch_mon_ctx)
+{
+	u32 mon_idx = *(u32 *)arch_mon_ctx;
+
+	kfree(arch_mon_ctx);
+	arch_mon_ctx = NULL;
+
+	resctrl_arch_mon_ctx_free_no_wait(evtid, mon_idx);
 }
 
 static bool cache_has_usable_cpor(struct mpam_class *class)
@@ -823,12 +923,14 @@ static void mpam_resctrl_monitor_init(struct mpam_class *class,
 {
 	struct mpam_resctrl_res *res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
 	struct rdt_resource *l3 = &res->resctrl_res;
+	u16 num_mbwu_mon;
 
 	lockdep_assert_cpus_held();
 
 	/* Did we find anything for this monitor type? */
 	if (!mpam_resctrl_counters[type].class)
 		return;
+	num_mbwu_mon = class->props.num_mbwu_mon;
 
 	/* There also needs to be an L3 cache present */
 	if (get_cpu_cacheinfo_id(smp_processor_id(), 3) == -1)
@@ -861,6 +963,15 @@ static void mpam_resctrl_monitor_init(struct mpam_class *class,
 		 * space.
 		 */
 		l3->num_rmid = 1;
+
+		switch (type) {
+		case QOS_L3_MBM_LOCAL_EVENT_ID:
+		case QOS_L3_MBM_TOTAL_EVENT_ID:
+			l3_num_allocated_mbwu = min(l3_num_allocated_mbwu, num_mbwu_mon);
+			break;
+		default:
+			break;
+		}
 	}
 }
 
