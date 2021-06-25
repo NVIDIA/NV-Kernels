@@ -12,6 +12,8 @@ DEFINE_STATIC_KEY_FALSE(mpam_enabled);
 DEFINE_PER_CPU(u64, arm64_mpam_default);
 DEFINE_PER_CPU(u64, arm64_mpam_current);
 
+u64 arm64_mpam_global_default;
+
 static int __init arm64_mpam_register_cpus(void)
 {
 	u64 mpamidr = read_sanitised_ftr_reg(SYS_MPAMIDR_EL1);
