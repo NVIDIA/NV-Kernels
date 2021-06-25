@@ -50,6 +50,11 @@ static inline int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
 }
 #endif
 
+static inline unsigned int resctrl_arch_round_mon_val(unsigned int val)
+{
+	return val;
+}
+
 bool resctrl_arch_alloc_capable(void);
 bool resctrl_arch_mon_capable(void);
 
