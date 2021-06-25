@@ -20,6 +20,8 @@
 
 #include "mpam_internal.h"
 
+DECLARE_WAIT_QUEUE_HEAD(resctrl_mon_ctx_waiters);
+
 /*
  * The classes we've picked to map to resctrl resources, wrapped
  * in with their resctrl structure.
@@ -45,6 +47,10 @@ static bool exposed_mon_capable;
  * This applies globally to all traffic the CPU generates.
  */
 static bool cdp_enabled;
+
+/* A dummy mon context to use when the monitors were allocated up front */
+u32 __mon_is_rmid_idx = USE_RMID_IDX;
+void *mon_is_rmid_idx = &__mon_is_rmid_idx;
 
 bool resctrl_arch_alloc_capable(void)
 {
@@ -259,6 +265,73 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 		return NULL;
 
 	return &mpam_resctrl_controls[l].resctrl_res;
+}
+
+static void *resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r,
+						enum resctrl_event_id evtid)
+{
+	struct mpam_resctrl_res *res;
+	u32 *ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
+
+	if (!ret)
+		return ERR_PTR(-ENOMEM);
+
+	switch (evtid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		*ret = mpam_alloc_csu_mon(res->class);
+		return ret;
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		return mon_is_rmid_idx;
+	}
+
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
+void *resctrl_arch_mon_ctx_alloc(struct rdt_resource *r,
+				 enum resctrl_event_id evtid)
+{
+	DEFINE_WAIT(wait);
+	void *ret;
+
+	might_sleep();
+
+	do {
+		prepare_to_wait(&resctrl_mon_ctx_waiters, &wait,
+				TASK_INTERRUPTIBLE);
+		ret = resctrl_arch_mon_ctx_alloc_no_wait(r, evtid);
+		if (PTR_ERR(ret) == -ENOSPC)
+			schedule();
+	} while (PTR_ERR(ret) == -ENOSPC && !signal_pending(current));
+	finish_wait(&resctrl_mon_ctx_waiters, &wait);
+
+	return ret;
+}
+
+void resctrl_arch_mon_ctx_free(struct rdt_resource *r,
+			       enum resctrl_event_id evtid, void *arch_mon_ctx)
+{
+	struct mpam_resctrl_res *res;
+	u32 mon = *(u32 *)arch_mon_ctx;
+
+	if (mon == USE_RMID_IDX)
+		return;
+	kfree(arch_mon_ctx);
+	arch_mon_ctx = NULL;
+
+	res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+	switch (evtid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		mpam_free_csu_mon(res->class, mon);
+		wake_up(&resctrl_mon_ctx_waiters);
+		return;
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+		return;
+	}
 }
 
 static bool cache_has_usable_cpor(struct mpam_class *class)
