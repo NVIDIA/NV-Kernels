@@ -334,6 +334,90 @@ void resctrl_arch_mon_ctx_free(struct rdt_resource *r,
 	}
 }
 
+int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
+			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
+			   u64 *val, void *arch_mon_ctx)
+{
+	int err;
+	u64 cdp_val;
+	struct mon_cfg cfg;
+	struct mpam_resctrl_dom *dom;
+	u32 mon = *(u32 *)arch_mon_ctx;
+	enum mpam_device_features type;
+
+	resctrl_arch_rmid_read_context_check();
+
+	dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
+
+	switch (eventid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		type = mpam_feat_msmon_csu;
+		break;
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+		type = mpam_feat_msmon_mbwu;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	cfg.mon = mon;
+	if (cfg.mon == USE_RMID_IDX)
+		cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid);
+
+	cfg.match_pmg = true;
+	cfg.pmg = rmid;
+
+	if (irqs_disabled()) {
+		/* Check if we can access this domain without an IPI */
+		err = -EIO;
+	} else {
+		if (cdp_enabled) {
+			cfg.partid = closid << 1;
+			err = mpam_msmon_read(dom->comp, &cfg, type, val);
+			if (err)
+				return err;
+
+			cfg.partid += 1;
+			err = mpam_msmon_read(dom->comp, &cfg, type, &cdp_val);
+			if (!err)
+				*val += cdp_val;
+		} else {
+			cfg.partid = closid;
+			err = mpam_msmon_read(dom->comp, &cfg, type, val);
+		}
+	}
+
+	return err;
+}
+
+void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_mon_domain *d,
+			     u32 closid, u32 rmid, enum resctrl_event_id eventid)
+{
+	struct mon_cfg cfg;
+	struct mpam_resctrl_dom *dom;
+
+	if (eventid != QOS_L3_MBM_LOCAL_EVENT_ID)
+		return;
+
+	cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid);
+	cfg.match_pmg = true;
+	cfg.pmg = rmid;
+
+	dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
+
+	if (cdp_enabled) {
+		cfg.partid = closid << 1;
+		mpam_msmon_reset_mbwu(dom->comp, &cfg);
+
+		cfg.partid += 1;
+		mpam_msmon_reset_mbwu(dom->comp, &cfg);
+	} else {
+		cfg.partid = closid;
+		mpam_msmon_reset_mbwu(dom->comp, &cfg);
+	}
+}
+
 static bool cache_has_usable_cpor(struct mpam_class *class)
 {
 	struct mpam_props *cprops = &class->props;
