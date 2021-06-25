@@ -138,6 +138,9 @@ struct mpam_class
 
 	/* member of mpam_classes */
 	struct list_head	classes_list;
+
+	struct ida		ida_csu_mon;
+	struct ida		ida_mbwu_mon;
 };
 
 struct mpam_config {
@@ -190,6 +193,38 @@ struct mpam_msc_ris
 	struct mpam_msc		*msc;
 	struct mpam_component	*comp;
 };
+
+static inline int mpam_alloc_csu_mon(struct mpam_class *class)
+{
+	struct mpam_props *cprops = &class->props;
+
+	if (!mpam_has_feature(mpam_feat_msmon_csu, cprops))
+		return -EOPNOTSUPP;
+
+	return ida_alloc_range(&class->ida_csu_mon, 0, cprops->num_csu_mon,
+                                GFP_KERNEL);
+}
+
+static inline void mpam_free_csu_mon(struct mpam_class *class, int csu_mon)
+{
+	ida_free(&class->ida_csu_mon, csu_mon);
+}
+
+static inline int mpam_alloc_mbwu_mon(struct mpam_class *class)
+{
+	struct mpam_props *cprops = &class->props;
+
+	if (!mpam_has_feature(mpam_feat_msmon_mbwu, cprops))
+		return -EOPNOTSUPP;
+
+	return ida_alloc_range(&class->ida_mbwu_mon, 0, cprops->num_mbwu_mon,
+                                GFP_KERNEL);
+}
+
+static inline void mpam_free_mbwu_mon(struct mpam_class *class, int mbwu_mon)
+{
+	ida_free(&class->ida_mbwu_mon, mbwu_mon);
+}
 
 /* List of all classes */
 extern struct list_head mpam_classes;
