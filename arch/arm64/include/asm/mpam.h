@@ -4,6 +4,7 @@
 #ifndef __ASM__MPAM_H
 #define __ASM__MPAM_H
 
+#include <linux/arm_mpam.h>
 #include <linux/bitops.h>
 #include <linux/init.h>
 #include <linux/jump_label.h>
@@ -108,7 +109,7 @@ static inline void mpam_thread_switch(struct task_struct *tsk)
 	    !static_branch_likely(&mpam_enabled))
 		return;
 
-	if (!regval)
+	if (regval == READ_ONCE(mpam_resctrl_default_group))
 		regval = READ_ONCE(per_cpu(arm64_mpam_default, cpu));
 
 	oldregval = READ_ONCE(per_cpu(arm64_mpam_current, cpu));
