@@ -5,8 +5,11 @@
 
 #include <linux/arm_mpam.h>
 #include <linux/jump_label.h>
+#include <linux/percpu.h>
 
 DEFINE_STATIC_KEY_FALSE(arm64_mpam_has_hcr);
+DEFINE_PER_CPU(u64, arm64_mpam_default);
+DEFINE_PER_CPU(u64, arm64_mpam_current);
 
 static int __init arm64_mpam_register_cpus(void)
 {
