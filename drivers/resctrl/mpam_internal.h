@@ -34,6 +34,14 @@ DECLARE_STATIC_KEY_FALSE(mpam_enabled);
 #define PACKED_FOR_KUNIT
 #endif
 
+/*
+ * This 'mon' values must not alias an actual monitor, so must be larger than
+ * U16_MAX, but not be confused with an errno value, so smaller than
+ * (u32)-SZ_4K.
+ * USE_PRE_ALLOCATED is used to avoid confusion with an actual monitor.
+ */
+#define USE_PRE_ALLOCATED      (U16_MAX + 1)
+
 static inline bool mpam_is_enabled(void)
 {
 	return static_branch_likely(&mpam_enabled);
@@ -209,7 +217,11 @@ enum mon_filter_options {
 };
 
 struct mon_cfg {
-	u16                     mon;
+	/*
+	 * mon must be large enough to hold out of range values like
+	 * USE_RMID_IDX
+	 */
+	u32                     mon;
 	u8                      pmg;
 	bool                    match_pmg;
 	bool			csu_exclude_clean;
