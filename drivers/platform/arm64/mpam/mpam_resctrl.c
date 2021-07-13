@@ -121,6 +121,34 @@ u32 resctrl_arch_get_num_closid(struct rdt_resource *ignored)
 	return mpam_partid_max + 1;
 }
 
+u32 resctrl_arch_system_num_rmid_idx(void)
+{
+	u8 closid_shift = fls(mpam_pmg_max);
+	u32 num_partid = resctrl_arch_get_num_closid(NULL);
+
+	return num_partid << closid_shift;
+}
+
+u32 resctrl_arch_rmid_idx_encode(u32 closid, u32 rmid)
+{
+	u8 closid_shift = fls(mpam_pmg_max);
+
+	WARN_ON_ONCE(closid_shift > 8);
+
+	return (closid << closid_shift) | rmid;
+}
+
+void resctrl_arch_rmid_idx_decode(u32 idx, u32 *closid, u32 *rmid)
+{
+	u8 closid_shift = fls(mpam_pmg_max);
+	u32 pmg_mask = ~(~0 << closid_shift);
+
+	WARN_ON_ONCE(closid_shift > 8);
+
+	*closid = idx >> closid_shift;
+	*rmid = idx & pmg_mask;
+}
+
 void resctrl_arch_sched_in(struct task_struct *tsk)
 {
 	lockdep_assert_preemption_disabled();
