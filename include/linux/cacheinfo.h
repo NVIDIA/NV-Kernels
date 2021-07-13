@@ -148,6 +148,21 @@ static inline int get_cpu_cacheinfo_id(int cpu, int level)
 	return ci ? ci->id : -1;
 }
 
+/**
+ * get_cpu_cacheinfo_size() - Get the size of the cache.
+ * @cpu:      The cpu that is associated with the cache.
+ * @level:    The level of the cache as seen by @cpu.
+ *
+ * Callers must hold the cpuhp lock.
+ * Returns the cache-size on success, or 0 for an error.
+ */
+static inline unsigned int get_cpu_cacheinfo_size(int cpu, int level)
+{
+	struct cacheinfo *ci = get_cpu_cacheinfo_level(cpu, level);
+
+	return ci ? ci->size : 0;
+}
+
 #if defined(CONFIG_ARM64) || defined(CONFIG_ARM)
 #define use_arch_cache_info()	(true)
 #else
