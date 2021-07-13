@@ -80,4 +80,11 @@ struct rdt_resource;
 void *resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r, int evtid);
 void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid, void *ctx);
 
+/* Pseudo lock is not supported by MPAM */
+static inline int resctrl_arch_pseudo_lock_fn(void *_plr) { return 0; }
+static inline int resctrl_arch_measure_l2_residency(void *_plr) { return 0; }
+static inline int resctrl_arch_measure_l3_residency(void *_plr) { return 0; }
+static inline int resctrl_arch_measure_cycles_lat_fn(void *_plr) { return 0; }
+static inline u64 resctrl_arch_get_prefetch_disable_bits(void) { return 0; }
+
 #endif /* __LINUX_ARM_MPAM_H */
