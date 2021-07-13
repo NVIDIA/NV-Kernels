@@ -636,10 +636,19 @@ struct arm_smmu_impl {
 	struct arm_smmu_cmdq *(*get_secondary_cmdq)(struct arm_smmu_device *smmu);
 };
 
+#ifdef CONFIG_TEGRA241_CMDQV
+struct arm_smmu_device *
+tegra241_cmdqv_acpi_dsdt_probe(struct arm_smmu_device *smmu,
+			       struct acpi_iort_node *node);
+#endif
+
 static inline struct arm_smmu_device *
 arm_smmu_impl_acpi_dsdt_probe(struct arm_smmu_device *smmu,
 			      struct acpi_iort_node *node)
 {
+#ifdef CONFIG_TEGRA241_CMDQV
+	smmu = tegra241_cmdqv_acpi_dsdt_probe(smmu, node);
+#endif
 	return smmu;
 }
 
