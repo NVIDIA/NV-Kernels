@@ -15,6 +15,7 @@
 #include <linux/resctrl.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/wait.h>
 
 #include <asm/mpam.h>
 
@@ -53,6 +54,13 @@ static bool cdp_enabled;
  * for the filesystem in the event of an error.
  */
 static bool resctrl_enabled;
+
+/*
+ * mpam_resctrl_pick_caches() needs to know the size of the caches. cacheinfo
+ * populates this from a device_initcall(). mpam_resctrl_setup() must wait.
+ */
+static bool cacheinfo_ready;
+static DECLARE_WAIT_QUEUE_HEAD(wait_cacheinfo_ready);
 
 /*
  * L3 local/total may come from different classes - what is the number of MBWU
@@ -519,6 +527,24 @@ void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_mon_domain *d,
 	}
 }
 
+/*
+ * The rmid realloc threshold should be for the smallest cache exposed to
+ * resctrl.
+ */
+static void update_rmid_limits(unsigned int size)
+{
+	u32 num_unique_pmg = resctrl_arch_system_num_rmid_idx();
+
+	if (WARN_ON_ONCE(!size))
+		return;
+
+	if (resctrl_rmid_realloc_limit && size > resctrl_rmid_realloc_limit)
+		return;
+
+	resctrl_rmid_realloc_limit = size;
+	resctrl_rmid_realloc_threshold = size / num_unique_pmg;
+}
+
 static bool cache_has_usable_cpor(struct mpam_class *class)
 {
 	struct mpam_props *cprops = &class->props;
@@ -738,6 +764,8 @@ static void mpam_resctrl_pick_caches(void)
 	struct mpam_class *class;
 	struct mpam_resctrl_res *res;
 
+	lockdep_assert_cpus_held();
+
 	idx = srcu_read_lock(&mpam_srcu);
 	list_for_each_entry_rcu(class, &mpam_classes, classes_list) {
 		if (class->type != MPAM_CLASS_CACHE) {
@@ -922,6 +950,7 @@ static void counter_update_class(enum resctrl_event_id evt_id,
 static void mpam_resctrl_pick_counters(void)
 {
 	struct mpam_class *class;
+	unsigned int cache_size;
 	bool has_csu, has_mbwu;
 	int idx;
 
@@ -929,6 +958,8 @@ static void mpam_resctrl_pick_counters(void)
 
 	idx = srcu_read_lock(&mpam_srcu);
 	list_for_each_entry_rcu(class, &mpam_classes, classes_list) {
+		struct mpam_props *cprops = &class->props;
+
 		if (class->level < 3) {
 			pr_debug("class %u is before L3", class->level);
 			continue;
@@ -946,6 +977,18 @@ static void mpam_resctrl_pick_counters(void)
 			/* CSU counters only make sense on a cache. */
 			switch (class->type) {
 			case MPAM_CLASS_CACHE:
+				/* Assume cache levels are the same size for all CPUs... */
+				cache_size = get_cpu_cacheinfo_size(smp_processor_id(),
+								    class->level);
+				if (!cache_size) {
+					pr_debug("Could not read cache size for class %u\n",
+						 class->level);
+					continue;
+				}
+
+				if (mpam_has_feature(mpam_feat_msmon_csu, cprops))
+					update_rmid_limits(cache_size);
+
 				counter_update_class(QOS_L3_OCCUP_EVENT_ID, class);
 				break;
 			default:
@@ -1541,6 +1584,8 @@ int mpam_resctrl_setup(void)
 	struct mpam_class *class;
 	struct mpam_resctrl_res *res;
 
+	wait_event(wait_cacheinfo_ready, cacheinfo_ready);
+
 	cpus_read_lock();
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
 		res = &mpam_resctrl_controls[i];
@@ -1645,6 +1690,15 @@ void mpam_resctrl_teardown_class(struct mpam_class *class)
 		}
 	}
 }
+
+static int __init __cacheinfo_ready(void)
+{
+	cacheinfo_ready = true;
+	wake_up(&wait_cacheinfo_ready);
+
+	return 0;
+}
+device_initcall_sync(__cacheinfo_ready);
 
 #ifdef CONFIG_MPAM_KUNIT_TEST
 #include "test_mpam_resctrl.c"
