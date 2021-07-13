@@ -15,6 +15,7 @@
 #include <linux/resctrl.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/wait.h>
 
 #include <asm/mpam.h>
 
@@ -44,6 +45,13 @@ static bool cdp_enabled;
  * for the filesystem in the event of an error.
  */
 static bool resctrl_enabled;
+
+/*
+ * mpam_resctrl_pick_caches() needs to know the size of the caches. cacheinfo
+ * populates this from a device_initcall(). mpam_resctrl_setup() must wait.
+ */
+static bool cacheinfo_ready;
+static DECLARE_WAIT_QUEUE_HEAD(wait_cacheinfo_ready);
 
 /* A dummy mon context to use when the monitors were allocated up front */
 u32 __mon_is_rmid_idx = USE_RMID_IDX;
@@ -380,6 +388,24 @@ void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_domain *d,
 	}
 }
 
+/*
+ * The rmid realloc threshold should be for the smallest cache exposed to
+ * resctrl.
+ */
+static void update_rmid_limits(unsigned int size)
+{
+	u32 num_unique_pmg = resctrl_arch_system_num_rmid_idx();
+
+	if (WARN_ON_ONCE(!size))
+		return;
+
+	if (resctrl_rmid_realloc_limit && size > resctrl_rmid_realloc_limit)
+		return;
+
+	resctrl_rmid_realloc_limit = size;
+	resctrl_rmid_realloc_threshold = size / num_unique_pmg;
+}
+
 static bool cache_has_usable_cpor(struct mpam_class *class)
 {
 	struct mpam_props *cprops = &class->props;
@@ -536,11 +562,15 @@ static u16 percent_to_mbw_max(u8 pc, struct mpam_props *cprops)
 static void mpam_resctrl_pick_caches(void)
 {
 	int idx;
+	unsigned int cache_size;
 	struct mpam_class *class;
 	struct mpam_resctrl_res *res;
 
+	lockdep_assert_cpus_held();
+
 	idx = srcu_read_lock(&mpam_srcu);
 	list_for_each_entry_rcu(class, &mpam_classes, classes_list) {
+		struct mpam_props *cprops = &class->props;
 		bool has_cpor = cache_has_usable_cpor(class);
 
 		if (class->type != MPAM_CLASS_CACHE) {
@@ -566,6 +596,16 @@ static void mpam_resctrl_pick_caches(void)
 			pr_debug("pick_caches: Class has missing CPUs\n");
 			continue;
 		}
+
+		/* Assume cache levels are the same size for all CPUs... */
+		cache_size = get_cpu_cacheinfo_size(smp_processor_id(), class->level);
+		if (!cache_size) {
+			pr_debug("pick_caches: Could not read cache size\n");
+			continue;
+		}
+
+		if (mpam_has_feature(mpam_feat_msmon_csu, cprops))
+			update_rmid_limits(cache_size);
 
 		if (class->level == 2) {
 			res = &mpam_resctrl_exports[RDT_RESOURCE_L2];
@@ -771,6 +811,8 @@ int mpam_resctrl_setup(void)
 	int err = 0;
 	struct mpam_resctrl_res *res;
 	enum resctrl_res_level i;
+
+	wait_event(wait_cacheinfo_ready, cacheinfo_ready);
 
 	cpus_read_lock();
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
@@ -1133,3 +1175,12 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 
 	return 0;
 }
+
+static int __init __cacheinfo_ready(void)
+{
+	cacheinfo_ready = true;
+	wake_up(&wait_cacheinfo_ready);
+
+	return 0;
+}
+device_initcall_sync(__cacheinfo_ready);
