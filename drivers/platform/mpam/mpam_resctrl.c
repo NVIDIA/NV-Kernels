@@ -22,8 +22,6 @@
 
 u64 mpam_resctrl_default_group;
 
-DECLARE_WAIT_QUEUE_HEAD(resctrl_mon_ctx_waiters);	// temporary
-
 /*
  * The classes we've picked to map to resctrl resources.
  * Class pointer may be NULL.
