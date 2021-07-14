@@ -77,4 +77,13 @@ static inline int resctrl_arch_measure_l3_residency(void *_plr) { return 0; }
 static inline int resctrl_arch_measure_cycles_lat_fn(void *_plr) { return 0; }
 static inline u64 resctrl_arch_get_prefetch_disable_bits(void) { return 0; }
 
+/*
+ * The CPU configuration for MPAM is cheap to write, and is only written if it
+ * has changed. No need for fine grained enables.
+ */
+static inline void resctrl_arch_enable_mon(void) { }
+static inline void resctrl_arch_disable_mon(void) { }
+static inline void resctrl_arch_enable_alloc(void) { }
+static inline void resctrl_arch_disable_alloc(void) { }
+
 #endif /* __LINUX_ARM_MPAM_H */
