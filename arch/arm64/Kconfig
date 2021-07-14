@@ -1982,7 +1982,8 @@ config ARM64_TLB_RANGE
 config ARM64_MPAM
 	bool "Enable support for MPAM"
 	select ACPI_MPAM if ACPI
-	select ARM_CPU_RESCTRL
+	select ARCH_HAS_CPU_RESCTRL
+	select RESCTRL_FS
 	help
 	  Memory Partitioning and Monitoring is an optional extension
 	  that allows the CPUs to mark load and store transactions with

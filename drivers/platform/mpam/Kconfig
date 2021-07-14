@@ -2,5 +2,7 @@
 # CPU resources, not containers or cgroups etc.
 config ARM_CPU_RESCTRL
 	bool
-	depends on ARM64
+	default y
+	depends on ARM64 && ARCH_HAS_CPU_RESCTRL
+	depends on MISC_FILESYSTEMS
 	select RESCTRL_RMID_DEPENDS_ON_CLOSID
