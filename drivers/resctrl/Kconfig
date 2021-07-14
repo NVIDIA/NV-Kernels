@@ -1,11 +1,11 @@
 menuconfig ARM64_MPAM_DRIVER
 	bool "MPAM driver"
-	depends on ARM64 && ARM64_MPAM && EXPERT
+	depends on ARM64 && ARM64_MPAM
+	select ACPI_MPAM if ACPI
 	help
 	  MPAM driver for System IP, e,g. caches and memory controllers.
 
 if ARM64_MPAM_DRIVER
-
 config ARM64_MPAM_DRIVER_DEBUG
 	bool "Enable debug messages from the MPAM driver"
 	depends on ARM64_MPAM_DRIVER
@@ -22,3 +22,8 @@ config MPAM_KUNIT_TEST
 	  If unsure, say N.
 
 endif
+
+config ARM64_MPAM_RESCTRL_FS
+	bool
+	default y if ARM64_MPAM_DRIVER && RESCTRL_FS
+	select RESCTRL_RMID_DEPENDS_ON_CLOSID
