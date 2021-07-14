@@ -1,8 +1,13 @@
-# Confusingly, this is everything but the CPU bits of MPAM. CPU here means
-# CPU resources, not containers or cgroups etc.
-config ARM_CPU_RESCTRL
+config ARM64_MPAM_DRIVER
 	bool
-	depends on ARM64
+	default y if ARM64_MPAM
+	select ACPI_MPAM if ACPI
+
+config ARM64_MPAM_RESCTRL_FS
+	bool
+	default y if ARM64_MPAM_DRIVER && RESCTRL_FS
+	select RESCTRL_RMID_DEPENDS_ON_CLOSID
+	select RESCTRL_IOMMU if ARM_SMMU_V3
 
 config MPAM_KUNIT_TEST
 	bool "KUnit tests for MPAM driver " if !KUNIT_ALL_TESTS
