@@ -431,7 +431,7 @@ int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx);
 void mpam_msmon_reset_all_mbwu(struct mpam_component *comp);
 
-#ifdef CONFIG_ARM_CPU_RESCTRL
+#ifdef CONFIG_RESCTRL_FS
 int mpam_resctrl_setup(void);
 int mpam_resctrl_online_cpu(unsigned int cpu);
 int mpam_resctrl_offline_cpu(unsigned int cpu);
