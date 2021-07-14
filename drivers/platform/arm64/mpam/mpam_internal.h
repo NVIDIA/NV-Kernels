@@ -453,7 +453,7 @@ void mpam_msmon_reset_all_mbwu(struct mpam_component *comp);
 int mpam_get_cpumask_from_cache_id(unsigned long cache_id, u32 cache_level,
 				   cpumask_t *affinity);
 
-#ifdef CONFIG_ARM_CPU_RESCTRL
+#ifdef CONFIG_RESCTRL_FS
 int mpam_resctrl_setup(void);
 int mpam_resctrl_online_cpu(unsigned int cpu);
 int mpam_resctrl_offline_cpu(unsigned int cpu);
