@@ -1,3 +1,16 @@
+linux-meta-unstable (5.14.0.1.1) impish; urgency=medium
+
+  * Bump ABI 5.14.0-1
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+    - [Packaging] resync debian/dkms-versions from main package
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] Change source package name to linux-meta-unstable
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Fri, 16 Jul 2021 16:06:02 +0200
+
 linux-meta-unstable (5.14.0.0.0) impish; urgency=medium
 
   * Empty entry.
