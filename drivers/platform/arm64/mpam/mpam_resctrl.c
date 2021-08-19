@@ -1006,7 +1006,7 @@ int mpam_resctrl_setup(void)
 			pr_warn("Number of PMG is not a power of 2! resctrl may misbehave");
 		}
 
-		/* TODO: call resctrl_init() */
+		err = resctrl_init();
 	}
 
 	return err;
@@ -1228,6 +1228,7 @@ static bool mpam_resctrl_offline_domain_hdr(unsigned int cpu,
 static struct mpam_resctrl_dom *
 mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 {
+	int err;
 	struct mpam_resctrl_dom *dom;
 	struct rdt_mon_domain *mon_d;
 	struct rdt_ctrl_domain *ctrl_d;
@@ -1258,12 +1259,23 @@ mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 	ctrl_d->hdr.type = RESCTRL_CTRL_DOMAIN;
 	/* TODO: this list should be sorted */
 	list_add_tail(&ctrl_d->hdr.list, &res->resctrl_res.ctrl_domains);
+	err = resctrl_online_ctrl_domain(&res->resctrl_res, ctrl_d);
+	if (err) {
+		mpam_resctrl_offline_domain_hdr(cpu, &ctrl_d->hdr);
+		return ERR_PTR(err);
+	}
 
 	mon_d = &dom->resctrl_mon_dom;
 	mpam_resctrl_domain_hdr_init(cpu, class, comp, &mon_d->hdr);
 	mon_d->hdr.type = RESCTRL_MON_DOMAIN;
 	/* TODO: this list should be sorted */
 	list_add_tail(&mon_d->hdr.list, &res->resctrl_res.mon_domains);
+	err = resctrl_online_mon_domain(&res->resctrl_res, mon_d);
+	if (err) {
+		mpam_resctrl_offline_domain_hdr(cpu, &mon_d->hdr);
+		resctrl_offline_ctrl_domain(&res->resctrl_res, ctrl_d);
+		return ERR_PTR(err);
+	}
 
 	return dom;
 }
@@ -1322,6 +1334,7 @@ int mpam_resctrl_online_cpu(unsigned int cpu)
 		cpumask_set_cpu(cpu, &dom->resctrl_mon_dom.hdr.cpu_mask);
 	}
 
+	resctrl_online_cpu(cpu);
 	return 0;
 }
 
@@ -1333,6 +1346,8 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 	struct rdt_mon_domain *mon_d;
 	struct rdt_ctrl_domain *ctrl_d;
 
+	resctrl_offline_cpu(cpu);
+
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
 		res = &mpam_resctrl_controls[i];
 		if (!res->class)
@@ -1341,11 +1356,14 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 		ctrl_d = resctrl_get_ctrl_domain_from_cpu(cpu, &res->resctrl_res);
 		if (WARN_ON_ONCE(!ctrl_d))
 			continue;
+
+		resctrl_offline_ctrl_domain(&res->resctrl_res, ctrl_d);
 		if (!mpam_resctrl_offline_domain_hdr(cpu, &ctrl_d->hdr))
 			continue;
 
 		dom = container_of(ctrl_d, struct mpam_resctrl_dom, resctrl_ctrl_dom);
 		mon_d = &dom->resctrl_mon_dom;
+		resctrl_offline_mon_domain(&res->resctrl_res, mon_d);
 		if (!mpam_resctrl_offline_domain_hdr(cpu, &mon_d->hdr))
 			continue;
 
