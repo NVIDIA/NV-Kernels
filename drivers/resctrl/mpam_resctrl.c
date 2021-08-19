@@ -1915,7 +1915,7 @@ int mpam_resctrl_setup(void)
 			pr_warn("Number of PMG is not a power of 2! resctrl may misbehave");
 		}
 
-		/* TODO: call resctrl_init() */
+		err = resctrl_init();
 	}
 
 	return err;
