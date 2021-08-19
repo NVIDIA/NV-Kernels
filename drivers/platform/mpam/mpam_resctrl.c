@@ -802,7 +802,7 @@ int mpam_resctrl_setup(void)
 			pr_warn("Number of PMG is not a power of 2! resctrl may misbehave");
 		}
 
-		/* TODO: call resctrl_init() */
+		err = resctrl_init();
 	}
 
 	return err;
@@ -1055,7 +1055,7 @@ struct rdt_domain *resctrl_arch_find_domain(struct rdt_resource *r, int id)
 
 int mpam_resctrl_online_cpu(unsigned int cpu)
 {
-	int i;
+	int i, err;
 	struct mpam_resctrl_dom *dom;
 	struct mpam_resctrl_res *res;
 
@@ -1074,9 +1074,12 @@ int mpam_resctrl_online_cpu(unsigned int cpu)
 		dom = mpam_resctrl_alloc_domain(cpu, res);
 		if (IS_ERR(dom))
 			return PTR_ERR(dom);
+		err = resctrl_online_domain(&res->resctrl_res, &dom->resctrl_dom);
+		if (err)
+			return err;
 	}
 
-	return 0;
+	return resctrl_online_cpu(cpu);
 }
 
 int mpam_resctrl_offline_cpu(unsigned int cpu)
@@ -1085,6 +1088,8 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 	struct rdt_domain *d;
 	struct mpam_resctrl_res *res;
 	struct mpam_resctrl_dom *dom;
+
+	resctrl_offline_cpu(cpu);
 
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
 		res = &mpam_resctrl_exports[i];
@@ -1104,6 +1109,7 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 		if (!cpumask_empty(&d->cpu_mask))
 			continue;
 
+		resctrl_offline_domain(&res->resctrl_res, &dom->resctrl_dom);
 		list_del(&d->list);
 		kfree(dom);
 	}
