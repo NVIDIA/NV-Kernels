@@ -1,3 +1,9 @@
+linux-meta-unstable (5.14.0.8.8) impish; urgency=medium
+
+  * Bump ABI 5.14.0-8
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 30 Aug 2021 12:58:21 +0200
+
 linux-meta-unstable (5.14.0.7.7) impish; urgency=medium
 
   * Bump ABI 5.14.0-7
