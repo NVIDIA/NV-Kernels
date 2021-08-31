@@ -3897,6 +3897,22 @@ static int arm_smmu_viommu_cache_invalidate(struct iommufd_viommu *viommu,
 			to_smmu_domain(domain), viommu, array);
 }
 
+static struct iommufd_viommu *
+arm_smmu_domain_viommu_alloc(struct iommu_domain *domain, struct device *dev,
+			     struct iommufd_ctx *ictx, unsigned int viommu_type)
+{
+	struct arm_smmu_domain *smmu_domain = to_smmu_domain_devices(domain);
+	struct arm_smmu_master *master = dev_iommu_priv_get(dev);
+
+	if (!master || !master->smmu)
+		return ERR_PTR(-ENODEV);
+
+	if (master->smmu->impl && master->smmu->impl->viommu_alloc)
+		return master->smmu->impl->viommu_alloc(
+			master->smmu, smmu_domain, ictx);
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
 static struct iommu_ops arm_smmu_ops = {
 	.identity_domain	= &arm_smmu_identity_domain,
 	.blocked_domain		= &arm_smmu_blocked_domain,
@@ -3927,6 +3943,7 @@ static struct iommu_ops arm_smmu_ops = {
 		.iotlb_sync		= arm_smmu_iotlb_sync,
 		.iova_to_phys		= arm_smmu_iova_to_phys,
 		.free			= arm_smmu_domain_free_paging,
+		.viommu_alloc		= arm_smmu_domain_viommu_alloc,
 		.default_viommu_ops = &(const struct iommufd_viommu_ops) {
 			.cache_invalidate = arm_smmu_viommu_cache_invalidate,
 		}

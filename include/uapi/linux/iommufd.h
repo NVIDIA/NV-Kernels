@@ -919,6 +919,7 @@ struct iommu_event_alloc {
  */
 enum iommu_viommu_type {
 	IOMMU_VIOMMU_TYPE_DEFAULT,
+	IOMMU_VIOMMU_TYPE_TEGRA241_CMDQV,
 };
 
 /**

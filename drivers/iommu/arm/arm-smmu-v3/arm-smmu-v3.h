@@ -16,6 +16,7 @@
 #include <linux/sizes.h>
 
 struct arm_smmu_device;
+struct arm_smmu_domain;
 struct acpi_iort_node;
 
 /* MMIO registers */
@@ -686,6 +687,9 @@ struct arm_smmu_impl {
 	void (*device_remove)(struct arm_smmu_device *smmu);
 	struct arm_smmu_cmdq *(*get_secondary_cmdq)(struct arm_smmu_device *smmu,
 			       u8 opcode);
+	struct iommufd_viommu *(*viommu_alloc)(
+		struct arm_smmu_device *smmu, struct arm_smmu_domain *smmu_domain,
+		struct iommufd_ctx *ictx);
 };
 
 #ifdef CONFIG_TEGRA241_CMDQV
@@ -919,6 +923,14 @@ int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
 			    size_t dwords, const char *name);
 int arm_smmu_cmdq_init(struct arm_smmu_device *smmu,
 		       struct arm_smmu_cmdq *cmdq);
+
+static inline phys_addr_t
+arm_smmu_domain_ipa_to_pa(struct arm_smmu_domain *smmu_domain, u64 ipa)
+{
+	if (WARN_ON_ONCE(smmu_domain->stage != ARM_SMMU_DOMAIN_S2))
+		return 0;
+	return iommu_iova_to_phys(&smmu_domain->domain, ipa);
+}
 
 #ifdef CONFIG_ARM_SMMU_V3_SVA
 bool arm_smmu_sva_supported(struct arm_smmu_device *smmu);
