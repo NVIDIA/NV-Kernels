@@ -893,6 +893,7 @@ struct iommu_fault_alloc {
  */
 enum iommu_viommu_type {
 	IOMMU_VIOMMU_TYPE_DEFAULT = 0,
+	IOMMU_VIOMMU_TYPE_TEGRA241_CMDQV = 1,
 };
 
 /**
@@ -1000,11 +1001,27 @@ struct iommu_virq_alloc {
 #define IOMMU_VIRQ_ALLOC _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VIRQ_ALLOC)
 
 /**
+ * struct iommu_vqueue_tegra241_cmdqv - NVIDIA Tegra241's Virtual Command Queue
+ *                                      for its CMDQV Extension for ARM SMMUv3
+ *                                      (IOMMU_VQUEUE_DATA_TEGRA241_CMDQV)
+ * @vcmdq_id: logical ID of a virtual command queue in the VIOMMU instance
+ * @vcmdq_log2size: (1 << @vcmdq_log2size) will be the size of the vcmdq
+ * @vcmdq_base: guest physical address (IPA) to the vcmdq base address
+ */
+struct iommu_vqueue_tegra241_cmdqv {
+	__u32 vcmdq_id;
+	__u32 vcmdq_log2size;
+	__aligned_u64 vcmdq_base;
+};
+
+/**
  * enum iommu_vqueue_data_type - VQUEUE Data Type
  * @IOMMU_VQUEUE_DATA_NONE: No Data
+ * @IOMMU_VQUEUE_DATA_TEGRA241_CMDQV: NVIDIA Tegra241 CMDQV Extension for SMMUv3
  */
 enum iommu_vqueue_data_type {
 	IOMMU_VQUEUE_DATA_NONE = 0,
+	IOMMU_VQUEUE_DATA_TEGRA241_CMDQV = 1,
 };
 
 /**
