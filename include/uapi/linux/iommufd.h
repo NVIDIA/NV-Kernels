@@ -928,10 +928,28 @@ struct iommu_fault_alloc {
  * enum iommu_viommu_type - Virtual IOMMU Type
  * @IOMMU_VIOMMU_TYPE_DEFAULT: Reserved for future use
  * @IOMMU_VIOMMU_TYPE_ARM_SMMUV3: ARM SMMUv3 driver specific type
+ * @IOMMU_VIOMMU_TYPE_TEGRA241_CMDQV: NVIDIA Tegra241 CMDQV Extension for SMMUv3
  */
 enum iommu_viommu_type {
 	IOMMU_VIOMMU_TYPE_DEFAULT = 0,
 	IOMMU_VIOMMU_TYPE_ARM_SMMUV3 = 1,
+	IOMMU_VIOMMU_TYPE_TEGRA241_CMDQV = 2,
+};
+
+/**
+ * struct iommu_viommu_tegra241_cmdqv - NVIDIA Tegra241 CMDQV Virtual Interface
+ *                                      (IOMMU_VIOMMU_TYPE_TEGRA241_CMDQV)
+ * @out_vintf_page0_pgoff: Offset of the VINTF page0 for mmap syscall
+ * @out_vintf_page0_pgsz: Size of the VINTF page0 for mmap syscall
+ *
+ * Both @out_vintf_page0_pgoff and @out_vintf_page0_pgsz are given by the kernel
+ * for user space to mmap the VINTF page0 from the host physical address space
+ * to the guest physical address space so that a guest kernel can directly R/W
+ * access to the VINTF page0 in order to control its virtual comamnd queues.
+ */
+struct iommu_viommu_tegra241_cmdqv {
+	__aligned_u64 out_vintf_page0_pgoff;
+	__aligned_u64 out_vintf_page0_pgsz;
 };
 
 /**
@@ -1121,9 +1139,25 @@ struct iommu_veventq_alloc {
 /**
  * enum iommu_vcmdq_type - Virtual Queue Type
  * @IOMMU_VCMDQ_TYPE_DEFAULT: Reserved for future use
+ * @IOMMU_VCMDQ_TYPE_TEGRA241_CMDQV: NVIDIA Tegra241 CMDQV Extension for SMMUv3
  */
 enum iommu_vcmdq_data_type {
 	IOMMU_VCMDQ_TYPE_DEFAULT = 0,
+	IOMMU_VCMDQ_TYPE_TEGRA241_CMDQV = 1,
+};
+
+/**
+ * struct iommu_vqueue_tegra241_cmdqv - NVIDIA Tegra241's Virtual Command Queue
+ *                                      for its CMDQV Extension for ARM SMMUv3
+ *                                      (IOMMU_VCMDQ_TYPE_TEGRA241_CMDQV)
+ * @vcmdq_id: logical ID of a virtual command queue in the VIOMMU instance
+ * @vcmdq_log2size: (1 << @vcmdq_log2size) will be the size of the vcmdq
+ * @vcmdq_base: guest physical address (IPA) to the vcmdq base address
+ */
+struct iommu_vcmdq_tegra241_cmdqv {
+	__u32 vcmdq_id;
+	__u32 vcmdq_log2size;
+	__aligned_u64 vcmdq_base;
 };
 
 /**
