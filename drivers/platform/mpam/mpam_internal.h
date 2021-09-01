@@ -7,6 +7,7 @@
 #include <linux/arm_mpam.h>
 #include <linux/atomic.h>
 #include <linux/cpumask.h>
+#include <linux/debugfs.h>
 #include <linux/io.h>
 #include <linux/jump_label.h>
 #include <linux/mailbox_client.h>
@@ -74,6 +75,8 @@ struct mpam_msc
 	spinlock_t		mon_sel_lock;
 	void __iomem *		mapped_hwpage;
 	size_t			mapped_hwpage_sz;
+
+	struct dentry		*debugfs;
 };
 
 /*
@@ -153,6 +156,8 @@ struct mpam_class
 
 	struct ida		ida_csu_mon;
 	struct ida		ida_mbwu_mon;
+
+	struct dentry		*debugfs;
 };
 
 struct mpam_config {
@@ -184,6 +189,8 @@ struct mpam_component
 
 	/* parent: */
 	struct mpam_class	*class;
+
+	struct dentry		*debugfs;
 };
 
 /* The values for MSMON_CFG_MBWU_FLT.RWBW */
@@ -241,6 +248,8 @@ struct mpam_msc_ris {
 
 	/* msmon mbwu configuration is preserved over reset */
 	struct msmon_mbwu_state	*mbwu_state;
+
+	struct dentry		*debugfs;
 };
 
 struct mpam_resctrl_dom {
