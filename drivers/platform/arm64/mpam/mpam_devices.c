@@ -73,6 +73,8 @@ static DECLARE_WORK(mpam_enable_work, &mpam_enable);
  */
 static DECLARE_WORK(mpam_broken_work, &mpam_disable);
 
+static struct dentry *mpam_debugfs;
+
 /*
  * An MSC is a physical container for controls and monitors, each identified by
  * their RIS index. These share a base-address, interrupts and some MMIO
@@ -365,6 +367,8 @@ static void mpam_class_destroy(struct mpam_class *class)
 {
 	lockdep_assert_held(&mpam_list_lock);
 
+	debugfs_remove_recursive(class->debugfs);
+	class->debugfs = NULL;
 	list_del_rcu(&class->classes_list);
 	add_to_garbage(class);
 }
@@ -379,6 +383,8 @@ static void mpam_comp_destroy(struct mpam_component *comp)
 
 	__destroy_component_cfg(comp);
 
+	debugfs_remove_recursive(comp->debugfs);
+	comp->debugfs = NULL;
 	list_del_rcu(&comp->class_list);
 	add_to_garbage(comp);
 
@@ -392,6 +398,8 @@ static void mpam_vmsc_destroy(struct mpam_vmsc *vmsc)
 
 	lockdep_assert_held(&mpam_list_lock);
 
+	debugfs_remove_recursive(vmsc->debugfs);
+	vmsc->debugfs = NULL;
 	list_del_rcu(&vmsc->comp_list);
 	add_to_garbage(vmsc);
 
@@ -418,6 +426,8 @@ static void mpam_ris_destroy(struct mpam_msc_ris *ris)
 	cpumask_andnot(&comp->affinity, &comp->affinity, &ris->affinity);
 	cpumask_andnot(&class->affinity, &class->affinity, &ris->affinity);
 	clear_bit(ris->ris_idx, msc->ris_idxs);
+	debugfs_remove_recursive(ris->debugfs);
+	ris->debugfs = NULL;
 	list_del_rcu(&ris->vmsc_list);
 	list_del_rcu(&ris->msc_list);
 	add_to_garbage(ris);
@@ -444,6 +454,9 @@ static void mpam_msc_destroy(struct mpam_msc *msc)
 
 	list_del_rcu(&msc->glbl_list);
 	platform_set_drvdata(pdev, NULL);
+
+	debugfs_remove_recursive(msc->debugfs);
+	msc->debugfs = NULL;
 
 	add_to_garbage(msc);
 	msc->garbage.pdev = pdev;
@@ -733,33 +746,33 @@ static void mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 
 	/* Cache Capacity Partitioning */
 	if (FIELD_GET(MPAMF_IDR_HAS_CCAP_PART, ris->idr)) {
-		u32 ccap_features = mpam_read_partsel_reg(msc, CCAP_IDR);
+		ris->ccap_idr = mpam_read_partsel_reg(msc, CCAP_IDR);
 
-		props->cmax_wd = FIELD_GET(MPAMF_CCAP_IDR_CMAX_WD, ccap_features);
+		props->cmax_wd = FIELD_GET(MPAMF_CCAP_IDR_CMAX_WD, ris->ccap_idr);
 		if (props->cmax_wd &&
-		    FIELD_GET(MPAMF_CCAP_IDR_HAS_CMAX_SOFTLIM, ccap_features))
+		    FIELD_GET(MPAMF_CCAP_IDR_HAS_CMAX_SOFTLIM, ris->ccap_idr))
 			mpam_set_feature(mpam_feat_cmax_softlim, props);
 
 		if (props->cmax_wd &&
-		    !FIELD_GET(MPAMF_CCAP_IDR_NO_CMAX, ccap_features))
+		    !FIELD_GET(MPAMF_CCAP_IDR_NO_CMAX, ris->ccap_idr))
 			mpam_set_feature(mpam_feat_cmax_cmax, props);
 
 		if (props->cmax_wd &&
-		    FIELD_GET(MPAMF_CCAP_IDR_HAS_CMIN, ccap_features))
+		    FIELD_GET(MPAMF_CCAP_IDR_HAS_CMIN, ris->ccap_idr))
 			mpam_set_feature(mpam_feat_cmax_cmin, props);
 
-		props->cassoc_wd = FIELD_GET(MPAMF_CCAP_IDR_CASSOC_WD, ccap_features);
+		props->cassoc_wd = FIELD_GET(MPAMF_CCAP_IDR_CASSOC_WD, ris->ccap_idr);
 
 		if (props->cassoc_wd &&
-		    FIELD_GET(MPAMF_CCAP_IDR_HAS_CASSOC, ccap_features))
+		    FIELD_GET(MPAMF_CCAP_IDR_HAS_CASSOC, ris->ccap_idr))
 			mpam_set_feature(mpam_feat_cmax_cassoc, props);
 	}
 
 	/* Cache Portion partitioning */
 	if (FIELD_GET(MPAMF_IDR_HAS_CPOR_PART, ris->idr)) {
-		u32 cpor_features = mpam_read_partsel_reg(msc, CPOR_IDR);
+		ris->cpor_idr = mpam_read_partsel_reg(msc, CPOR_IDR);
 
-		props->cpbm_wd = FIELD_GET(MPAMF_CPOR_IDR_CPBM_WD, cpor_features);
+		props->cpbm_wd = FIELD_GET(MPAMF_CPOR_IDR_CPBM_WD, ris->cpor_idr);
 		if (props->cpbm_wd)
 			mpam_set_feature(mpam_feat_cpor_part, props);
 	}
@@ -1937,6 +1950,7 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 {
 	int err;
 	pgprot_t prot;
+	char name[20];
 	void * __iomem io;
 	struct mpam_msc *msc;
 	struct resource *msc_res;
@@ -2030,6 +2044,10 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 
 		list_add_rcu(&msc->glbl_list, &mpam_all_msc);
 		platform_set_drvdata(pdev, msc);
+
+		snprintf(name, sizeof(name), "msc.%u", msc->id);
+		msc->debugfs = debugfs_create_dir(name, mpam_debugfs);
+		debugfs_create_x32("max_nrdy_usec", 0400, msc->debugfs, &msc->nrdy_usec);
 	} while (0);
 	mutex_unlock(&mpam_list_lock);
 
@@ -2576,6 +2594,99 @@ static int mpam_allocate_config(void)
 	return 0;
 }
 
+static void mpam_debugfs_setup_ris(struct mpam_msc_ris *ris)
+{
+	char name[40];
+	struct dentry *d;
+	struct mpam_props *rprops = &ris->props;
+
+	snprintf(name, sizeof(name), "ris.%u", ris->ris_idx);
+	d = debugfs_create_dir(name, ris->vmsc->msc->debugfs);
+	debugfs_create_x64("mpamf_idr", 0400, d, &ris->idr);
+	debugfs_create_x32("mpamf_cpor_idr", 0400, d, &ris->cpor_idr);
+	debugfs_create_x32("mpamf_ccap_idr", 0400, d, &ris->ccap_idr);
+	debugfs_create_x32("features", 0400, d, &rprops->features);
+	debugfs_create_x16("cpbm_wd", 0400, d, &rprops->cpbm_wd);
+	debugfs_create_x16("mbw_pbm_bits", 0400, d, &rprops->mbw_pbm_bits);
+	debugfs_create_x16("num_csu_mon", 0400, d, &rprops->num_csu_mon);
+	debugfs_create_x16("num_mbwu_mon", 0400, d, &rprops->num_mbwu_mon);
+	debugfs_create_cpumask("affinity", 0400, d, &ris->affinity);
+	ris->debugfs = d;
+}
+
+static void mpam_debugfs_setup_vmsc(struct mpam_component *comp,
+				    struct mpam_vmsc *vmsc)
+{
+	u8 ris_idx;
+	char name[40];
+	char path[40];
+	struct dentry *d;
+	struct mpam_msc_ris *ris;
+	int msc_id = vmsc->msc->id;
+
+	snprintf(name, sizeof(name), "vmsc.%u", msc_id);
+	d = debugfs_create_dir(name, comp->debugfs);
+	debugfs_create_x32("features", 0400, d, &vmsc->props.features);
+	vmsc->debugfs = d;
+
+	list_for_each_entry_rcu(ris, &vmsc->ris, vmsc_list) {
+		ris_idx = ris->ris_idx;
+
+		snprintf(name, sizeof(name), "msc.%u_ris.%u", msc_id,
+			 ris_idx);
+		snprintf(path, sizeof(path), "../../../msc.%u/ris.%u",
+			 msc_id, ris_idx);
+		debugfs_create_symlink(name, d, path);
+	}
+}
+
+static void mpam_debugfs_setup_comp(struct mpam_class *class,
+				    struct mpam_component *comp)
+{
+	char name[40];
+	struct dentry *d;
+	struct mpam_vmsc *vmsc;
+
+	snprintf(name, sizeof(name), "comp.%u", comp->comp_id);
+	d = debugfs_create_dir(name, class->debugfs);
+	comp->debugfs = d;
+
+	list_for_each_entry_rcu(vmsc, &comp->vmsc, comp_list)
+		mpam_debugfs_setup_vmsc(comp, vmsc);
+}
+
+static void mpam_debugfs_setup(void)
+{
+	char name[40];
+	struct dentry *d;
+	struct mpam_msc *msc;
+	struct mpam_class *class;
+	struct mpam_msc_ris *ris;
+	struct mpam_component *comp;
+
+	lockdep_assert_held(&mpam_list_lock);
+
+	list_for_each_entry(msc, &mpam_all_msc, glbl_list) {
+		d = msc->debugfs;
+		debugfs_create_x32("iface", 0400, d, &msc->iface);
+		list_for_each_entry(ris, &msc->ris, msc_list)
+			mpam_debugfs_setup_ris(ris);
+	}
+
+	list_for_each_entry_rcu(class, &mpam_classes, classes_list) {
+		snprintf(name, sizeof(name), "class.%u", class->level);
+		d = debugfs_create_dir(name, mpam_debugfs);
+		debugfs_create_x32("features", 0400, d, &class->props.features);
+		debugfs_create_x32("nrdy_usec", 0400, d, &class->nrdy_usec);
+		debugfs_create_x8("level", 0400, d, &class->level);
+		debugfs_create_cpumask("affinity", 0400, d, &class->affinity);
+		class->debugfs = d;
+
+		list_for_each_entry_rcu(comp, &class->components, class_list)
+			mpam_debugfs_setup_comp(class, comp);
+	}
+}
+
 static void mpam_enable_once(void)
 {
 	int err;
@@ -2601,6 +2712,8 @@ static void mpam_enable_once(void)
 			pr_warn("Failed to register irqs: %d\n", err);
 			break;
 		}
+
+		mpam_debugfs_setup();
 	} while (0);
 	mutex_unlock(&mpam_list_lock);
 	cpus_read_unlock();
@@ -2930,6 +3043,8 @@ static int __init mpam_msc_driver_init(void)
 
 	if (acpi_disabled)
 		mpam_dt_create_foundling_msc();
+
+	mpam_debugfs = debugfs_create_dir("mpam", NULL);
 
 	return platform_driver_register(&mpam_msc_driver);
 }
