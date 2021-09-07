@@ -341,6 +341,14 @@ struct mpam_msc_ris {
 
 struct mpam_resctrl_dom {
 	struct mpam_component	*ctrl_comp;
+
+	/*
+	 * There is no single mon_comp because different events may be backed
+	 * by different class/components. mon_comp is indexed by the event
+	 * number.
+	 */
+	struct mpam_component   *mon_comp[QOS_NUM_EVENTS];
+
 	struct rdt_ctrl_domain	resctrl_ctrl_dom;
 	struct rdt_mon_domain	resctrl_mon_dom;
 };
