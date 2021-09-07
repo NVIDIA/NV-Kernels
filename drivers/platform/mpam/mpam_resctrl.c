@@ -31,6 +31,7 @@ static struct mpam_resctrl_res mpam_resctrl_exports[RDT_NUM_RESOURCES];
 static bool exposed_alloc_capable;
 static bool exposed_mon_capable;
 static struct mpam_class *mbm_local_class;
+static struct mpam_class *mbm_total_class;
 
 /*
  * MPAM emulates CDP by setting different PARTID in the I/D fields of MPAM1_EL1.
@@ -51,6 +52,11 @@ bool resctrl_arch_mon_capable(void)
 bool resctrl_arch_is_mbm_local_enabled(void)
 {
 	return mbm_local_class;
+}
+
+bool resctrl_arch_is_mbm_total_enabled(void)
+{
+	return mbm_total_class;
 }
 
 bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level rid)
@@ -264,6 +270,24 @@ bool resctrl_arch_is_llc_occupancy_enabled(void)
 	return cache_has_usable_csu(mpam_resctrl_exports[RDT_RESOURCE_L3].class);
 }
 
+static bool class_has_usable_mbwu(struct mpam_class *class)
+{
+	struct mpam_props *cprops = &class->props;
+
+	if (!mpam_has_feature(mpam_feat_msmon_mbwu, cprops))
+		return false;
+
+	/*
+	 * resctrl expects the bandwidth counters to be free running,
+	 * which means we need as many monitors as resctrl has
+	 * control/monitor groups.
+	 */
+	if (cprops->num_mbwu_mon < resctrl_arch_system_num_rmid_idx())
+		return false;
+
+	return (mpam_partid_max > 1) || (mpam_pmg_max != 0);
+}
+
 static bool mba_class_use_mbw_part(struct mpam_props *cprops)
 {
 	/* TODO: Scaling is not yet supported */
@@ -449,10 +473,13 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 {
 	struct mpam_class *class = res->class;
 	struct rdt_resource *r = &res->resctrl_res;
+	bool has_mbwu = class_has_usable_mbwu(class);
 
 	/* Is this one of the two well-known caches? */
 	if (res->resctrl_res.rid == RDT_RESOURCE_L2 ||
 	    res->resctrl_res.rid == RDT_RESOURCE_L3) {
+		bool has_csu = cache_has_usable_csu(class);
+
 		/* TODO: Scaling is not yet supported */
 		r->cache.cbm_len = class->props.cpbm_wd;
 		r->cache.arch_has_sparse_bitmasks = true;
@@ -479,8 +506,25 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 			exposed_alloc_capable = true;
 		}
 
-		if (class->level == 3 && cache_has_usable_csu(class))
+		/*
+		 * MBWU counters may be 'local' or 'total' depending on where
+		 * they are in the topology. Counters on caches are assumed to
+		 * be local. If it's on the memory controller, its assumed to
+		 * be global.
+		 */
+		if (has_mbwu && class->level >= 3) {
+			mbm_local_class = class;
 			r->mon_capable = true;
+		}
+
+		/*
+		 * CSU counters only make sense on a cache. The file is called
+		 * llc_occupancy, but its expected to the on the L3.
+		 */
+		if (has_csu && class->type == MPAM_CLASS_CACHE &&
+		    class->level == 3) {
+			r->mon_capable = true;
+		}
 	} else if (res->resctrl_res.rid == RDT_RESOURCE_MBA) {
 		struct mpam_props *cprops = &class->props;
 
@@ -501,6 +545,11 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 		if (class_has_usable_mba(cprops)) {
 			r->alloc_capable = true;
 			exposed_alloc_capable = true;
+		}
+
+		if (has_mbwu && class->type == MPAM_CLASS_MEMORY) {
+			mbm_total_class = class;
+			r->mon_capable = true;
 		}
 	}
 
@@ -537,6 +586,7 @@ int mpam_resctrl_setup(void)
 
 	mpam_resctrl_pick_caches();
 	mpam_resctrl_pick_mba();
+	/* TODO: mpam_resctrl_pick_counters(); */
 
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
 		res = &mpam_resctrl_exports[i];
