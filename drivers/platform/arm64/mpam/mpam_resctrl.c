@@ -61,6 +61,16 @@ bool resctrl_arch_is_llc_occupancy_enabled(void)
 	return mpam_resctrl_counters[QOS_L3_OCCUP_EVENT_ID];
 }
 
+bool resctrl_arch_is_mbm_local_enabled(void)
+{
+	return mpam_resctrl_counters[QOS_L3_MBM_LOCAL_EVENT_ID];
+}
+
+bool resctrl_arch_is_mbm_total_enabled(void)
+{
+	return mpam_resctrl_counters[QOS_L3_MBM_TOTAL_EVENT_ID];
+}
+
 bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level rid)
 {
 	switch (rid) {
@@ -296,6 +306,24 @@ static bool cache_has_usable_csu(struct mpam_class *class)
 	 * having only one.
 	 */
 	if (!cprops->num_csu_mon)
+		return false;
+
+	return (mpam_partid_max > 1) || (mpam_pmg_max != 0);
+}
+
+static bool class_has_usable_mbwu(struct mpam_class *class)
+{
+	struct mpam_props *cprops = &class->props;
+
+	if (!mpam_has_feature(mpam_feat_msmon_mbwu, cprops))
+		return false;
+
+	/*
+	 * resctrl expects the bandwidth counters to be free running,
+	 * which means we need as many monitors as resctrl has
+	 * control/monitor groups.
+	 */
+	if (cprops->num_mbwu_mon < resctrl_arch_system_num_rmid_idx())
 		return false;
 
 	return (mpam_partid_max > 1) || (mpam_pmg_max != 0);
@@ -571,7 +599,7 @@ static void counter_update_class(enum resctrl_event_id evt_id,
 static void mpam_resctrl_pick_counters(void)
 {
 	struct mpam_class *class;
-	bool has_csu;
+	bool has_csu, has_mbwu;
 	int idx;
 
 	lockdep_assert_cpus_held();
@@ -590,6 +618,27 @@ static void mpam_resctrl_pick_counters(void)
 			switch (class->type) {
 			case MPAM_CLASS_CACHE:
 				counter_update_class(QOS_L3_OCCUP_EVENT_ID, class);
+				break;
+			default:
+				break;
+			}
+		}
+
+		has_mbwu = class_has_usable_mbwu(class);
+		if (has_mbwu && topology_matches_l3(class)) {
+			/*
+			 * MBWU counters may be 'local' or 'total' depending on where
+			 * they are in the topology. Counters on caches are assumed to
+			 * be local. If it's on the memory controller, its assumed to
+			 * be global.
+			 * TODO: check mbm_local matches NUMA boundaries...
+			 */
+			switch (class->type) {
+			case MPAM_CLASS_CACHE:
+				counter_update_class(QOS_L3_MBM_LOCAL_EVENT_ID, class);
+				break;
+			case MPAM_CLASS_MEMORY:
+				counter_update_class(QOS_L3_MBM_TOTAL_EVENT_ID, class);
 				break;
 			default:
 				break;
@@ -656,7 +705,7 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 }
 
 static void mpam_resctrl_monitor_init(struct mpam_class *class,
-				     enum resctrl_event_id type)
+				      enum resctrl_event_id type)
 {
 	struct mpam_resctrl_res *res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
 	struct rdt_resource *l3 = &res->resctrl_res;
