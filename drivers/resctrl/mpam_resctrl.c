@@ -47,6 +47,14 @@ static bool exposed_mon_capable;
  */
 static bool cdp_enabled;
 
+/* Whether this num_mbw_mon could result in a free_running system */
+static int __mpam_monitors_free_running(u16 num_mbwu_mon)
+{
+	if (num_mbwu_mon >= resctrl_arch_system_num_rmid_idx())
+		return resctrl_arch_system_num_rmid_idx();
+	return 0;
+}
+
 bool resctrl_arch_alloc_capable(void)
 {
 	return exposed_alloc_capable;
@@ -60,6 +68,16 @@ bool resctrl_arch_mon_capable(void)
 bool resctrl_arch_is_llc_occupancy_enabled(void)
 {
 	return mpam_resctrl_counters[QOS_L3_OCCUP_EVENT_ID].class;
+}
+
+bool resctrl_arch_is_mbm_local_enabled(void)
+{
+	return mpam_resctrl_counters[QOS_L3_MBM_LOCAL_EVENT_ID].class;
+}
+
+bool resctrl_arch_is_mbm_total_enabled(void)
+{
+	return mpam_resctrl_counters[QOS_L3_MBM_TOTAL_EVENT_ID].class;
 }
 
 bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level rid)
@@ -305,6 +323,24 @@ static bool cache_has_usable_csu(struct mpam_class *class)
 		return false;
 
 	return (mpam_partid_max > 1) || (mpam_pmg_max != 0);
+}
+
+static bool class_has_usable_mbwu(struct mpam_class *class)
+{
+	struct mpam_props *cprops = &class->props;
+
+	if (!mpam_has_feature(mpam_feat_msmon_mbwu, cprops))
+		return false;
+
+	/*
+	 * resctrl expects the bandwidth counters to be free running,
+	 * which means we need as many monitors as resctrl has
+	 * control/monitor groups.
+	 */
+	if (!__mpam_monitors_free_running(cprops->num_mbwu_mon))
+		return false;
+
+	return true;
 }
 
 /*
@@ -602,7 +638,7 @@ static void counter_update_class(enum resctrl_event_id evt_id,
 static void mpam_resctrl_pick_counters(void)
 {
 	struct mpam_class *class;
-	bool has_csu;
+	bool has_csu, has_mbwu;
 	int idx;
 
 	lockdep_assert_cpus_held();
@@ -632,8 +668,38 @@ static void mpam_resctrl_pick_counters(void)
 				break;
 			}
 		}
+
+		has_mbwu = class_has_usable_mbwu(class);
+		if (has_mbwu && topology_matches_l3(class)) {
+			pr_debug("class %u has usable MBWU, and matches L3 topology", class->level);
+
+			/*
+			 * MBWU counters may be 'local' or 'total' depending on
+			 * where they are in the topology. Counters on caches
+			 * are assumed to be local. If it's on the memory
+			 * controller, its assumed to be global.
+			 * TODO: check mbm_local matches NUMA boundaries...
+			 */
+			switch (class->type) {
+			case MPAM_CLASS_CACHE:
+				counter_update_class(QOS_L3_MBM_LOCAL_EVENT_ID,
+						     class);
+				break;
+			case MPAM_CLASS_MEMORY:
+				counter_update_class(QOS_L3_MBM_TOTAL_EVENT_ID,
+						     class);
+				break;
+			default:
+				break;
+			}
+		}
 	}
 	srcu_read_unlock(&mpam_srcu, idx);
+
+	/* Allocation of MBWU monitors assumes that the class is unique... */
+	if (mpam_resctrl_counters[QOS_L3_MBM_LOCAL_EVENT_ID].class)
+		WARN_ON_ONCE(mpam_resctrl_counters[QOS_L3_MBM_LOCAL_EVENT_ID].class ==
+			     mpam_resctrl_counters[QOS_L3_MBM_TOTAL_EVENT_ID].class);
 }
 
 static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
@@ -968,6 +1034,18 @@ static bool mpam_resctrl_offline_domain_hdr(unsigned int cpu,
 	return false;
 }
 
+static struct mpam_component *find_component(struct mpam_class *victim, int cpu)
+{
+	struct mpam_component *victim_comp;
+
+	list_for_each_entry(victim_comp, &victim->components, class_list) {
+		if (cpumask_test_cpu(cpu, &victim_comp->affinity))
+			return victim_comp;
+	}
+
+	return NULL;
+}
+
 static struct mpam_resctrl_dom *
 mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 {
@@ -1007,8 +1085,32 @@ mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 	}
 
 	if (exposed_mon_capable) {
+		int i;
+		struct mpam_component *mon_comp, *any_mon_comp;
+
+		/*
+		 * Even if the monitor domain is backed by a different component,
+		 * the L3 component IDs need to be used... only there may be no
+		 * ctrl_comp for the L3.
+		 * Search each event's class list for a component with overlapping
+		 * CPUs and set up the dom->mon_comp array.
+		 */
+		for (i = 0; i < QOS_NUM_EVENTS; i++) {
+			struct mpam_resctrl_mon *mon;
+
+			mon = &mpam_resctrl_counters[i];
+			if (!mon->class)
+				continue;       // dummy resource
+
+			mon_comp = find_component(mon->class, cpu);
+			dom->mon_comp[i] = mon_comp;
+			if (mon_comp)
+				any_mon_comp = mon_comp;
+		}
+		WARN_ON_ONCE(!any_mon_comp);
+
 		mon_d = &dom->resctrl_mon_dom;
-		mpam_resctrl_domain_hdr_init(cpu, ctrl_comp, &mon_d->hdr);
+		mpam_resctrl_domain_hdr_init(cpu, any_mon_comp, &mon_d->hdr);
 		mon_d->hdr.type = RESCTRL_MON_DOMAIN;
 		/* TODO: this list should be sorted */
 		list_add_tail(&mon_d->hdr.list, &r->mon_domains);
@@ -1017,6 +1119,37 @@ mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 	}
 
 	return dom;
+}
+
+/*
+ * We know all the monitors are associated with the L3, even if there are no
+ * controls and therefore no control component. Find the cache-id for the CPU
+ * and use that to search for existing resctrl domains.
+ * This relies on mpam_resctrl_pick_domain_id() using the L3 cache-id
+ * for anything that is not a cache.
+ */
+static struct mpam_resctrl_dom *mpam_resctrl_get_mon_domain_from_cpu(int cpu)
+{
+	u32 cache_id;
+	struct rdt_mon_domain *mon_d;
+	struct mpam_resctrl_dom *dom;
+	struct mpam_resctrl_res *l3 = &mpam_resctrl_controls[RDT_RESOURCE_L3];
+
+	if (!l3->class)
+		return NULL;
+	/* TODO: how does this order with cacheinfo updates under cpuhp? */
+	cache_id = get_cpu_cacheinfo_id(cpu, 3);
+	if (cache_id == ~0)
+		return NULL;
+
+	list_for_each_entry(mon_d, &l3->resctrl_res.mon_domains, hdr.list) {
+		dom = container_of(mon_d, struct mpam_resctrl_dom, resctrl_mon_dom);
+
+		if (mon_d->hdr.id == cache_id)
+			return dom;
+	}
+
+	return NULL;
 }
 
 
@@ -1031,23 +1164,29 @@ mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
  * domain is online.
  * For platforms with controls, this is easy as each resource has one control
  * component.
+ * For the monitors, we need to search the list of events...
  */
 static struct mpam_resctrl_dom *
 mpam_resctrl_get_domain_from_cpu(int cpu, struct mpam_resctrl_res *res)
 {
-	struct rdt_ctrl_domain *d;
 	struct mpam_resctrl_dom *dom;
+	struct rdt_ctrl_domain *ctrl_d;
+	struct rdt_resource *r = &res->resctrl_res;
 
 	lockdep_assert_cpus_held();
 
-	list_for_each_entry(d, &res->resctrl_res.ctrl_domains, hdr.list) {
-		dom = container_of(d, struct mpam_resctrl_dom, resctrl_ctrl_dom);
+	list_for_each_entry(ctrl_d, &r->ctrl_domains, hdr.list) {
+		dom = container_of(ctrl_d, struct mpam_resctrl_dom, resctrl_ctrl_dom);
 
 		if (cpumask_test_cpu(cpu, &dom->ctrl_comp->affinity))
 			return dom;
 	}
 
-	return NULL;
+	if (r->rid != RDT_RESOURCE_L3)
+		return NULL;
+
+	/* Search the mon domain list too - needed on monitor only platforms. */
+	return mpam_resctrl_get_mon_domain_from_cpu(cpu);
 }
 
 int mpam_resctrl_online_cpu(unsigned int cpu)
