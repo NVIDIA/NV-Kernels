@@ -921,9 +921,11 @@ static void __ris_msmon_read(void *arg)
 {
 	bool nrdy = false;
 	unsigned long flags;
+	bool config_mismatch;
 	struct mon_read *m = arg;
 	u64 now, overflow_val = 0;
 	struct mon_cfg *ctx = m->ctx;
+	bool reset_on_next_read = false;
 	struct mpam_msc_ris *ris = m->ris;
 	struct mpam_msc *msc = m->ris->msc;
 	struct msmon_mbwu_state *mbwu_state;
@@ -936,13 +938,24 @@ static void __ris_msmon_read(void *arg)
 		  FIELD_PREP(MSMON_CFG_MON_SEL_RIS, ris->ris_idx);
 	mpam_write_monsel_reg(msc, CFG_MON_SEL, mon_sel);
 
+	if (m->type == mpam_feat_msmon_mbwu) {
+		mbwu_state = &ris->mbwu_state[ctx->mon];
+		if (mbwu_state) {
+			reset_on_next_read = mbwu_state->reset_on_next_read;
+			mbwu_state->reset_on_next_read = false;
+		}
+	}
+
 	/*
 	 * Read the existing configuration to avoid re-writing the same values.
 	 * This saves waiting for 'nrdy' on subsequent reads.
 	 */
 	read_msmon_ctl_flt_vals(m, &cur_ctl, &cur_flt);
 	gen_msmon_ctl_flt_vals(m, &ctl_val, &flt_val);
-	if (cur_flt != flt_val || cur_ctl != (ctl_val | MSMON_CFG_x_CTL_EN))
+	config_mismatch = cur_flt != flt_val ||
+			  cur_ctl != (ctl_val | MSMON_CFG_x_CTL_EN);
+
+	if (config_mismatch || reset_on_next_read)
 		write_msmon_ctl_flt_vals(m, ctl_val, flt_val);
 
 	switch (m->type) {
@@ -972,7 +985,6 @@ static void __ris_msmon_read(void *arg)
 		if (nrdy)
 			break;
 
-		mbwu_state = &ris->mbwu_state[ctx->mon];
 		if (!mbwu_state)
 			break;
 
@@ -1064,6 +1076,30 @@ int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 	}
 
 	return err;
+}
+
+void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx)
+{
+	int idx;
+	unsigned long flags;
+	struct mpam_msc *msc;
+	struct mpam_msc_ris *ris;
+
+	if (!mpam_is_enabled())
+		return;
+
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_rcu(ris, &comp->ris, comp_list) {
+		if (!mpam_has_feature(mpam_feat_msmon_mbwu, &ris->props))
+			continue;
+
+		msc = ris->msc;
+		spin_lock_irqsave(&msc->mon_sel_lock, flags);
+		ris->mbwu_state[ctx->mon].correction = 0;
+		ris->mbwu_state[ctx->mon].reset_on_next_read = true;
+		spin_unlock_irqrestore(&msc->mon_sel_lock, flags);
+	}
+	srcu_read_unlock(&mpam_srcu, idx);
 }
 
 static void mpam_reset_msc_bitmap(struct mpam_msc *msc, u16 reg, u16 wd)
@@ -1192,8 +1228,6 @@ static int mpam_restore_mbwu_state(void *_ris)
 	struct mon_read mwbu_arg;
 	struct mpam_msc_ris *ris = _ris;
 
-	lockdep_assert_held(&ris->msc->lock);
-
 	for (i = 0; i < ris->props.num_mbwu_mon; i++) {
 		if (ris->mbwu_state[i].enabled) {
 			mwbu_arg.ris = ris;
@@ -1217,8 +1251,6 @@ static int mpam_save_mbwu_state(void *arg)
 	struct mpam_msc_ris *ris = arg;
 	struct mpam_msc *msc = ris->msc;
 	struct msmon_mbwu_state *mbwu_state;
-
-	lockdep_assert_held(&msc->lock);
 
 	for (i = 0; i < ris->props.num_mbwu_mon; i++) {
 		mbwu_state = &ris->mbwu_state[i];
