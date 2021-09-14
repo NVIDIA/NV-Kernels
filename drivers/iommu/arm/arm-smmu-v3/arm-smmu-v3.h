@@ -273,6 +273,7 @@ static inline u32 arm_smmu_strtab_l2_idx(u32 sid)
 
 #define STRTAB_STE_1_S2FWB		(1UL << 25)
 #define STRTAB_STE_1_S1STALLD		(1UL << 27)
+#define STRTAB_STE_1_S1MPAM		(1UL << 26)
 
 #define STRTAB_STE_1_EATS		GENMASK_ULL(29, 28)
 #define STRTAB_STE_1_EATS_ABT		0UL
@@ -301,6 +302,10 @@ static inline u32 arm_smmu_strtab_l2_idx(u32 sid)
 #define STRTAB_STE_2_S2R		(1UL << 58)
 
 #define STRTAB_STE_3_S2TTB_MASK		GENMASK_ULL(51, 4)
+
+#define STRTAB_STE_4_PARTID		GENMASK_ULL(31, 16)
+
+#define STRTAB_STE_5_PMG		GENMASK_ULL(7, 0)
 
 /* These bits can be controlled by userspace for STRTAB_STE_0_CFG_NESTED */
 #define STRTAB_STE_0_NESTING_ALLOWED                                         \
@@ -808,6 +813,8 @@ struct arm_smmu_master {
 	bool				sva_enabled;
 	bool				iopf_enabled;
 	unsigned int			ssid_bits;
+	u16				partid;
+	u8				pmg;
 };
 
 /* SMMU private data for an IOMMU domain */
