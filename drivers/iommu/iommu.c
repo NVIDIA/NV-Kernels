@@ -2341,6 +2341,12 @@ struct iommu_domain *iommu_get_domain_for_dev(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(iommu_get_domain_for_dev);
 
+struct iommu_domain *iommu_get_domain_for_group(struct iommu_group *group)
+{
+	return group->domain;
+}
+EXPORT_SYMBOL_GPL(iommu_get_domain_for_group);
+
 /*
  * For IOMMU_DOMAIN_DMA implementations which already provide their own
  * guarantees that the group and its default domain are valid and correct.
