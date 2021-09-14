@@ -243,6 +243,8 @@ struct arm_smmu_ste {
 #define STRTAB_STE_1_S1CSH		GENMASK_ULL(7, 6)
 
 #define STRTAB_STE_1_S1STALLD		(1UL << 27)
+#define STRTAB_STE_1_S1MPAM		(1UL << 26)
+#define STRTAB_STE_1_S2FWB		(1UL << 25)
 
 #define STRTAB_STE_1_EATS		GENMASK_ULL(29, 28)
 #define STRTAB_STE_1_EATS_ABT		0UL
@@ -271,6 +273,19 @@ struct arm_smmu_ste {
 #define STRTAB_STE_2_S2R		(1UL << 58)
 
 #define STRTAB_STE_3_S2TTB_MASK		GENMASK_ULL(51, 4)
+
+#define STRTAB_STE_4_PARTID		GENMASK_ULL(31, 16)
+
+#define STRTAB_STE_5_PMG		GENMASK_ULL(7, 0)
+
+/* These bits can be controlled by userspace for STRTAB_STE_0_CFG_NESTED */
+#define STRTAB_STE_0_NESTING_ALLOWED                                         \
+	cpu_to_le64(STRTAB_STE_0_V | STRTAB_STE_0_CFG | STRTAB_STE_0_S1FMT | \
+		    STRTAB_STE_0_S1CTXPTR_MASK | STRTAB_STE_0_S1CDMAX)
+#define STRTAB_STE_1_NESTING_ALLOWED                            \
+	cpu_to_le64(STRTAB_STE_1_S1DSS | STRTAB_STE_1_S1CIR |   \
+		    STRTAB_STE_1_S1COR | STRTAB_STE_1_S1CSH |   \
+		    STRTAB_STE_1_S1STALLD | STRTAB_STE_1_EATS)
 
 /*
  * Context descriptors.
@@ -720,6 +735,8 @@ struct arm_smmu_master {
 	bool				iopf_enabled;
 	struct list_head		bonds;
 	unsigned int			ssid_bits;
+	u16				partid;
+	u8				pmg;
 };
 
 /* SMMU private data for an IOMMU domain */
@@ -748,6 +765,11 @@ struct arm_smmu_domain {
 	spinlock_t			devices_lock;
 
 	struct list_head		mmu_notifiers;
+};
+
+struct arm_smmu_master_domain {
+       struct list_head devices_elm;
+       struct arm_smmu_master *master;
 };
 
 static inline struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
