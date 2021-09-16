@@ -4,6 +4,7 @@
 
 #include <linux/cacheinfo.h>
 #include <linux/cpu.h>
+#include <linux/iommu.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/pid.h>
@@ -578,4 +579,23 @@ extern unsigned int resctrl_rmid_realloc_limit;
 int resctrl_init(void);
 void resctrl_exit(void);
 
+/* When supported, the architecture must implement these */
+#ifndef CONFIG_RESCTRL_IOMMU
+static inline int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group,
+						     u32 closid, u32 rmid)
+{
+	return -EOPNOTSUPP;
+}
+static inline bool resctrl_arch_match_iommu_closid(struct iommu_group *group,
+						   u32 closid)
+{
+	return false;
+}
+static inline bool
+resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group,
+				     u32 closid, u32 rmid)
+{
+	return false;
+}
+#endif /* CONFIG_RESCTRL_IOMMU */
 #endif /* _RESCTRL_H */
