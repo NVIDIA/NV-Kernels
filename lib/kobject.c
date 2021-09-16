@@ -920,6 +920,27 @@ struct kobject *kset_find_obj(struct kset *kset, const char *name)
 }
 EXPORT_SYMBOL_GPL(kset_find_obj);
 
+struct kobject *kset_get_next_obj(struct kset *kset, struct kobject *prev)
+{
+	struct kobject *k;
+
+	spin_lock(&kset->list_lock);
+
+	if (!prev)
+		k = list_first_entry_or_null(&kset->list, typeof(*k), entry);
+	else
+		k = list_next_entry(prev, entry);
+
+	if (list_entry_is_head(k, &kset->list, entry))
+		k = NULL;
+
+	kobject_get(k);
+	spin_unlock(&kset->list_lock);
+	kobject_put(prev);
+
+	return k;
+}
+
 static void kset_release(struct kobject *kobj)
 {
 	struct kset *kset = container_of(kobj, struct kset, kobj);
