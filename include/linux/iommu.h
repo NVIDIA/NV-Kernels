@@ -909,6 +909,8 @@ static inline struct iommu_domain *iommu_paging_domain_alloc(struct device *dev)
 {
 	return iommu_paging_domain_alloc_flags(dev, 0);
 }
+struct iommu_group *iommu_group_get_from_kobj(struct kobject *group_kobj);
+extern struct iommu_group *iommu_group_get_by_id(int id);
 extern void iommu_domain_free(struct iommu_domain *domain);
 extern int iommu_attach_device(struct iommu_domain *domain,
 			       struct device *dev);
@@ -1220,6 +1222,16 @@ static inline struct iommu_domain *iommu_paging_domain_alloc_flags(struct device
 static inline struct iommu_domain *iommu_paging_domain_alloc(struct device *dev)
 {
 	return ERR_PTR(-ENODEV);
+}
+
+static inline struct iommu_group *iommu_group_get_from_kobj(struct kobject *group_kobj)
+{
+	return NULL;
+}
+
+static inline struct iommu_group *iommu_group_get_by_id(int id)
+{
+	return NULL;
 }
 
 static inline void iommu_domain_free(struct iommu_domain *domain)
