@@ -4,6 +4,7 @@
 
 #ifdef CONFIG_X86_CPU_RESCTRL
 
+#include <linux/iommu.h>
 #include <linux/jump_label.h>
 #include <linux/percpu.h>
 #include <linux/sched.h>
@@ -227,6 +228,22 @@ void resctrl_cpu_detect(struct cpuinfo_x86 *c);
 bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level l);
 int resctrl_arch_set_cdp_enabled(enum resctrl_res_level l, bool enable);
 
+/* Not supported: */
+static inline int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group,
+						     u32 closid, u32 rmid)
+{
+	return -EOPNOTSUPP;
+}
+static inline bool resctrl_arch_match_iommu_closid(struct iommu_group *group,
+						   u32 closid)
+{
+	return false;
+}
+static inline bool resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group,
+							u32 closid, u32 rmid)
+{
+	return false;
+}
 #else
 
 static inline void resctrl_sched_in(struct task_struct *tsk) {}
