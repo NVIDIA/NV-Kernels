@@ -1058,6 +1058,27 @@ struct iommu_group *iommu_group_get_by_id(int id)
 }
 EXPORT_SYMBOL_GPL(iommu_group_get_by_id);
 
+struct kset *iommu_get_group_kset(void)
+{
+	return kset_get(iommu_group_kset);
+}
+
+const struct iommu_ops *iommu_group_get_ops(struct iommu_group *group)
+{
+	struct group_device *device;
+	const struct iommu_ops *ops = NULL;
+
+	mutex_lock(&group->mutex);
+	device = list_first_entry_or_null(&group->devices, typeof(*device),
+					  list);
+	if (device)
+		ops = dev_iommu_ops(device->dev);
+
+	mutex_unlock(&group->mutex);
+
+	return ops;
+}
+
 /**
  * iommu_group_get_iommudata - retrieve iommu_data registered for a group
  * @group: the group

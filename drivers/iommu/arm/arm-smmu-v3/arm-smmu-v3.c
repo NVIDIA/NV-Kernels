@@ -2854,7 +2854,7 @@ static int arm_smmu_group_set_mpam(struct iommu_group *group, u16 partid,
 {
 	int i;
 	u32 sid;
-	__le64 *step;
+	struct arm_smmu_ste *step;
 	unsigned long flags;
 	struct iommu_domain *domain;
 	struct arm_smmu_device *smmu;
@@ -2883,8 +2883,8 @@ static int arm_smmu_group_set_mpam(struct iommu_group *group, u16 partid,
 			step = arm_smmu_get_step_for_sid(smmu, sid);
 
 			/* These need locking if the VMSPtr is ever used */
-			step[4] = FIELD_PREP(STRTAB_STE_4_PARTID, partid);
-			step[5] = FIELD_PREP(STRTAB_STE_5_PMG, pmg);
+			step->data[4] = FIELD_PREP(STRTAB_STE_4_PARTID, partid);
+			step->data[5] = FIELD_PREP(STRTAB_STE_5_PMG, pmg);
 
 			cmd.cfgi.sid = sid;
 			arm_smmu_cmdq_batch_add(smmu, &cmds, &cmd);
