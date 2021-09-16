@@ -3,6 +3,7 @@
 #define _RESCTRL_H
 
 #include <linux/cacheinfo.h>
+#include <linux/iommu.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/pid.h>
@@ -662,6 +663,7 @@ extern unsigned int resctrl_rmid_realloc_limit;
 int resctrl_init(void);
 void resctrl_exit(void);
 
+
 #ifdef CONFIG_RESCTRL_FS_PSEUDO_LOCK
 u64 resctrl_arch_get_prefetch_disable_bits(void);
 int resctrl_arch_pseudo_lock_fn(void *_plr);
@@ -675,4 +677,30 @@ static inline int resctrl_arch_measure_cycles_lat_fn(void *_plr) { return 0; }
 static inline int resctrl_arch_measure_l2_residency(void *_plr) { return 0; }
 static inline int resctrl_arch_measure_l3_residency(void *_plr) { return 0; }
 #endif /* CONFIG_RESCTRL_FS_PSEUDO_LOCK */
+
+/* When supported, the architecture must implement these */
+#ifdef CONFIG_RESCTRL_IOMMU
+int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group, u32 closid,
+				       u32 rmid);
+bool resctrl_arch_match_iommu_closid(struct iommu_group *group, u32 closid);
+bool resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group, u32 closid,
+					  u32 rmid);
+#else
+static inline int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group,
+						     u32 closid, u32 rmid)
+{
+	return -EOPNOTSUPP;
+}
+static inline bool resctrl_arch_match_iommu_closid(struct iommu_group *group,
+						   u32 closid)
+{
+	return false;
+}
+static inline bool
+resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group,
+				     u32 closid, u32 rmid)
+{
+	return false;
+}
+#endif /* CONFIG_RESCTRL_IOMMU */
 #endif /* _RESCTRL_H */
