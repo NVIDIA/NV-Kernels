@@ -17,6 +17,7 @@
 #include <linux/debugfs.h>
 #include <linux/fs.h>
 #include <linux/fs_parser.h>
+#include <linux/iommu.h>
 #include <linux/sysfs.h>
 #include <linux/kernfs.h>
 #include <linux/random.h>
@@ -735,14 +736,71 @@ static int rdtgroup_move_task(pid_t pid, struct rdtgroup *rdtgrp,
 	return ret;
 }
 
+static int rdtgroup_move_iommu(int iommu_group_id, struct rdtgroup *rdtgrp,
+			       struct kernfs_open_file *of)
+{
+	const struct cred *cred = current_cred();
+	struct iommu_group *iommu_group;
+	int err;
+
+	if (!uid_eq(cred->euid, GLOBAL_ROOT_UID)) {
+		rdt_last_cmd_printf("No permission to move iommu_group %d\n",
+				    iommu_group_id);
+		return -EPERM;
+	}
+
+	iommu_group = iommu_group_get_by_id(iommu_group_id);
+	if (!iommu_group) {
+		rdt_last_cmd_printf("No matching iommu_group %d\n",
+				    iommu_group_id);
+		return -ESRCH;
+	}
+
+	if (rdtgrp->type == RDTMON_GROUP &&
+	    !resctrl_arch_match_iommu_closid(iommu_group,
+					     rdtgrp->mon.parent->closid)) {
+		rdt_last_cmd_puts("Can't move iommu_group to different control group\n");
+		err = -EINVAL;
+	} else {
+		err = resctrl_arch_set_iommu_closid_rmid(iommu_group,
+							 rdtgrp->closid,
+							 rdtgrp->mon.rmid);
+	}
+
+	iommu_group_put(iommu_group);
+
+	return err;
+}
+
+static bool string_is_iommu_group(char *buf, size_t nbytes, int *val)
+{
+	if (!IS_ENABLED(CONFIG_RESCTRL_IOMMU) ||
+	    !static_branch_unlikely(&resctrl_abi_playground))
+		return false;
+
+	if (nbytes <= strlen("iommu_group:"))
+		return false;
+
+	if (strncmp(buf, "iommu_group:", strlen("iommu_group:")))
+		return false;
+
+	buf += strlen("iommu_group:");
+	nbytes -= strlen("iommu_group:");
+
+	return !kstrtoint(buf, 0, val);
+}
+
 static ssize_t rdtgroup_tasks_write(struct kernfs_open_file *of,
 				    char *buf, size_t nbytes, loff_t off)
 {
 	struct rdtgroup *rdtgrp;
+	int iommu_group_id;
+	bool is_iommu;
 	int ret = 0;
 	pid_t pid;
 
-	if (kstrtoint(strstrip(buf), 0, &pid) || pid < 0)
+	is_iommu = string_is_iommu_group(buf, nbytes, &iommu_group_id);
+	if (!is_iommu && (kstrtoint(strstrip(buf), 0, &pid) || pid < 0))
 		return -EINVAL;
 	rdtgrp = rdtgroup_kn_lock_live(of->kn);
 	if (!rdtgrp) {
@@ -758,12 +816,53 @@ static ssize_t rdtgroup_tasks_write(struct kernfs_open_file *of,
 		goto unlock;
 	}
 
-	ret = rdtgroup_move_task(pid, rdtgrp, of);
+	if (is_iommu)
+		ret = rdtgroup_move_iommu(iommu_group_id, rdtgrp, of);
+	else
+		ret = rdtgroup_move_task(pid, rdtgrp, of);
 
 unlock:
 	rdtgroup_kn_unlock(of->kn);
 
 	return ret ?: nbytes;
+}
+
+
+static bool iommu_matches_rdtgroup(struct iommu_group *group, struct rdtgroup *r)
+{
+	if (r->type == RDTCTRL_GROUP)
+		return resctrl_arch_match_iommu_closid(group, r->closid);
+
+	return resctrl_arch_match_iommu_closid_rmid(group, r->closid,
+						    r->mon.rmid);
+}
+
+static void show_rdt_iommu(struct rdtgroup *r, struct seq_file *s)
+{
+	struct kset *iommu_groups;
+	struct iommu_group *group;
+	struct kobject *group_kobj = NULL;
+
+	if (!IS_ENABLED(CONFIG_RESCTRL_IOMMU) ||
+	    !static_branch_unlikely(&resctrl_abi_playground))
+		return;
+
+	iommu_groups = iommu_get_group_kset();
+
+	while ((group_kobj = kset_get_next_obj(iommu_groups, group_kobj))) {
+
+		/* iommu_group_get_from_kobj() wants to drop a reference */
+		kobject_get(group_kobj);
+
+		group = iommu_group_get_from_kobj(group_kobj);
+		if (!group)
+			continue;
+
+		if (iommu_matches_rdtgroup(group, r))
+			seq_printf(s, "iommu_group:%s\n", group_kobj->name);
+	}
+
+	kset_put(iommu_groups);
 }
 
 static void show_rdt_tasks(struct rdtgroup *r, struct seq_file *s)
@@ -780,6 +879,8 @@ static void show_rdt_tasks(struct rdtgroup *r, struct seq_file *s)
 		}
 	}
 	rcu_read_unlock();
+
+	show_rdt_iommu(r, s);
 }
 
 static int rdtgroup_tasks_show(struct kernfs_open_file *of,

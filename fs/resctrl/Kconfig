@@ -31,3 +31,9 @@ config RESCTRL_RMID_DEPENDS_ON_CLOSID
 	  Enable by the architecture when the RMID values depend on the CLOSID.
 	  This causes the closid allocator to search for CLOSID with clean
 	  RMID.
+
+config RESCTRL_IOMMU
+	bool
+	help
+	  Enabled by the architecture when some IOMMU are able to be configured
+	  with CLOSID/RMID.
