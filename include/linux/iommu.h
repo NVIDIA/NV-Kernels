@@ -674,6 +674,8 @@ extern bool iommu_present(const struct bus_type *bus);
 extern bool device_iommu_capable(struct device *dev, enum iommu_cap cap);
 extern bool iommu_group_has_isolated_msi(struct iommu_group *group);
 extern struct iommu_domain *iommu_domain_alloc(const struct bus_type *bus);
+struct iommu_group *iommu_group_get_from_kobj(struct kobject *group_kobj);
+extern struct iommu_group *iommu_group_get_by_id(int id);
 extern void iommu_domain_free(struct iommu_domain *domain);
 extern int iommu_attach_device(struct iommu_domain *domain,
 			       struct device *dev);
@@ -989,6 +991,16 @@ static inline bool device_iommu_capable(struct device *dev, enum iommu_cap cap)
 }
 
 static inline struct iommu_domain *iommu_domain_alloc(const struct bus_type *bus)
+{
+	return NULL;
+}
+
+static inline struct iommu_group *iommu_group_get_from_kobj(struct kobject *group_kobj)
+{
+	return NULL;
+}
+
+static inline struct iommu_group *iommu_group_get_by_id(int id)
 {
 	return NULL;
 }
