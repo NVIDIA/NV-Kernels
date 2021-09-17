@@ -11,6 +11,7 @@
 
 #include <linux/acpi.h>
 #include <linux/acpi_iort.h>
+#include <linux/arm_mpam.h>
 #include <linux/bitops.h>
 #include <linux/crash_dump.h>
 #include <linux/delay.h>
@@ -4309,6 +4310,29 @@ static void arm_smmu_get_httu(struct arm_smmu_device *smmu, u32 reg)
 			  hw_features, fw_features);
 }
 
+static void arm_smmu_mpam_register_smmu(struct arm_smmu_device *smmu)
+{
+	u16 partid_max;
+	u8 pmg_max;
+	u32 reg;
+
+	if (!IS_ENABLED(CONFIG_ARM64_MPAM))
+		return;
+
+	if (!(smmu->features & ARM_SMMU_FEAT_MPAM))
+		return;
+
+	reg = readl_relaxed(smmu->base + ARM_SMMU_MPAMIDR);
+	if (!reg)
+		return;
+
+	partid_max = FIELD_GET(SMMU_MPAMIDR_PARTID_MAX, reg);
+	pmg_max = FIELD_GET(SMMU_MPAMIDR_PMG_MAX, reg);
+
+	if (mpam_register_requestor(partid_max, pmg_max))
+		smmu->features &= ~ARM_SMMU_FEAT_MPAM;
+}
+
 static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 {
 	u32 reg;
@@ -4462,6 +4486,8 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 		smmu->features |= ARM_SMMU_FEAT_RANGE_INV;
 	if (FIELD_GET(IDR3_FWB, reg))
 		smmu->features |= ARM_SMMU_FEAT_S2FWB;
+	if (FIELD_GET(IDR3_MPAM, reg))
+		smmu->features |= ARM_SMMU_FEAT_MPAM;
 
 	if (FIELD_GET(IDR3_BBM, reg) == 2)
 		smmu->features |= ARM_SMMU_FEAT_BBML2;
@@ -4528,6 +4554,8 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 
 	if (arm_smmu_sva_supported(smmu))
 		smmu->features |= ARM_SMMU_FEAT_SVA;
+
+	arm_smmu_mpam_register_smmu(smmu);
 
 	dev_info(smmu->dev, "ias %lu-bit, oas %lu-bit (features 0x%08x)\n",
 		 smmu->ias, smmu->oas, smmu->features);
