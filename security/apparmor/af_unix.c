@@ -243,8 +243,8 @@ static int profile_create_perm(struct aa_profile *profile, int family,
 
 	state = RULE_MEDIATES_AF(rules, AF_UNIX);
 	if (state) {
-		state = match_to_prot(rules->policy->dfa, state, type, protocol,
-				      &ad.info);
+		state = match_to_prot(rules->policy->dfa, state, type,
+				      protocol, &ad.info);
 		return do_perms(profile, rules, state, AA_MAY_CREATE, &ad);
 	}
 
