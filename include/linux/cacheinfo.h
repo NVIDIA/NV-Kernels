@@ -111,6 +111,7 @@ int acpi_get_cache_info(unsigned int cpu,
 #endif
 
 const struct attribute_group *cache_get_priv_group(struct cacheinfo *this_leaf);
+unsigned long cache_of_get_id(struct device_node *np);
 
 /*
  * Get the id of the cache associated with @cpu at level @level.
