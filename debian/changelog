@@ -1,4 +1,4 @@
-linux-meta-unstable (5.15.0.6.6) impish; urgency=medium
+linux-meta-unstable (5.15.0.6.6) jammy; urgency=medium
 
   * Bump ABI 5.15.0-6
 
