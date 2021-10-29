@@ -20,6 +20,7 @@
 #include <linux/list.h>
 #include <linux/lockdep.h>
 #include <linux/mutex.h>
+#include <linux/moduleparam.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
@@ -68,6 +69,8 @@ static DEFINE_MUTEX(mpam_cpuhp_state_lock);
 u16 mpam_partid_max;
 u8 mpam_pmg_max;
 static bool partid_max_init, partid_max_published;
+static u16 mpam_cmdline_partid_max;
+static bool mpam_cmdline_partid_max_overridden;
 static DEFINE_SPINLOCK(partid_max_lock);
 
 /*
@@ -274,6 +277,9 @@ int mpam_register_requestor(u16 partid_max, u8 pmg_max)
 		if (partid_max < mpam_partid_max || pmg_max < mpam_pmg_max)
 			return -EBUSY;
 	}
+
+	if (mpam_cmdline_partid_max_overridden)
+		mpam_partid_max = min(mpam_cmdline_partid_max, mpam_partid_max);
 
 	return 0;
 }
@@ -3416,6 +3422,38 @@ static int __init mpam_msc_driver_init(void)
 }
 /* Must occur after arm64_mpam_register_cpus() from arch_initcall() */
 subsys_initcall(mpam_msc_driver_init);
+
+static int mpam_cmdline_partid_max_set(const char *arg,
+				       const struct kernel_param *kp)
+{
+	int ret;
+
+	spin_lock(&partid_max_lock);
+	ret = kstrtou16(arg, 10, &mpam_cmdline_partid_max);
+	if (!ret)
+		mpam_cmdline_partid_max_overridden = true;
+	spin_unlock(&partid_max_lock);
+
+	return 0;
+}
+static int mpam_cmdline_partid_max_get(char *buffer,
+				       const struct kernel_param *kp)
+{
+	u16 val = 0xffff;
+
+	spin_lock(&partid_max_lock);
+	if (mpam_cmdline_partid_max_overridden)
+		val = mpam_cmdline_partid_max;
+	spin_unlock(&partid_max_lock);
+
+	return sprintf(buffer, "%u\n", val);
+}
+static const struct kernel_param_ops mpam_cmdline_partid_max_ops = {
+	.set = mpam_cmdline_partid_max_set,
+	.get = mpam_cmdline_partid_max_get,
+};
+module_param_cb(partid_max, &mpam_cmdline_partid_max_ops, NULL, 0644);
+MODULE_PARM_DESC(partid_max, "Override for reducing the number of PARTID.");
 
 #ifdef CONFIG_MPAM_KUNIT_TEST
 #include "test_mpam_devices.c"
