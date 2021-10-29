@@ -8,6 +8,7 @@
 #include <linux/list.h>
 #include <linux/pid.h>
 #include <linux/resctrl_types.h>
+#include <linux/bitfield.h>
 
 #ifdef CONFIG_ARCH_HAS_CPU_RESCTRL
 #include <asm/resctrl.h>
@@ -30,6 +31,10 @@ int proc_resctrl_show(struct seq_file *m,
 
 /* max value for struct rdt_domain's mbps_val */
 #define MBA_MAX_MBPS   U32_MAX
+
+/* The format for packing fields into the u64 'id' exposed to user-space */
+#define RESCTRL_ID_CLOSID      GENMASK_ULL(31, 0)
+#define RESCTRL_ID_RMID                GENMASK_ULL(63, 32)
 
 /* Walk all possible resources, with variants for only controls or monitors. */
 #define for_each_rdt_resource(_r)						\
@@ -439,6 +444,52 @@ static inline u32 resctrl_get_schema_default_ctrl(struct resctrl_schema *s)
 
 	return WARN_ON_ONCE(1);
 }
+
+/**
+ * resctrl_id_encode() - pack a closid and rmid into a u64 that can be used
+ *                      to identify a rdtgroup.
+ * @closid:    The closid to encode.
+ * @rmid:      The rmid to encode.
+ */
+static inline u64 resctrl_id_encode(u32 closid, u32 rmid)
+{
+	u64 id;
+
+	id = FIELD_PREP(RESCTRL_ID_CLOSID, closid) |
+	     FIELD_PREP(RESCTRL_ID_RMID, rmid);
+
+	return id;
+}
+
+/**
+ * __resctrl_id_decode() - unpack a known-good id that has been checked by
+ *                         resctrl_id_decode().
+ * @id:		The value originally passed by user-space.
+ * @closid:	Returned closid.
+ * @rmid:	Returned rmid.
+ *
+ * Decodes the id field with no error checking. resctrl_id_decode() must have
+ * been used to check the id produces values that are in range and are
+ * allocated at the time of first use.
+ */
+static inline void __resctrl_id_decode(u64 id, u32 *closid, u32 *rmid)
+{
+	*closid = FIELD_GET(RESCTRL_ID_CLOSID, id);
+	*rmid = FIELD_GET(RESCTRL_ID_RMID, id);
+}
+
+/**
+ * resctrl_id_decode() - unpack an id passed by user-space.
+ * @id:		The value passed by user-space.
+ * @closid:	Returned closid.
+ * @rmid:	Returned rmid.
+ *
+ * Returns -EINVAL if @id doesn't correspond to an allocated control
+ * or monitor group. Returns 0 on success.
+ *
+ * Takes a mutex, call in process context.
+ */
+int resctrl_id_decode(u64 id, u32 *closid, u32 *rmid);
 
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);

@@ -1968,6 +1968,64 @@ void resctrl_bmec_files_show(struct rdt_resource *r, struct kernfs_node *l3_mon_
 		kernfs_put(mon_kn);
 }
 
+static struct rdtgroup *find_rdtgroup(u32 closid, u32 rmid)
+{
+	struct rdtgroup *prgrp, *crgrp;
+
+	lockdep_assert_held(&rdtgroup_mutex);
+
+	list_for_each_entry(prgrp, &rdt_all_groups, rdtgroup_list) {
+		if (prgrp->closid != closid)
+			continue;
+
+		if (prgrp->mon.rmid == rmid)
+			return prgrp;
+
+		list_for_each_entry(crgrp, &prgrp->mon.crdtgrp_list,
+				    mon.crdtgrp_list)
+		{
+			if (crgrp->mon.rmid == rmid)
+				return crgrp;
+		}
+	}
+
+	return NULL;
+}
+
+int resctrl_id_decode(u64 id, u32 *closid, u32 *rmid)
+{
+	int err = 0;
+
+	__resctrl_id_decode(id, closid, rmid);
+
+	/* Check this closid/rmid is allocated */
+	mutex_lock(&rdtgroup_mutex);
+	if (!find_rdtgroup(*closid, *rmid))
+		err = -ENOENT;
+	mutex_unlock(&rdtgroup_mutex);
+
+	return err;
+}
+
+static int rdtgroup_id_show(struct kernfs_open_file *of,
+			    struct seq_file *seq, void *v)
+{
+	struct rdtgroup *rdtgrp;
+	int ret = 0;
+	u64 id;
+
+	rdtgrp = rdtgroup_kn_lock_live(of->kn);
+	if (rdtgrp) {
+		id = resctrl_id_encode(rdtgrp->closid, rdtgrp->mon.rmid);
+		seq_printf(seq, "0x%llx\n", id);
+	} else {
+		ret = -ENOENT;
+	}
+	rdtgroup_kn_unlock(of->kn);
+
+	return ret;
+}
+
 /* rdtgroup information files for one cache resource. */
 static struct rftype res_common_files[] = {
 	{
@@ -2232,7 +2290,13 @@ static struct rftype res_common_files[] = {
 		.seq_show	= resctrl_schema_format_show,
 		.fflags		= RFTYPE_CTRL_INFO,
 	},
-
+	{
+		.name		= "id",
+		.mode		= 0444,
+		.kf_ops		= &rdtgroup_kf_single_ops,
+		.seq_show	= rdtgroup_id_show,
+		.fflags		= RFTYPE_BASE,
+	},
 };
 
 static int rdtgroup_add_files(struct kernfs_node *kn, unsigned long fflags)
