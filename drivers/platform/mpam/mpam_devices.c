@@ -2241,6 +2241,8 @@ static irqreturn_t mpam_disable_thread(int irq, void *dev_id)
 	}
 	mutex_unlock(&mpam_cpuhp_state_lock);
 
+	mpam_resctrl_exit();
+
 	static_branch_disable(&mpam_enabled);
 
 	mpam_unregister_irqs();

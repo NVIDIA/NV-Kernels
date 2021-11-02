@@ -39,6 +39,12 @@ static struct mpam_class *mbm_total_class;
  */
 static bool cdp_enabled;
 
+/*
+ * If resctrl_init() succeeded, resctrl_exit() can be used to remove support
+ * for the filesystem in the event of an error.
+ */
+static bool resctrl_enabled;
+
 /* A dummy mon context to use when the monitors were allocated up front */
 u32 __mon_is_rmid_idx = USE_RMID_IDX;
 void *mon_is_rmid_idx = &__mon_is_rmid_idx;
@@ -803,9 +809,20 @@ int mpam_resctrl_setup(void)
 		}
 
 		err = resctrl_init();
+		if (!err)
+			WRITE_ONCE(resctrl_enabled, true);
 	}
 
 	return err;
+}
+
+void mpam_resctrl_exit(void)
+{
+	if (!READ_ONCE(resctrl_enabled))
+		return;
+
+	WRITE_ONCE(resctrl_enabled, false);
+	resctrl_exit();
 }
 
 u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
