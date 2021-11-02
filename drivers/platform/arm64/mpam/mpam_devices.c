@@ -72,6 +72,14 @@ static DECLARE_WORK(mpam_enable_work, &mpam_enable);
 static DECLARE_WORK(mpam_broken_work, &mpam_disable);
 
 /*
+ * Whether has been setup. Used by cpuhp in preference to mpam_is_enabled()
+ * the disable call after an error interrupt makes mpam_is_enabled() false before
+ * the cpuhp callbacks are made.
+ * Reads/writes should hold mpam_cpuhp_state_lock, (or be cpuhp callbacks).
+ */
+static bool mpam_resctrl_enabled;
+
+/*
  * An MSC is a physical container for controls and monitors, each identified by
  * their RIS index. These share a base-address, interrupts and some MMIO
  * registers. A vMSC is a virtual container for RIS in an MSC that control or
@@ -422,6 +430,12 @@ static void mpam_ris_destroy(struct mpam_msc_ris *ris)
 	struct mpam_class *class = comp->class;
 
 	lockdep_assert_held(&mpam_list_lock);
+
+	/*
+	 * Once a RIS has been removed from a class, it can no longer be used
+	 * by resctrl, even though the class has yet to be removed.
+	 */
+	mpam_resctrl_teardown_class(class);
 
 	cpumask_andnot(&comp->affinity, &comp->affinity, &ris->affinity);
 	cpumask_andnot(&class->affinity, &class->affinity, &ris->affinity);
@@ -1709,7 +1723,7 @@ static int mpam_cpu_online(unsigned int cpu)
 	}
 	srcu_read_unlock(&mpam_srcu, idx);
 
-	if (mpam_is_enabled())
+	if (mpam_resctrl_enabled)
 		mpam_resctrl_online_cpu(cpu);
 
 	return 0;
@@ -1766,7 +1780,7 @@ static int mpam_cpu_offline(unsigned int cpu)
 	}
 	srcu_read_unlock(&mpam_srcu, idx);
 
-	if (mpam_is_enabled())
+	if (mpam_resctrl_enabled)
 		mpam_resctrl_offline_cpu(cpu);
 
 	return 0;
@@ -2701,6 +2715,7 @@ static void mpam_enable_once(void)
 	spin_unlock(&partid_max_lock);
 
 	static_branch_enable(&mpam_enabled);
+	mpam_resctrl_enabled = true;
 	mpam_register_cpuhp_callbacks(mpam_cpu_online, mpam_cpu_offline);
 
 	printk(KERN_INFO "MPAM enabled with %u partid and %u pmg\n",
@@ -2760,17 +2775,26 @@ void mpam_reset_class(struct mpam_class *class)
 static irqreturn_t mpam_disable_thread(int irq, void *dev_id)
 {
 	int idx;
+	bool do_resctrl_exit;
 	struct mpam_class *class;
 	struct mpam_msc *msc, *tmp;
+
+	if (mpam_is_enabled())
+		static_branch_disable(&mpam_enabled);
 
 	mutex_lock(&mpam_cpuhp_state_lock);
 	if (mpam_cpuhp_state) {
 		cpuhp_remove_state(mpam_cpuhp_state);
 		mpam_cpuhp_state = 0;
 	}
+
+	/* mpam_cpu_offline() tells resctrl all the CPUs are offline. */
+	do_resctrl_exit = mpam_resctrl_enabled;
+	mpam_resctrl_enabled = false;
 	mutex_unlock(&mpam_cpuhp_state_lock);
 
-	static_branch_disable(&mpam_enabled);
+	if (do_resctrl_exit)
+		mpam_resctrl_exit();
 
 	mpam_unregister_irqs();
 
