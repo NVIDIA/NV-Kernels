@@ -48,6 +48,12 @@ static bool exposed_mon_capable;
  */
 static bool cdp_enabled;
 
+/*
+ * If resctrl_init() succeeded, resctrl_exit() can be used to remove support
+ * for the filesystem in the event of an error.
+ */
+static bool resctrl_enabled;
+
 /* A dummy mon context to use when the monitors were allocated up front */
 u32 __mon_is_rmid_idx = USE_RMID_IDX;
 void *mon_is_rmid_idx = &__mon_is_rmid_idx;
@@ -1007,10 +1013,22 @@ int mpam_resctrl_setup(void)
 		}
 
 		err = resctrl_init();
+		if (!err)
+			WRITE_ONCE(resctrl_enabled, true);
 	}
 
 	return err;
 }
+
+static void mpam_resctrl_exit(void)
+{
+	if (!READ_ONCE(resctrl_enabled))
+		return;
+
+	WRITE_ONCE(resctrl_enabled, false);
+	resctrl_exit();
+}
+
 
 u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 			    u32 closid, enum resctrl_conf_type type)
@@ -1371,6 +1389,37 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 	}
 
 	return 0;
+}
+
+/*
+ * The driver is detaching an MSC from this class, if resctrl was using it,
+ * pull on resctrl_exit().
+ */
+void mpam_resctrl_teardown_class(struct mpam_class *class)
+{
+	int i;
+	bool found = false;
+	struct mpam_resctrl_res *res;
+
+	might_sleep();
+
+	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
+		res = &mpam_resctrl_controls[i];
+		if (res->class == class) {
+			found = true;
+			break;
+		}
+	}
+
+	for (i = 0; i < QOS_NUM_EVENTS; i++) {
+		if (mpam_resctrl_counters[i] == class) {
+			found = true;
+			break;
+		}
+	}
+
+	if (found)
+		mpam_resctrl_exit();
 }
 
 #ifdef CONFIG_MPAM_KUNIT_TEST

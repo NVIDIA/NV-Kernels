@@ -417,6 +417,12 @@ static void mpam_ris_destroy(struct mpam_msc_ris *ris)
 
 	lockdep_assert_held(&mpam_list_lock);
 
+	/*
+	 * Once a RIS has been removed from a class, it can no longer be used
+	 * by resctrl, even though the class has yet to be removed.
+	 */
+	mpam_resctrl_teardown_class(class);
+
 	cpumask_andnot(&comp->affinity, &comp->affinity, &ris->affinity);
 	cpumask_andnot(&class->affinity, &class->affinity, &ris->affinity);
 	clear_bit(ris->ris_idx, msc->ris_idxs);

@@ -435,10 +435,12 @@ void mpam_msmon_reset_all_mbwu(struct mpam_component *comp);
 int mpam_resctrl_setup(void);
 int mpam_resctrl_online_cpu(unsigned int cpu);
 int mpam_resctrl_offline_cpu(unsigned int cpu);
+void mpam_resctrl_teardown_class(struct mpam_class *class);
 #else
 static inline int mpam_resctrl_setup(void) { return 0; }
 static inline int mpam_resctrl_online_cpu(unsigned int cpu) { return 0; }
 static inline int mpam_resctrl_offline_cpu(unsigned int cpu) { return 0; }
+static inline void mpam_resctrl_teardown_class(struct mpam_class *class) { }
 #endif /* CONFIG_RESCTRL_FS */
 
 /*
