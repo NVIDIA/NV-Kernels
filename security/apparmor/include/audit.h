@@ -136,6 +136,10 @@ struct apparmor_audit_data {
 					void *addr;
 					int addrlen;
 				} net;
+				struct {
+					kuid_t fsuid;
+					kuid_t ouid;
+				} mq;
 			};
 		};
 		struct {
