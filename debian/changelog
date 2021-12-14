@@ -1,3 +1,9 @@
+linux-meta (5.15.0.14.14) jammy; urgency=medium
+
+  * Bump ABI 5.15.0-14
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Tue, 14 Dec 2021 10:52:04 +0100
+
 linux-meta (5.15.0.13.13) jammy; urgency=medium
 
   * Bump ABI 5.15.0-13
