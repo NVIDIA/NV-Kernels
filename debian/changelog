@@ -1,3 +1,12 @@
+linux-meta (5.15.0.16.16) jammy; urgency=medium
+
+  * Bump ABI 5.15.0-16
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Sat, 08 Jan 2022 10:52:16 +0100
+
 linux-meta (5.15.0.15.15) jammy; urgency=medium
 
   * Bump ABI 5.15.0-15
