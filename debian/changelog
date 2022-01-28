@@ -1,3 +1,16 @@
+linux-meta (5.15.0.19.19) jammy; urgency=medium
+
+  * Bump ABI 5.15.0-19
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] lowlatency: add arm64 arch
+    - [Packaging] lowlatency-64k: introduce the lowlatency-64k flavour
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Fri, 28 Jan 2022 17:17:23 +0100
+
 linux-meta (5.15.0.18.18) jammy; urgency=medium
 
   * Bump ABI 5.15.0-18
