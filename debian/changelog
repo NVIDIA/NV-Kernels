@@ -1,3 +1,10 @@
+linux-meta (5.15.0.19.21) jammy; urgency=medium
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] lowlatency: drop arm64-microcode from Depends
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Wed, 02 Feb 2022 10:40:06 +0100
+
 linux-meta (5.15.0.19.20) jammy; urgency=medium
 
   * Miscellaneous Ubuntu changes
