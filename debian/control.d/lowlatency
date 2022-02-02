@@ -9,7 +9,7 @@ Description: lowlatency Linux kernel headers
 Package: linux-image-lowlatency${variant:suffix}
 Architecture: amd64 arm64
 Section: kernel
-Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware, intel-microcode [amd64], arm64-microcode [arm64]
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-lowlatency, linux-firmware, intel-microcode [amd64]
 Provides: ${dkms:zfs-modules} ${dkms:virtualbox-guest-modules} ${dkms:wireguard-linux-compat-modules}
 Recommends: thermald [amd64 arm64]
 Description: lowlatency Linux kernel image
