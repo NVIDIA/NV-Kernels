@@ -1,3 +1,12 @@
+linux-meta (5.15.0.21.23) jammy; urgency=medium
+
+  * Bump ABI 5.15.0-21
+
+  * Miscellaneous Ubuntu changes
+    - [packaging] remove lowlatency flavours
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 07 Feb 2022 12:06:53 +0100
+
 linux-meta (5.15.0.20.22) jammy; urgency=medium
 
   * Bump ABI 5.15.0-20
