@@ -1,3 +1,43 @@
+linux-meta-unstable (5.17.0.1.1) jammy; urgency=medium
+
+  * Bump ABI 5.17.0-1
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+    - [Packaging] resync debian/dkms-versions from main package
+    - [Packaging] resync debian/dkms-versions from main package
+    - [Packaging] resync debian/dkms-versions from main package
+    - [Packaging] resync debian/dkms-versions from main package
+    - [Packaging] update variants
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] change source package name to linux-meta
+    - Ubuntu-5.15.0.1.1
+    - packaging: bump to 5.15.0.9.9
+    - Ubuntu-5.15.0.10.10
+    - Ubuntu-5.15.0.11.11
+    - Ubuntu-5.15.0.12.12
+    - Ubuntu-5.15.0.13.13
+    - Ubuntu-5.15.0.14.14
+    - Ubuntu-5.15.0.15.15
+    - Ubuntu-5.15.0.16.16
+    - Ubuntu-5.15.0.17.17
+    - Ubuntu-5.15.0.18.18
+    - [Packaging] lowlatency: add arm64 arch
+    - [Packaging] lowlatency-64k: introduce the lowlatency-64k flavour
+    - Ubuntu-5.15.0.19.19
+    - [Packaging] lowlatency: arm64-microcode is a Depends on arm64 only
+    - Ubuntu-5.15.0.19.20
+    - [Packaging] lowlatency: drop arm64-microcode from Depends
+    - Ubuntu-5.15.0.19.21
+    - Ubuntu-5.15.0.20.22
+    - [packaging] remove lowlatency flavours
+    - Ubuntu-5.15.0.21.23
+    - Ubuntu-5.15.0.22.24
+    - [Packaging] move to linux-meta-unstable 5.17
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 21 Feb 2022 17:59:33 +0100
+
 linux-meta-unstable (5.17.0.0.0) jammy; urgency=medium
 
   * Empty entry
