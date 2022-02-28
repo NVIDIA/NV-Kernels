@@ -1,3 +1,9 @@
+linux-meta-unstable (5.17.0.3.3) jammy; urgency=medium
+
+  * Bump ABI 5.17.0-3
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 28 Feb 2022 10:00:43 +0100
+
 linux-meta-unstable (5.17.0.2.2) jammy; urgency=medium
 
   * Bump ABI 5.17.0-2
