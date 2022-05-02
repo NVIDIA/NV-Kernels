@@ -16,8 +16,7 @@
 
 #define IPU6_PCI_ID	0x9a19
 #define IPU6SE_PCI_ID	0x4e19
-#define IPU6EP_ADL_P_PCI_ID	0x465d
-#define IPU6EP_ADL_N_PCI_ID	0x462e
+#define IPU6EP_PCI_ID	0x465d
 
 enum ipu_version {
 	IPU_VER_INVALID = 0,
