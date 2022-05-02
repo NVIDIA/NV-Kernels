@@ -89,6 +89,7 @@ struct ipu_isys_internal_pdata isys_ipdata = {
 						   2, 2, 2, 2, 2, 2
 				   },
 				   .insert_read_before_invalidate = false,
+				   .zlw_invalidate = false,
 				   .l1_stream_id_reg_offset =
 				   IPU_MMU_L1_STREAM_ID_REG_OFFSET,
 				   .l2_stream_id_reg_offset =
@@ -108,6 +109,7 @@ struct ipu_isys_internal_pdata isys_ipdata = {
 						   2, 2, 2, 2, 2, 2
 				   },
 				   .insert_read_before_invalidate = false,
+				   .zlw_invalidate = false,
 				   .l1_stream_id_reg_offset =
 				   IPU_MMU_L1_STREAM_ID_REG_OFFSET,
 				   .l2_stream_id_reg_offset =
@@ -149,6 +151,7 @@ struct ipu_psys_internal_pdata psys_ipdata = {
 						   2, 2, 2, 2, 2, 2
 				   },
 				   .insert_read_before_invalidate = false,
+				   .zlw_invalidate = false,
 				   .l1_stream_id_reg_offset =
 				   IPU_MMU_L1_STREAM_ID_REG_OFFSET,
 				   .l2_stream_id_reg_offset =
@@ -172,6 +175,7 @@ struct ipu_psys_internal_pdata psys_ipdata = {
 						   2, 2, 2, 2, 2, 2
 				   },
 				   .insert_read_before_invalidate = false,
+				   .zlw_invalidate = false,
 				   .l1_stream_id_reg_offset =
 				   IPU_MMU_L1_STREAM_ID_REG_OFFSET,
 				   .l2_stream_id_reg_offset =
@@ -191,6 +195,7 @@ struct ipu_psys_internal_pdata psys_ipdata = {
 						   2, 2, 2, 2, 2, 2
 				   },
 				   .insert_read_before_invalidate = false,
+				   .zlw_invalidate = false,
 				   .l1_stream_id_reg_offset =
 				   IPU_MMU_L1_STREAM_ID_REG_OFFSET,
 				   .l2_stream_id_reg_offset =
