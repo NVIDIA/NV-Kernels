@@ -29,9 +29,7 @@
 #include "ipu-dma.h"
 #include "ipu-isys.h"
 #include "ipu-isys-csi2.h"
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
 #include "ipu-isys-tpg.h"
-#endif
 #include "ipu-isys-video.h"
 #include "ipu-platform-regs.h"
 #include "ipu-buttress.h"
@@ -47,7 +45,7 @@
 
 /* LTR & DID value are 10 bit at most */
 #define LTR_DID_VAL_MAX		1023
-#define LTR_DEFAULT_VALUE	0x70503C19
+#define LTR_DEFAULT_VALUE	0x64503C19
 #define FILL_TIME_DEFAULT_VALUE 0xFFF0783C
 #define LTR_DID_PKGC_2R		20
 #define LTR_DID_PKGC_8		100
@@ -133,10 +131,8 @@ skip_unregister_subdev:
 
 static void isys_unregister_subdevices(struct ipu_isys *isys)
 {
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
 	const struct ipu_isys_internal_tpg_pdata *tpg =
 	    &isys->pdata->ipdata->tpg;
-#endif
 	const struct ipu_isys_internal_csi2_pdata *csi2 =
 	    &isys->pdata->ipdata->csi2;
 	unsigned int i;
@@ -145,10 +141,8 @@ static void isys_unregister_subdevices(struct ipu_isys *isys)
 	for (i = 0; i < NR_OF_CSI2_BE_SOC_DEV; i++)
 		ipu_isys_csi2_be_soc_cleanup(&isys->csi2_be_soc[i]);
 
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
 	for (i = 0; i < tpg->ntpgs; i++)
 		ipu_isys_tpg_cleanup(&isys->tpg[i]);
-#endif
 
 	for (i = 0; i < csi2->nports; i++)
 		ipu_isys_csi2_cleanup(&isys->csi2[i]);
@@ -156,10 +150,8 @@ static void isys_unregister_subdevices(struct ipu_isys *isys)
 
 static int isys_register_subdevices(struct ipu_isys *isys)
 {
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
 	const struct ipu_isys_internal_tpg_pdata *tpg =
 	    &isys->pdata->ipdata->tpg;
-#endif
 	const struct ipu_isys_internal_csi2_pdata *csi2 =
 	    &isys->pdata->ipdata->csi2;
 	struct ipu_isys_csi2_be_soc *csi2_be_soc;
@@ -183,7 +175,6 @@ static int isys_register_subdevices(struct ipu_isys *isys)
 		isys->isr_csi2_bits |= IPU_ISYS_UNISPART_IRQ_CSI2(i);
 	}
 
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
 	isys->tpg = devm_kcalloc(&isys->adev->dev, tpg->ntpgs,
 				 sizeof(*isys->tpg), GFP_KERNEL);
 	if (!isys->tpg) {
@@ -200,7 +191,6 @@ static int isys_register_subdevices(struct ipu_isys *isys)
 		if (rval)
 			goto fail;
 	}
-#endif
 
 	for (k = 0; k < NR_OF_CSI2_BE_SOC_DEV; k++) {
 		rval = ipu_isys_csi2_be_soc_init(&isys->csi2_be_soc[k],
@@ -244,7 +234,6 @@ static int isys_register_subdevices(struct ipu_isys *isys)
 		}
 	}
 
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
 	for (i = 0; i < tpg->ntpgs; i++) {
 		rval = media_create_pad_link(&isys->tpg[i].asd.sd.entity,
 					     TPG_PAD_SOURCE,
@@ -270,7 +259,6 @@ static int isys_register_subdevices(struct ipu_isys *isys)
 			}
 		}
 	}
-#endif
 
 	return 0;
 
@@ -361,8 +349,6 @@ static void set_iwake_ltrdid(struct ipu_isys *isys,
 	fc.bits.ltr_scale = ltr_scale;
 	fc.bits.did_val = did_val;
 	fc.bits.did_scale = 2;
-	dev_dbg(&isys->adev->dev,
-		"%s ltr: %d  did: %d", __func__, ltr_val, did_val);
 	writel(fc.value, isp->base + IPU_BUTTRESS_FABIC_CONTROL);
 }
 
@@ -393,8 +379,7 @@ void update_watermark_setting(struct ipu_isys *isys)
 	struct video_stream_watermark *p_watermark;
 	struct ltr_did ltrdid;
 	u16 calc_fill_time_us = 0;
-	u16 ltr = 0;
-	u16 did = 0;
+	u16 ltr, did;
 	u32 iwake_threshold, iwake_critical_threshold;
 	u64 threshold_bytes;
 	u64 isys_pb_datarate_mbs = 0;
@@ -426,7 +411,6 @@ void update_watermark_setting(struct ipu_isys *isys)
 	mutex_unlock(&iwake_watermark->mutex);
 
 	if (!isys_pb_datarate_mbs) {
-		enable_iwake(isys, false);
 		set_iwake_ltrdid(isys, 0, 0, LTR_IWAKE_OFF);
 		mutex_lock(&iwake_watermark->mutex);
 		set_iwake_register(isys, GDA_IRQ_CRITICAL_THRESHOLD_INDEX,
@@ -464,8 +448,6 @@ void update_watermark_setting(struct ipu_isys *isys)
 		iwake_critical_threshold = iwake_threshold +
 			(IS_PIXEL_BUFFER_PAGES - iwake_threshold) / 2;
 
-		dev_dbg(&isys->adev->dev, "%s threshold: %u  critical: %u",
-			__func__, iwake_threshold, iwake_critical_threshold);
 		set_iwake_ltrdid(isys, ltr, did, LTR_IWAKE_ON);
 		mutex_lock(&iwake_watermark->mutex);
 		set_iwake_register(isys,
@@ -587,17 +569,11 @@ static int isys_notifier_init(struct ipu_isys *isys)
 							 asd_struct_size,
 							 isys_fwnode_parse);
 
-	if (ret < 0) {
-		dev_err(&isys->adev->dev,
-			"v4l2 parse_fwnode_endpoints() failed: %d\n", ret);
+	if (ret < 0)
 		return ret;
-	}
 
-	if (list_empty(&isys->notifier.asd_list)) {
-		/* isys probe could continue with async subdevs missing */
-		dev_warn(&isys->adev->dev, "no subdev found in graph\n");
-		return 0;
-	}
+	if (list_empty(&isys->notifier.asd_list))
+		return -ENODEV;	/* no endpoint */
 
 	isys->notifier.ops = &isys_async_ops;
 	ret = v4l2_async_notifier_register(&isys->v4l2_dev, &isys->notifier);
@@ -608,12 +584,6 @@ static int isys_notifier_init(struct ipu_isys *isys)
 	}
 
 	return ret;
-}
-
-static void isys_notifier_cleanup(struct ipu_isys *isys)
-{
-	v4l2_async_notifier_unregister(&isys->notifier);
-	v4l2_async_notifier_cleanup(&isys->notifier);
 }
 
 static struct media_device_ops isys_mdev_ops = {
@@ -652,18 +622,14 @@ static int isys_register_devices(struct ipu_isys *isys)
 	rval = isys_register_subdevices(isys);
 	if (rval)
 		goto out_v4l2_device_unregister;
-
 	rval = isys_notifier_init(isys);
 	if (rval)
 		goto out_isys_unregister_subdevices;
 	rval = v4l2_device_register_subdev_nodes(&isys->v4l2_dev);
 	if (rval)
-		goto out_isys_notifier_cleanup;
+		goto out_isys_unregister_subdevices;
 
 	return 0;
-
-out_isys_notifier_cleanup:
-	isys_notifier_cleanup(isys);
 
 out_isys_unregister_subdevices:
 	isys_unregister_subdevices(isys);
@@ -808,7 +774,6 @@ static void isys_remove(struct ipu_bus_device *adev)
 	isys_iwake_watermark_cleanup(isys);
 
 	ipu_trace_uninit(&adev->dev);
-	isys_notifier_cleanup(isys);
 	isys_unregister_devices(isys);
 	pm_qos_remove_request(&isys->pm_qos);
 
@@ -1361,11 +1326,9 @@ int isys_isr_one(struct ipu_bus_device *adev)
 		if (pipe->csi2)
 			ipu_isys_csi2_sof_event(pipe->csi2);
 
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
 #ifdef IPU_TPG_FRAME_SYNC
 		if (pipe->tpg)
 			ipu_isys_tpg_sof_event(pipe->tpg);
-#endif
 #endif
 		pipe->seq[pipe->seq_index].sequence =
 		    atomic_read(&pipe->sequence) - 1;
@@ -1381,11 +1344,9 @@ int isys_isr_one(struct ipu_bus_device *adev)
 		if (pipe->csi2)
 			ipu_isys_csi2_eof_event(pipe->csi2);
 
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
 #ifdef IPU_TPG_FRAME_SYNC
 		if (pipe->tpg)
 			ipu_isys_tpg_eof_event(pipe->tpg);
-#endif
 #endif
 
 		dev_dbg(&adev->dev,
