@@ -162,7 +162,7 @@ static int ipu_psys_get_userpages(struct ipu_dma_buf_attach *attach)
 	if (!pages)
 		goto free_sgt;
 
-	mmap_read_lock(current->mm);
+	down_read(&current->mm->mmap_sem);
 	vma = find_vma(current->mm, start);
 	if (!vma) {
 		ret = -EFAULT;
@@ -201,7 +201,7 @@ static int ipu_psys_get_userpages(struct ipu_dma_buf_attach *attach)
 		if (nr < npages)
 			goto error_up_read;
 	}
-	mmap_read_unlock(current->mm);
+	up_read(&current->mm->mmap_sem);
 
 	attach->pages = pages;
 	attach->npages = npages;
@@ -218,7 +218,7 @@ skip_pages:
 	return 0;
 
 error_up_read:
-	mmap_read_unlock(current->mm);
+	up_read(&current->mm->mmap_sem);
 error:
 	if (!attach->vma_is_io)
 		while (nr > 0)
@@ -364,7 +364,8 @@ static void *ipu_dma_buf_vmap(struct dma_buf *dmabuf)
 	if (!ipu_attach || !ipu_attach->pages || !ipu_attach->npages)
 		return NULL;
 
-	return vm_map_ram(ipu_attach->pages, ipu_attach->npages, 0);
+	return vm_map_ram(ipu_attach->pages,
+			  ipu_attach->npages, 0, PAGE_KERNEL);
 }
 
 static void ipu_dma_buf_vunmap(struct dma_buf *dmabuf, void *vaddr)

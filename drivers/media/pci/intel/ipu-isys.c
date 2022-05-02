@@ -656,7 +656,6 @@ static int isys_register_devices(struct ipu_isys *isys)
 	rval = isys_notifier_init(isys);
 	if (rval)
 		goto out_isys_unregister_subdevices;
-
 	rval = v4l2_device_register_subdev_nodes(&isys->v4l2_dev);
 	if (rval)
 		goto out_isys_notifier_cleanup;
@@ -705,7 +704,7 @@ static int isys_runtime_pm_resume(struct device *dev)
 
 	ipu_trace_restore(dev);
 
-	cpu_latency_qos_update_request(&isys->pm_qos, ISYS_PM_QOS_VALUE);
+	pm_qos_update_request(&isys->pm_qos, ISYS_PM_QOS_VALUE);
 
 	ret = ipu_buttress_start_tsc_sync(isp);
 	if (ret)
@@ -744,7 +743,7 @@ static int isys_runtime_pm_suspend(struct device *dev)
 	isys->reset_needed = false;
 	mutex_unlock(&isys->mutex);
 
-	cpu_latency_qos_update_request(&isys->pm_qos, PM_QOS_DEFAULT_VALUE);
+	pm_qos_update_request(&isys->pm_qos, PM_QOS_DEFAULT_VALUE);
 
 	ipu_mmu_hw_cleanup(adev->mmu);
 
@@ -811,8 +810,7 @@ static void isys_remove(struct ipu_bus_device *adev)
 	ipu_trace_uninit(&adev->dev);
 	isys_notifier_cleanup(isys);
 	isys_unregister_devices(isys);
-
-	cpu_latency_qos_remove_request(&isys->pm_qos);
+	pm_qos_remove_request(&isys->pm_qos);
 
 	if (!isp->secure_mode) {
 		ipu_cpd_free_pkg_dir(adev, isys->pkg_dir,
@@ -827,10 +825,12 @@ static void isys_remove(struct ipu_bus_device *adev)
 
 	if (isys->short_packet_source == IPU_ISYS_SHORT_PACKET_FROM_TUNIT) {
 		u32 trace_size = IPU_ISYS_SHORT_PACKET_TRACE_BUFFER_SIZE;
-		dma_free_noncoherent(&adev->dev, trace_size,
-				     isys->short_packet_trace_buffer,
-				     isys->short_packet_trace_buffer_dma_addr,
-				     DMA_BIDIRECTIONAL);
+		unsigned long attrs;
+
+		attrs = DMA_ATTR_NON_CONSISTENT;
+		dma_free_attrs(&adev->dev, trace_size,
+			       isys->short_packet_trace_buffer,
+			       isys->short_packet_trace_buffer_dma_addr, attrs);
 	}
 }
 
@@ -1142,7 +1142,8 @@ static int isys_probe(struct ipu_bus_device *adev)
 	ipu_trace_init(adev->isp, isys->pdata->base, &adev->dev,
 		       isys_trace_blocks);
 
-	cpu_latency_qos_add_request(&isys->pm_qos, PM_QOS_DEFAULT_VALUE);
+	pm_qos_add_request(&isys->pm_qos, PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
 	alloc_fw_msg_bufs(isys, 20);
 
 	rval = isys_register_devices(isys);
