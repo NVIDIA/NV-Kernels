@@ -509,24 +509,24 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
 	cfg.pmg = rmid;
 	cfg.opts = resctrl_evt_config_to_mpam(dom->mbm_local_evt_cfg);
 
-	if (irqs_disabled()) {
-		/* Check if we can access this domain without an IPI */
-		err = -EIO;
-	} else {
-		if (cdp_enabled) {
-			cfg.partid = closid << 1;
-			err = mpam_msmon_read(dom->comp, &cfg, type, val);
-			if (err)
-				return err;
+	/**
+	 *  mpam_msmon_read() is now safe for irq-masked callers 
+	 *  Ref. 71b20488fff77c) FIXME arm_mpam: Make mpam_msmon_read()
+	 *  safe for irq-masked callers
+	 */
+	if (cdp_enabled) {
+		cfg.partid = closid << 1;
+		err = mpam_msmon_read(dom->comp, &cfg, type, val);
+		if (err)
+			return err;
 
-			cfg.partid += 1;
-			err = mpam_msmon_read(dom->comp, &cfg, type, &cdp_val);
-			if (!err)
-				*val += cdp_val;
-		} else {
-			cfg.partid = closid;
-			err = mpam_msmon_read(dom->comp, &cfg, type, val);
-		}
+		cfg.partid += 1;
+		err = mpam_msmon_read(dom->comp, &cfg, type, &cdp_val);
+		if (!err)
+			*val += cdp_val;
+	} else {
+		cfg.partid = closid;
+		err = mpam_msmon_read(dom->comp, &cfg, type, val);
 	}
 
 	return err;
