@@ -20,6 +20,7 @@
 #include <linux/sysfs.h>
 #include <linux/kernfs.h>
 #include <linux/resctrl.h>
+#include <linux/platform_device.h>
 #include <linux/random.h>
 #include <linux/seq_buf.h>
 #include <linux/seq_file.h>
@@ -89,6 +90,8 @@ static bool resctrl_debug;
 DEFINE_STATIC_KEY_FALSE(resctrl_abi_playground);
 
 u64 resctrl_id_obsfucation;
+
+static struct platform_device *pmu_pdev;
 
 void rdt_last_cmd_clear(void)
 {
@@ -4596,6 +4599,11 @@ int resctrl_init(void)
 
 	resctrl_id_obsfucation = get_random_u64();
 
+	if (resctrl_is_mbm_enabled()) {
+		pmu_pdev = platform_device_register_simple("resctrl_pmu", 0,
+							   NULL, 0);
+	}
+
 	return 0;
 
 cleanup_mountpoint:
@@ -4610,6 +4618,9 @@ void resctrl_exit(void)
 	mutex_lock(&rdtgroup_mutex);
 	rdtgroup_destroy_root();
 	mutex_unlock(&rdtgroup_mutex);
+
+	platform_device_put(pmu_pdev);
+	pmu_pdev = NULL;
 
 	debugfs_remove_recursive(debugfs_resctrl);
 	unregister_filesystem(&rdt_fs_type);
