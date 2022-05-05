@@ -54,6 +54,9 @@ static bool resctrl_enabled;
 static bool cacheinfo_ready;
 static DECLARE_WAIT_QUEUE_HEAD(wait_cacheinfo_ready);
 
+/* Whether counters were pre-allocated and are left running */
+bool mpam_monitors_free_runing;
+
 /* A dummy mon context to use when the monitors were allocated up front */
 u32 __mon_is_rmid_idx = USE_RMID_IDX;
 void *mon_is_rmid_idx = &__mon_is_rmid_idx;
@@ -328,7 +331,12 @@ void *resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r, int evtid)
 		return ret;
 	case QOS_L3_MBM_LOCAL_EVENT_ID:
 	case QOS_L3_MBM_TOTAL_EVENT_ID:
-		return mon_is_rmid_idx;
+		if (mpam_monitors_free_runing)
+			return mon_is_rmid_idx;
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		*ret = mpam_alloc_mbwu_mon(res->class);
+		return ret;
 	}
 
 	return ERR_PTR(-EOPNOTSUPP);
@@ -352,8 +360,16 @@ void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid,
 		mpam_free_csu_mon(res->class, mon);
 		wake_up(&resctrl_mon_ctx_waiters);
 		return;
-	case QOS_L3_MBM_TOTAL_EVENT_ID:
 	case QOS_L3_MBM_LOCAL_EVENT_ID:
+		if (mpam_monitors_free_runing)
+			return;
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		mpam_free_mbwu_mon(res->class, mon);
+		wake_up(&resctrl_mon_ctx_waiters);
+		return;
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+	default:
 		return;
 	}
 }
@@ -515,13 +531,16 @@ static bool class_has_usable_mbwu(struct mpam_class *class)
 
 	/*
 	 * resctrl expects the bandwidth counters to be free running,
-	 * which means we need as many monitors as resctrl has
-	 * control/monitor groups.
+	 * which means to expose the files in the filesystem we need
+	 * as many monitors as resctrl has control/monitor groups.
+	 * Otherwise, these counters are only accessible via perf.
 	 */
 	if (cprops->num_mbwu_mon < resctrl_arch_system_num_rmid_idx())
-		return false;
+		mpam_monitors_free_runing = false;
+	else
+		mpam_monitors_free_runing = true;
 
-	return (mpam_partid_max > 1) || (mpam_pmg_max != 0);
+	return true;
 }
 
 static bool mba_class_use_mbw_part(struct mpam_props *cprops)
