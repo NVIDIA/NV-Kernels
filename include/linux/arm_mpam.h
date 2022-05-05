@@ -50,15 +50,28 @@ int mpam_register_requestor(u16 partid_max, u8 pmg_max);
 int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
 		    enum mpam_class_types type, u8 class_id, int component_id);
 
+/* Are there enough MSMON monitors for 1 per PARTID*PMG ? */
+extern bool mpam_monitors_free_runing;
+
+/* Does the event count even when no context is allocated? */
+static inline bool resctrl_arch_event_is_free_running(enum resctrl_event_id evt)
+{
+	switch (evt) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		return true;
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+		return mpam_monitors_free_runing;
+	}
+
+	unreachable();
+
+	return false;
+}
+
 static inline unsigned int resctrl_arch_round_mon_val(unsigned int val)
 {
 	return val;
-}
-
-/* MPAM counters requires a monitor to be allocated */
-static inline bool resctrl_arch_event_is_free_running(enum resctrl_event_id evt)
-{
-	return false;
 }
 
 bool resctrl_arch_alloc_capable(void);
