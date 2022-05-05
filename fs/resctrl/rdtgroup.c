@@ -1055,6 +1055,9 @@ static int rdt_mon_features_show(struct kernfs_open_file *of,
 	struct mon_evt *mevt;
 
 	list_for_each_entry(mevt, &r->evt_list, list) {
+		if (!resctrl_arch_event_is_free_running(mevt->evtid))
+			continue;
+
 		seq_printf(seq, "%s\n", mevt->name);
 		if (mevt->configurable)
 			seq_printf(seq, "%s_config\n", mevt->name);
@@ -2791,6 +2794,9 @@ static int mkdir_mondata_subdir(struct kernfs_node *parent_kn,
 	priv.u.rid = r->rid;
 	priv.u.domid = d->id;
 	list_for_each_entry(mevt, &r->evt_list, list) {
+		if (!resctrl_arch_event_is_free_running(mevt->evtid))
+			continue;
+
 		priv.u.evtid = mevt->evtid;
 		ret = mon_addfile(kn, mevt->name, priv.priv);
 		if (ret)
