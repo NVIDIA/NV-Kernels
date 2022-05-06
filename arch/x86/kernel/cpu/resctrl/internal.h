@@ -2,6 +2,7 @@
 #ifndef _ASM_X86_RESCTRL_INTERNAL_H
 #define _ASM_X86_RESCTRL_INTERNAL_H
 
+#include <linux/atomic.h>
 #include <linux/resctrl.h>
 #include <linux/sched.h>
 #include <linux/kernfs.h>
@@ -333,8 +334,8 @@ struct mbm_state {
  *		find this struct.
  */
 struct arch_mbm_state {
-	u64	chunks;
-	u64	prev_msr;
+	atomic64_t	chunks;
+	atomic64_t	prev_msr;
 };
 
 /**
