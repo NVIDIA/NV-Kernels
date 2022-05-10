@@ -244,6 +244,11 @@ struct resctrl_schema {
 	u32				num_closid;
 };
 
+/*
+ * Wait-queue for tasks waiting for a monitoring context to become available.
+ */
+extern struct wait_queue_head resctrl_mon_ctx_waiters;
+
 struct resctrl_cpu_sync
 {
 	u32 closid;
@@ -322,6 +327,17 @@ int resctrl_online_domain(struct rdt_resource *r, struct rdt_domain *d);
 void resctrl_offline_domain(struct rdt_resource *r, struct rdt_domain *d);
 int resctrl_online_cpu(unsigned int cpu);
 void resctrl_offline_cpu(unsigned int cpu);
+
+/**
+ * resctrl_arch_mon_ctx_alloc() - Allocate architecture specific resources need
+ * 				  to use the monitors. This might sleep.
+ * @r:			resource that will be used to read the counter.
+ * @evtid:		the event that will be read, e.g. L3 occupancy.
+ *
+ * Call from process context, this might sleep until a context becomes
+ * available.
+ */
+void *resctrl_arch_mon_ctx_alloc(struct rdt_resource *r, int evtid);
 
 /**
  * resctrl_arch_rmid_read() - Read the eventid counter corresponding to rmid
