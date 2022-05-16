@@ -1,0 +1,2 @@
+archs="amd64 arm64"
+family='ubuntu'

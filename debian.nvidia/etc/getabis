@@ -1,0 +1,14 @@
+repo_list=(
+	"http://archive.ubuntu.com/ubuntu/pool/main/l/linux-nvidia"
+	"http://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux-nvidia"
+	"http://archive.ubuntu.com/ubuntu/pool/universe/l/linux-nvidia"
+	"http://ports.ubuntu.com/ubuntu-ports/pool/universe/l/linux-nvidia"
+	"http://ppa.launchpad.net/canonical-kernel-team/ppa/ubuntu/pool/main/l/linux-nvidia"
+	"http://ppa.launchpad.net/canonical-kernel-team/unstable/ubuntu/pool/main/l/linux-nvidia"
+	"http://ppa.launchpad.net/canonical-kernel-team/bootstrap/ubuntu/pool/main/l/linux-nvidia"
+)
+
+package_prefixes linux-nvidia-buildinfo
+
+getall amd64 nvidia
+getall arm64 nvidia nvidia-64k
