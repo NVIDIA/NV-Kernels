@@ -1,3 +1,12 @@
+linux-meta-unstable (5.18.0.4.12) kinetic; urgency=medium
+
+  * Bump ABI 5.18.0-4
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync debian/dkms-versions from main package
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 16 May 2022 15:48:53 +0200
+
 linux-meta-unstable (5.18.0.3.11) kinetic; urgency=medium
 
   * Bump ABI 5.18.0-3
