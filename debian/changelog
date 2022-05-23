@@ -1,3 +1,9 @@
+linux-meta (5.18.0.5.13) kinetic; urgency=medium
+
+  * Empty entry
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 23 May 2022 17:00:52 +0200
+
 linux-meta-unstable (5.18.0.5.13) kinetic; urgency=medium
 
   * Bump ABI 5.18.0-5
