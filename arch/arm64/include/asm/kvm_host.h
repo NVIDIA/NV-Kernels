@@ -899,6 +899,9 @@ struct kvm_vcpu_arch {
 
 	/* Per-vcpu TLB for VNCR_EL2 -- NULL when !NV */
 	struct vncr_tlb	*vncr_tlb;
+
+	/* Realm meta data */
+	struct realm_rec rec;
 };
 
 /*
