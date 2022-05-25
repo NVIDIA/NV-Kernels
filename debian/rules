@@ -7,6 +7,11 @@
 # Copyright (c) 2004 Jens Schmalzing <jensen@debian.org>
 #
 
+include /usr/share/dpkg/architecture.mk
+
+# Used when you need to 'escape' a comma.
+comma = ,
+
 SERIES=$(shell dpkg-parsechangelog -SDistribution | sed -e 's/-\(security\|updates\|proposed\)$$//')
 SOURCE=$(shell dpkg-parsechangelog -SSource)
 KERNEL_SOURCE=$(shell echo "$(SOURCE)" | sed -e 's/-meta//')
@@ -26,10 +31,11 @@ endif
 control_files := debian/control.common
 # control files only wanted for the primary variant
 primary_control_files := $(shell LC_ALL=C ls -d debian/control.d/primary debian/control.d/transitionals-* 2>/dev/null)
+dkms_control_files :=
 ifneq ($(filter --,$(variants)),)
 	control_files += $(primary_control_files)
 endif
-control_files += $(filter-out $(primary_control_files),$(shell LC_ALL=C ls -d debian/control.d/*))
+control_files += $(filter-out $(primary_control_files) $(wildcard debian/control.d/dkms-*),$(shell LC_ALL=C ls -d debian/control.d/*))
 
 SHELL := sh -e
 
@@ -38,13 +44,57 @@ clean: debian/control
 	dh_testroot
 	dh_clean
 
-# Versions of dkms packages.
-dkms_zfs_linux_version=$(shell gawk '/^zfs-linux/ { print $$2; }' debian/dkms-versions)
+# DKMS
+all_dkms_modules =
+$(foreach _line,$(shell gawk '{ OFS = "!"; $$1 = $$1; print }' debian/dkms-versions), \
+  $(eval _params = $(subst !, ,$(_line))) \
+  $(eval _deb_pkgname = $(firstword $(_params))) \
+  $(eval _deb_version = $(word 2,$(_params))) \
+  $(if $(filter modulename=%,$(_params)), \
+    $(eval _m = $(word 2,$(subst =, ,$(filter modulename=%,$(_params))))) \
+    , \
+    $(info modulename for $(_deb_pkgname) not specified in dkms-versions. Assume $(_deb_pkgname).) \
+    $(eval _m = $(_deb_pkgname)) \
+  ) \
+  $(eval all_dkms_modules += $(_m)) \
+  $(eval dkms_$(_m)_version = $(_deb_version)) \
+  $(if $(filter arch=%,$(_params)), \
+    $(eval dkms_$(_m)_archs = $(patsubst arch=%,%,$(filter arch=%,$(_params)))) \
+    , \
+    $(eval dkms_$(_m)_archs = any) \
+  ) \
+  $(eval dkms_$(_m)_rprovides = $(patsubst rprovides=%,%,$(filter rprovides=%,$(_params)))) \
+  $(eval dkms_$(_m)_type = $(word 1,$(patsubst type=%,%,$(filter type=%,$(_params))) built-in)) \
+  $(eval all_$(dkms_$(_m)_type)_dkms_modules += $(_m)) \
+  $(if $(filter standalone,$(dkms_$(_m)_type)), \
+    $(eval dkms_$(_m)_rprovides += $(_m)-prebuilt-kernel) \
+    $(eval dkms_control_files += debian/control.d/dkms-$(_m)) \
+  ) \
+)
 dkms_virtualbox_version=$(KERNEL_ABI_VERSION)
 dkms_wireguard_version=$(shell /sbin/modinfo -F version /lib/modules/$(KERNEL_ABI_VERSION)-generic/kernel/drivers/net/wireguard/wireguard.ko)
 
+debian/control.d/dkms-%: module = $(patsubst debian/control.d/dkms-%,%,$@)
+debian/control.d/dkms-%: module_archs = $(dkms_$(patsubst debian/control.d/dkms-%,%,$@)_archs)
+debian/control.d/dkms-%: debian/control.dkms
+	for cf in $(filter-out debian/control.common $(primary_control_files),$(control_files)); do \
+	    flavour=$$(basename $$cf); \
+	    flavour_archs=$$(gawk "/^Package: linux-image-$${flavour}\\\$$/ { getline; \$$1=\"\"; print; }" $$cf); \
+	    available_archs=$${flavour_archs}; \
+	    if ! test "$(module_archs)" = "any"; then \
+	        available_archs=$$(echo "$${flavour_archs} $(module_archs)" | tr " " "\n" | sort | uniq -d); \
+	        test -n "$${available_archs}" || continue; \
+	    fi; \
+	    cat debian/control.dkms | sed \
+	            -e "s/MODULE/$(module)/g" \
+	            -e "s/ARCH/$${available_archs}/g" \
+	            -e "s/FLAVOUR/$${flavour}/g"; \
+	done >$@.tmp
+	rm -f $@
+	mv $@.tmp $@
+
 debian/control: tp_key=test:provides\(-full\|-image\|-headers\|-modules-extra\)
-debian/control: $(control_files)
+debian/control: $(control_files) $(dkms_control_files)
 	for i in $^; do \
 		if grep -q "{variant:" $$i; then \
 			variant_first='yes'; \
@@ -75,7 +125,16 @@ debian/control: $(control_files)
 
 gencontrol_flags = -Vkernel-version=$(KERNEL_VERSION)
 gencontrol_flags += -Vkernel-abi-version=$(KERNEL_ABI_VERSION)
-gencontrol_flags += -Vdkms:zfs-modules="zfs-modules (= $(dkms_zfs_linux_version)),"
+gencontrol_flags += \
+  $(foreach _m,$(all_dkms_modules), \
+    $(if $(filter $(DEB_HOST_ARCH),$(subst any,$(DEB_HOST_ARCH),$(dkms_$(_m)_archs))), \
+      $(if $(filter standalone,$(dkms_$(_m)_type)), \
+        -Vdkms:$(_m)-modules="$(foreach _p,$(dkms_$(_m)_rprovides),$(_p) (= $(dkms_$(_m)_version))$(comma) )" \
+        , \
+        -Vdkms:$(_m)-modules="$(foreach _p,$(filter %-modules,$(dkms_$(_m)_rprovides)),$(_p) (= $(dkms_$(_m)_version))$(comma) )" \
+      ) \
+    ) \
+  )
 gencontrol_flags += -Vdkms:virtualbox-guest-modules="virtualbox-guest-modules (= $(dkms_virtualbox_version)),"
 gencontrol_flags += -Vdkms:wireguard-linux-compat-modules="wireguard-modules (= $(dkms_wireguard_version)),"
 
