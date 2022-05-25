@@ -723,7 +723,14 @@ static inline bool kvm_realm_is_created(struct kvm *kvm)
 
 static inline bool vcpu_is_rec(struct kvm_vcpu *vcpu)
 {
+	if (static_branch_unlikely(&kvm_rmi_is_available))
+		return vcpu_has_feature(vcpu, KVM_ARM_VCPU_REC);
 	return false;
+}
+
+static inline bool kvm_arm_rec_finalized(struct kvm_vcpu *vcpu)
+{
+	return vcpu->arch.rec.mpidr != INVALID_HWID;
 }
 
 #endif /* __ARM64_KVM_EMULATE_H__ */
