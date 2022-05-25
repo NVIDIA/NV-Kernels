@@ -712,6 +712,8 @@ static inline bool kvm_realm_is_created(struct kvm *kvm)
 
 static inline bool vcpu_is_rec(struct kvm_vcpu *vcpu)
 {
+	if (static_branch_unlikely(&kvm_rme_is_available))
+		return vcpu->arch.rec.mpidr != INVALID_HWID;
 	return false;
 }
 
