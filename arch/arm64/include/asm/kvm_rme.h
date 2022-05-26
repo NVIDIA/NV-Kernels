@@ -96,6 +96,15 @@ void kvm_realm_destroy_rtts(struct kvm *kvm, u32 ia_bits);
 int kvm_create_rec(struct kvm_vcpu *vcpu);
 void kvm_destroy_rec(struct kvm_vcpu *vcpu);
 
+void kvm_realm_unmap_range(struct kvm *kvm,
+			   unsigned long ipa,
+			   u64 size,
+			   bool unmap_private);
+int realm_set_ipa_state(struct kvm_vcpu *vcpu,
+			unsigned long addr, unsigned long end,
+			unsigned long ripas,
+			unsigned long *top_ipa);
+
 #define RME_RTT_BLOCK_LEVEL	2
 #define RME_RTT_MAX_LEVEL	3
 
@@ -112,6 +121,14 @@ static inline unsigned long rme_rtt_level_mapsize(int level)
 		return RME_PAGE_SIZE;
 
 	return (1UL << RME_RTT_LEVEL_SHIFT(level));
+}
+
+static inline bool realm_is_addr_protected(struct realm *realm,
+					   unsigned long addr)
+{
+	unsigned int ia_bits = realm->ia_bits;
+
+	return !(addr & ~(BIT(ia_bits - 1) - 1));
 }
 
 #endif
