@@ -132,6 +132,7 @@ struct gendisk {
 #define GD_READ_ONLY			1
 #define GD_DEAD				2
 #define GD_NATIVE_CAPACITY		3
+#define GD_SUPPRESS_PART_SCAN		5
 
 	struct mutex open_mutex;	/* open/close mutex */
 	unsigned open_partitions;	/* number of open partitions */
@@ -185,6 +186,8 @@ static inline int disk_max_parts(struct gendisk *disk)
 
 static inline bool disk_part_scan_enabled(struct gendisk *disk)
 {
+	if (test_bit(GD_SUPPRESS_PART_SCAN, &disk->state))
+		return 0;
 	return disk_max_parts(disk) > 1 && !(disk->flags & GENHD_FL_NO_PART);
 }
 
