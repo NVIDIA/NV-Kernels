@@ -48,6 +48,7 @@
 #include <asm/fpu/api.h>
 #include "kvm-s390.h"
 #include "gaccess.h"
+#include "pci.h"
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
@@ -503,6 +504,14 @@ int kvm_arch_init(void *opaque)
 		goto out;
 	}
 
+	if (kvm_s390_pci_interp_allowed()) {
+		rc = kvm_s390_pci_init();
+		if (rc) {
+			pr_err("Unable to allocate AIFT for PCI\n");
+			goto out;
+		}
+	}
+
 	rc = kvm_s390_gib_init(GAL_ISC);
 	if (rc)
 		goto out;
@@ -517,6 +526,8 @@ out:
 void kvm_arch_exit(void)
 {
 	kvm_s390_gib_destroy();
+	if (kvm_s390_pci_interp_allowed())
+		kvm_s390_pci_exit();
 	debug_unregister(kvm_s390_dbf);
 	debug_unregister(kvm_s390_dbf_uv);
 }
