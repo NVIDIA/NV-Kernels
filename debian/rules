@@ -85,6 +85,7 @@ debian/control.d/dkms-%: debian/control.dkms
 	        available_archs=$$(echo "$${flavour_archs} $(module_archs)" | tr " " "\n" | sort | uniq -d); \
 	        test -n "$${available_archs}" || continue; \
 	    fi; \
+	    [ "$$flavour" = "virtual" ] && continue; \
 	    cat debian/control.dkms | sed \
 	            -e "s/MODULE/$(module)/g" \
 	            -e "s/ARCH/$${available_archs}/g" \
