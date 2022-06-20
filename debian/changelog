@@ -1,3 +1,15 @@
+linux-meta-unstable (5.19.0.4.4) kinetic; urgency=medium
+
+  * Bump ABI 5.19.0-4
+
+  * build backport-iwlwifi-dkms as linux-modules-iwlwifi-ABI (LP: #1969434)
+    - [Packaging] support standalone dkms module builds
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] skip standalone dkms modules for virtual flavour
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 20 Jun 2022 09:46:35 +0200
+
 linux-meta-unstable (5.19.0.3.3) kinetic; urgency=medium
 
   * Bump ABI 5.19.0-3
