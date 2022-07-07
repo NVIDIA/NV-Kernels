@@ -3249,6 +3249,15 @@ static struct iommu_domain arm_smmu_blocked_domain = {
 	.ops = &arm_smmu_blocked_ops,
 };
 
+static struct iommu_domain *
+arm_smmu_get_msi_mapping_domain(struct iommu_domain *domain)
+{
+	struct arm_smmu_nested_domain *nested_domain =
+		container_of(domain, struct arm_smmu_nested_domain, domain);
+
+	return &nested_domain->s2_parent->domain;
+}
+
 static int arm_smmu_attach_dev_nested(struct iommu_domain *domain,
 				      struct device *dev)
 {
@@ -3461,6 +3470,7 @@ static int arm_smmu_cache_invalidate_user(struct iommu_domain *domain,
 }
 
 static const struct iommu_domain_ops arm_smmu_nested_ops = {
+	.get_msi_mapping_domain	= arm_smmu_get_msi_mapping_domain,
 	.attach_dev = arm_smmu_attach_dev_nested,
 	.free = arm_smmu_domain_nested_free,
 	.cache_invalidate_user	= arm_smmu_cache_invalidate_user,
