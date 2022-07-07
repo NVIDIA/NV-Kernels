@@ -30,6 +30,15 @@ void *arm_smmu_hw_info(struct device *dev, u32 *length, u32 *type)
 	return info;
 }
 
+static struct iommu_domain *
+arm_smmu_get_msi_mapping_domain(struct iommu_domain *domain)
+{
+	struct arm_smmu_nested_domain *nested_domain =
+		container_of(domain, struct arm_smmu_nested_domain, domain);
+
+	return &nested_domain->vsmmu->s2_parent->domain;
+}
+
 static void arm_smmu_make_nested_cd_table_ste(
 	struct arm_smmu_ste *target, struct arm_smmu_master *master,
 	struct arm_smmu_nested_domain *nested_domain, bool ats_enabled)
@@ -134,6 +143,7 @@ static void arm_smmu_domain_nested_free(struct iommu_domain *domain)
 }
 
 static const struct iommu_domain_ops arm_smmu_nested_ops = {
+	.get_msi_mapping_domain	= arm_smmu_get_msi_mapping_domain,
 	.attach_dev = arm_smmu_attach_dev_nested,
 	.free = arm_smmu_domain_nested_free,
 };
