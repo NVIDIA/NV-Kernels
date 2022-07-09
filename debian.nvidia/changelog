@@ -1,6 +1,6 @@
-linux-nvidia (5.15.0-1002.2) jammy; urgency=medium
+linux-nvidia (5.15.0-1003.3) jammy; urgency=medium
 
-  * jammy/linux-nvidia: 5.15.0-1002.2 -proposed tracker (LP: #1980546)
+  * jammy/linux-nvidia: 5.15.0-1003.3 -proposed tracker (LP: #1980546)
 
   [ Ubuntu: 5.15.0-41.44 ]
 
@@ -2400,7 +2400,7 @@ linux-nvidia (5.15.0-1002.2) jammy; urgency=medium
     option (LP: #1972740)
     - ptrace: Check PTRACE_O_SUSPEND_SECCOMP permission on PTRACE_SEIZE
 
- -- Brad Figg <brad.figg@canonical.com>  Tue, 05 Jul 2022 13:58:52 -0700
+ -- Brad Figg <bfigg@nvidia.com>  Tue, 05 Jul 2022 13:58:52 -0700
 
 linux-nvidia (5.15.0-1001.1) jammy; urgency=medium
 
