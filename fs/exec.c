@@ -1302,7 +1302,7 @@ int begin_new_exec(struct linux_binprm * bprm)
 	spin_lock_irq(&me->sighand->siglock);
 	posix_cpu_timers_exit(me);
 	spin_unlock_irq(&me->sighand->siglock);
-	exit_itimers(me->signal);
+	exit_itimers(me);
 	flush_itimer_signals();
 #endif
 
