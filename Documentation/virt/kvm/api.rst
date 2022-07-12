@@ -5392,7 +5392,7 @@ The Stats Data block contains an array of 64-bit values in the same order
 as the descriptors in Descriptors block.
 
 4.137 KVM_S390_ZPCI_OP
---------------------
+----------------------
 
 :Capability: KVM_CAP_S390_ZPCI_OP
 :Architectures: s390
