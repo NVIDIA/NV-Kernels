@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 
 ccflags-y				+= -I$(src)
-
+ccflags-y               		+= -DCONFIG_NVFS
 obj-$(CONFIG_NVME_CORE)			+= nvme-core.o
 obj-$(CONFIG_BLK_DEV_NVME)		+= nvme.o
 obj-$(CONFIG_NVME_FABRICS)		+= nvme-fabrics.o
@@ -17,10 +17,12 @@ nvme-core-$(CONFIG_FAULT_INJECTION_DEBUG_FS)	+= fault_inject.o
 nvme-core-$(CONFIG_NVME_HWMON)		+= hwmon.o
 
 nvme-y					+= pci.o
+nvme-y                  		+= nvfs-dma.o
 
 nvme-fabrics-y				+= fabrics.o
 
 nvme-rdma-y				+= rdma.o
+nvme-rdma-y				+= nvfs-rdma.o
 
 nvme-fc-y				+= fc.o
 
