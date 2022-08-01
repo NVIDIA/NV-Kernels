@@ -247,7 +247,7 @@ static int probe_map_create(enum bpf_map_type map_type, __u32 ifindex)
 	LIBBPF_OPTS(bpf_map_create_opts, opts);
 	int key_size, value_size, max_entries;
 	__u32 btf_key_type_id = 0, btf_value_type_id = 0;
-	int fd = -1, btf_fd = -1, fd_inner = -1, exp_err = 0, err;
+	int fd = -1, btf_fd = -1, fd_inner = -1, exp_err = 0, err = 0;
 
 	opts.map_ifindex = ifindex;
 
