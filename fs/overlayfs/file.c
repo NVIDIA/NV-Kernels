@@ -490,7 +490,6 @@ static int ovl_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 	return ret;
 }
 
-#if IS_ENABLED(CONFIG_AUFS_FS)
 /*
  * In map_files_get_link() (fs/proc/base.c)
  * we need to determine correct path from overlayfs.
@@ -516,12 +515,6 @@ static void ovl_vm_prfile_set(struct vm_area_struct *vma,
 	vma->vm_region->vm_prfile = file;
 #endif
 }
-#else /* !CONFIG_AUFS_FS */
-static void ovl_vm_prfile_set(struct vm_area_struct *vma,
-			      struct file *file)
-{
-}
-#endif/* CONFIG_AUFS_FS */
 
 static int ovl_mmap(struct file *file, struct vm_area_struct *vma)
 {
