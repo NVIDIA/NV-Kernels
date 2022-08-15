@@ -1009,7 +1009,7 @@ __u8 *uclogic_rdesc_template_apply(const __u8 *template_ptr,
 		if (memcmp(p, head, sizeof(head)) == 0 &&
 		    p[sizeof(head)] < param_num) {
 			v = param_list[p[sizeof(head)]];
-			put_unaligned(cpu_to_le32(v), (s32 *)p);
+			put_unaligned((__force u32)cpu_to_le32(v), (s32 *)p);
 			p += sizeof(head) + 1;
 		} else {
 			p++;
