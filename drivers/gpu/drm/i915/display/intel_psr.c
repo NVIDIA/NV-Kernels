@@ -720,7 +720,6 @@ static bool intel_psr2_sel_fetch_config_valid(struct intel_dp *intel_dp,
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	struct edid *edid;
-	int i;
 
 	edid = intel_dp_get_edid(intel_dp);
 
