@@ -2566,7 +2566,6 @@ lib80211_crypt_wep
 libahci
 libahci_platform
 libarc4
-libblake2s
 libceph
 libchacha
 libchacha20poly1305
