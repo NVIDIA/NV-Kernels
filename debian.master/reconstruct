@@ -1,6 +1,8 @@
 # Recreate any symlinks created since the orig.
 # Remove any files deleted from the orig.
 rm -f 'arch/hexagon/include/asm/timer-regs.h'
+rm -f 'arch/powerpc/include/uapi/asm/bpf_perf_event.h'
+rm -f 'crypto/memneq.c'
 rm -f 'drivers/gpu/drm/amd/display/dc/dsc/qp_tables.h'
 rm -f 'drivers/gpu/drm/msm/hdmi/hdmi_connector.c'
 rm -f 'drivers/gpu/drm/vmwgfx/vmwgfx_thp.c'
