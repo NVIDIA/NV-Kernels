@@ -10,5 +10,5 @@ repo_list=(
 
 package_prefixes linux-nvidia-buildinfo
 
-getall amd64 nvidia
+getall amd64 nvidia nvidia-lowlatency
 getall arm64 nvidia nvidia-64k
