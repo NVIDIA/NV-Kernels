@@ -4734,7 +4734,6 @@ EXPORT_SYMBOL	 lib/crypto/libarc4 0xcd47fcc4	arc4_crypt
 EXPORT_SYMBOL	 lib/crypto/libblake2s 0x7bcc24fd	blake2s256_hmac
 EXPORT_SYMBOL	 lib/crypto/libblake2s 0xa3cefaa0	blake2s_update
 EXPORT_SYMBOL	 lib/crypto/libblake2s 0xadae6df8	blake2s_final
-EXPORT_SYMBOL	 lib/crypto/libblake2s-generic 0x755f4ba3	blake2s_compress_generic
 EXPORT_SYMBOL	 lib/crypto/libchacha 0xcec122d7	chacha_crypt_generic
 EXPORT_SYMBOL	 lib/crypto/libchacha20poly1305 0x147c3f2e	chacha20poly1305_encrypt
 EXPORT_SYMBOL	 lib/crypto/libchacha20poly1305 0x37b34b92	chacha20poly1305_encrypt_sg_inplace
