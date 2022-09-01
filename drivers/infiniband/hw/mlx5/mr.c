@@ -960,7 +960,8 @@ static struct mlx5_ib_mr *alloc_cacheable_mr(struct ib_pd *pd,
 	 * cache then synchronously create an uncached one.
 	 */
 	if (!ent || ent->limit == 0 ||
-	    !mlx5_ib_can_reconfig_with_umr(dev, 0, access_flags)) {
+	    !mlx5_ib_can_reconfig_with_umr(dev, 0, access_flags) ||
+	    mlx5_umem_needs_ats(dev, umem, access_flags)) {
 		mutex_lock(&dev->slow_path_mutex);
 		mr = reg_create(pd, umem, iova, access_flags, page_size, false);
 		mutex_unlock(&dev->slow_path_mutex);
@@ -1337,6 +1338,8 @@ static struct mlx5_ib_mr *reg_create(struct ib_pd *pd, struct ib_umem *umem,
 	if (umem->is_peer)
 		MLX5_SET(mkc, mkc, ma_translation_mode,
 			 MLX5_CAP_GEN(dev->mdev, ats));
+	if (mlx5_umem_needs_ats(dev, umem, access_flags))
+		MLX5_SET(mkc, mkc, ma_translation_mode, 1);
 	if (populate) {
 		MLX5_SET(create_mkey_in, in, translations_octword_actual_size,
 			 get_octo_len(iova, umem->length, mr->page_shift));
