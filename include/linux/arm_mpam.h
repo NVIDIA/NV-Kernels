@@ -55,6 +55,12 @@ static inline unsigned int resctrl_arch_round_mon_val(unsigned int val)
 	return val;
 }
 
+/* MPAM counters requires a monitor to be allocated */
+static inline bool resctrl_arch_event_is_free_running(enum resctrl_event_id evt)
+{
+	return false;
+}
+
 bool resctrl_arch_alloc_capable(void);
 bool resctrl_arch_mon_capable(void);
 bool resctrl_arch_is_llc_occupancy_enabled(void);
