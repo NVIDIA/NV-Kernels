@@ -49,6 +49,7 @@
 struct aa_sk_ctx {
 	struct aa_label *label;
 	struct aa_label *peer;
+	struct path path;
 };
 
 static inline bool aa_secmark(void)
@@ -92,6 +93,9 @@ struct aa_net_compat {
 ({						\
 	int __e;				\
 	switch ((FAMILY)) {			\
+	case AF_UNIX:				\
+		__e = aa_unix_ ## FN;		\
+		break;				\
 	default:				\
 		__e = DEF_FN;			\
 	}					\
