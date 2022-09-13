@@ -1253,6 +1253,9 @@ static const struct snd_soc_component_driver sun8i_a23_codec_codec = {
 
 static const struct snd_soc_component_driver sun4i_codec_component = {
 	.name = "sun4i-codec",
+#ifdef CONFIG_DEBUG_FS
+	.debugfs_prefix		= "cpu",
+#endif
 };
 
 #define SUN4I_CODEC_RATES	SNDRV_PCM_RATE_CONTINUOUS
