@@ -42,6 +42,7 @@ struct rdt_fs_context {
 	bool				enable_cdpl3;
 	bool				enable_mba_mbps;
 	bool				enable_debug;
+	bool				enable_abi_playground;
 };
 
 static inline struct rdt_fs_context *rdt_fc2context(struct fs_context *fc)
@@ -295,6 +296,8 @@ struct mbm_state {
 	u64	prev_bw_bytes;
 	u32	prev_bw;
 };
+
+DECLARE_STATIC_KEY_FALSE(resctrl_abi_playground);
 
 extern struct mutex rdtgroup_mutex;
 
