@@ -57,6 +57,7 @@ struct rdt_fs_context {
 	bool				enable_cdpl3;
 	bool				enable_mba_mbps;
 	bool				enable_debug;
+	bool				enable_abi_playground;
 };
 
 static inline struct rdt_fs_context *rdt_fc2context(struct fs_context *fc)
@@ -250,6 +251,8 @@ static inline  bool is_mba_sc(struct rdt_resource *r)
 
 	return r->membw.mba_sc;
 }
+
+DECLARE_STATIC_KEY_FALSE(resctrl_abi_playground);
 
 extern struct mutex rdtgroup_mutex;
 extern struct rdtgroup rdtgroup_default;
