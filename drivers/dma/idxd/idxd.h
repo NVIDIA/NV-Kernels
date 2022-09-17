@@ -297,6 +297,8 @@ struct idxd_device {
 	int *int_handles;
 
 	struct idxd_pmu *idxd_pmu;
+
+	unsigned long *opcap_bmap;
 };
 
 /* IDXD software descriptor */
