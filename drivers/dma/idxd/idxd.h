@@ -10,6 +10,7 @@
 #include <linux/cdev.h>
 #include <linux/idr.h>
 #include <linux/pci.h>
+#include <linux/bitmap.h>
 #include <linux/perf_event.h>
 #include <uapi/linux/idxd.h>
 #include "registers.h"
@@ -181,6 +182,8 @@ struct idxd_wq {
 	enum idxd_wq_state state;
 	unsigned long flags;
 	union wqcfg *wqcfg;
+	unsigned long *opcap_bmap;
+
 	struct dsa_hw_desc **hw_descs;
 	int num_descs;
 	union {
