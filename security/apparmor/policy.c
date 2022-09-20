@@ -753,7 +753,8 @@ static int audit_policy(struct aa_label *subj_label, const char *op,
 /* don't call out to other LSMs in the stack for apparmor policy admin
  * permissions
  */
-static int policy_ns_capable(struct aa_label *label,
+static int policy_ns_capable(const struct cred *subj_cred,
+			     struct aa_label *label,
 			     struct user_namespace *userns, int cap)
 {
 	int err;
@@ -761,23 +762,25 @@ static int policy_ns_capable(struct aa_label *label,
 	/* check for MAC_ADMIN cap in cred */
 	err = cap_capable(current_cred(), userns, cap, CAP_OPT_NONE);
 	if (!err)
-		err = aa_capable(label, cap, CAP_OPT_NONE);
+		err = aa_capable(subj_cred, label, cap, CAP_OPT_NONE);
 
 	return err;
 }
 
 /**
  * aa_policy_view_capable - check if viewing policy in at @ns is allowed
- * label: label that is trying to view policy in ns
- * ns: namespace being viewed by @label (may be NULL if @label's ns)
+ * @subj_cred: cred of subject
+ * @label: label that is trying to view policy in ns
+ * @ns: namespace being viewed by @label (may be NULL if @label's ns)
  * Returns: true if viewing policy is allowed
  *
  * If @ns is NULL then the namespace being viewed is assumed to be the
  * tasks current namespace.
  */
-bool aa_policy_view_capable(struct aa_label *label, struct aa_ns *ns)
+bool aa_policy_view_capable(const struct cred *subj_cred,
+			    struct aa_label *label, struct aa_ns *ns)
 {
-	struct user_namespace *user_ns = current_user_ns();
+	struct user_namespace *user_ns = subj_cred->user_ns;
 	struct aa_ns *view_ns = labels_view(label);
 	bool root_in_user_ns = uid_eq(current_euid(), make_kuid(user_ns, 0)) ||
 			       in_egroup_p(make_kgid(user_ns, 0));
@@ -794,15 +797,17 @@ bool aa_policy_view_capable(struct aa_label *label, struct aa_ns *ns)
 	return response;
 }
 
-bool aa_policy_admin_capable(struct aa_label *label, struct aa_ns *ns)
+bool aa_policy_admin_capable(const struct cred *subj_cred,
+			     struct aa_label *label, struct aa_ns *ns)
 {
-	struct user_namespace *user_ns = current_user_ns();
-	bool capable = policy_ns_capable(label, user_ns, CAP_MAC_ADMIN) == 0;
+	struct user_namespace *user_ns = subj_cred->user_ns;
+	bool capable = policy_ns_capable(subj_cred, label, user_ns,
+					 CAP_MAC_ADMIN) == 0;
 
 	AA_DEBUG("cap_mac_admin? %d\n", capable);
 	AA_DEBUG("policy locked? %d\n", aa_g_lock_policy);
 
-	return aa_policy_view_capable(label, ns) && capable &&
+	return aa_policy_view_capable(subj_cred, label, ns) && capable &&
 		!aa_g_lock_policy;
 }
 
@@ -812,7 +817,7 @@ bool aa_current_policy_view_capable(struct aa_ns *ns)
 	bool res;
 
 	label = __begin_current_label_crit_section();
-	res = aa_policy_view_capable(label, ns);
+	res = aa_policy_view_capable(current_cred(), label, ns);
 	__end_current_label_crit_section(label);
 
 	return res;
@@ -824,7 +829,7 @@ bool aa_current_policy_admin_capable(struct aa_ns *ns)
 	bool res;
 
 	label = __begin_current_label_crit_section();
-	res = aa_policy_admin_capable(label, ns);
+	res = aa_policy_admin_capable(current_cred(), label, ns);
 	__end_current_label_crit_section(label);
 
 	return res;
@@ -832,12 +837,14 @@ bool aa_current_policy_admin_capable(struct aa_ns *ns)
 
 /**
  * aa_may_manage_policy - can the current task manage policy
+ * @subj_cred: subject cred
  * @label: label to check if it can manage policy
  * @op: the policy manipulation operation being done
  *
  * Returns: 0 if the task is allowed to manipulate policy else error
  */
-int aa_may_manage_policy(struct aa_label *label, struct aa_ns *ns, u32 mask)
+int aa_may_manage_policy(const struct cred *subj_cred, struct aa_label *label,
+			 struct aa_ns *ns, u32 mask)
 {
 	const char *op;
 
@@ -853,7 +860,7 @@ int aa_may_manage_policy(struct aa_label *label, struct aa_ns *ns, u32 mask)
 		return audit_policy(label, op, NULL, NULL, "policy_locked",
 				    -EACCES);
 
-	if (!aa_policy_admin_capable(label, ns))
+	if (!aa_policy_admin_capable(subj_cred, label, ns))
 		return audit_policy(label, op, NULL, NULL, "not policy admin",
 				    -EACCES);
 
