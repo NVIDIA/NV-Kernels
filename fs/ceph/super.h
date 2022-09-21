@@ -1084,8 +1084,7 @@ struct ceph_acl_sec_ctx {
 	void *acl;
 #endif
 #ifdef CONFIG_CEPH_FS_SECURITY_LABEL
-	void *sec_ctx;
-	u32 sec_ctxlen;
+	struct lsmcontext lsmctx;
 #endif
 	struct ceph_pagelist *pagelist;
 };
