@@ -535,6 +535,8 @@ static int lsm_append(const char *new, char **result)
  * Current index to use while initializing the lsmblob secid list.
  */
 static int lsm_slot __ro_after_init;
+
+#if LSMBLOB_ENTRIES > 0
 static struct lsm_id *lsm_slotlist[LSMBLOB_ENTRIES] __ro_after_init;
 
 /**
@@ -579,6 +581,7 @@ const char *lsm_slot_to_name(int slot)
 		return NULL;
 	return lsm_slotlist[slot]->lsm;
 }
+#endif /* LSMBLOB_ENTRIES > 0 */
 
 /**
  * security_add_hooks - Add a modules hooks to the hook lists.
@@ -607,6 +610,7 @@ void __init security_add_hooks(struct security_hook_list *hooks, int count,
 
 	WARN_ON(!lsmid->slot || !lsmid->id);
 
+#if LSMBLOB_ENTRIES > 0
 	if (lsmid->slot == LSMBLOB_NEEDED) {
 		if (lsm_slot >= LSMBLOB_ENTRIES)
 			panic("%s Too many LSMs registered.\n", __func__);
@@ -615,6 +619,7 @@ void __init security_add_hooks(struct security_hook_list *hooks, int count,
 		init_debug("%s assigned lsmblob slot %d\n", lsmid->lsm,
 			   lsmid->slot);
 	}
+#endif /* LSMBLOB_ENTRIES > 0 */
 
 	for (i = 0; i < count; i++) {
 		hooks[i].lsmid = lsmid;
@@ -1681,8 +1686,8 @@ void security_inode_free(struct inode *inode)
  */
 int security_dentry_init_security(struct dentry *dentry, int mode,
 				  const struct qstr *name,
-				  const char **xattr_name, void **ctx,
-				  u32 *ctxlen)
+				  const char **xattr_name,
+				  struct lsmcontext *lsmctx)
 {
 	struct security_hook_list *hp;
 	int rc;
@@ -1693,7 +1698,10 @@ int security_dentry_init_security(struct dentry *dentry, int mode,
 	hlist_for_each_entry(hp, &security_hook_heads.dentry_init_security,
 			     list) {
 		rc = hp->hook.dentry_init_security(dentry, mode, name,
-						   xattr_name, ctx, ctxlen);
+						   xattr_name,
+						   (void **)&lsmctx->context,
+						   &lsmctx->len);
+		lsmctx->slot = hp->lsmid->slot;
 		if (rc != LSM_RET_DEFAULT(dentry_init_security))
 			return rc;
 	}
