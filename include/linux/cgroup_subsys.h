@@ -65,6 +65,11 @@ SUBSYS(rdma)
 SUBSYS(misc)
 #endif
 
+#if IS_ENABLED(CONFIG_CGROUP_RESCTRL)
+SUBSYS(resctrl)
+#endif
+
+
 /*
  * The following subsystems are not supported on the default hierarchy.
  */
