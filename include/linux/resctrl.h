@@ -330,6 +330,8 @@ static inline void __resctrl_id_decode(u64 id, u32 *closid, u32 *rmid)
  */
 int resctrl_id_decode(u64 id, u32 *closid, u32 *rmid);
 
+int resctrl_rdtgroup_show(struct seq_file *seq, u32 closid, u32 rmid);
+
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 
