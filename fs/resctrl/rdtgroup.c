@@ -564,22 +564,24 @@ static void rdtgroup_remove(struct rdtgroup *rdtgrp)
 	kfree(rdtgrp);
 }
 
-static void _update_task_closid_rmid(void *task)
+void resctrl_sync_task(void *task)
 {
 	/*
 	 * If the task is still current on this CPU, update PQR_ASSOC MSR.
 	 * Otherwise, the MSR is updated when the task is scheduled in.
 	 */
-	if (task == current)
-		resctrl_sched_in(task);
+	if (task && task != current)
+		return;
+
+	resctrl_sched_in(task);
 }
 
 static void update_task_closid_rmid(struct task_struct *t)
 {
 	if (IS_ENABLED(CONFIG_SMP) && task_curr(t))
-		smp_call_function_single(task_cpu(t), _update_task_closid_rmid, t, 1);
+		smp_call_function_single(task_cpu(t), resctrl_sync_task, t, 1);
 	else
-		_update_task_closid_rmid(t);
+		resctrl_sync_task(t);
 }
 
 static bool task_in_rdtgroup(struct task_struct *tsk, struct rdtgroup *rdtgrp)
@@ -1689,7 +1691,7 @@ static ssize_t mbm_local_bytes_config_write(struct kernfs_open_file *of,
 	return ret ?: nbytes;
 }
 
-struct rdtgroup *find_rdtgroup(u32 closid, u32 rmid)
+static struct rdtgroup *find_rdtgroup(u32 closid, u32 rmid)
 {
 	struct rdtgroup *prgrp, *crgrp;
 
@@ -1711,6 +1713,28 @@ struct rdtgroup *find_rdtgroup(u32 closid, u32 rmid)
 	}
 
 	return NULL;
+}
+
+int resctrl_rdtgroup_show(struct seq_file *seq, u32 closid, u32 rmid)
+{
+	struct rdtgroup *rdtgrp;
+	int err = -ENOENT;
+
+	mutex_lock(&rdtgroup_mutex);
+	rdtgrp = find_rdtgroup(closid, rmid);
+	if (rdtgrp) {
+		err = 0;
+
+		if (rdtgrp->type == RDTCTRL_GROUP)
+			seq_printf(seq, "/%s\n", rdtgrp->kn->name);
+		else if (rdtgrp->type == RDTMON_GROUP)
+			seq_printf(seq, "/%s/%s\n",
+				   rdtgrp->mon.parent->kn->name,
+				   rdtgrp->kn->name);
+	}
+	mutex_unlock(&rdtgroup_mutex);
+
+	return err;
 }
 
 int resctrl_id_decode(u64 id, u32 *closid, u32 *rmid)
@@ -2641,6 +2665,7 @@ static const struct fs_parameter_spec rdt_fs_parameters[] = {
 	 * Some of MPAM's out of tree code exposes things through resctrl
 	 * that need much more discussion before they are considered for
 	 * mainline. Add a mount option that can be used to hide these crimes.
+	 * The name of this option will change randomly.
 	 */
 	fsparam_flag("this_is_not_abi",	Opt_not_abi_playground),
 	{}
@@ -2708,6 +2733,35 @@ static int rdt_init_fs_context(struct fs_context *fc)
 	return 0;
 }
 
+static void relabel_tasks(struct task_struct *tsk, u32 closid, u32 rmid,
+			  struct cpumask *mask)
+{
+	if (IS_ENABLED(CONFIG_CGROUP_RESCTRL) &&
+	    static_branch_unlikely(&resctrl_abi_playground)) {
+		resctrl_cgroup_relabel_task(tsk, closid, rmid, mask);
+	} else {
+		resctrl_arch_set_closid_rmid(tsk, closid, rmid);
+
+		/*
+		 * Order the closid/rmid stores above before the loads
+		 * in task_curr(). This pairs with the full barrier
+		 * between the rq->curr update and resctrl_sched_in()
+		 * during context switch.
+		 */
+		smp_mb();
+
+		/*
+		 * If the task is on a CPU, set the CPU in the mask.
+		 * The detection is inaccurate as tasks might move or
+		 * schedule before the smp function call takes place.
+		 * In such a case the function call is pointless, but
+		 * there is no other side effect.
+		 */
+		if (IS_ENABLED(CONFIG_SMP) && mask && task_curr(tsk))
+			cpumask_set_cpu(task_cpu(tsk), mask);
+	}
+}
+
 /*
  * Move tasks from one to the other group. If @from is NULL, then all tasks
  * in the systems are moved unconditionally (used for teardown).
@@ -2725,26 +2779,7 @@ static void rdt_move_group_tasks(struct rdtgroup *from, struct rdtgroup *to,
 	for_each_process_thread(p, t) {
 		if (!from || is_closid_match(t, from) ||
 		    is_rmid_match(t, from)) {
-			resctrl_arch_set_closid_rmid(t, to->closid,
-						     to->mon.rmid);
-
-			/*
-			 * Order the closid/rmid stores above before the loads
-			 * in task_curr(). This pairs with the full barrier
-			 * between the rq->curr update and resctrl_sched_in()
-			 * during context switch.
-			 */
-			smp_mb();
-
-			/*
-			 * If the task is on a CPU, set the CPU in the mask.
-			 * The detection is inaccurate as tasks might move or
-			 * schedule before the smp function call takes place.
-			 * In such a case the function call is pointless, but
-			 * there is no other side effect.
-			 */
-			if (IS_ENABLED(CONFIG_SMP) && mask && task_curr(t))
-				cpumask_set_cpu(task_cpu(t), mask);
+			relabel_tasks(t, to->closid, to->mon.rmid, mask);
 		}
 	}
 	read_unlock(&tasklist_lock);

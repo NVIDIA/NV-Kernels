@@ -7,6 +7,18 @@ config RESCTRL_FS
 	  Resctrl is a filesystem interface to control allocation and
 	  monitoring of system resources usage by the CPU.
 
+config CGROUP_RESCTRL
+	bool "cgroup controller for resctrl tasks"
+	depends on RESCTRL_FS && CGROUPS
+	help
+	  Use cgroups to manage the task assignment to control and monitor
+	  groups. This option adds a 'resctrl' controller which allows the
+	  control or monitor group 'id' to be written to a cgroup. The tasks
+	  in that cgroup are then part of the specified control or monitor
+	  group. Creation and configuration of control and monitor groups
+	  is still done through resctrl. This option requires the
+	  'abi playground' mount option to resctrl, and is not to be relied on.
+
 config RESCTRL_FS_PSEUDO_LOCK
 	bool
 	help

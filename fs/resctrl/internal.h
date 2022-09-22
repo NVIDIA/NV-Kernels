@@ -324,4 +324,7 @@ void rdt_staged_configs_clear(void);
 bool resctrl_closid_is_free(u32 closid);
 int resctrl_find_cleanest_closid(void);
 
+void resctrl_cgroup_relabel_task(struct task_struct *task, u32 closid, u32 rmid, struct cpumask *dirty_cpus);
+void resctrl_sync_task(void *task);
+
 #endif /* _FS_RESCTRL_INTERNAL_H */
