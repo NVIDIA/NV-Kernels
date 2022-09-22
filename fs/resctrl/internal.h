@@ -313,4 +313,7 @@ void mbm_config_rftype_init(const char *config);
 void rdt_staged_configs_clear(void);
 int resctrl_find_cleanest_closid(void);
 
+void resctrl_cgroup_relabel_task(struct task_struct *task, u32 closid, u32 rmid, struct cpumask *dirty_cpus);
+void resctrl_sync_task(void *task);
+
 #endif /* _FS_RESCTRL_INTERNAL_H */
