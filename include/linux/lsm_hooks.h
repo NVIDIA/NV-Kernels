@@ -1677,6 +1677,7 @@ struct security_hook_heads {
 struct lsm_id {
 	const char	*lsm;		/* Name of the LSM */
 	int		id;		/* LSM ID */
+	int		features;	/* Set of LSM features */
 };
 
 /*
