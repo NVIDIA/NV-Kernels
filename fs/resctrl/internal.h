@@ -440,4 +440,7 @@ static inline int rdtgroup_pseudo_lock_create(struct rdtgroup *rdtgrp)
 static inline void rdtgroup_pseudo_lock_remove(struct rdtgroup *rdtgrp) { }
 #endif /* CONFIG_RESCTRL_FS_PSEUDO_LOCK */
 
+void resctrl_cgroup_relabel_task(struct task_struct *task, u32 closid, u32 rmid, struct cpumask *dirty_cpus);
+void resctrl_sync_task(void *task);
+
 #endif /* _ASM_X86_RESCTRL_INTERNAL_H */
