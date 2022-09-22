@@ -92,6 +92,7 @@
 #include <linux/fsnotify.h>
 #include <linux/fanotify.h>
 #include <linux/io_uring.h>
+#include <uapi/linux/lsm.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -7034,6 +7035,7 @@ static int selinux_uring_cmd(struct io_uring_cmd *ioucmd)
 
 static struct lsm_id selinux_lsmid __lsm_ro_after_init = {
 	.lsm      = "selinux",
+	.id       = LSM_ID_SELINUX,
 };
 
 /*

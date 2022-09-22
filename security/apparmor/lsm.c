@@ -26,6 +26,7 @@
 #include <linux/zstd.h>
 #include <net/sock.h>
 #include <uapi/linux/mount.h>
+#include <uapi/linux/lsm.h>
 
 #include "include/af_unix.h"
 #include "include/apparmor.h"
@@ -1527,6 +1528,7 @@ struct lsm_blob_sizes apparmor_blob_sizes __lsm_ro_after_init = {
 
 static struct lsm_id apparmor_lsmid __lsm_ro_after_init = {
 	.lsm      = "apparmor",
+	.id       = LSM_ID_APPARMOR,
 };
 
 static struct security_hook_list apparmor_hooks[] __lsm_ro_after_init = {

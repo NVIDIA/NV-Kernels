@@ -43,6 +43,7 @@
 #include <linux/fs_parser.h>
 #include <linux/watch_queue.h>
 #include <linux/io_uring.h>
+#include <uapi/linux/lsm.h>
 #include "smack.h"
 
 #define TRANS_TRUE	"TRUE"
@@ -4858,6 +4859,7 @@ struct lsm_blob_sizes smack_blob_sizes __lsm_ro_after_init = {
 
 static struct lsm_id smack_lsmid __lsm_ro_after_init = {
 	.lsm      = "smack",
+	.id       = LSM_ID_SMACK,
 };
 
 static struct security_hook_list smack_hooks[] __lsm_ro_after_init = {
