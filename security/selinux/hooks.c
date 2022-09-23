@@ -7032,6 +7032,7 @@ static struct lsm_id selinux_lsmid __lsm_ro_after_init = {
 	.id       = LSM_ID_SELINUX,
 	.features = LSM_ATTR_CURRENT | LSM_ATTR_EXEC | LSM_ATTR_FSCREATE |
 		    LSM_ATTR_KEYCREATE | LSM_ATTR_PREV | LSM_ATTR_SOCKCREATE,
+	.slot     = LSMBLOB_NEEDED,
 };
 
 /*
