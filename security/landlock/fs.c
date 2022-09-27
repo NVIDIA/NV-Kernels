@@ -37,11 +37,6 @@
 #include "ruleset.h"
 #include "setup.h"
 
-static struct lsm_id landlock_lsmid __lsm_ro_after_init = {
-	.lsm  = "landlock",
-	.slot = LSMBLOB_NEEDED
-};
-
 /* Underlying object management */
 
 static void release_inode(struct landlock_object *const object)
