@@ -281,6 +281,10 @@ struct prctl_mm_map {
 # define PR_SME_VL_LEN_MASK		0xffff
 # define PR_SME_VL_INHERIT		(1 << 17) /* inherit across exec */
 
+/* Set/get the active security module for /proc/self/attr */
+#define PR_LSM_ATTR_SET			65	/* Set the display LSM ID */
+#define PR_LSM_ATTR_GET			66	/* Get the display LSM ID */
+
 #define PR_SET_VMA		0x53564d41
 # define PR_SET_VMA_ANON_NAME		0
 
