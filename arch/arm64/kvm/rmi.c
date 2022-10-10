@@ -33,6 +33,16 @@ static inline unsigned long rmi_rtt_level_mapsize(int level)
 	return (1UL << RMM_RTT_LEVEL_SHIFT(level));
 }
 
+static bool rmi_has_feature(unsigned long feature)
+{
+	return !!u64_get_bits(rmm_feat_reg0, feature);
+}
+
+bool kvm_rmi_supports_sve(void)
+{
+	return rmi_has_feature(RMI_FEATURE_REGISTER_0_SVE_EN);
+}
+
 static int rmi_check_version(void)
 {
 	struct arm_smccc_res res;
