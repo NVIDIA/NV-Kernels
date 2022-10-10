@@ -89,6 +89,8 @@ void kvm_init_rmi(void);
 u32 kvm_realm_ipa_limit(void);
 u32 kvm_realm_vgic_nr_lr(void);
 
+bool kvm_rmi_supports_sve(void);
+
 struct kvm_enable_cap;
 
 int kvm_realm_enable_cap(struct kvm *kvm, struct kvm_enable_cap *cap);
