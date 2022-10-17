@@ -88,7 +88,7 @@ Description: Linux kernel version specific tools for version PKGVER
 
 Package: SRCPKGNAME-tools-PKGVER-ABINUM
 Build-Profiles: <!stage1>
-Architecture: amd64 arm64
+Architecture: amd64
 Section: devel
 Priority: optional
 Depends: ${misc:Depends}, ${shlibs:Depends}, linux-tools-common
@@ -112,7 +112,7 @@ Description: Linux kernel version specific cloud tools for version PKGVER
 
 Package: SRCPKGNAME-cloud-tools-PKGVER-ABINUM
 Build-Profiles: <!stage1>
-Architecture: amd64 
+Architecture: amd64
 Section: devel
 Priority: optional
 Depends: ${misc:Depends}, ${shlibs:Depends}, linux-cloud-tools-common
