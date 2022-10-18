@@ -4237,12 +4237,10 @@ static int decode_attr_security_label(struct xdr_stream *xdr, uint32_t *bitmap,
 			return -EIO;
 		bitmap[2] &= ~FATTR4_WORD2_SECURITY_LABEL;
 		if (len < NFS4_MAXLABELLEN) {
-			if (label) {
-				if (label->lsmctx.len) {
-					if (label->lsmctx.len < len)
-						return -ERANGE;
-					memcpy(label->lsmctx.context, p, len);
-				}
+			if (label && label->lsmctx.len) {
+				if (label->lsmctx.len < len)
+					return -ERANGE;
+				memcpy(label->lsmctx.context, p, len);
 				label->lsmctx.len = len;
 				label->pi = pi;
 				label->lfs = lfs;
