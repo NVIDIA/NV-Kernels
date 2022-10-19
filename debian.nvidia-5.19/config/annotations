@@ -1,0 +1,31 @@
+# Menu: HEADER
+# FORMAT: 3
+# ARCH: x86 arm64
+
+include "../../debian.hwe-5.19/config/annotations"
+
+CONFIG_LATENCYTOP                               policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y', 'arm64': 'n'}>
+CONFIG_HZ_1000                               	policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y', 'arm64': 'n'}>
+CONFIG_HZ_250                               	policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'y'}>
+CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'y'}>
+CONFIG_PREEMPT					policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y', 'arm64': 'n'}>
+
+CONFIG_COMEDI_TESTS_EXAMPLE			policy<{'amd64': 'm', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'm'}>
+CONFIG_TEST_DIV64				policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'm', 'arm64': 'n'}>
+CONFIG_COMEDI_TESTS_NI_ROUTES			policy<{'amd64': 'm', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'm'}>
+
+CONFIG_ARM64_64K_PAGES 				policy<{'arm64': 'n', 'arm64-nvidia-64k': 'y'}>
+CONFIG_NTFS_RW 					policy<{'amd64': 'n', 'arm64': 'n', 'arm64-nvidia-64k': '-'}>
+
+CONFIG_MESON_SECURE_PM_DOMAINS 			policy<{'arm64': 'y', 'arm64-nvidia-64k': '-'}>
+CONFIG_INFINIBAND_VMWARE_PVRDMA 		policy<{'amd64': 'm', 'arm64': 'm', 'arm64-nvidia-64k': '-'}>
+CONFIG_MESON_SM 				policy<{'arm64': 'y', 'arm64-nvidia-64k': '-'}>
+CONFIG_VMXNET3 					policy<{'amd64': 'm', 'arm64': 'm', 'arm64-nvidia-64k': '-'}>
+CONFIG_FORCE_MAX_ZONEORDER 			policy<{'arm64': '13', 'arm64-nvidia-64k': '14'}>
+CONFIG_ARM64_4K_PAGES 				policy<{'arm64': 'y', 'arm64-nvidia-64k': 'n'}>
+CONFIG_MESON_EFUSE 				policy<{'arm64': 'm', 'arm64-nvidia-64k': '-'}>
+
+CONFIG_ARM64_VA_BITS_39 			policy<{'arm64': 'n', 'arm64-nvidia-64k': '-'}>
+CONFIG_ARM64_VA_BITS_42 			policy<{'arm64-nvidia-64k': 'n'}>
+CONFIG_ARM64_VA_BITS_52 			policy<{'arm64-nvidia-64k': 'n'}>
+CONFIG_ARM64_PA_BITS_52 			policy<{'arm64-nvidia-64k': 'n'}>
