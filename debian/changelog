@@ -1,3 +1,9 @@
+linux-meta-unstable (6.1.0.3.3) kinetic; urgency=medium
+
+  * Bump ABI 6.1.0-3
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 24 Oct 2022 17:56:33 +0200
+
 linux-meta-unstable (6.1.0.2.2) kinetic; urgency=medium
 
   * Bump ABI 6.1.0-2
