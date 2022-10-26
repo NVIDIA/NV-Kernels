@@ -1899,9 +1899,7 @@ static int dsi_populate_dsc_params(struct msm_display_dsc_config *dsc)
 	 * params are calculated
 	 */
 	groups_per_line = DIV_ROUND_UP(dsc->drm->slice_width, 3);
-	dsc->drm->slice_chunk_size = dsc->drm->slice_width * dsc->drm->bits_per_pixel / 8;
-	if ((dsc->drm->slice_width * dsc->drm->bits_per_pixel) % 8)
-		dsc->drm->slice_chunk_size++;
+	dsc->drm->slice_chunk_size = DIV_ROUND_UP(dsc->drm->slice_width * dsc->drm->bits_per_pixel, 8);
 
 	/* rbs-min */
 	min_rate_buffer_size =  dsc->drm->rc_model_size - dsc->drm->initial_offset +
