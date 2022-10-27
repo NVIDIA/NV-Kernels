@@ -1539,6 +1539,7 @@ cifs_put_tcp_session(struct TCP_Server_Info *server, int from_reconnect)
 	server->session_key.response = NULL;
 	server->session_key.len = 0;
 	kfree(server->hostname);
+	server->hostname = NULL;
 
 	task = xchg(&server->tsk, NULL);
 	if (task)
