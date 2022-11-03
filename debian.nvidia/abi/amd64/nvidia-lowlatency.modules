@@ -3387,6 +3387,7 @@ ntfs3
 null_blk
 nuvoton-cir
 nv_tco
+nvidia-fs
 nvidia-wmi-ec-backlight
 nvidiafb
 nvme
