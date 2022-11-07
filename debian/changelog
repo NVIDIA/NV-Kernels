@@ -1,3 +1,12 @@
+linux-meta-unstable (6.1.0.5.5) lunar; urgency=medium
+
+  * Bump ABI 6.1.0-5
+
+  * Miscellaneous Ubuntu changes
+    - packaging: switch to lunar series
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 07 Nov 2022 16:48:06 +0100
+
 linux-meta-unstable (6.1.0.4.4) lunar; urgency=medium
 
   * Bump ABI 6.1.0-4
