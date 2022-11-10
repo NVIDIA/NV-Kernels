@@ -10,7 +10,7 @@ static int dr_table_set_miss_action_nic(struct mlx5dr_domain *dmn,
 	struct mlx5dr_matcher_rx_tx *last_nic_matcher = NULL;
 	struct mlx5dr_htbl_connect_info info;
 	struct mlx5dr_ste_htbl *last_htbl;
-	int ret;
+	int ret = -EOPNOTSUPP;
 
 	if (!list_empty(&nic_tbl->nic_matcher_list))
 		last_nic_matcher = list_last_entry(&nic_tbl->nic_matcher_list,
@@ -64,6 +64,9 @@ int mlx5dr_table_set_miss_action(struct mlx5dr_table *tbl,
 		if (ret)
 			goto out;
 	}
+
+	if (ret)
+		goto out;
 
 	/* Release old action */
 	if (tbl->miss_action)
