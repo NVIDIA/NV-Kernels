@@ -1,3 +1,9 @@
+linux-meta-unstable (6.1.0.6.6) lunar; urgency=medium
+
+  * Bump ABI 6.1.0-6
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Tue, 15 Nov 2022 15:55:47 +0100
+
 linux-meta-unstable (6.1.0.5.5) lunar; urgency=medium
 
   * Bump ABI 6.1.0-5
