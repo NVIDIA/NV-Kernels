@@ -1091,7 +1091,7 @@ static inline int arm_cspmu_find_cpu_container(int cpu, u32 container_uid)
 		    acpi_uid == container_uid)
 			return 0;
 
-		acpi_dev = acpi_dev_parent(acpi_dev);
+		acpi_dev = acpi_dev->parent;
 	}
 
 	return -ENODEV;
