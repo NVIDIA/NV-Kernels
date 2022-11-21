@@ -227,6 +227,9 @@ int mt7921_register_device(struct mt7921_dev *dev)
 	dev->pm.ds_enable = true;
 
 	ret = mt7921_init_hardware(dev);
+
+	mt7921_init_acpi_sar(dev);
+
 	if (ret)
 		return ret;
 
