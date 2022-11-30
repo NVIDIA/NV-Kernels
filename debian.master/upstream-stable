@@ -2,4 +2,4 @@
 [upstream-stable]
     linux-5.15.y = v5.15.75
     linux-5.19.y = v5.19.17
-    linux-6.0.y = v6.0.4
+    linux-6.0.y = v6.0.5
