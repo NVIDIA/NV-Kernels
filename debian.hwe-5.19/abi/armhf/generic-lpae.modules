@@ -3112,7 +3112,6 @@ mdev
 mdio
 mdio-aspeed
 mdio-bcm-unimac
-mdio-bitbang
 mdio-gpio
 mdio-hisi-femac
 mdio-i2c
@@ -6780,4 +6779,3 @@ zpa2326_spi
 zr364xx
 zram
 zstd
-zstd_compress
