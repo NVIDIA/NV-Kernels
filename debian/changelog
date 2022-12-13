@@ -1,3 +1,9 @@
+linux-meta (6.1.0.3.3) lunar; urgency=medium
+
+  * Bump ABI 6.1.0-3
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 13 Dec 2022 16:47:34 +0100
+
 linux-meta (6.1.0.2.2) lunar; urgency=medium
 
   * Bump ABI 6.1.0-2
