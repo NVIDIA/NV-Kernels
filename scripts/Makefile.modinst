@@ -68,8 +68,13 @@ endif
 ifeq ($(CONFIG_MODULE_SIG_ALL),y)
 quiet_cmd_sign = SIGN    $@
 $(eval $(call config_filename,MODULE_SIG_KEY))
-      cmd_sign = scripts/sign-file $(CONFIG_MODULE_SIG_HASH) $(MODULE_SIG_KEY_SRCPREFIX)$(CONFIG_MODULE_SIG_KEY) certs/signing_key.x509 $@ \
-                 $(if $(KBUILD_EXTMOD),|| true)
+      cmd_sign = if echo "$@" | grep -qF "/drivers/staging/" && \
+                    test -f $(srctree)/debian/signature-inclusion && \
+                    ! grep -qFx "$(notdir $@)" $(srctree)/debian/signature-inclusion ; \
+                 then echo "UBUNTU: Not signing $@" ; \
+                 else scripts/sign-file $(CONFIG_MODULE_SIG_HASH) $(MODULE_SIG_KEY_SRCPREFIX)$(CONFIG_MODULE_SIG_KEY) certs/signing_key.x509 $@ \
+                      $(if $(KBUILD_EXTMOD),|| true) ; \
+                 fi
 else
 quiet_cmd_sign :=
       cmd_sign := :
