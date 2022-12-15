@@ -113,6 +113,7 @@ struct mlx5e_tc_attr_to_reg_mapping mlx5e_tc_attr_to_reg_mappings[] = {
  * it's different than the ht->mutex here.
  */
 static struct lock_class_key tc_ht_lock_key;
+static struct lock_class_key tc_ht_wq_key;
 
 static void mlx5e_put_flow_tunnel_id(struct mlx5e_tc_flow *flow);
 static void free_flow_post_acts(struct mlx5e_tc_flow *flow);
@@ -4823,6 +4824,7 @@ int mlx5e_tc_nic_init(struct mlx5e_priv *priv)
 		return err;
 
 	lockdep_set_class(&tc->ht.mutex, &tc_ht_lock_key);
+	lockdep_init_map(&tc->ht.run_work.lockdep_map, "tc_ht_wq_key", &tc_ht_wq_key, 0);
 
 	mapping_id = mlx5_query_nic_system_image_guid(dev);
 
@@ -4929,6 +4931,7 @@ int mlx5e_tc_ht_init(struct rhashtable *tc_ht)
 		return err;
 
 	lockdep_set_class(&tc_ht->mutex, &tc_ht_lock_key);
+	lockdep_init_map(&tc_ht->run_work.lockdep_map, "tc_ht_wq_key", &tc_ht_wq_key, 0);
 
 	return 0;
 }
