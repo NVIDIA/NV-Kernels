@@ -3249,7 +3249,6 @@ mdc800
 mdev
 mdio
 mdio-bcm-unimac
-mdio-bitbang
 mdio-cavium
 mdio-gpio
 mdio-hisi-femac
@@ -5511,6 +5510,7 @@ snd-hda-codec-realtek
 snd-hda-codec-si3054
 snd-hda-codec-via
 snd-hda-core
+snd-hda-cs-dsp-ctls
 snd-hda-intel
 snd-hda-scodec-cs35l41
 snd-hda-scodec-cs35l41-i2c
