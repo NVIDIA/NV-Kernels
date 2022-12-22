@@ -1151,6 +1151,70 @@ void debugfs_create_str(const char *name, umode_t mode,
 				   &fops_str_ro, &fops_str_wo);
 }
 
+static ssize_t debugfs_read_file_cpumask(struct file *file,
+					 char __user *user_buf,
+					 size_t count, loff_t *ppos)
+{
+	struct dentry *dentry = F_DENTRY(file);
+	struct cpumask *cpumask;
+	char *kernel_buf;
+	ssize_t ret;
+	int len;
+
+	ret = debugfs_file_get(dentry);
+	if (unlikely(ret))
+		return ret;
+
+	/* How long is a piece of string? */
+	kernel_buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!kernel_buf) {
+		debugfs_file_put(dentry);
+		return -ENOMEM;
+	}
+
+	cpumask = (struct cpumask *)file->private_data;
+	len = scnprintf(kernel_buf, PAGE_SIZE,
+			"%*pb\n", cpumask_pr_args(cpumask));
+	debugfs_file_put(dentry);
+	if (len + 1 >= PAGE_SIZE) {
+		kfree(kernel_buf);
+		return -EIO;
+	}
+
+	ret = simple_read_from_buffer(user_buf, count, ppos, kernel_buf, len);
+	kfree(kernel_buf);
+
+	return ret;
+}
+
+static const struct file_operations fops_cpumask_ro = {
+	.read =	debugfs_read_file_cpumask,
+	.open =	simple_open,
+	.llseek =	default_llseek,
+};
+
+/**
+ * debugfs_create_cpumask - create a read-only debugfs file that is used to read a cpumask
+ * @name: a pointer to a string containing the name of the file to create.
+ * @mode: the permission that the file should have
+ * @parent: a pointer to the parent dentry for this file.  This should be a
+ *          directory dentry if set.  If this parameter is %NULL, then the
+ *          file will be created in the root of the debugfs filesystem.
+ * @value: a pointer to the variable that the file should read from.
+ *
+ * This function creates a file in debugfs with the given name that
+ * contains the value of the variable @value.
+ */
+void debugfs_create_cpumask(const char *name, umode_t mode,
+			    struct dentry *parent, struct cpumask *value)
+{
+	/* Only read-only is supported */
+	WARN_ON_ONCE(mode & S_IWUGO);
+
+	debugfs_create_mode_unsafe(name, mode, parent, value, &fops_cpumask_ro,
+				   &fops_cpumask_ro, &fops_cpumask_ro);
+}
+
 static ssize_t read_file_blob(struct file *file, char __user *user_buf,
 			      size_t count, loff_t *ppos)
 {
