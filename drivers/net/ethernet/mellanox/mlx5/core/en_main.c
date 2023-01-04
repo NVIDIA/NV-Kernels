@@ -3883,6 +3883,9 @@ static netdev_features_t mlx5e_fix_features(struct net_device *netdev,
 	struct mlx5e_priv *priv = netdev_priv(netdev);
 	struct mlx5e_params *params;
 
+	if (!netif_device_present(netdev))
+		return features;
+
 	mutex_lock(&priv->state_lock);
 	params = &priv->channels.params;
 	if (!priv->fs.vlan ||
