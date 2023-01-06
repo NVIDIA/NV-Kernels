@@ -29,3 +29,5 @@ CONFIG_ARM64_VA_BITS_39 			policy<{'arm64': 'n', 'arm64-nvidia-64k': '-'}>
 CONFIG_ARM64_VA_BITS_42 			policy<{'arm64-nvidia-64k': 'n'}>
 CONFIG_ARM64_VA_BITS_52 			policy<{'arm64-nvidia-64k': 'n'}>
 CONFIG_ARM64_PA_BITS_52 			policy<{'arm64-nvidia-64k': 'n'}>
+
+CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
