@@ -417,7 +417,7 @@ void mlx5e_enable_cvlan_filter(struct mlx5e_priv *priv)
 
 void mlx5e_disable_cvlan_filter(struct mlx5e_priv *priv)
 {
-	if (priv->fs.vlan->cvlan_filter_disabled)
+	if (!priv->fs.vlan || priv->fs.vlan->cvlan_filter_disabled)
 		return;
 
 	priv->fs.vlan->cvlan_filter_disabled = true;
