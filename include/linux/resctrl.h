@@ -30,9 +30,9 @@ int proc_resctrl_show(struct seq_file *m,
 #define MBA_MAX_MBPS   U32_MAX
 
 /*
- * Resctrl uses a u32 as a closid bitmap. The maximum closid is 32.
+ * Resctrl uses a u32 as a closid bitmap. The maximum closid is 128.
  */
-#define RESCTRL_MAX_CLOSID		32
+#define RESCTRL_MAX_CLOSID		128
 
 /*
  * Resctrl uses u32 to hold the user-space config. The maximum bitmap size is
