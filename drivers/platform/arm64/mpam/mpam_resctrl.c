@@ -163,7 +163,7 @@ static bool mpam_resctrl_hide_cdp(enum resctrl_res_level rid)
  */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *ignored)
 {
-	return min((u32)mpam_partid_max + 1, (u32)RESCTRL_MAX_CLOSID);
+	return mpam_partid_max + 1;
 }
 
 u32 resctrl_arch_system_num_rmid_idx(void)
