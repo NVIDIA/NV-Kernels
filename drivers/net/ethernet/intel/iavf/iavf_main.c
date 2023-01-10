@@ -1027,7 +1027,7 @@ static int iavf_set_mac(struct net_device *netdev, void *p)
 
 	/* schedule the watchdog task to immediately process the request */
 	if (f)
-		queue_work(iavf_wq, &adapter->watchdog_task.work);
+		mod_delayed_work(iavf_wq, &adapter->watchdog_task, 0);
 
 	return (f == NULL) ? -ENOMEM : 0;
 }
