@@ -4035,7 +4035,10 @@ static noinline int log_dir_items(struct btrfs_trans_handle *trans,
 					      path->slots[0]);
 			if (tmp.type == BTRFS_DIR_INDEX_KEY)
 				last_old_dentry_offset = tmp.offset;
+		} else if (ret < 0) {
+			err = ret;
 		}
+
 		goto done;
 	}
 
@@ -4055,7 +4058,11 @@ static noinline int log_dir_items(struct btrfs_trans_handle *trans,
 		 */
 		if (tmp.type == BTRFS_DIR_INDEX_KEY)
 			last_old_dentry_offset = tmp.offset;
+	} else if (ret < 0) {
+		err = ret;
+		goto done;
 	}
+
 	btrfs_release_path(path);
 
 	/*
@@ -4068,6 +4075,8 @@ static noinline int log_dir_items(struct btrfs_trans_handle *trans,
 	 */
 search:
 	ret = btrfs_search_slot(NULL, root, &min_key, path, 0, 0);
+	if (ret < 0)
+		err = ret;
 	if (ret != 0)
 		goto done;
 
