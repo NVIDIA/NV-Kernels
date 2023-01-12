@@ -138,6 +138,7 @@ fi
 
 # Load the info about derivative
 BACKPORT_SUFFIX=
+BACKPORT_NO_SUFFIX=
 derivative_conf="$DEBIAN/etc/update.conf"
 if [ -f "$derivative_conf" ]; then
 	# shellcheck disable=SC1090
