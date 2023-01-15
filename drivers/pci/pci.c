@@ -163,9 +163,6 @@ static int __init pcie_port_pm_setup(char *str)
 }
 __setup("pcie_port_pm=", pcie_port_pm_setup);
 
-/* Time to wait after a reset for device to become responsive */
-#define PCIE_RESET_READY_POLL_MS 60000
-
 static const struct dmi_system_id aspm_fix_whitelist[] = {
 	{
 		.ident = "LENOVO Stealth Thinkstation",
