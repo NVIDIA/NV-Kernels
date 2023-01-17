@@ -22,6 +22,6 @@ do_tools_common = true
 do_tools_acpidbg = true
 do_zfs		= true
 do_v4l2loopback	= true
-do_odm_drivers  = true
+do_odm_drivers  = false
 
 do_libc_dev_package = false
