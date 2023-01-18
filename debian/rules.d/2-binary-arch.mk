@@ -712,7 +712,7 @@ $(stampdir)/stamp-prepare-perarch:
 ifeq ($(do_any_tools),true)
 	rm -rf $(builddirpa)
 	install -d $(builddirpa)
-	rsync -a --exclude debian --exclude debian.master --exclude $(DEBIAN) --exclude .git -a ./ $(builddirpa)/
+	rsync -a --exclude debian --exclude debian.master --exclude debian.hwe-5.19 --exclude $(DEBIAN) --exclude .git -a ./ $(builddirpa)/
 endif
 	touch $@
 
