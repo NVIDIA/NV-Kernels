@@ -2316,6 +2316,7 @@ inv-mpu6050-spi
 io-domain
 io_edgeport
 io_ti
+iosm
 iova
 iowarrior
 ip6_gre
@@ -3034,7 +3035,6 @@ mdev
 mdio
 mdio-aspeed
 mdio-bcm-unimac
-mdio-bitbang
 mdio-gpio
 mdio-hisi-femac
 mdio-i2c
