@@ -83,7 +83,7 @@ LIST_HEAD(mpam_classes);
 
 static u32 __mpam_read_reg(struct mpam_msc *msc, u16 reg)
 {
-	WARN_ON_ONCE(reg > msc->mapped_hwpage_sz);
+	WARN_ON_ONCE((reg + sizeof(u32)) > msc->mapped_hwpage_sz);
 	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
 
 	return readl_relaxed(msc->mapped_hwpage + reg);
@@ -91,7 +91,7 @@ static u32 __mpam_read_reg(struct mpam_msc *msc, u16 reg)
 
 static void __mpam_write_reg(struct mpam_msc *msc, u16 reg, u32 val)
 {
-	WARN_ON_ONCE(reg > msc->mapped_hwpage_sz);
+	WARN_ON_ONCE((reg + sizeof(u32)) > msc->mapped_hwpage_sz);
 	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
 
 	writel_relaxed(val, msc->mapped_hwpage + reg);
