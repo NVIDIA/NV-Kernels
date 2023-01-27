@@ -185,6 +185,7 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			break;
 		}
 
+		msc->id = mpam_num_msc++;
 		INIT_LIST_HEAD_RCU(&msc->glbl_list);
 		msc->pdev = pdev;
 
@@ -259,7 +260,6 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			msc->mapped_hwpage = io + sizeof(struct acpi_pcct_shared_memory);
 		}
 
-		msc->id = mpam_num_msc++;
 		list_add_rcu(&msc->glbl_list, &mpam_all_msc);
 		platform_set_drvdata(pdev, msc);
 	} while (0);
