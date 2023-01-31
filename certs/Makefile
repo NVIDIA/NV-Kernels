@@ -25,8 +25,8 @@ endif
 targets += blacklist_hash_list
 
 quiet_cmd_extract_certs  = CERT    $@
-      cmd_extract_certs  = $(obj)/extract-cert $(extract-cert-in) $@
-extract-cert-in = $(or $(filter-out $(obj)/extract-cert, $(real-prereqs)),"")
+      cmd_extract_certs  = $(obj)/extract-cert "$(extract-cert-in)" $@
+extract-cert-in = $(filter-out $(obj)/extract-cert, $(real-prereqs))
 
 $(obj)/system_certificates.o: $(obj)/x509_certificate_list
 
