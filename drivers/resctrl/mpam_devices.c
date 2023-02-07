@@ -853,15 +853,24 @@ static void mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 				dev_err_once(dev, "Counters are not usable because not-ready timeout was not provided by firmware.");
 		}
 		if (FIELD_GET(MPAMF_MSMON_IDR_MSMON_MBWU, msmon_features)) {
-			bool hw_managed;
+			bool has_long, hw_managed;
 			u32 mbwumon_idr = mpam_read_partsel_reg(msc, MBWUMON_IDR);
 
 			props->num_mbwu_mon = FIELD_GET(MPAMF_MBWUMON_IDR_NUM_MON, mbwumon_idr);
-			if (props->num_mbwu_mon)
+			if (props->num_mbwu_mon) {
 				mpam_set_feature(mpam_feat_msmon_mbwu, props);
+				mpam_set_feature(mpam_feat_msmon_mbwu_31counter, props);
+			}
 
 			if (FIELD_GET(MPAMF_MBWUMON_IDR_HAS_RWBW, mbwumon_idr))
 				mpam_set_feature(mpam_feat_msmon_mbwu_rwbw, props);
+
+			has_long = FIELD_GET(MPAMF_MBWUMON_IDR_HAS_LONG, mbwumon_idr);
+			if (props->num_mbwu_mon && has_long) {
+				mpam_set_feature(mpam_feat_msmon_mbwu_44counter, props);
+				if (FIELD_GET(MPAMF_MBWUMON_IDR_LWD, mbwumon_idr))
+					mpam_set_feature(mpam_feat_msmon_mbwu_63counter, props);
+			}
 
 			/* Is NRDY hardware managed? */
 			hw_managed = mpam_ris_hw_probe_hw_nrdy(ris, MBWU);
