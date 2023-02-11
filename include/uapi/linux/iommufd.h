@@ -682,9 +682,11 @@ struct iommu_hwpt_get_dirty_bitmap {
  * enum iommu_hwpt_invalidate_data_type - IOMMU HWPT Cache Invalidation
  *                                        Data Type
  * @IOMMU_HWPT_INVALIDATE_DATA_VTD_S1: Invalidation data for VTD_S1
+ * @IOMMU_HWPT_INVALIDATE_DATA_ARM_SMMUV3: Invalidation data for ARM SMMUv3
  */
 enum iommu_hwpt_invalidate_data_type {
 	IOMMU_HWPT_INVALIDATE_DATA_VTD_S1,
+	IOMMU_HWPT_INVALIDATE_DATA_ARM_SMMUV3,
 };
 
 /**
@@ -721,6 +723,28 @@ struct iommu_hwpt_vtd_s1_invalidate {
 	__aligned_u64 npages;
 	__u32 flags;
 	__u32 __reserved;
+};
+
+/**
+ * struct iommu_hwpt_arm_smmuv3_invalidate - ARM SMMUv3 cahce invalidation
+ *         (IOMMU_HWPT_INVALIDATE_DATA_ARM_SMMUV3)
+ * @cmd: 128-bit cache invalidation command that runs in SMMU CMDQ.
+ *       Must be little-endian.
+ *
+ * Supported command list:
+ *     CMDQ_OP_TLBI_NSNH_ALL
+ *     CMDQ_OP_TLBI_NH_VA
+ *     CMDQ_OP_TLBI_NH_VAA
+ *     CMDQ_OP_TLBI_NH_ALL
+ *     CMDQ_OP_TLBI_NH_ASID
+ *
+ * This API does not support ATS invalidation. Userspace must not request EATS,
+ * or enable ATS in the IDR.
+ *
+ * -EIO will be returned if the command is not supported.
+ */
+struct iommu_hwpt_arm_smmuv3_invalidate {
+	__aligned_u64 cmd[2];
 };
 
 /**

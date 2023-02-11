@@ -3227,9 +3227,96 @@ static void arm_smmu_domain_nested_free(struct iommu_domain *domain)
 	kfree(container_of(domain, struct arm_smmu_nested_domain, domain));
 }
 
+/*
+ * Convert, in place, the raw invalidation command into an internal format that
+ * can be passed to arm_smmu_cmdq_issue_cmdlist(). Internally commands are
+ * stored in CPU endian.
+ *
+ * Enforce the VMID on the command.
+ */
+static int
+arm_smmu_convert_user_cmd(struct arm_smmu_nested_domain *nested_domain,
+			  struct iommu_hwpt_arm_smmuv3_invalidate *cmd)
+{
+	cmd->cmd[0] = le64_to_cpu(cmd->cmd[0]);
+	cmd->cmd[1] = le64_to_cpu(cmd->cmd[1]);
+
+	switch (cmd->cmd[0] & CMDQ_0_OP) {
+	case CMDQ_OP_TLBI_NSNH_ALL:
+		/* Convert to NH_ALL */
+		cmd->cmd[0] = CMDQ_OP_TLBI_NH_ALL |
+			      FIELD_PREP(CMDQ_TLBI_0_VMID,
+					 nested_domain->s2_parent->vmid);
+		cmd->cmd[1] = 0;
+		break;
+	case CMDQ_OP_TLBI_NH_VA:
+	case CMDQ_OP_TLBI_NH_VAA:
+	case CMDQ_OP_TLBI_NH_ALL:
+	case CMDQ_OP_TLBI_NH_ASID:
+		cmd->cmd[0] &= ~CMDQ_TLBI_0_VMID;
+		cmd->cmd[0] |= FIELD_PREP(CMDQ_TLBI_0_VMID,
+					  nested_domain->s2_parent->vmid);
+		break;
+	default:
+		return -EIO;
+	}
+	return 0;
+}
+
+static int arm_smmu_cache_invalidate_user(struct iommu_domain *domain,
+					  struct iommu_user_data_array *array)
+{
+	struct arm_smmu_nested_domain *nested_domain =
+		container_of(domain, struct arm_smmu_nested_domain, domain);
+	struct arm_smmu_device *smmu = nested_domain->s2_parent->smmu;
+	struct iommu_hwpt_arm_smmuv3_invalidate *last_batch;
+	struct iommu_hwpt_arm_smmuv3_invalidate *cmds;
+	struct iommu_hwpt_arm_smmuv3_invalidate *cur;
+	struct iommu_hwpt_arm_smmuv3_invalidate *end;
+	int ret;
+
+	cmds = kcalloc(array->entry_num, sizeof(*cmds), GFP_KERNEL);
+	if (!cmds)
+		return -ENOMEM;
+	cur = cmds;
+	end = cmds + array->entry_num;
+
+	static_assert(sizeof(*cmds) == 2 * sizeof(u64));
+	ret = iommu_copy_struct_from_full_user_array(
+		cmds, sizeof(*cmds), array,
+		IOMMU_HWPT_INVALIDATE_DATA_ARM_SMMUV3);
+	if (ret)
+		goto out;
+
+	last_batch = cmds;
+	while (cur != end) {
+		ret = arm_smmu_convert_user_cmd(nested_domain, cur);
+		if (ret)
+			goto out;
+
+		/* FIXME work in blocks of CMDQ_BATCH_ENTRIES and copy each block? */
+		cur++;
+		if (cur != end && (cur - last_batch) != CMDQ_BATCH_ENTRIES - 1)
+			continue;
+
+		ret = arm_smmu_cmdq_issue_cmdlist(smmu, last_batch->cmd,
+						  cur - last_batch, true);
+		if (ret) {
+			cur--;
+			goto out;
+		}
+		last_batch = cur;
+	}
+out:
+	array->entry_num = cur - cmds;
+	kfree(cmds);
+	return ret;
+}
+
 static const struct iommu_domain_ops arm_smmu_nested_ops = {
 	.attach_dev = arm_smmu_attach_dev_nested,
 	.free = arm_smmu_domain_nested_free,
+	.cache_invalidate_user	= arm_smmu_cache_invalidate_user,
 };
 
 static struct iommu_domain *
@@ -3246,6 +3333,14 @@ arm_smmu_domain_alloc_nesting(struct device *dev, u32 flags,
 	int ret;
 
 	if (!(master->smmu->features & ARM_SMMU_FEAT_NESTING))
+		return ERR_PTR(-EOPNOTSUPP);
+
+	/*
+	 * FORCE_SYNC is not set with FEAT_NESTING. Some study of the exact HW
+	 * defect is needed to determine if arm_smmu_cache_invalidate_user()
+	 * needs any change to remove this.
+	 */
+	if (WARN_ON(master->smmu->options & ARM_SMMU_OPT_CMDQ_FORCE_SYNC))
 		return ERR_PTR(-EOPNOTSUPP);
 
 	ret = iommu_copy_struct_from_user(&arg, user_data,
