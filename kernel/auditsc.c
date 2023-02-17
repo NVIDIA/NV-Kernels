@@ -1526,7 +1526,7 @@ void audit_log_lsm(struct lsmblob *blob, bool exiting)
 	if (blob == NULL) {
 		security_task_getsecid_subj(current, &localblob);
 		if (!lsmblob_is_set(&localblob))
-			return;
+			goto end;
 		blob = &localblob;
 	}
 
@@ -1536,7 +1536,7 @@ void audit_log_lsm(struct lsmblob *blob, bool exiting)
 		error = security_secid_to_secctx(blob, &lsmdata, i);
 		if (error && error != -EINVAL) {
 			audit_panic("error in audit_log_lsm");
-			return;
+			goto end;
 		}
 
 		audit_log_format(ab, "%ssubj_%s=%s", sep ? " " : "",
@@ -1546,6 +1546,7 @@ void audit_log_lsm(struct lsmblob *blob, bool exiting)
 		security_release_secctx(&lsmdata);
 	}
 
+end:
 	audit_log_end(ab);
 }
 
