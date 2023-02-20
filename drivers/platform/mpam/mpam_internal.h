@@ -330,6 +330,8 @@ int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 #define MSMON_CSU_CAPTURE       0x0848  /* last cache-usage value captured */
 #define MSMON_MBWU              0x0860  /* current mem-bw usage value */
 #define MSMON_MBWU_CAPTURE      0x0868  /* last mem-bw value captured */
+#define MSMON_MBWU_L		0x0880  /* current long mem-bw usage value */
+#define MSMON_MBWU_CAPTURE_L	0x0890  /* last long mem-bw value captured */
 #define MSMON_CAPT_EVNT         0x0808  /* signal a capture event */
 #define MPAMF_ESR               0x00F8  /* error status register */
 #define MPAMF_ECR               0x00F0  /* error control register */
@@ -533,7 +535,10 @@ int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
  */
 #define MSMON___VALUE          GENMASK(30, 0)
 #define MSMON___NRDY           BIT(31)
-#define MSMON_MBWU_L_VALUE     GENMASK(62, 0)
+#define MSMON___NRDY_L		BIT(63)
+#define MSMON___L_VALUE		GENMASK(43, 0)
+#define MSMON___LWD_VALUE	GENMASK(62, 0)
+
 /*
  * MSMON_CAPT_EVNT - Memory system performance monitoring capture event
  *                  generation register
