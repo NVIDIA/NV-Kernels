@@ -1,3 +1,9 @@
+linux-meta-unstable (6.2.0.10.10) lunar; urgency=medium
+
+  * Bump ABI 6.2.0-10
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 20 Feb 2023 12:15:33 +0100
+
 linux-meta-unstable (6.2.0.9.9) lunar; urgency=medium
 
   * Bump ABI 6.2.0-9
