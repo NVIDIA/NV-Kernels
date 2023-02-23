@@ -1622,7 +1622,7 @@ bool kaslr_requires_kpti(void)
 			return false;
 	}
 
-	return kaslr_offset() > 0;
+	return kaslr_enabled();
 }
 
 static bool __meltdown_safe = true;
