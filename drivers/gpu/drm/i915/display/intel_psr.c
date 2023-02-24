@@ -23,6 +23,7 @@
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_damage_helper.h>
+#include <drm/drm_edid.h>
 
 #include "display/intel_dp.h"
 
@@ -727,6 +728,24 @@ static bool intel_psr2_sel_fetch_config_valid(struct intel_dp *intel_dp,
 					      struct intel_crtc_state *crtc_state)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
+	struct edid *edid;
+
+	edid = intel_dp_get_edid(intel_dp);
+
+	/* The mfg:prod can be obtained from EDID byte [8-11].
+	 * For instance, if the first bytes of EDID are
+	 * "00 ff ff ff ff ff ff 00 4d 10 51 15 00 00 00 00",
+	 * the mfg:prod is "4d 10 51 15".
+	 *
+	 * TODO: If the list grows more than three quirks, please make a quirk
+	 * table.
+	 */
+	if (edid && edid->mfg_id[0] == 0x4d && edid->mfg_id[1] == 0x10 &&
+	    edid->prod_code[0] == 0x51 && edid->prod_code[1] == 0x15) {
+		drm_info_once(&dev_priv->drm,
+			      "PSR2 sel fetch disabled\n");
+		return false;
+	}
 
 	if (!dev_priv->params.enable_psr2_sel_fetch &&
 	    intel_dp->psr.debug != I915_PSR_DEBUG_ENABLE_SEL_FETCH) {
