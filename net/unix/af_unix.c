@@ -186,17 +186,17 @@ static void unix_table_double_unlock(struct net *net,
 #ifdef CONFIG_SECURITY_NETWORK
 static void unix_get_secdata(struct scm_cookie *scm, struct sk_buff *skb)
 {
-	UNIXCB(skb).lsmblob = scm->lsmblob;
+	UNIXCB(skb).secid = scm->secid;
 }
 
 static inline void unix_set_secdata(struct scm_cookie *scm, struct sk_buff *skb)
 {
-	scm->lsmblob = UNIXCB(skb).lsmblob;
+	scm->secid = UNIXCB(skb).secid;
 }
 
 static inline bool unix_secdata_eq(struct scm_cookie *scm, struct sk_buff *skb)
 {
-	return lsmblob_equal(&scm->lsmblob, &(UNIXCB(skb).lsmblob));
+	return (scm->secid == UNIXCB(skb).secid);
 }
 #else
 static inline void unix_get_secdata(struct scm_cookie *scm, struct sk_buff *skb)
