@@ -33,8 +33,6 @@ static DEFINE_XARRAY_FLAGS(aa_secids, XA_FLAGS_LOCK_IRQ | XA_FLAGS_TRACK_FREE);
 
 int apparmor_display_secid_mode;
 
-int apparmor_display_secid_mode = 0;
-
 /*
  * TODO: allow policy to reserve a secid range?
  * TODO: add secid pinning
