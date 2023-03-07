@@ -14401,6 +14401,9 @@ CONFIG_KVM_AMD                                  policy<{'amd64': 'm'}>
 CONFIG_KVM_AMD_SEV                              policy<{'amd64': 'y'}>
 CONFIG_KVM_XEN                                  policy<{'amd64': 'y'}>
 
+CONFIG_TDX_GUEST_DRIVER                         policy<{'amd64': 'm'}>
+CONFIG_TDX_GUEST_DRIVER                         note<feature requested by Intel LP: #2009437>
+
 # Menu: Virtualization >> Linux - VM Monitor Stream, base infrastructure >> Architecture: s390
 
 CONFIG_APPLDATA_BASE                            policy<{'s390x': 'y'}>
