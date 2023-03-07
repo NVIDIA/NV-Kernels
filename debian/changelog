@@ -1,3 +1,13 @@
+linux-meta (6.2.0.1.1) lunar; urgency=medium
+
+  * Bump ABI 6.2.0-1
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+    - [Packaging] resync debian/dkms-versions from main package
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 07 Mar 2023 19:19:14 +0100
+
 linux-meta (6.2.0.0.0) lunar; urgency=medium
 
   * Empty entry
