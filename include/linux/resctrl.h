@@ -193,6 +193,13 @@ struct resctrl_cpu_sync
 	u32 rmid;
 };
 
+struct resctrl_mon_config_info {
+	struct rdt_resource *r;
+	struct rdt_domain   *d;
+	u32                  evtid;
+	u32                  mon_config;
+};
+
 /*
  * Update and re-load this CPUs defaults. Called via IPI, takes a pointer to
  * struct resctrl_cpu_sync, or NULL.
@@ -207,6 +214,8 @@ struct rdt_domain *resctrl_arch_find_domain(struct rdt_resource *r, int id);
 int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid);
 
 bool resctrl_arch_is_evt_configurable(enum resctrl_event_id evt);
+void resctrl_arch_mon_event_config_write(void *info);
+void resctrl_arch_mon_event_config_read(void *info);
 
 /*
  * Update the ctrl_val and apply this config right now.
