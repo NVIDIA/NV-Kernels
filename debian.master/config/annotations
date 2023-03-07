@@ -9262,7 +9262,7 @@ CONFIG_SND_HDA_CODEC_CMEDIA                     policy<{'amd64': 'm', 'arm64': '
 CONFIG_SND_HDA_CODEC_SI3054                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_SND_HDA_GENERIC                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_SND_HDA_POWER_SAVE_DEFAULT               policy<{'amd64': '1', 'arm64': '1', 'armhf': '1', 'ppc64el': '1'}>
-CONFIG_SND_HDA_INTEL_HDMI_SILENT_STREAM         policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n'}>
+CONFIG_SND_HDA_INTEL_HDMI_SILENT_STREAM         policy<{'amd64': 'y', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n'}>
 #
 CONFIG_SND_HDA_RECONFIG                         note<allows fixes to be tested live>
 CONFIG_SND_HDA_POWER_SAVE_DEFAULT               note<LP:1804265>
