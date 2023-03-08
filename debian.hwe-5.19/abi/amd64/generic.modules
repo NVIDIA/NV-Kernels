@@ -5100,6 +5100,7 @@ snd-sof-pci
 snd-sof-pci-intel-apl
 snd-sof-pci-intel-cnl
 snd-sof-pci-intel-icl
+snd-sof-pci-intel-mtl
 snd-sof-pci-intel-tgl
 snd-sof-pci-intel-tng
 snd-sof-probes
