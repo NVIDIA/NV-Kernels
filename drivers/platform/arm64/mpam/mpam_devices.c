@@ -1311,6 +1311,41 @@ int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 	return err;
 }
 
+void mpam_msmon_reset_all_mbwu(struct mpam_component *comp)
+{
+	int idx, i;
+	struct mpam_msc *msc;
+	struct mpam_vmsc *vmsc;
+	struct mpam_msc_ris *ris;
+
+	if (!mpam_is_enabled())
+		return;
+
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_rcu(vmsc, &comp->vmsc, comp_list) {
+		if (!mpam_has_feature(mpam_feat_msmon_mbwu, &vmsc->props))
+			continue;
+
+		msc = vmsc->msc;
+		mpam_mon_sel_outer_lock(msc);
+		list_for_each_entry_rcu(ris, &msc->ris, vmsc_list) {
+			if (!mpam_has_feature(mpam_feat_msmon_mbwu, &ris->props))
+				continue;
+
+			if (WARN_ON_ONCE(!mpam_mon_sel_inner_lock(msc)))
+				continue;
+
+			for (i = 0; i < ris->props.num_mbwu_mon; i++) {
+				ris->mbwu_state[i].correction = 0;
+				ris->mbwu_state[i].reset_on_next_read = true;
+			}
+			mpam_mon_sel_inner_unlock(msc);
+		}
+		mpam_mon_sel_outer_unlock(msc);
+	}
+	srcu_read_unlock(&mpam_srcu, idx);
+}
+
 void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx)
 {
 	int idx;
