@@ -198,6 +198,8 @@ struct resctrl_mon_config_info {
 	struct rdt_domain   *d;
 	u32                  evtid;
 	u32                  mon_config;
+
+	int                  err;
 };
 
 /*
