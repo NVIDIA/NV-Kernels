@@ -1679,16 +1679,18 @@ void resctrl_arch_mon_event_config_write(void *info)
 	index = mon_event_config_index_get(mon_info->evtid);
 	if (index == INVALID_CONFIG_INDEX) {
 		pr_warn_once("Invalid event id %d\n", mon_info->evtid);
+		mon_info->err = -EINVAL;
 		return;
 	}
 	wrmsr(MSR_IA32_EVT_CFG_BASE + index, mon_info->mon_config, 0);
+
+	mon_info->err = 0;
 }
 
 static int mbm_config_write_domain(struct rdt_resource *r,
 				   struct rdt_domain *d, u32 evtid, u32 val)
 {
 	struct resctrl_mon_config_info mon_info = {0};
-	int ret = 0;
 
 	/*
 	 * Read the current config value first. If both are the same then
@@ -1711,6 +1713,10 @@ static int mbm_config_write_domain(struct rdt_resource *r,
 	 */
 	smp_call_function_any(&d->cpu_mask, resctrl_arch_mon_event_config_write,
 			      &mon_info, 1);
+	if (mon_info.err) {
+		rdt_last_cmd_puts("Invalid event configuration\n");
+		goto out;
+	}
 
 	/*
 	 * When an Event Configuration is changed, the bandwidth counters
@@ -1724,7 +1730,7 @@ static int mbm_config_write_domain(struct rdt_resource *r,
 	resctrl_arch_reset_rmid_all(r, d);
 
 out:
-	return ret;
+	return mon_info.err;
 }
 
 static int mon_config_write(struct rdt_resource *r, char *tok, u32 evtid)
