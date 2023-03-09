@@ -21,6 +21,12 @@ DECLARE_STATIC_KEY_FALSE(mpam_enabled);
 /* Value to indicate the allocated monitor is derived from the RMID index. */
 #define USE_RMID_IDX	(U16_MAX + 1)
 
+/*
+ * Only these event configuration bits are supported. MPAM can't know if
+ * data is being written back, these will show up as a write.
+ */
+#define MPAM_RESTRL_EVT_CONFIG_VALID	(READS_TO_LOCAL_MEM | NON_TEMP_WRITE_TO_LOCAL_MEM)
+
 static inline bool mpam_is_enabled(void)
 {
 	return static_branch_likely(&mpam_enabled);
@@ -357,6 +363,8 @@ struct mpam_resctrl_dom {
 	struct mpam_component	*comp;
 	struct rdt_ctrl_domain	resctrl_ctrl_dom;
 	struct rdt_mon_domain	resctrl_mon_dom;
+
+	u32			mbm_local_evt_cfg;
 };
 
 struct mpam_resctrl_res {
@@ -421,6 +429,7 @@ int mpam_apply_config(struct mpam_component *comp, u16 partid,
 int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 		    enum mpam_device_features, u64 *val);
 void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx);
+void mpam_msmon_reset_all_mbwu(struct mpam_component *comp);
 
 #ifdef CONFIG_ARM_CPU_RESCTRL
 int mpam_resctrl_setup(void);

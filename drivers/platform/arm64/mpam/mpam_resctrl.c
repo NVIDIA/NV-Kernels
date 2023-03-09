@@ -334,6 +334,18 @@ void resctrl_arch_mon_ctx_free(struct rdt_resource *r,
 	}
 }
 
+static enum mon_filter_options resctrl_evt_config_to_mpam(u32 local_evt_cfg)
+{
+	switch (local_evt_cfg) {
+	case READS_TO_LOCAL_MEM:
+		return COUNT_READ;
+	case NON_TEMP_WRITE_TO_LOCAL_MEM:
+		return COUNT_WRITE;
+	default:
+		return COUNT_BOTH;
+	}
+}
+
 int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
 			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
 			   u64 *val, void *arch_mon_ctx)
@@ -367,6 +379,7 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
 
 	cfg.match_pmg = true;
 	cfg.pmg = rmid;
+	cfg.opts = resctrl_evt_config_to_mpam(dom->mbm_local_evt_cfg);
 
 	if (irqs_disabled()) {
 		/* Check if we can access this domain without an IPI */
@@ -804,6 +817,49 @@ static void mpam_resctrl_pick_counters(void)
 	srcu_read_unlock(&mpam_srcu, idx);
 }
 
+bool resctrl_arch_is_evt_configurable(enum resctrl_event_id evt)
+{
+	struct mpam_class *class;
+	struct mpam_props *cprops;
+
+	class = mpam_resctrl_counters[evt];
+	if (!class)
+		return false;
+
+	cprops = &class->props;
+
+	return mpam_has_feature(mpam_feat_msmon_mbwu_rwbw, cprops);
+}
+
+void resctrl_arch_mon_event_config_read(void *info)
+{
+	struct mpam_resctrl_dom *dom;
+	struct resctrl_mon_config_info *mon_info = info;
+
+	dom = container_of(mon_info->d, struct mpam_resctrl_dom, resctrl_mon_dom);
+	mon_info->mon_config = dom->mbm_local_evt_cfg & MAX_EVT_CONFIG_BITS;
+}
+
+void resctrl_arch_mon_event_config_write(void *info)
+{
+	struct mpam_resctrl_dom *dom;
+	struct resctrl_mon_config_info *mon_info = info;
+
+	WARN_ON_ONCE(mon_info->mon_config & ~MPAM_RESTRL_EVT_CONFIG_VALID);
+
+	dom = container_of(mon_info->d, struct mpam_resctrl_dom, resctrl_mon_dom);
+	dom->mbm_local_evt_cfg = mon_info->mon_config & MPAM_RESTRL_EVT_CONFIG_VALID;
+}
+
+void resctrl_arch_reset_rmid_all(struct rdt_resource *r, struct rdt_mon_domain *d)
+{
+	struct mpam_resctrl_dom *dom;
+
+	dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
+	dom->mbm_local_evt_cfg = MPAM_RESTRL_EVT_CONFIG_VALID;
+	mpam_msmon_reset_all_mbwu(dom->comp);
+}
+
 static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 				     enum resctrl_res_level type)
 {
@@ -1195,6 +1251,7 @@ mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 		return ERR_PTR(-ENOMEM);
 
 	dom->comp = comp;
+	dom->mbm_local_evt_cfg = MPAM_RESTRL_EVT_CONFIG_VALID;
 
 	ctrl_d = &dom->resctrl_ctrl_dom;
 	mpam_resctrl_domain_hdr_init(cpu, class, comp, &ctrl_d->hdr);
