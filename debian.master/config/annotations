@@ -873,7 +873,10 @@ CONFIG_SERIAL_8250_OMAP_TTYO_FIXUP              policy<{'arm64': 'y', 'armhf': '
 CONFIG_SERIAL_8250_MT6577                       policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_SERIAL_8250_UNIPHIER                     policy<{'armhf': 'n', 'armhf-generic-lpae': '-'}>
 CONFIG_SERIAL_8250_LPSS                         policy<{'amd64': 'm'}>
-CONFIG_SERIAL_8250_MID                          policy<{'amd64': 'm'}>
+CONFIG_SERIAL_8250_MID                          policy<{'amd64': 'y'}>
+CONFIG_SERIAL_8250_MID                          note<'required to provide console on some Intel SoC platforms (LP: #2009283)'>
+CONFIG_HSU_DMA                                  policy<{'amd64': 'y'}>
+CONFIG_HSU_DMA                                  note<'required by CONFIG_SERIAL_8250_MID (LP: #2009283)'>
 CONFIG_SERIAL_8250_TEGRA                        policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_SERIAL_8250_BCM7271                      policy<{'arm64': 'm'}>
 CONFIG_SERIAL_OF_PLATFORM                       policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
