@@ -864,10 +864,12 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
 		}
 		profile->attach.xmatch_len = tmp;
 		profile->attach.xmatch.start[AA_CLASS_XMATCH] = DFA_START;
-		error = aa_compat_map_xmatch(&profile->attach.xmatch);
-		if (error) {
-			info = "failed to convert xmatch permission table";
-			goto fail;
+		if (!profile->attach.xmatch.perms) {
+			error = aa_compat_map_xmatch(&profile->attach.xmatch);
+			if (error) {
+				info = "failed to convert xmatch permission table";
+				goto fail;
+			}
 		}
 	}
 
@@ -1026,10 +1028,13 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
 				      AA_CLASS_FILE);
 		if (!aa_unpack_nameX(e, AA_STRUCTEND, NULL))
 			goto fail;
-		error = aa_compat_map_policy(&rules->policy, e->version);
-		if (error) {
-			info = "failed to remap policydb permission table";
-			goto fail;
+		if (!rules->policy.perms) {
+			error = aa_compat_map_policy(&rules->policy,
+						     e->version);
+			if (error) {
+				info = "failed to remap policydb permission table";
+				goto fail;
+			}
 		}
 	} else
 		rules->policy.dfa = aa_get_dfa(nulldfa);
@@ -1038,7 +1043,7 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
 	error = unpack_pdb(e, &rules->file, false, true, &info);
 	if (error) {
 		goto fail;
-	} else if (rules->file.dfa) {
+	} else if (rules->file.dfa && !rules->file.perms) {
 		error = aa_compat_map_file(&rules->file);
 		if (error) {
 			info = "failed to remap file permission table";
