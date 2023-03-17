@@ -2829,7 +2829,6 @@ static void nfs_access_add_rbtree(struct inode *inode, struct nfs_access_entry *
 		else
 			goto found;
 	}
-	set->timestamp = ktime_get_ns();
 	rb_link_node(&set->rb_node, parent, p);
 	rb_insert_color(&set->rb_node, root_node);
 	list_add_tail(&set->lru, &nfsi->access_cache_entry_lru);
@@ -2851,6 +2850,7 @@ void nfs_access_add_cache(struct inode *inode, struct nfs_access_entry *set)
 	RB_CLEAR_NODE(&cache->rb_node);
 	cache->cred = get_cred(set->cred);
 	cache->mask = set->mask;
+	cache->timestamp = ktime_get_ns();
 
 	/* The above field assignments must be visible
 	 * before this item appears on the lru.  We cannot easily
