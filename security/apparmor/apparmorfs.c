@@ -2588,6 +2588,8 @@ static struct aa_sfs_entry aa_sfs_entry_domain[] = {
 static struct aa_sfs_entry aa_sfs_entry_unconfined[] = {
 	AA_SFS_FILE_BOOLEAN("change_profile", 1),
 	AA_SFS_FILE_INTPTR("userns",		aa_unprivileged_userns_restricted),
+	AA_SFS_FILE_INTPTR("io_uring",
+			    aa_unprivileged_uring_restricted),
 	{ }
 };
 
