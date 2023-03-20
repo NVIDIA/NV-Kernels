@@ -803,13 +803,41 @@ static int profile_uring(struct aa_profile *profile, u32 request,
 {
 	unsigned int state;
 	struct aa_ruleset *rules;
-	int error = 0;
 
 	AA_BUG(!profile);
 
 	rules = list_first_entry(&profile->rules, typeof(*rules), list);
+
+	/* TODO: rework unconfined profile/dfa to mediate user ns, then
+	 * we can drop the unconfined test
+	 */
 	state = RULE_MEDIATES(rules, AA_CLASS_IO_URING);
-	if (state) {
+	if (!state) {
+		/* TODO: this gets replaced when the default unconfined
+		 * profile dfa gets updated to handle this
+		 */
+		if (profile_unconfined(profile) &&
+		    profile == profiles_ns(profile)->unconfined) {
+			if (!aa_unprivileged_uring_restricted ||
+			    ns_capable_noaudit(current_user_ns(), cap))
+				/* unconfined early bail out */
+				return 0;
+			/* unconfined unprivileged user */
+			/* don't just return: allow complain mode to override */
+		} else {
+			/* Fallback to capability check if profile doesn't
+			 * support io_uring rules. Note: special unconfined
+			 * profiles as well.
+			 */
+			return aa_capable(current_cred(), &profile->label,
+					  cap, CAP_OPT_NONE);
+		}
+		/* continue to mediation - !state means non-accepting
+		 * but can be overidden by complain
+		 */
+	}
+	/* block so perms is not initialized unless mediating */
+	do {
 		struct aa_perms perms = { };
 
 		if (new) {
@@ -819,11 +847,11 @@ static int profile_uring(struct aa_profile *profile, u32 request,
 			perms = *aa_lookup_perms(rules->policy, state);
 		}
 		aa_apply_modes_to_perms(profile, &perms);
-		error = aa_check_perms(profile, &perms, request, ad,
+		return aa_check_perms(profile, &perms, request, ad,
 				       audit_uring_cb);
-	}
+	} while (0);
 
-	return error;
+	return 0;
 }
 
 /**
@@ -2402,6 +2430,13 @@ static struct ctl_table apparmor_sysctl_table[] = {
 	{
 		.procname       = "apparmor_restrict_unprivileged_unconfined",
 		.data           = &aa_unprivileged_unconfined_restricted,
+		.maxlen         = sizeof(int),
+		.mode           = 0600,
+		.proc_handler   = apparmor_dointvec,
+	},
+	{
+		.procname       = "apparmor_restrict_unprivileged_io_uring",
+		.data           = &aa_unprivileged_uring_restricted,
 		.maxlen         = sizeof(int),
 		.mode           = 0600,
 		.proc_handler   = apparmor_dointvec,
