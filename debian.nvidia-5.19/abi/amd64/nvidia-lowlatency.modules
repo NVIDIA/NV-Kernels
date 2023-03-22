@@ -3105,6 +3105,7 @@ msi2500
 msp3400
 mspro_block
 msr
+mstflint_access
 mt2060
 mt2063
 mt20xx
@@ -4683,6 +4684,7 @@ snd-hda-codec-realtek
 snd-hda-codec-si3054
 snd-hda-codec-via
 snd-hda-core
+snd-hda-cs-dsp-ctls
 snd-hda-ext-core
 snd-hda-intel
 snd-hda-scodec-cs35l41
@@ -6176,6 +6178,5 @@ zpa2326_spi
 zr364xx
 zram
 zstd
-zstd_compress
 zunicode
 zzstd
