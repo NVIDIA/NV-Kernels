@@ -2504,6 +2504,7 @@ io-domain
 io_edgeport
 io_ti
 ionic
+iosm
 iowarrior
 ip5xxx_power
 ip6_gre
@@ -3249,7 +3250,6 @@ mdc800
 mdev
 mdio
 mdio-bcm-unimac
-mdio-bitbang
 mdio-cavium
 mdio-gpio
 mdio-hisi-femac
@@ -3444,6 +3444,7 @@ msm
 msp3400
 mspro_block
 mss-sc7180
+mstflint_access
 mt2060
 mt2063
 mt20xx
@@ -5511,6 +5512,7 @@ snd-hda-codec-realtek
 snd-hda-codec-si3054
 snd-hda-codec-via
 snd-hda-core
+snd-hda-cs-dsp-ctls
 snd-hda-intel
 snd-hda-scodec-cs35l41
 snd-hda-scodec-cs35l41-i2c
@@ -7172,7 +7174,6 @@ zpa2326_spi
 zr364xx
 zram
 zstd
-zstd_compress
 zunicode
 zynqmp-aes-gcm
 zynqmp-dpsub
