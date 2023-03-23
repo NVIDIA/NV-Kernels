@@ -2076,6 +2076,8 @@ static void hsw_crtc_disable(struct intel_atomic_state *state,
 
 	intel_disable_shared_dpll(old_crtc_state);
 
+	intel_encoders_post_pll_disable(state, crtc);
+
 	intel_dmc_disable_pipe(i915, crtc->pipe);
 }
 
