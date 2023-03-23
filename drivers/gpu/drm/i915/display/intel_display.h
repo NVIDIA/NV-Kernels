@@ -255,13 +255,6 @@ enum tc_port {
 	I915_MAX_TC_PORTS
 };
 
-enum tc_port_mode {
-	TC_PORT_DISCONNECTED,
-	TC_PORT_TBT_ALT,
-	TC_PORT_DP_ALT,
-	TC_PORT_LEGACY,
-};
-
 enum aux_ch {
 	AUX_CH_A,
 	AUX_CH_B,
