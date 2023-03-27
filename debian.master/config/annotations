@@ -7112,7 +7112,7 @@ CONFIG_PCIE_KEEMBAY_HOST                        policy<{'arm64': 'y'}>
 CONFIG_PCIE_KEEMBAY_EP                          policy<{'arm64': 'y'}>
 CONFIG_PCIE_KIRIN                               policy<{'arm64': 'y'}>
 CONFIG_PCIE_HISI_STB                            policy<{'arm64': 'y', 'armhf': 'y'}>
-CONFIG_PCI_MESON                                policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
+CONFIG_PCI_MESON                                policy<{'amd64': 'n', 'arm64': 'm', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_PCIE_TEGRA194_HOST                       policy<{'arm64': 'm'}>
 CONFIG_PCIE_TEGRA194_EP                         policy<{'arm64': 'm'}>
 CONFIG_PCIE_VISCONTI_HOST                       policy<{'arm64': 'y'}>
@@ -7120,6 +7120,8 @@ CONFIG_PCIE_UNIPHIER                            policy<{'armhf': 'n', 'armhf-gen
 CONFIG_PCIE_UNIPHIER_EP                         policy<{'armhf': 'n', 'armhf-generic-lpae': '-'}>
 CONFIG_PCIE_AL                                  policy<{'arm64': 'y'}>
 CONFIG_PCIE_FU740                               policy<{'riscv64': 'y'}>
+#
+CONFIG_PCI_MESON                                note<LP #2007745>
 
 # Menu: Device Drivers >> PCI support >> PCI controller drivers >> Mobiveil PCIe Core Support
 CONFIG_PCIE_MOBIVEIL_PLAT                       policy<{'arm64': 'n'}>
