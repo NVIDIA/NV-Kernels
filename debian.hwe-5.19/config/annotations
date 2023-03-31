@@ -873,7 +873,10 @@ CONFIG_SERIAL_8250_OMAP_TTYO_FIXUP              policy<{'arm64': 'y', 'armhf': '
 CONFIG_SERIAL_8250_MT6577                       policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_SERIAL_8250_UNIPHIER                     policy<{'armhf': 'n', 'armhf-generic-lpae': '-'}>
 CONFIG_SERIAL_8250_LPSS                         policy<{'amd64': 'm'}>
-CONFIG_SERIAL_8250_MID                          policy<{'amd64': 'm'}>
+CONFIG_SERIAL_8250_MID                          policy<{'amd64': 'y'}>
+CONFIG_SERIAL_8250_MID                          note<'required to provide console on some Intel SoC platforms (LP: #2009283)'>
+CONFIG_HSU_DMA                                  policy<{'amd64': 'y'}>
+CONFIG_HSU_DMA                                  note<'required by CONFIG_SERIAL_8250_MID (LP: #2009283)'>
 CONFIG_SERIAL_8250_TEGRA                        policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_SERIAL_8250_BCM7271                      policy<{'arm64': 'm'}>
 CONFIG_SERIAL_OF_PLATFORM                       policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
@@ -9159,7 +9162,7 @@ CONFIG_SND_HDA_CODEC_CMEDIA                     policy<{'amd64': 'm', 'arm64': '
 CONFIG_SND_HDA_CODEC_SI3054                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SND_HDA_GENERIC                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SND_HDA_POWER_SAVE_DEFAULT               policy<{'amd64': '1', 'arm64': '1', 'armhf': '1', 'ppc64el': '1'}>
-CONFIG_SND_HDA_INTEL_HDMI_SILENT_STREAM         policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n'}>
+CONFIG_SND_HDA_INTEL_HDMI_SILENT_STREAM         policy<{'amd64': 'y', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n'}>
 #
 CONFIG_SND_HDA_RECONFIG                         note<allows fixes to be tested live>
 CONFIG_SND_HDA_POWER_SAVE_DEFAULT               note<LP: #1804265>
@@ -14400,6 +14403,9 @@ CONFIG_X86_SGX_KVM                              policy<{'amd64': 'y'}>
 CONFIG_KVM_AMD                                  policy<{'amd64': 'm'}>
 CONFIG_KVM_AMD_SEV                              policy<{'amd64': 'y'}>
 CONFIG_KVM_XEN                                  policy<{'amd64': 'y'}>
+
+CONFIG_TDX_GUEST_DRIVER                         policy<{'amd64': 'm'}>
+CONFIG_TDX_GUEST_DRIVER                         note<feature requested by Intel LP: #2009437>
 
 # Menu: Virtualization >> Linux - VM Monitor Stream, base infrastructure >> Architecture: s390
 
