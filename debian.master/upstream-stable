@@ -1,6 +1,6 @@
 # The following upstream stable releases have been ported:
 [upstream-stable]
-    linux-5.15.y = v5.15.94
+    linux-5.15.y = v5.15.95
     linux-5.19.y = v5.19.17
     linux-6.0.y = v6.0.19
-    linux-6.1.y = v6.1.12
+    linux-6.1.y = v6.1.13
