@@ -1,0 +1,20 @@
+# Menu: HEADER
+# FORMAT: 4
+# ARCH: amd64 arm64
+# FLAVOUR: amd64-nvidia arm64-nvidia arm64-nvidia-64k
+# FLAVOUR_DEP: {'amd64-nvidia': 'amd64-generic', 'arm64-nvidia': 'arm64-generic', 'arm64-nvidia-64k': 'arm64-generic-64k'}
+
+include "../../debian.nvidia/config/annotations"
+
+CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_RUST                                     note<'required to enable Rust support, LP: #1993183'>
+
+
+# ---- Annotations without notes ----
+
+CONFIG_AS_VERSION                               policy<{'amd64': '23800', 'arm64': '23800'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"', 'arm64': '"aarch64-linux-gnu-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"'}>
+CONFIG_GCC_VERSION                              policy<{'amd64': '120100', 'arm64': '120100'}>
+CONFIG_LD_VERSION                               policy<{'amd64': '23800', 'arm64': '23800'}>
+CONFIG_PAHOLE_HAS_LANG_EXCLUDE                  policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_PAHOLE_VERSION                           policy<{'amd64': '122', 'arm64': '122'}>
