@@ -16,6 +16,7 @@
 #include <linux/mutex.h>
 #include <linux/bug.h>
 #include <uapi/linux/iommufd.h>
+#include <linux/iommu.h>
 #include <linux/iommufd.h>
 
 #include "io_pagetable.h"
@@ -440,11 +441,50 @@ static long iommufd_fops_ioctl(struct file *filp, unsigned int cmd,
 	return ret;
 }
 
+static int iommufd_fops_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	struct iommufd_ctx *ictx = filp->private_data;
+	size_t size = vma->vm_end - vma->vm_start;
+	u32 viommu_id = (u32)vma->vm_pgoff;
+	struct iommufd_viommu *viommu;
+	unsigned long pfn;
+	int rc;
+
+	if (size > PAGE_SIZE)
+		return -EINVAL;
+
+	viommu = container_of(iommufd_get_object(ictx, viommu_id,
+						 IOMMUFD_OBJ_VIOMMU),
+			      struct iommufd_viommu, obj);
+	if (IS_ERR(viommu))
+		return PTR_ERR(viommu);
+
+	if (!viommu->ops->get_mmap_pfn) {
+		rc = -EOPNOTSUPP;
+		goto out_put_viommu;
+	}
+
+	pfn = viommu->ops->get_mmap_pfn(viommu, size);
+	if (!pfn) {
+		rc = -ENOMEM;
+		goto out_put_viommu;
+	}
+
+	vma->vm_pgoff = 0;
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	vm_flags_set(vma, VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP);
+	rc = remap_pfn_range(vma, vma->vm_start, pfn, size, vma->vm_page_prot);
+out_put_viommu:
+	iommufd_put_object(ictx, &viommu->obj);
+	return rc;
+}
+
 static const struct file_operations iommufd_fops = {
 	.owner = THIS_MODULE,
 	.open = iommufd_fops_open,
 	.release = iommufd_fops_release,
 	.unlocked_ioctl = iommufd_fops_ioctl,
+	.mmap = iommufd_fops_mmap,
 };
 
 /**
