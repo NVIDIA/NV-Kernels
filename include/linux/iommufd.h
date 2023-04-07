@@ -219,6 +219,9 @@ static inline int iommufd_vfio_compat_set_no_iommu(struct iommufd_ctx *ictx)
 #endif /* CONFIG_IOMMUFD */
 
 #if IS_ENABLED(CONFIG_IOMMUFD_DRIVER_CORE)
+int iommufd_ctx_alloc_mmap(struct iommufd_ctx *ictx, phys_addr_t base,
+			   size_t size, bool is_io, unsigned long *immap_id);
+void iommufd_ctx_free_mmap(struct iommufd_ctx *ictx, unsigned long immap_id);
 struct iommufd_object *_iommufd_object_alloc(struct iommufd_ctx *ictx,
 					     size_t size,
 					     enum iommufd_object_type type);
@@ -231,6 +234,18 @@ int iommufd_viommu_report_event(struct iommufd_viommu *viommu,
 				enum iommu_veventq_type type, void *event_data,
 				size_t data_len);
 #else /* !CONFIG_IOMMUFD_DRIVER_CORE */
+static inline int iommufd_ctx_alloc_mmap(struct iommufd_ctx *ictx,
+					 phys_addr_t base, size_t size,
+					 bool is_io, unsigned long *immap_id)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline void iommufd_ctx_free_mmap(struct iommufd_ctx *ictx,
+					 unsigned long immap_id)
+{
+}
+
 static inline struct iommufd_object *
 _iommufd_object_alloc(struct iommufd_ctx *ictx, size_t size,
 		      enum iommufd_object_type type)
