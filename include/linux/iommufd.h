@@ -118,6 +118,8 @@ struct iommufd_vqueue {
  *                the include/uapi/linux/iommufd.h header.
  * @vqueue_free: Free all driver-specific parts of an iommufd_vqueue. The memory
  *               of the iommufd_vqueue will be free-ed by iommufd core
+ * @get_mmap_pfn: Return the PFN of a viommu given a finite size, for user space
+ *                to mmap the page(s)
  */
 struct iommufd_viommu_ops {
 	void (*free)(struct iommufd_viommu *viommu);
@@ -130,6 +132,8 @@ struct iommufd_viommu_ops {
 		struct iommufd_viommu *viommu,
 		const struct iommu_user_data *user_data);
 	void (*vqueue_free)(struct iommufd_vqueue *vqueue);
+	unsigned long (*get_mmap_pfn)(struct iommufd_viommu *viommu,
+				      size_t pgsize);
 };
 
 #if IS_ENABLED(CONFIG_IOMMUFD)
