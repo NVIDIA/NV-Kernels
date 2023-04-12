@@ -1,5 +1,5 @@
 zfs-linux 2.1.5-1ubuntu6~22.04.3 modulename=zfs debpath=pool/universe/z/%package%/zfs-dkms_%version%_all.deb arch=amd64 arch=arm64 arch=ppc64el arch=s390x rprovides=spl-modules rprovides=spl-dkms rprovides=zfs-modules rprovides=zfs-dkms
 backport-iwlwifi-dkms 9858-0ubuntu3.4 modulename=iwlwifi debpath=pool/universe/b/%package%/backport-iwlwifi-dkms_%version%_all.deb arch=amd64 rprovides=iwlwifi-modules rprovides=backport-iwlwifi-dkms type=standalone
 v4l2loopback 0.12.7-2ubuntu2~22.04.1 modulename=v4l2loopback debpath=pool/universe/v/%package%/v4l2loopback-dkms_%version%_all.deb arch=amd64 rprovides=v4l2loopback-modules rprovides=v4l2loopback-dkms
-nvidia-fs 2.15.1-5~jammy modulename=nvidia-fs debpath=pool/universe/n/%package%/nvidia-fs-dkms_%version%_amd64.deb arch=amd64 rprovides=nvidia-fs-modules rprovides=nvidia-fs-dkms
+nvidia-fs 2.15.1-5~jammy modulename=nvidia-fs debpath=pool/universe/n/%package%/nvidia-fs-dkms_%version%_amd64.deb arch=amd64 rprovides=nvidia-fs-modules rprovides=nvidia-fs-dkms type=standalone
 mstflint              4.23.0-2~jammy         modulename=mstflint_access debpath=pool/universe/m/%package%/mstflint-dkms_%version%_all.deb         arch=amd64                         rprovides=mstflint-modules rprovides=mstflint-dkms
