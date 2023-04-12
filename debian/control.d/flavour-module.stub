@@ -4,6 +4,7 @@ Build-Profiles: <!stage1>
 Architecture: ARCH
 Section: kernel
 Priority: optional
+Provides: ${MODULE:rprovides}
 Depends:
  ${misc:Depends},
  linux-image-PKGVER-ABINUM-FLAVOUR | linux-image-unsigned-PKGVER-ABINUM-FLAVOUR,
