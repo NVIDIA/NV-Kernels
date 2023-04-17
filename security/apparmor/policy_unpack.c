@@ -1043,11 +1043,13 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
 	error = unpack_pdb(e, &rules->file, false, true, &info);
 	if (error) {
 		goto fail;
-	} else if (rules->file.dfa && !rules->file.perms) {
-		error = aa_compat_map_file(&rules->file);
-		if (error) {
-			info = "failed to remap file permission table";
-			goto fail;
+	} else if (rules->file.dfa) {
+		if (!rules->file.perms) {
+			error = aa_compat_map_file(&rules->file);
+			if (error) {
+				info = "failed to remap file permission table";
+				goto fail;
+			}
 		}
 	} else if (rules->policy.dfa &&
 		   rules->policy.start[AA_CLASS_FILE]) {
