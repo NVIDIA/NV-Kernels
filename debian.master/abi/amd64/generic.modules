@@ -16,7 +16,6 @@
 8250_exar
 8250_lpss
 8250_men_mcb
-8250_mid
 8250_pericom
 8255
 8255_pci
@@ -1971,7 +1970,6 @@ hsi
 hsi_char
 hso
 hsr
-hsu_dma
 ht16k33
 htc-pasic3
 hts221
@@ -5446,6 +5444,7 @@ tda9950
 tda998x
 tdfxfb
 tdo24m
+tdx-guest
 tea575x
 tea5761
 tea5767
