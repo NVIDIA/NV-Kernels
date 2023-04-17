@@ -38,13 +38,13 @@ CONFIG_I2C_LJCA                                 policy<{'amd64': '-'}>
 CONFIG_SPI_LJCA                                 policy<{'amd64': '-'}>
 CONFIG_MFD_LJCA                                 policy<{'amd64': 'n'}>
 #
-CONFIG_TEST_DIV64                               policy<{'amd64-nvidia': 'n', 'amd64-lowlatency': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
-CONFIG_LATENCYTOP                               policy<{'amd64-nvidia': 'n', 'amd64-lowlatency': 'y', 'arm64': 'n', 'arm64-lowlatency': 'y', 'arm64-lowlatency-64k': 'y', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
+CONFIG_TEST_DIV64                               policy<{'amd64-nvidia': 'n', 'amd64-nvidia-lowlatency': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
+CONFIG_LATENCYTOP                               policy<{'amd64-nvidia': 'n', 'amd64-nvidia-lowlatency': 'y', 'arm64': 'n', 'arm64-lowlatency': 'y', 'arm64-lowlatency-64k': 'y', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
 
-CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64-nvidia': 'y', 'amd64-lowlatency': 'n', 'arm64': 'y', 'arm64-lowlatency': 'n', 'arm64-lowlatency-64k': 'n', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
-CONFIG_PREEMPT                                  policy<{'amd64-nvidia': 'n', 'amd64-lowlatency': 'y', 'arm64': 'n', 'arm64-lowlatency': 'y', 'arm64-lowlatency-64k': 'y', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
-CONFIG_HZ_250                                   policy<{'amd64-nvidia': 'y', 'amd64-lowlatency': 'n', 'arm64': 'y', 'arm64-lowlatency': 'n', 'arm64-lowlatency-64k': 'n', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
-CONFIG_HZ_1000                                  policy<{'amd64-nvidia': 'n', 'amd64-lowlatency': 'y', 'arm64': 'n', 'arm64-lowlatency': 'y', 'arm64-lowlatency-64k': 'y', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
+CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64-nvidia': 'y', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'y', 'arm64-lowlatency': 'n', 'arm64-lowlatency-64k': 'n', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
+CONFIG_PREEMPT                                  policy<{'amd64-nvidia': 'n', 'amd64-nvidia-lowlatency': 'y', 'arm64': 'n', 'arm64-lowlatency': 'y', 'arm64-lowlatency-64k': 'y', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
+CONFIG_HZ_250                                   policy<{'amd64-nvidia': 'y', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'y', 'arm64-lowlatency': 'n', 'arm64-lowlatency-64k': 'n', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
+CONFIG_HZ_1000                                  policy<{'amd64-nvidia': 'n', 'amd64-nvidia-lowlatency': 'y', 'arm64': 'n', 'arm64-lowlatency': 'y', 'arm64-lowlatency-64k': 'y', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
 #
-CONFIG_COMEDI_TESTS_EXAMPLE                     policy<{'amd64-nvidia': 'm', 'amd64-lowlatency': 'n', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
-CONFIG_COMEDI_TESTS_NI_ROUTES                   policy<{'amd64-nvidia': 'm', 'amd64-lowlatency': 'n', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_COMEDI_TESTS_EXAMPLE                     policy<{'amd64-nvidia': 'm', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_COMEDI_TESTS_NI_ROUTES                   policy<{'amd64-nvidia': 'm', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
