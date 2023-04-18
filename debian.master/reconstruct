@@ -1,5 +1,7 @@
 # Recreate any symlinks created since the orig.
 # Remove any files deleted from the orig.
+rm -f 'Documentation/devicetree/bindings/phy/amlogic,meson-g12a-usb2-phy.yaml'
+rm -f 'Documentation/devicetree/bindings/phy/amlogic,meson-g12a-usb3-pcie-phy.yaml'
 rm -f 'arch/arm/crypto/blake2s-shash.c'
 rm -f 'arch/x86/crypto/blake2s-shash.c'
 rm -f 'crypto/blake2s_generic.c'
@@ -57,6 +59,7 @@ chmod +x 'debian/templates/image.prerm.in'
 chmod +x 'debian/tests-build/check-aliases'
 chmod +x 'debian/tests/rebuild'
 chmod +x 'debian/tests/ubuntu-regression-suite'
+chmod -x 'drivers/gpu/drm/vmwgfx/vmwgfx_msg_arm64.h'
 chmod +x 'drivers/watchdog/f71808e_wdt.c'
 chmod +x 'update-dkms-versions'
 chmod +x 'update-version-dkms'
