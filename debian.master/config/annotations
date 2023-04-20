@@ -10327,7 +10327,7 @@ CONFIG_ITCO_WDT                                 policy<{'amd64': 'm'}>
 CONFIG_ITCO_VENDOR_SUPPORT                      policy<{'amd64': 'y'}>
 CONFIG_IT8712F_WDT                              policy<{'amd64': 'm'}>
 CONFIG_IT87_WDT                                 policy<{'amd64': 'm'}>
-CONFIG_HP_WATCHDOG                              policy<{'amd64': 'm'}>
+CONFIG_HP_WATCHDOG                              policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_HPWDT_NMI_DECODING                       policy<{'amd64': 'y'}>
 CONFIG_KEMPLD_WDT                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SC1200_WDT                               policy<{'amd64': 'm'}>
