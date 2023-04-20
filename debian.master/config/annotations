@@ -5444,7 +5444,7 @@ CONFIG_HPFS_FS                                  policy<{'amd64': 'm', 'arm64': '
 CONFIG_HPWDT_NMI_DECODING                       policy<{'amd64': 'y'}>
 CONFIG_HP_ACCEL                                 policy<{'amd64': 'm'}>
 CONFIG_HP_ILO                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
-CONFIG_HP_WATCHDOG                              policy<{'amd64': 'm'}>
+CONFIG_HP_WATCHDOG                              policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_HP_WMI                                   policy<{'amd64': 'm'}>
 CONFIG_HSA_AMD                                  policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y'}>
 CONFIG_HSA_AMD_SVM                              policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y'}>
