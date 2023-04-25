@@ -5,3 +5,8 @@
 # FLAVOUR_DEP: {'amd64-nvidia': 'amd64-generic', 'arm64-nvidia': 'arm64-generic', 'arm64-nvidia-64k': 'arm64-generic-64k'}
 
 include "../../debian.master/config/annotations"
+
+
+# ---- Annotations without notes ----
+
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-12 (Ubuntu 12.2.0-17ubuntu1) 12.2.0"', 'arm64': '"aarch64-linux-gnu-gcc-12 (Ubuntu 12.2.0-14ubuntu2) 12.2.0"'}>
