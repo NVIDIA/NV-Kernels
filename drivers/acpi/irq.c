@@ -53,7 +53,8 @@ static void pack_fwspec(struct irq_fwspec *fwspec, u32 gsi, int trigger,
 {
 	unsigned int offset = 0;
 
-	if (IS_ENABLED(CONFIG_ACPI_IRQCHIP_FWSPEC_ARG0)) {
+	if (IS_ENABLED(CONFIG_ACPI_IRQCHIP_FWSPEC_ARG0) &&
+	    (fwspec->fwnode == acpi_get_gsi_domain_id(gsi))) {
 		fwspec->param[0] = ACPI_IRQCHIP_FWSPEC_ARG0;
 		offset = 1;
 	}
@@ -189,8 +190,8 @@ static inline void acpi_irq_parse_one_match(struct fwnode_handle *fwnode,
 	ctx->rc = 0;
 	*ctx->res_flags = acpi_dev_irq_flags(triggering, polarity, shareable, wake_capable);
 
-	pack_fwspec(ctx->fwspec, hwirq, triggering, polarity);
 	ctx->fwspec->fwnode = fwnode;
+	pack_fwspec(ctx->fwspec, hwirq, triggering, polarity);
 }
 
 /**
