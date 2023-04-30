@@ -174,6 +174,7 @@ struct apparmor_audit_data {
 };
 
 struct aa_audit_node {
+	struct kref count;
 	struct apparmor_audit_data data;
 	struct list_head list;
 	struct aa_knotif knotif;
@@ -254,10 +255,26 @@ int aa_audit_rule_match(struct lsmblob *blob, u32 field, u32 op, void *vrule,
 			int lsmid);
 
 
-void aa_audit_node_free(struct aa_audit_node *node);
+void aa_audit_node_free_kref(struct kref *kref);
 struct aa_audit_node *aa_dup_audit_data(struct apparmor_audit_data *orig,
 					gfp_t gfp);
 long aa_audit_data_cmp(struct apparmor_audit_data *lhs,
 		       struct apparmor_audit_data *rhs);
+
+
+static inline struct aa_audit_node *aa_get_audit_node(struct aa_audit_node *node)
+{
+	if (node)
+		kref_get(&(node->count));
+
+	return node;
+}
+
+static inline void aa_put_audit_node(struct aa_audit_node *node)
+{
+	if (node)
+		kref_put(&node->count, aa_audit_node_free_kref);
+}
+
 
 #endif /* __AA_AUDIT_H */
