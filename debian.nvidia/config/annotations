@@ -6,7 +6,17 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_RUST                                     policy<{'amd64': 'n', 'arm64': '-'}>
+CONFIG_RUST                                     note<'required to enable Rust support, LP: #1993183'>
+
 
 # ---- Annotations without notes ----
 
+CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-12 (Ubuntu 12.2.0-17ubuntu1) 12.2.0"', 'arm64': '"aarch64-linux-gnu-gcc-12 (Ubuntu 12.2.0-14ubuntu2) 12.2.0"'}>
+CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
+CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-'}>
+CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'amd64': '-'}>
+CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': '-'}>
+CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-'}>
+CONFIG_SAMPLES_RUST                             policy<{'amd64': '-'}>
