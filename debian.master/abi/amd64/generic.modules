@@ -507,16 +507,6 @@ atmel_cs
 atmel_mxt_ts
 atmel_pci
 atmtcp
-atomisp
-atomisp-gc0310
-atomisp-gc2235
-atomisp-libmsrlisthelper
-atomisp-lm3554
-atomisp-mt9m114
-atomisp-ov2680
-atomisp-ov2722
-atomisp-ov5693
-atomisp_gmin_platform
 atp
 atp870u
 atusb
