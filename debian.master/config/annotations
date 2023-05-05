@@ -2179,7 +2179,6 @@ CONFIG_DRM_HISI_HIBMC                           policy<{'arm64': 'm'}>
 CONFIG_DRM_HISI_KIRIN                           policy<{'arm64': 'm'}>
 CONFIG_DRM_MEDIATEK                             policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DRM_MEDIATEK_HDMI                        policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_DRM_MXSFB                                policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_DRM_MESON                                policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DRM_MESON_DW_HDMI                        policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DRM_ARCPGU                               policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
