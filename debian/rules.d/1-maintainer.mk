@@ -1,7 +1,7 @@
 # The following targets are for the maintainer only! do not run if you don't
 # know what they do.
 
-.PHONY: printenv updateconfigs printchanges insertchanges startnewrelease diffupstream help autoreconstruct finalchecks
+.PHONY: printenv updateconfigs migrateconfigs printchanges insertchanges startnewrelease diffupstream help autoreconstruct finalchecks
 
 help:
 	@echo "These are the targets in addition to the normal $(DEBIAN) ones:"
@@ -11,6 +11,7 @@ help:
 	@echo "  updateconfigs        : Update core arch configs"
 	@echo
 	@echo "  editconfigs          : Update core arch configs interractively"
+	@echo "  migrateconfigs       : Automatically import old configs into annotations"
 	@echo "  genconfigs           : Generate core arch configs in CONFIGS/*"
 	@echo
 	@echo "  printchanges    : Print the current changelog entries (from git)"
@@ -40,8 +41,25 @@ printdebian:
 
 updateconfigs defaultconfigs editconfigs genconfigs dumpconfigs:
 	dh_testdir;
-	$(SHELL) $(DROOT)/scripts/misc/kernelconfig $@ "$(do_enforce_all)"
+	kmake='$(kmake)' skip_checks=$(do_skip_checks) conc_level=$(conc_level) \
+		$(SHELL) $(DROOT)/scripts/misc/kernelconfig $@
+	@rm -rf build
+
+migrateconfigs:
+ifneq ($(wildcard $(DEBIAN)/config/config.common.ubuntu),)
+	dh_testdir
+	conc_level=$(conc_level) $(SHELL) $(DROOT)/scripts/misc/old-kernelconfig genconfigs
 	rm -rf build
+	mkdir build
+	mv $(DEBIAN)/config/annotations build/.annotations
+	mv $(DEBIAN)/config/README.rst build/.README.rst 2>/dev/null || true
+	rm -rf $(DEBIAN)/config
+	mkdir -p $(DEBIAN)/config
+	debian/scripts/misc/migrate-annotations < build/.annotations > $(DEBIAN)/config/annotations
+	mv build/.README.rst $(DEBIAN)/config/README.rst 2>/dev/null || true
+	rm -rf build
+	kmake='$(kmake)' conc_level=$(conc_level) $(SHELL) $(DROOT)/scripts/misc/kernelconfig updateconfigs
+endif
 
 printenv:
 	dh_testdir

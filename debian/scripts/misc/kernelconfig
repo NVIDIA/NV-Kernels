@@ -1,207 +1,177 @@
-#!/bin/bash
+#!/bin/bash -u
+#
+# Manage kernel config annotations
+#
+# Supported environment variales:
+#   conc_level  : Concurrency level for upstream make (-jX)
+#   skip_checks : Skip config checks if set to 'true'
+#   gcc         : Default gcc to use (mandatory)
+#
 
-. debian/debian.env
+function cleanup()
+{
+	rm -rf build "${TMP_DIR}"
+}
 
-# Script to merge all configs and run 'make syncconfig' on it to wade out bad juju.
-# Then split the configs into distro-commmon and flavour-specific parts
-
-# We have to be in the top level kernel source directory
-if [ ! -f MAINTAINERS ] || [ ! -f Makefile ]; then
-	echo "This does not appear to be the kernel source directory." 1>&2
+# We have to be in the top level Ubuntu kernel source directory
+if ! [ -e debian/debian.env ] ; then
+	echo "ERROR: This is not an Ubuntu kernel source directory" >&2
 	exit 1
 fi
 
-mode=${1:?"Usage: $0 (oldconfig|editconfig) [do_enforce_all]"}
-do_enforce_all=${2:-0}
-yes=0
-case "$mode" in
-    update*configs)  mode='syncconfig' ;;
-    default*configs) mode='oldconfig'; yes=1 ;;
-    edit*configs)    ;; # All is good
-    gen*configs)     mode='genconfigs' ;; # All is good
-    dump*configs)    mode='config'; yes=1 ;;
-    *) echo "$0 called with invalid mode" 1>&2
-       exit 1 ;;
-esac
-kerneldir="`pwd`"
-confdir="$kerneldir/${DEBIAN}/config"
-variant="$2"
-
-. $DEBIAN/etc/kernelconfig
-
-bindir="`pwd`/${DROOT}/scripts/misc"
-common_conf="$confdir/config.common.$family"
-tmpdir=`mktemp -d`
-mkdir "$tmpdir/CONFIGS"
-
-if [ "$mode" = "genconfigs" ]; then
-	keep=1
-	mode="oldconfig"
-	test -d CONFIGS || mkdir CONFIGS
+if [ -z "${gcc:-}" ] ; then
+	gcc=gcc
 fi
 
-warning_partial=
+if [ ${#} -ne 1 ] ; then
+	echo "Usage: $0 updateconfigs|defaultconfigs|genconfigs|editconfigs"
+	exit 2
+fi
 
-for arch in $archs; do
-	rm -rf build
-	mkdir build
+mode=${1}
+
+case "${mode}" in
+	updateconfigs)  target="syncconfig" ;;
+	defaultconfigs) target="olddefconfig" ;;
+	genconfigs)     target="oldconfig" ;;
+	editconfigs)    ;;  # Target is set later based on user input
+	*) echo "ERROR: Invalid mode: ${1}" >&2
+	   exit 1 ;;
+esac
+
+. debian/debian.env
+
+annotations_file=${DEBIAN}/config/annotations
+warning_partial=()
+
+TMP_DIR=$(mktemp -d)
+trap cleanup EXIT
+
+# Use annotations to generate configs
+FLAVOURS=$(sed -ne 's/^# FLAVOUR: //p' "${annotations_file}")
+
+for arch_flavour in ${FLAVOURS} ; do
+	arch=${arch_flavour%%-*}
+	flavour=${arch_flavour#*-}
+	tmp_conf_file=${TMP_DIR}/${arch}-config.flavour.${flavour}
 
 	# Map debian archs to kernel archs
-	case "$arch" in
-		ppc64|ppc64el)	kernarch="powerpc"	;;
-		amd64)		kernarch="x86_64"	;;
-		lpia)		kernarch="x86" 		;;
-		sparc)		kernarch="sparc64"	;;
-		armel|armhf)	kernarch="arm"		;;
-		s390x)		kernarch="s390"		;;
-		riscv64)	kernarch="riscv"	;;
-		*)		kernarch="$arch"	;;
+	case "${arch}" in
+		amd64)   kern_arch="x86_64" ;;
+		arm64)   kern_arch="arm64" ;;
+		armhf)   kern_arch="arm" ;;
+		ppc64el) kern_arch="powerpc" ;;
+		riscv64) kern_arch="riscv" ;;
+		s390x)   kern_arch="s390" ;;
+		*)       echo "WARNING: Unsupported architecture: ${arch}"
+		         warning_partial+=("${arch}")
+		         continue ;;
 	esac
 
 	# Determine cross toolchain to use for Kconfig compiler tests
-	cross_compile=""
-	deb_build_arch=$(dpkg-architecture -qDEB_BUILD_ARCH -a$arch 2>/dev/null)
-	deb_host_arch=$(dpkg-architecture -qDEB_HOST_ARCH -a$arch 2>/dev/null)
-	[ $deb_build_arch != $deb_host_arch ] && cross_compile="$(dpkg-architecture -qDEB_HOST_GNU_TYPE -a$arch 2>/dev/null)-"
+	cross_compile="$(dpkg-architecture -qDEB_HOST_GNU_TYPE -a"${arch}" 2>/dev/null)-"
 
-	# Environment variables for 'make *config'. We omit CROSS_COMPILE
-	# for i386 since it is no longer supported after 19.04, however
-	# we maintain the configs for hwe.
-	modify_config=true
-	env="ARCH=$kernarch DEB_ARCH=$arch"
-	compiler_path=$(which "${cross_compile}gcc" || true)
-	if [ "$compiler_path" != '' ]; then
-		env="$env CROSS_COMPILE=$cross_compile"
-	else
-		echo "WARNING: ${cross_compile}gcc not installed"
-		modify_config=
-		warning_partial="$warning_partial $arch"
+	# Arch-specific compiler, if any
+	arch_gcc=$(cat <<EOF | make -s -f - all
+include ${DEBIAN}/rules.d/${arch}.mk
+all:
+	@echo \$(if \$(gcc),\$(gcc),${gcc})
+EOF
+			)
+	gcc_path=$(which "${cross_compile}${arch_gcc}" || true)
+	if [ -z "${gcc_path}" ] ; then
+		echo "WARNING: ${cross_compile}${arch_gcc} not installed"
+		warning_partial+=("${arch}")
+		continue
 	fi
 
-	archconfdir=$confdir/$arch
-	flavourconfigs=$(cd $archconfdir && ls config.flavour.*)
+	if [ "${mode}" = "editconfigs" ] ; then
+		while true ; do
+			echo -n "Do you want to edit configs for ${arch}-${flavour}? [Y/n] "
+			read -r choice
+			case "${choice,,}" in
+				y|"") target="menuconfig" ; break ;;
+				n)    target="syncconfig" ; break ;;
+			esac
+		done
+	fi
 
-	# Merge configs
-	# We merge config.common.ubuntu + config.common.<arch> +
-	# config.flavour.<flavour>
+	rm -rf build
+	mkdir build
 
-	for config in $flavourconfigs; do
-		fullconf="$tmpdir/$arch-$config-full"
-		case $config in
-		*)
-			: >"$fullconf"
-			if [ -f $common_conf ]; then
-				cat $common_conf >> "$fullconf"
-			fi
-			if [ -f $archconfdir/config.common.$arch ]; then
-				cat $archconfdir/config.common.$arch >> "$fullconf"
-			fi
-			cat "$archconfdir/$config" >>"$fullconf"
-			if [ -f $confdir/OVERRIDES ]; then
-				cat $confdir/OVERRIDES >> "$fullconf"
-			fi
-			;;
-		esac
-	done
+	# Generate .config from annotations
+	python3 debian/scripts/misc/annotations -f "${annotations_file}" \
+			--arch "${arch}" --flavour "${flavour}" --export > build/.config
 
-	for config in $flavourconfigs; do
-		if [ -f $archconfdir/$config ]; then
-			fullconf="$tmpdir/$arch-$config-full"
-			cat "$fullconf" > build/.config
-			# Call oldconfig or menuconfig
-			if [ "$modify_config" ]; then
-				case "$mode" in
-				    editconfigs)
-					# Interactively edit config parameters
-					while : ; do
-						echo -n "Do you want to edit config: $arch/$config? [Y/n] "
-						read choice
-						case "$choice" in
-						y* | Y* | "" )
-							make O=`pwd`/build $env menuconfig
-							break ;;
-						n* | N* )
-							# 'syncconfig' prevents
-							# errors for '-' options set
-							# in common config fragments
-							make O=`pwd`/build $env syncconfig
-							break ;;
-						*)
-							echo "Entry not valid"
-						esac
-					done
-					;;
-				    *)
-					echo "* Run $mode (yes=$yes) on $arch/$config ..."
-					if [ "$yes" -eq 1 ]; then
-						yes "" | make O=`pwd`/build $env "$mode"
-					else
-						make O=`pwd`/build $env "$mode"
-					fi ;;
-				esac
-			fi
-			cat build/.config > $archconfdir/$config
-			[ "$modify_config" ] && cat build/.config >"$tmpdir/CONFIGS/$arch-$config"
-			if [ "$keep" = "1" ]; then
-				cat build/.config > CONFIGS/$arch-$config
-			fi
-		else
-			echo "!! Config not found $archconfdir/$config..."
-		fi
-	done
+	# Environment variables for 'make *config'
+	env=(ARCH="${kern_arch}"
+		 DEB_ARCH="${arch}"
+		 CROSS_COMPILE="${cross_compile}"
+		 CC="${gcc_path}")
 
-	echo "Running splitconfig.pl for $arch"
+	# Concurrency level
+	if [ -n "${conc_level:-}" ] ; then
+		env+=("${conc_level}")
+	fi
+
+	# Call config target
 	echo
+	echo "* Run ${target} on ${arch}/${flavour} ..."
+	${kmake} O=build "${env[@]}" "${target}"
 
-	# Can we make this more robust by avoiding $tmpdir completely?
-	# This approach was used for now because I didn't want to change
-	# splitconfig.pl
-	(cd $archconfdir; $bindir/splitconfig.pl config.flavour.*; mv config.common \
-	 config.common.$arch; cp config.common.$arch $tmpdir)
+	# Move config for further processing
+	mv build/.config "${tmp_conf_file}"
 done
 
-rm -f $common_conf
+rc=0
 
-# Now run splitconfig.pl on all the config.common.<arch> copied to
-# $tmpdir
-(cd $tmpdir; $bindir/splitconfig.pl *)
-(
-	cd $confdir;
-	rm -f *-full
-	grep -v 'is UNMERGABLE' <$tmpdir/config.common >$common_conf
-	for arch in $archs; do
-		grep -v 'is UNMERGABLE' <$tmpdir/config.common.$arch \
-			>$arch/config.common.$arch
+if [ "${skip_checks:-}" = "true" ] ; then
+	echo
+	echo "Skipping config-check (skip_checks=${skip_checks}) ..."
+else
+	echo
+	echo "Running config-check for all configurations ..."
+	fail=0
+	for arch_flavour in ${FLAVOURS} ; do
+		arch=${arch_flavour%%-*}
+		flavour=${arch_flavour#*-}
+		tmp_conf_file=${TMP_DIR}/${arch}-config.flavour.${flavour}
+
+		echo
+		echo "* Run config-check for ${arch}-${flavour} ..."
+		python3 debian/scripts/misc/annotations -f "${annotations_file}" \
+				--arch "${arch}" --flavour "${flavour}" --check "${tmp_conf_file}" || \
+			fail=$((fail + 1))
 	done
-)
 
-echo ""
-echo "Running config-check for all configurations ..."
-echo ""
-fail=0
-for arch in $archs; do
-	archconfdir=$confdir/$arch
-	flavourconfigs=$(cd $archconfdir && ls config.flavour.*)
-	for config in $flavourconfigs; do
-		flavour="${config##*.}"
-		if [ -f $archconfdir/$config ]; then
-			fullconf="$tmpdir/CONFIGS/$arch-$config"
-			[ ! -f "$fullconf" ] && continue
-			"$bindir/../config-check" "$fullconf" "$arch" "$flavour" "$confdir" "0" "$do_enforce_all" || let "fail=$fail+1"
-		fi
-	done
-done
-
-if [ "$fail" != 0 ]; then
-	echo ""
-	echo "*** ERROR: $fail config-check failures detected"
-	echo ""
+	if [ ${fail} -gt 0 ] ; then
+		rc=1
+		echo "ERROR: ${fail} config-check failures detected" >&2
+	fi
 fi
 
-rm -rf build
-
-if [ "$warning_partial" ]; then
-	echo ""
-	echo "WARNING: configuration operation applied only to a subset of architectures (skipped$warning_partial)" 1>&2
-	echo ""
+if [ ${#warning_partial[@]} -gt 0 ] ; then
+	rc=1
+	echo "ERROR: Config operation not applied to all architectures (skipped ${warning_partial[*]})" >&2
 fi
+
+# Recreate the annotations file
+if [ "${mode}" = "genconfigs" ] ; then
+	rm -rf CONFIGS
+	mv "${TMP_DIR}" CONFIGS
+else
+	echo
+	echo "Importing all configurations ..."
+	echo
+	for arch_flavour in ${FLAVOURS} ; do
+		arch=${arch_flavour%%-*}
+		flavour=${arch_flavour#*-}
+		tmp_conf_file=${TMP_DIR}/${arch}-config.flavour.${flavour}
+
+		echo "* Import configs for ${arch}-${flavour} ..."
+		python3 debian/scripts/misc/annotations -f "${annotations_file}" \
+				--arch "${arch}" --flavour "${flavour}" --import "${tmp_conf_file}"
+	done
+fi
+
+exit "${rc}"
