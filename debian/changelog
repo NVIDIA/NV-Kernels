@@ -1,4 +1,4 @@
-linux-meta-unstable (6.3.0.2.2) lunar; urgency=medium
+linux-meta (6.3.0.2.2) mantic; urgency=medium
 
   * Bump ABI 6.3.0-2
 
