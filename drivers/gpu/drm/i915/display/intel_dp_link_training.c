@@ -1110,6 +1110,16 @@ static void intel_dp_schedule_fallback_link_training(struct intel_dp *intel_dp,
 	struct intel_connector *intel_connector = intel_dp->attached_connector;
 	struct intel_encoder *encoder = &dp_to_dig_port(intel_dp)->base;
 
+	if (!intel_digital_port_connected(&dp_to_dig_port(intel_dp)->base)) {
+		drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
+			    "[CONNECTOR:%d:%s][ENCODER:%d:%s]"
+			    "Link Training failed on disconnected sink.\n",
+			    intel_connector->base.base.id, intel_connector->base.name,
+			    encoder->base.base.id, encoder->base.name);
+
+		return;
+	}
+
 	if (intel_dp->hobl_active) {
 		drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
 			    "[ENCODER:%d:%s] Link Training failed with HOBL active, "
