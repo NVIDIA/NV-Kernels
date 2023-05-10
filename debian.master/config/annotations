@@ -3815,8 +3815,8 @@ CONFIG_DRM_MSM_GPU_STATE                        policy<{'arm64': 'y', 'armhf': '
 CONFIG_DRM_MSM_GPU_SUDO                         policy<{'arm64': 'n', 'armhf': 'n'}>
 CONFIG_DRM_MSM_HDMI_HDCP                        policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_DRM_MSM_REGISTER_LOGGING                 policy<{'arm64': 'n', 'armhf': 'n'}>
-CONFIG_DRM_MXS                                  policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y'}>
-CONFIG_DRM_MXSFB                                policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_DRM_MXS                                  policy<{'arm64': 'y', 'armhf-generic': 'y', 'armhf-generic-lpae': '-', 'ppc64el': '-'}>
+CONFIG_DRM_MXSFB                                policy<{'arm64': 'm', 'armhf-generic': 'm', 'armhf-generic-lpae': '-', 'ppc64el': '-'}>
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
 CONFIG_DRM_NOUVEAU_BACKLIGHT                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y'}>
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': 'n', 'arm64': 'n', 'ppc64el': 'n'}>
