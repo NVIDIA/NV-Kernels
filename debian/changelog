@@ -1,3 +1,15 @@
+linux-meta (6.3.0.3.3) mantic; urgency=medium
+
+  * Bump ABI 6.3.0-3
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] rename to linux and move to mantic
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Wed, 10 May 2023 15:12:16 +0200
+
 linux-meta (6.3.0.2.2) mantic; urgency=medium
 
   * Bump ABI 6.3.0-2
