@@ -7301,7 +7301,7 @@ CONFIG_MICROCHIP_TCB_CAPTURE                    policy<{'arm64': 'm', 'armhf': '
 CONFIG_MICROCODE                                policy<{'amd64': 'y'}>
 CONFIG_MICROCODE_AMD                            policy<{'amd64': 'y'}>
 CONFIG_MICROCODE_INTEL                          policy<{'amd64': 'y'}>
-CONFIG_MICROCODE_OLD_INTERFACE                  policy<{'amd64': 'y'}>
+CONFIG_MICROCODE_LATE_LOADING                   policy<{'amd64': 'n'}>
 CONFIG_MICROSEMI_PHY                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
 CONFIG_MICROSOFT_MANA                           policy<{'amd64': 'm'}>
 CONFIG_MIGHT_HAVE_CACHE_L2X0                    policy<{'armhf': 'y'}>
