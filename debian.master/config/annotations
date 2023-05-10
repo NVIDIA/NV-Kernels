@@ -5387,7 +5387,7 @@ CONFIG_HISILICON_ERRATUM_161010101              policy<{'arm64': 'y'}>
 CONFIG_HISILICON_ERRATUM_161600802              policy<{'arm64': 'y'}>
 CONFIG_HISILICON_IRQ_MBIGEN                     policy<{'arm64': 'y'}>
 CONFIG_HISILICON_LPC                            policy<{'arm64': 'y'}>
-CONFIG_HISI_DMA                                 policy<{'arm64': 'n'}>
+CONFIG_HISI_DMA                                 policy<{'arm64': 'n', 'armhf': 'n'}>
 CONFIG_HISI_FEMAC                               policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_HISI_HIKEY_USB                           policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_HISI_PMU                                 policy<{'arm64': 'm'}>
