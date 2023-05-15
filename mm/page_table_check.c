@@ -70,6 +70,8 @@ static void page_table_check_clear(struct mm_struct *mm, unsigned long addr,
 
 	page = pfn_to_page(pfn);
 	page_ext = page_ext_get(page);
+
+	BUG_ON(PageSlab(page));
 	anon = PageAnon(page);
 
 	for (i = 0; i < pgcnt; i++) {
@@ -106,6 +108,8 @@ static void page_table_check_set(struct mm_struct *mm, unsigned long addr,
 
 	page = pfn_to_page(pfn);
 	page_ext = page_ext_get(page);
+
+	BUG_ON(PageSlab(page));
 	anon = PageAnon(page);
 
 	for (i = 0; i < pgcnt; i++) {
@@ -131,6 +135,8 @@ void __page_table_check_zero(struct page *page, unsigned int order)
 {
 	struct page_ext *page_ext;
 	unsigned long i;
+
+	BUG_ON(PageSlab(page));
 
 	page_ext = page_ext_get(page);
 	BUG_ON(!page_ext);
