@@ -3212,10 +3212,10 @@ static void mlx5_vdpa_dev_del(struct vdpa_mgmt_dev *v_mdev, struct vdpa_device *
 		ndev->nb_registered = false;
 		mlx5_notifier_unregister(mvdev->mdev, &ndev->nb);
 	}
+	_vdpa_unregister_device(dev);
 	wq = mvdev->wq;
 	mvdev->wq = NULL;
 	destroy_workqueue(wq);
-	_vdpa_unregister_device(dev);
 	mgtdev->ndev = NULL;
 }
 
