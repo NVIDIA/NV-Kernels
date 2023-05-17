@@ -1891,6 +1891,7 @@ hidp
 hih6130
 hinic
 hisi-spmi-controller
+hm11b1
 hmc425a
 hmc5843_core
 hmc5843_i2c
@@ -3440,6 +3441,7 @@ orinoco_tmd
 orinoco_usb
 oti6858
 otm3225a
+ov01a1s
 ov02a10
 ov13858
 ov2640
@@ -3683,6 +3685,7 @@ pnd2_edac
 poly1305-x86_64
 poly1305_generic
 port100
+power_ctrl_logic
 powermate
 powr1220
 ppa
