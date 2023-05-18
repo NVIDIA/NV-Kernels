@@ -64,12 +64,6 @@ static int cxl_port_probe(struct device *dev)
 		rc = cxl_hdm_decode_init(cxlds, cxlhdm);
 		if (rc)
 			return rc;
-
-		rc = cxl_await_media_ready(cxlds);
-		if (rc) {
-			dev_err(dev, "Media not active (%d)\n", rc);
-			return rc;
-		}
 	}
 
 	rc = devm_cxl_enumerate_decoders(cxlhdm);
