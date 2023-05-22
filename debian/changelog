@@ -1,3 +1,9 @@
+linux-meta-unstable (6.4.0.2.2) mantic; urgency=medium
+
+  * Bump ABI 6.4.0-2
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 22 May 2023 12:08:06 +0200
+
 linux-meta-unstable (6.4.0.1.1) mantic; urgency=medium
 
   * Bump ABI 6.4.0-1
