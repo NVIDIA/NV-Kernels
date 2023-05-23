@@ -1,56 +1,67 @@
 # Menu: HEADER
-# FORMAT: 3
-# ARCH: x86
+# FORMAT: 4
+# ARCH: amd64
+# FLAVOUR: amd64-nvidia amd64-nvidia-lowlatency
 
 include "../../debian.master/config/annotations"
 
-#
+CONFIG_LATENCYTOP                               policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y'}>
+CONFIG_LATENCYTOP                               note<'https://lists.ubuntu.com/archives/kernel-team/2014-July/045006.html, LP#1655986'>
+
+CONFIG_NOUVEAU_LEGACY_CTX_SUPPORT               policy<{'amd64': '-'}>
+CONFIG_NOUVEAU_LEGACY_CTX_SUPPORT               note<'Selects CONFIG_DRM_LEGACY which is not wanted'>
+
+
+# ---- Annotations without notes ----
+
+CONFIG_AAEON_IWMI_WDT                           policy<{'amd64': '-'}>
+CONFIG_CEC_GPIO                                 policy<{'amd64-nvidia-lowlatency': 'm'}>
+CONFIG_CEC_PIN                                  policy<{'amd64-nvidia-lowlatency': 'y'}>
+CONFIG_CEC_PIN_ERROR_INJ                        policy<{'amd64-nvidia-lowlatency': 'n'}>
+CONFIG_COMEDI_TESTS_EXAMPLE                     policy<{'amd64': 'm', 'amd64-nvidia-lowlatency': 'n'}>
+CONFIG_COMEDI_TESTS_NI_ROUTES                   policy<{'amd64': 'm', 'amd64-nvidia-lowlatency': 'n'}>
+CONFIG_DEBUG_PREEMPT                            policy<{'amd64-nvidia-lowlatency': 'n'}>
+CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n'}>
+CONFIG_DRM_NOUVEAU_BACKLIGHT                    policy<{'amd64': '-'}>
+CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-'}>
+CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
+CONFIG_GPIO_LJCA                                policy<{'amd64': '-'}>
+CONFIG_HZ                                       policy<{'amd64': '250', 'amd64-nvidia-lowlatency': '1000'}>
+CONFIG_HZ_1000                                  policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y'}>
+CONFIG_HZ_250                                   policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n'}>
+CONFIG_I2C_LJCA                                 policy<{'amd64': '-'}>
+CONFIG_INLINE_READ_UNLOCK                       policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': '-'}>
+CONFIG_INLINE_READ_UNLOCK_IRQ                   policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': '-'}>
+CONFIG_INLINE_SPIN_UNLOCK_IRQ                   policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': '-'}>
+CONFIG_INLINE_WRITE_UNLOCK                      policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': '-'}>
+CONFIG_INLINE_WRITE_UNLOCK_IRQ                  policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': '-'}>
+CONFIG_INTEL_MEI_VSC                            policy<{'amd64': 'n'}>
 CONFIG_INTEL_VSC                                policy<{'amd64': 'n'}>
-CONFIG_INTEL_VSC_PSE                            policy<{'amd64': 'n'}>
-CONFIG_INTEL_VSC_CSI                            policy<{'amd64': '-'}>
 CONFIG_INTEL_VSC_ACE                            policy<{'amd64': '-'}>
 CONFIG_INTEL_VSC_ACE_DEBUG                      policy<{'amd64': 'n'}>
-CONFIG_INTEL_MEI_VSC                            policy<{'amd64': 'n'}>
-#
-CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
-CONFIG_AAEON_IWMI_WDT                           policy<{'amd64': '-'}>
-CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
-CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
+CONFIG_INTEL_VSC_CSI                            policy<{'amd64': '-'}>
+CONFIG_INTEL_VSC_PSE                            policy<{'amd64': 'n'}>
 CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
-#
-CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n'}>
-CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-'}>
-CONFIG_DRM_NOUVEAU_BACKLIGHT                    policy<{'amd64': '-'}>
+CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
+CONFIG_MFD_LJCA                                 policy<{'amd64': 'n'}>
 CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_DEFAULT                    policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_MMU                        policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_PUSH                       policy<{'amd64': '-'}>
-CONFIG_NOUVEAU_LEGACY_CTX_SUPPORT               policy<{'amd64': '-'}>
-#
-CONFIG_VIDEO_OV01A10                            policy<{'amd64': 'n'}>
-CONFIG_VIDEO_OV01A1S                            policy<{'amd64': 'm'}>
-CONFIG_VIDEO_OV02C10                            policy<{'amd64': 'n'}>
-CONFIG_VIDEO_HM11B1                             policy<{'amd64': 'm'}>
-CONFIG_VIDEO_INTEL_IPU6                         policy<{'amd64': 'n'}>
-#
-CONFIG_GPIO_LJCA                                policy<{'amd64': '-'}>
-CONFIG_I2C_LJCA                                 policy<{'amd64': '-'}>
-CONFIG_SPI_LJCA                                 policy<{'amd64': '-'}>
-CONFIG_MFD_LJCA                                 policy<{'amd64': 'n'}>
-#
-CONFIG_TEST_DIV64                               policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'm'}>
-CONFIG_LATENCYTOP                               policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y'}>
-
-CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n'}>
 CONFIG_PREEMPT                                  policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y'}>
-CONFIG_DEBUG_PREEMPT                            policy<{'amd64-nvidia-lowlatency': 'n'}>
+CONFIG_PREEMPTION                               policy<{'amd64-nvidia-lowlatency': 'y'}>
+CONFIG_PREEMPT_COUNT                            policy<{'amd64-nvidia-lowlatency': 'y'}>
+CONFIG_PREEMPT_DYNAMIC                          policy<{'amd64-nvidia-lowlatency': 'y'}>
+CONFIG_PREEMPT_RCU                              policy<{'amd64-nvidia-lowlatency': 'y'}>
 CONFIG_PREEMPT_TRACER                           policy<{'amd64-nvidia-lowlatency': 'n'}>
-CONFIG_HZ_250                                   policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n'}>
-CONFIG_HZ_1000                                  policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y'}>
-#
-CONFIG_COMEDI_TESTS_EXAMPLE                     policy<{'amd64': 'm', 'amd64-nvidia-lowlatency': 'n'}>
-CONFIG_COMEDI_TESTS_NI_ROUTES                   policy<{'amd64': 'm', 'amd64-nvidia-lowlatency': 'n'}>
-
+CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n'}>
+CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SND_HDA_INTEL_HDMI_SILENT_STREAM         policy<{'amd64': 'n'}>
-CONFIG_CEC_GPIO                                 policy<{'amd64-nvidia-lowlatency': 'm'}>
-CONFIG_CEC_PIN_ERROR_INJ                        policy<{'amd64-nvidia-lowlatency': 'n'}>
+CONFIG_SPI_LJCA                                 policy<{'amd64': '-'}>
+CONFIG_TASKS_RCU                                policy<{'amd64-nvidia-lowlatency': 'y'}>
+CONFIG_TEST_DIV64                               policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'm'}>
+CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': '-'}>
+CONFIG_UNINLINE_SPIN_UNLOCK                     policy<{'amd64-nvidia-lowlatency': 'y'}>
+CONFIG_VIDEO_INTEL_IPU6                         policy<{'amd64': 'n'}>
+CONFIG_VIDEO_OV01A10                            policy<{'amd64': 'n'}>
+CONFIG_VIDEO_OV02C10                            policy<{'amd64': 'n'}>
