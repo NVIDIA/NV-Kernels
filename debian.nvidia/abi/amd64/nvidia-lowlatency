@@ -18200,6 +18200,7 @@ EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x7e0bb0ed	nf_tables_bind_set
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x7e2aaa5a	nft_register_chain_type
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x825fd57a	__nft_release_basechain
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x8b5ae838	nft_chain_validate_dependency
+EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x8d0d9f25	nf_tables_activate_set
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x8fe2cf5b	nft_obj_notify
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x90dc46a6	nft_obj_lookup
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x9bf738d8	nft_data_dump
