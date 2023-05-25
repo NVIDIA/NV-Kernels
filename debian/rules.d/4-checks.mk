@@ -32,7 +32,7 @@ config-prepare-check-%: $(stampdir)/stamp-prepare-tree-%
 	if [ -e $(commonconfdir)/config.common.ubuntu ]; then \
 		perl -f $(DROOT)/scripts/config-check \
 			$(builddir)/build-$*/.config "$(arch)" "$*" "$(commonconfdir)" \
-			"$(skipconfig)" "$(do_enforce_all)" \
+			"$(skipconfig)" "$(do_enforce_all)"; \
 	else \
 		python3 $(DROOT)/scripts/misc/annotations -f $(commonconfdir)/annotations \
 			--arch $(arch) --flavour $* --check $(builddir)/build-$*/.config; \
