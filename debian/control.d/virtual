@@ -1,12 +1,12 @@
 Package: linux-headers-virtual${variant:suffix}
-Architecture: amd64 arm64 powerpc ppc64el s390x
+Architecture: amd64 arm64 ppc64el s390x
 Section: kernel
 Depends: ${misc:Depends}, linux-headers-generic${variant:suffix} (= ${binary:Version})
 Description: Virtual Linux kernel headers
  This package will always depend on linux-headers-generic.
 
 Package: linux-image-virtual${variant:suffix}
-Architecture: amd64 arm64 powerpc ppc64el s390x
+Architecture: amd64 arm64 ppc64el s390x
 Section: kernel
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic
 Provides: ${dkms:zfs-modules} ${dkms:virtualbox-guest-modules} ${dkms:wireguard-linux-compat-modules}
@@ -15,7 +15,7 @@ Description: Virtual Linux kernel image
  used for virtual instances.
 
 Package: linux-tools-virtual${variant:suffix}
-Architecture: amd64 arm64 powerpc ppc64el s390x
+Architecture: amd64 arm64 ppc64el s390x
 Section: kernel
 Provides: linux-tools
 Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-generic
@@ -33,7 +33,7 @@ Description: Virtual Linux kernel cloud tools
  used for virtual instances.
 
 Package: linux-virtual${variant:suffix}
-Architecture: amd64 arm64 powerpc ppc64el s390x
+Architecture: amd64 arm64 ppc64el s390x
 Section: kernel
 Provides: ${test:provides-full-virtual}
 Depends: ${misc:Depends}, linux-image-virtual${variant:suffix} (= ${binary:Version}), linux-headers-virtual${variant:suffix} (= ${binary:Version})
@@ -42,7 +42,7 @@ Description: Minimal Generic Linux kernel and headers
  linux-headers-virtual.
 
 Package: linux-image-extra-virtual${variant:suffix}
-Architecture: amd64 arm64 powerpc ppc64el s390x
+Architecture: amd64 arm64 ppc64el s390x
 Section: kernel
 Provides: ${test:provides-modules-extra-virtual}
 Depends: ${misc:Depends}, linux-image-generic${variant:suffix} (= ${binary:Version})
