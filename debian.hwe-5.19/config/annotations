@@ -1413,7 +1413,6 @@ CONFIG_DMA_SUN6I                                policy<{'arm64': 'm', 'armhf': '
 CONFIG_DW_AXI_DMAC                              policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_FSL_EDMA                                 policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_FSL_QDMA                                 policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_HISI_DMA                                 policy<{'arm64': 'n'}>
 CONFIG_IMX_DMA                                  policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_IMX_SDMA                                 policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTEL_IDMA64                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
@@ -2179,7 +2178,6 @@ CONFIG_DRM_HISI_HIBMC                           policy<{'arm64': 'm'}>
 CONFIG_DRM_HISI_KIRIN                           policy<{'arm64': 'm'}>
 CONFIG_DRM_MEDIATEK                             policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DRM_MEDIATEK_HDMI                        policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_DRM_MXSFB                                policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_DRM_MESON                                policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DRM_MESON_DW_HDMI                        policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DRM_ARCPGU                               policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
@@ -7114,7 +7112,7 @@ CONFIG_PCIE_KEEMBAY_HOST                        policy<{'arm64': 'y'}>
 CONFIG_PCIE_KEEMBAY_EP                          policy<{'arm64': 'y'}>
 CONFIG_PCIE_KIRIN                               policy<{'arm64': 'y'}>
 CONFIG_PCIE_HISI_STB                            policy<{'arm64': 'y', 'armhf': 'y'}>
-CONFIG_PCI_MESON                                policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
+CONFIG_PCI_MESON                                policy<{'amd64': 'n', 'arm64': 'm', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_PCIE_TEGRA194_HOST                       policy<{'arm64': 'm'}>
 CONFIG_PCIE_TEGRA194_EP                         policy<{'arm64': 'm'}>
 CONFIG_PCIE_VISCONTI_HOST                       policy<{'arm64': 'y'}>
@@ -7122,6 +7120,8 @@ CONFIG_PCIE_UNIPHIER                            policy<{'armhf': 'n', 'armhf-gen
 CONFIG_PCIE_UNIPHIER_EP                         policy<{'armhf': 'n', 'armhf-generic-lpae': '-'}>
 CONFIG_PCIE_AL                                  policy<{'arm64': 'y'}>
 CONFIG_PCIE_FU740                               policy<{'riscv64': 'y'}>
+#
+CONFIG_PCI_MESON                                note<LP #2007745>
 
 # Menu: Device Drivers >> PCI support >> PCI controller drivers >> Mobiveil PCIe Core Support
 CONFIG_PCIE_MOBIVEIL_PLAT                       policy<{'arm64': 'n'}>
@@ -10327,7 +10327,7 @@ CONFIG_ITCO_WDT                                 policy<{'amd64': 'm'}>
 CONFIG_ITCO_VENDOR_SUPPORT                      policy<{'amd64': 'y'}>
 CONFIG_IT8712F_WDT                              policy<{'amd64': 'm'}>
 CONFIG_IT87_WDT                                 policy<{'amd64': 'm'}>
-CONFIG_HP_WATCHDOG                              policy<{'amd64': 'm'}>
+CONFIG_HP_WATCHDOG                              policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_HPWDT_NMI_DECODING                       policy<{'amd64': 'y'}>
 CONFIG_KEMPLD_WDT                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SC1200_WDT                               policy<{'amd64': 'm'}>
@@ -14424,4 +14424,3 @@ CONFIG_FW_LOADER_COMPRESS_XZ                    policy<{'amd64': 'y', 'arm64': '
 CONFIG_FW_LOADER_COMPRESS_ZSTD                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_EFI_DISABLE_RUNTIME                      policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'riscv64': 'n'}>
 CONFIG_EFI_COCO_SECRET                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'riscv64': 'y'}>
-CONFIG_HUGETLB_PAGE_OPTIMIZE_VMEMMAP_DEFAULT_ON policy<{'amd64': 'n', 'arm64': 'n'}>
