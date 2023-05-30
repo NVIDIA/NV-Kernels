@@ -9304,6 +9304,7 @@ EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x2aec4316	__nft_release_basechain
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x2c8dfa01	nft_register_expr
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x3251d762	nf_tables_trans_destroy_flush_work
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x34cf1702	__nft_reg_track_cancel
+EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x38191dfe	nf_tables_activate_set
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x39829324	nft_data_init
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x41b71e65	nft_trace_enabled
 EXPORT_SYMBOL_GPL	 net/netfilter/nf_tables 0x439db33d	nft_parse_register_store
