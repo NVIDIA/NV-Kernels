@@ -107,7 +107,7 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
 
 static struct plt_entry *get_ftrace_plt(struct module *mod, unsigned long addr)
 {
-#ifdef CONFIG_ARM64_MODULE_PLTS
+#ifdef CONFIG_MODULES
 	struct plt_entry *plt = mod->arch.ftrace_trampolines;
 
 	if (addr == FTRACE_ADDR)
@@ -145,7 +145,7 @@ static bool ftrace_find_callable_addr(struct dyn_ftrace *rec,
 	 * must use a PLT to reach it. We can only place PLTs for modules, and
 	 * only when module PLT support is built-in.
 	 */
-	if (!IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
+	if (!IS_ENABLED(CONFIG_MODULES))
 		return false;
 
 	/*
@@ -249,10 +249,8 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
 	 *
 	 * Note: 'mod' is only set at module load time.
 	 */
-	if (!IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_ARGS) &&
-	    IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) && mod) {
+	if (!IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_ARGS) && mod)
 		return aarch64_insn_patch_text_nosync((void *)pc, new);
-	}
 
 	if (!ftrace_find_callable_addr(rec, mod, &addr))
 		return -EINVAL;
