@@ -3151,7 +3151,7 @@ int extent_write_locked_range(struct inode *inode, u64 start, u64 end)
 	struct writeback_control wbc_writepages = {
 		.sync_mode	= WB_SYNC_ALL,
 		.range_start	= start,
-		.range_end	= end + 1,
+		.range_end	= end,
 		/* We're called from an async helper function */
 		.punt_to_cgroup	= 1,
 		.no_cgroup_owner = 1,
