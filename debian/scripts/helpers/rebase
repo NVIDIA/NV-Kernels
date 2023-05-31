@@ -91,8 +91,11 @@ if [ -z "${LOCAL_BRANCH}" ]; then
 	#
 	# Fetch the upstream branch.
 	#
-	git fetch "${RELEASE_REPO}"
-	git fetch "${RELEASE_REPO}" "${SOURCE_RELEASE_BRANCH}"
+    if [ -z "${SOURCE_RELEASE_BRANCH}" ]; then
+	    git fetch "${RELEASE_REPO}"
+    else
+	    git fetch "${RELEASE_REPO}" "${SOURCE_RELEASE_BRANCH}"
+    fi
 	LOCAL_BRANCH=FETCH_HEAD
 fi
 
