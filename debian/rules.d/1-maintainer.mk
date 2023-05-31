@@ -41,9 +41,13 @@ printdebian:
 
 updateconfigs defaultconfigs editconfigs genconfigs dumpconfigs:
 	dh_testdir;
+ifneq ($(wildcard $(DEBIAN)/config/config.common.ubuntu),)
+	$(SHELL) $(DROOT)/scripts/misc/old-kernelconfig $@ "$(do_enforce_all)"
+else
 	kmake='$(kmake)' skip_checks=$(do_skip_checks) conc_level=$(conc_level) \
 		$(SHELL) $(DROOT)/scripts/misc/kernelconfig $@
 	@rm -rf build
+endif
 
 migrateconfigs:
 ifneq ($(wildcard $(DEBIAN)/config/config.common.ubuntu),)
