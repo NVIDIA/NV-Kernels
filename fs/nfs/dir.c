@@ -2544,6 +2544,10 @@ static DEFINE_SPINLOCK(nfs_access_lru_lock);
 static LIST_HEAD(nfs_access_lru_list);
 static atomic_long_t nfs_access_nr_entries;
 
+static bool nfs_fasc = false;
+module_param(nfs_fasc, bool, 0644);
+MODULE_PARM_DESC(nfs_fasc, "Use file access stale cache for NFS");
+
 static unsigned long nfs_access_max_cachesize = 4*1024*1024;
 module_param(nfs_access_max_cachesize, ulong, 0644);
 MODULE_PARM_DESC(nfs_access_max_cachesize, "NFS access maximum total cache length");
@@ -2718,7 +2722,9 @@ static u64 nfs_access_login_time(const struct task_struct *task,
 static int nfs_access_get_cached_locked(struct inode *inode, const struct cred *cred, u32 *mask, bool may_block)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
-	u64 login_time = nfs_access_login_time(current, cred);
+	u64 login_time;
+	if (nfs_fasc)
+		login_time = nfs_access_login_time(current, cred);
 	struct nfs_access_entry *cache;
 	bool retry = true;
 	int err;
@@ -2746,9 +2752,11 @@ static int nfs_access_get_cached_locked(struct inode *inode, const struct cred *
 		spin_lock(&inode->i_lock);
 		retry = false;
 	}
-	err = -ENOENT;
-	if ((s64)(login_time - cache->timestamp) > 0)
-		goto out;
+	if (nfs_fasc) {
+		err = -ENOENT;
+		if ((s64)(login_time - cache->timestamp) > 0)
+			goto out;
+	}
 	*mask = cache->mask;
 	list_move_tail(&cache->lru, &nfsi->access_cache_entry_lru);
 	err = 0;
@@ -2767,7 +2775,9 @@ static int nfs_access_get_cached_rcu(struct inode *inode, const struct cred *cre
 	 * but do it without locking.
 	 */
 	struct nfs_inode *nfsi = NFS_I(inode);
-	u64 login_time = nfs_access_login_time(current, cred);
+	u64 login_time;
+	if (nfs_fasc)
+		login_time = nfs_access_login_time(current, cred);
 	struct nfs_access_entry *cache;
 	int err = -ECHILD;
 	struct list_head *lh;
@@ -2782,8 +2792,10 @@ static int nfs_access_get_cached_rcu(struct inode *inode, const struct cred *cre
 		cache = NULL;
 	if (cache == NULL)
 		goto out;
-	if ((s64)(login_time - cache->timestamp) > 0)
-		goto out;
+	if (nfs_fasc) {
+		if ((s64)(login_time - cache->timestamp) > 0)
+			goto out;
+	}
 	if (nfs_check_cache_invalid(inode, NFS_INO_INVALID_ACCESS))
 		goto out;
 	*mask = cache->mask;
@@ -2850,7 +2862,8 @@ void nfs_access_add_cache(struct inode *inode, struct nfs_access_entry *set)
 	RB_CLEAR_NODE(&cache->rb_node);
 	cache->cred = get_cred(set->cred);
 	cache->mask = set->mask;
-	cache->timestamp = ktime_get_ns();
+	if (nfs_fasc)
+		cache->timestamp = ktime_get_ns();
 
 	/* The above field assignments must be visible
 	 * before this item appears on the lru.  We cannot easily
