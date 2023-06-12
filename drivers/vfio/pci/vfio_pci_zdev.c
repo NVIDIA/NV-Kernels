@@ -147,9 +147,9 @@ static int vfio_pci_zdev_group_notifier(struct notifier_block *nb,
 	struct zpci_dev *zdev = container_of(nb, struct zpci_dev,
 					     kvm_group_nb);
 
-	if (action == VFIO_GROUP_NOTIFY_SET_KVM) {
+	if (action == VFIO_GROUP_NOTIFY_SET_KVM && zpci_kvm_hook.kvm_register) {
 		if (data) {
-			if (kvm_s390_pci_register_kvm(zdev, data))
+			if (zpci_kvm_hook.kvm_register(zdev, data))
 				return NOTIFY_BAD;
 		}
 	}
@@ -197,5 +197,6 @@ void vfio_pci_zdev_close_device(struct vfio_pci_core_device *vdev)
 	if (!zdev || !zdev->kzdev)
 		return;
 
-	kvm_s390_pci_unregister_kvm(zdev);
+	if (zpci_kvm_hook.kvm_unregister)
+		zpci_kvm_hook.kvm_unregister(zdev);
 }
