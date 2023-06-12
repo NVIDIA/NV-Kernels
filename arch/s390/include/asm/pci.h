@@ -195,6 +195,7 @@ struct zpci_dev {
 	struct s390_domain *s390_domain; /* s390 IOMMU domain data */
 	struct kvm_zdev *kzdev;
 	struct mutex kzdev_lock;
+	struct notifier_block kvm_group_nb; /* Jammy-specific */
 };
 
 static inline bool zdev_enabled(struct zpci_dev *zdev)

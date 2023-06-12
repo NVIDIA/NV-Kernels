@@ -11,6 +11,7 @@
 #include <linux/uaccess.h>
 #include <linux/vfio.h>
 #include <linux/vfio_zdev.h>
+#include <linux/kvm_host.h>
 #include <asm/pci_clp.h>
 #include <asm/pci_io.h>
 
@@ -135,4 +136,63 @@ int vfio_pci_info_zdev_add_caps(struct vfio_pci_core_device *vdev,
 	ret = zpci_pfip_cap(zdev, caps);
 
 	return ret;
+}
+
+static int vfio_pci_zdev_group_notifier(struct notifier_block *nb,
+					unsigned long action, void *data)
+{
+	struct zpci_dev *zdev = container_of(nb, struct zpci_dev,
+					     kvm_group_nb);
+
+	if (action == VFIO_GROUP_NOTIFY_SET_KVM) {
+		if (data) {
+			if (kvm_s390_pci_register_kvm(zdev, data))
+				return NOTIFY_BAD;
+		}
+	}
+
+	return NOTIFY_OK;
+}
+
+int vfio_pci_zdev_open_device(struct vfio_pci_core_device *vdev)
+{
+	struct zpci_dev *zdev = to_zpci(vdev->pdev);
+	unsigned long events = VFIO_GROUP_NOTIFY_SET_KVM;
+	int ret;
+
+	if (!zdev)
+		return -ENODEV;
+
+	/*
+	 * Jammy-specific: backporting upstream commit 421cfe6596f6cb would
+	 * require a large number of pre-req series to also be applied,
+	 * affecting vfio across all platforms.
+	 * Instead implement a vfio KVM group notifier here which only
+	 * affects vfio-pci-zdev.  Rather than relying on the kvm pointer
+	 * being provided in the vdev, get it from the notifier.  Sice we know
+	 * the kvm will already be set, we can then immediately unregister the
+	 * notifier.
+	 */
+	zdev->kvm_group_nb.notifier_call = vfio_pci_zdev_group_notifier;
+	ret = vfio_register_notifier(&vdev->pdev->dev, VFIO_GROUP_NOTIFY,
+				     &events, &zdev->kvm_group_nb);
+	if (ret != 0) {
+		pr_warn("vfio_register_notifier for group failed: %d\n", ret);
+		return ret;
+	}
+
+	vfio_unregister_notifier(&vdev->pdev->dev, VFIO_GROUP_NOTIFY,
+				 &zdev->kvm_group_nb);
+
+	return 0;
+}
+
+void vfio_pci_zdev_close_device(struct vfio_pci_core_device *vdev)
+{
+	struct zpci_dev *zdev = to_zpci(vdev->pdev);
+
+	if (!zdev || !zdev->kzdev)
+		return;
+
+	kvm_s390_pci_unregister_kvm(zdev);
 }
