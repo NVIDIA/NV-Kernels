@@ -185,7 +185,7 @@ struct igc_adapter {
 
 	ktime_t base_time;
 	ktime_t cycle_time;
-	bool qbv_enable;
+	bool taprio_offload_enable;
 
 	/* OS defined structs */
 	struct pci_dev *pdev;
