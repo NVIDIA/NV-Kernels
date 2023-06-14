@@ -5049,6 +5049,28 @@ static int io_msg_ring_prep(struct io_kiocb *req,
 	return 0;
 }
 
+static void io_double_unlock_ctx(struct io_ring_ctx *octx)
+{
+	mutex_unlock(&octx->uring_lock);
+}
+
+static int io_double_lock_ctx(struct io_ring_ctx *octx,
+			      unsigned int issue_flags)
+{
+	/*
+	 * To ensure proper ordering between the two ctxs, we can only
+	 * attempt a trylock on the target. If that fails and we already have
+	 * the source ctx lock, punt to io-wq.
+	 */
+	if (!(issue_flags & IO_URING_F_UNLOCKED)) {
+		if (!mutex_trylock(&octx->uring_lock))
+			return -EAGAIN;
+		return 0;
+	}
+	mutex_lock(&octx->uring_lock);
+	return 0;
+}
+
 static int io_msg_ring(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_ring_ctx *target_ctx;
@@ -5063,6 +5085,10 @@ static int io_msg_ring(struct io_kiocb *req, unsigned int issue_flags)
 	ret = -EOVERFLOW;
 	target_ctx = req->file->private_data;
 
+	if (target_ctx->flags & IORING_SETUP_IOPOLL)
+		if (unlikely(io_double_lock_ctx(target_ctx, issue_flags)))
+			return -EAGAIN;
+
 	spin_lock(&target_ctx->completion_lock);
 	filled = io_fill_cqe_aux(target_ctx, msg->user_data, msg->len, 0);
 	io_commit_cqring(target_ctx);
@@ -5072,6 +5098,9 @@ static int io_msg_ring(struct io_kiocb *req, unsigned int issue_flags)
 		io_cqring_ev_posted(target_ctx);
 		ret = 0;
 	}
+
+	if (target_ctx->flags & IORING_SETUP_IOPOLL)
+		io_double_unlock_ctx(target_ctx);
 
 done:
 	if (ret < 0)
