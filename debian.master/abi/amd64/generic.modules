@@ -2222,6 +2222,7 @@ intel-wmi-thunderbolt
 intel-xhci-usb-role-switch
 intel-xway
 intel_atomisp2_led
+intel_atomisp2_pm
 intel_bxt_pmic_thermal
 intel_bxtwc_tmu
 intel_chtdc_ti_pwrbtn
@@ -5950,7 +5951,6 @@ virtio_mem
 virtio_net
 virtio_pmem
 virtio_rpmsg_bus
-virtio_scsi
 virtio_snd
 virtio_vdpa
 virtiofs

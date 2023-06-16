@@ -850,7 +850,6 @@ virtio_crypto
 virtio_dma_buf
 virtio_input
 virtio_net
-virtio_scsi
 virtiofs
 vitesse
 vmac

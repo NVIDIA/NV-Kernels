@@ -5659,7 +5659,6 @@ virtio_input
 virtio_net
 virtio_pmem
 virtio_rpmsg_bus
-virtio_scsi
 virtio_snd
 virtio_vdpa
 virtiofs
