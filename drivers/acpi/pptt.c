@@ -181,9 +181,10 @@ acpi_find_cache_level(struct acpi_table_header *table_hdr,
  * levels and split cache levels (data/instruction).
  * @table_hdr: Pointer to the head of the PPTT table
  * @cpu_node: processor node we wish to count caches for
- * @levels: Number of levels if success.
+ * @levels: Number of levels if success. (*levels) should be initialized by
+ *          the caller with the value to be used as the starting level.
  * @split_levels:	Number of split cache levels (data/instruction) if
- *			success. Can by NULL.
+ *			success. Can be NULL.
  *
  * Given a processor node containing a processing unit, walk into it and count
  * how many levels exist solely for it, and then walk up each level until we hit
@@ -999,6 +1000,8 @@ int find_acpi_cache_level_from_id(u32 cache_id)
 	 * to find the level...
 	 */
 	for_each_possible_cpu(cpu) {
+
+		num_levels = 0;
 		acpi_cpu_id = get_acpi_id_for_cpu(cpu);
 		cpu_node = acpi_find_processor_node(table, acpi_cpu_id);
 		if (!cpu_node)
@@ -1069,6 +1072,8 @@ int acpi_pptt_get_cpumask_from_cache_id(u32 cache_id, cpumask_t *cpus)
 	 * If we found the cache first, we'd still need to walk from each cpu.
 	 */
 	for_each_possible_cpu(cpu) {
+
+		num_levels = 0;
 		acpi_cpu_id = get_acpi_id_for_cpu(cpu);
 		cpu_node = acpi_find_processor_node(table, acpi_cpu_id);
 		if (!cpu_node)
