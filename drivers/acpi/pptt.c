@@ -1005,7 +1005,7 @@ int find_acpi_cache_level_from_id(u32 cache_id)
 			break;
 		acpi_count_levels(table, cpu_node, &num_levels, NULL);
 
-		for (level = 0; level <= num_levels; level++) {
+		for (level = 1; level <= num_levels; level++) {
 			cache = acpi_find_cache_node(table, acpi_cpu_id,
 						     ACPI_PPTT_CACHE_TYPE_UNIFIED,
 						     level, &cpu_node);
@@ -1075,7 +1075,7 @@ int acpi_pptt_get_cpumask_from_cache_id(u32 cache_id, cpumask_t *cpus)
 			break;
 		acpi_count_levels(table, cpu_node, &num_levels, NULL);
 
-		for (level = 0; level <= num_levels; level++) {
+		for (level = 1; level <= num_levels; level++) {
 			cache = acpi_find_cache_node(table, acpi_cpu_id,
 						     ACPI_PPTT_CACHE_TYPE_UNIFIED,
 						     level, &cpu_node);
