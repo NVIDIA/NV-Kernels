@@ -2594,6 +2594,11 @@ static struct aa_sfs_entry aa_sfs_entry_versions[] = {
 	{ }
 };
 
+static struct aa_sfs_entry aa_sfs_entry_unconfined[] = {
+	AA_SFS_FILE_INTPTR("userns",		unprivileged_userns_restricted),
+	{ }
+};
+
 static struct aa_sfs_entry aa_sfs_entry_profile[] = {
 	AA_SFS_FILE_BOOLEAN("interruptible",		1),
 	{ }
@@ -2606,6 +2611,7 @@ static struct aa_sfs_entry aa_sfs_entry_policy[] = {
 	AA_SFS_FILE_U64("outofband",		MAX_OOB_SUPPORTED),
 	AA_SFS_FILE_U64("permstable32_version",	2),
 	AA_SFS_FILE_STRING("permstable32", "allow deny subtree cond kill complain prompt audit quiet hide xindex tag label"),
+	AA_SFS_DIR("unconfined_restrictions",	aa_sfs_entry_unconfined),
 	{ }
 };
 
