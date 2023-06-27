@@ -6577,11 +6577,13 @@ int __btrfs_map_block(struct btrfs_fs_info *fs_info, enum btrfs_map_op op,
 		if (patch_the_first_stripe_for_dev_replace) {
 			smap->dev = dev_replace->tgtdev;
 			smap->physical = physical_to_patch_in_first_stripe;
-			*mirror_num_ret = map->num_stripes + 1;
+			if (mirror_num_ret)
+				*mirror_num_ret = map->num_stripes + 1;
 		} else {
 			set_io_stripe(smap, map, stripe_index, stripe_offset,
 				      stripe_nr);
-			*mirror_num_ret = mirror_num;
+			if (mirror_num_ret)
+				*mirror_num_ret = mirror_num;
 		}
 		*bioc_ret = NULL;
 		ret = 0;
