@@ -15,11 +15,10 @@ linux-hwe-6.2 (6.2.0-23.23~22.04.1) jammy; urgency=medium
     - [Packaging] update Ubuntu.md
     - [Packaging] resync getabis
     - [Packaging] resync git-ubuntu-log
-
-  * Miscellaneous Ubuntu changes
     - [Packaging] enable rust only in the master kernel for amd64
 
-  * Miscellaneous upstream changes
+  * Revert variable symbol length modversion in all the jammy kernels
+    (LP: #2025134)
     - Revert "UBUNTU: SAUCE: modpost: support arbitrary symbol length in
       modversion"
 
