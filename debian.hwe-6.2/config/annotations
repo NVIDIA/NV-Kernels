@@ -8,6 +8,9 @@ include "../../debian.master/config/annotations"
 CONFIG_RUST                                     policy<{'amd64': '-'}>
 CONFIG_RUST                                     note<'Rust should not be enabled in hwe kernels'>
 
+CONFIG_RUST_IS_AVAILABLE                        policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
+CONFIG_RUST_IS_AVAILABLE                        note<'required to enable Rust support, LP: #1993183'>
+
 
 # ---- Annotations without notes ----
 
@@ -15,14 +18,24 @@ CONFIG_ARCH_HAS_DMA_PREP_COHERENT               policy<{'arm64': 'y', 'riscv64':
 CONFIG_ARCH_HAS_SETUP_DMA_OPS                   policy<{'arm64': 'y', 'armhf': 'y', 'riscv64': '-'}>
 CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU                policy<{'arm64': 'y', 'armhf': 'y', 'riscv64': '-'}>
 CONFIG_ARCH_HAS_SYNC_DMA_FOR_DEVICE             policy<{'arm64': 'y', 'armhf': 'y', 'riscv64': '-'}>
+CONFIG_ARCH_SUPPORTS_SHADOW_CALL_STACK          policy<{'arm64': '-'}>
 CONFIG_AS_VERSION                               policy<{'amd64': '23800', 'arm64': '23800', 'armhf': '23800', 'ppc64el': '23800', 'riscv64': '23800', 's390x': '23800'}>
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
-CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"', 'arm64': '"aarch64-linux-gnu-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"', 'armhf': '"arm-linux-gnueabihf-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"', 'ppc64el': '"powerpc64le-linux-gnu-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"', 'riscv64': '"riscv64-linux-gnu-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"', 's390x': '"s390x-linux-gnu-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"'}>
+CONFIG_CC_HAS_AUTO_VAR_INIT_PATTERN             policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
+CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO                policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
+CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO_BARE           policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
+CONFIG_CC_HAVE_SHADOW_CALL_STACK                policy<{'arm64': '-'}>
+CONFIG_CC_HAVE_STACKPROTECTOR_TLS               policy<{'armhf': '-', 'riscv64': 'y'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'armhf': '"arm-linux-gnueabihf-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'ppc64el': '"powerpc64le-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'riscv64': '"riscv64-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 's390x': '"s390x-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"'}>
 CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
 CONFIG_DMA_COHERENT_POOL                        policy<{'amd64': 'y', 'arm64': 'y', 'riscv64': '-'}>
 CONFIG_DMA_DIRECT_REMAP                         policy<{'arm64': 'y', 'riscv64': '-'}>
 CONFIG_DMA_NONCOHERENT_MMAP                     policy<{'arm64': 'y', 'armhf': 'y', 'riscv64': '-'}>
-CONFIG_GCC_VERSION                              policy<{'amd64': '120100', 'arm64': '120100', 'armhf': '120100', 'ppc64el': '120100', 'riscv64': '120100', 's390x': '120100'}>
+CONFIG_GCC_VERSION                              policy<{'amd64': '110300', 'arm64': '110300', 'armhf': '110300', 'ppc64el': '110300', 'riscv64': '110300', 's390x': '110300'}>
+CONFIG_INIT_STACK_ALL_PATTERN                   policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
+CONFIG_INIT_STACK_ALL_ZERO                      policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
+CONFIG_INIT_STACK_NONE                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_KCOV                                     policy<{'amd64': 'n', 'arm64': '-', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': '-'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '23800', 'arm64': '23800', 'armhf': '23800', 'ppc64el': '23800', 'riscv64': '23800', 's390x': '23800'}>
 CONFIG_PAHOLE_HAS_LANG_EXCLUDE                  policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '122', 'arm64': '122', 'armhf': '122', 'ppc64el': '122', 'riscv64': '122', 's390x': '122'}>
@@ -33,4 +46,6 @@ CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'amd64': '-'}>
 CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': '-'}>
 CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-'}>
 CONFIG_SAMPLES_RUST                             policy<{'amd64': '-'}>
+CONFIG_SHADOW_CALL_STACK                        policy<{'arm64': '-'}>
+CONFIG_STACKPROTECTOR_PER_TASK                  policy<{'arm64': 'y', 'armhf': '-', 'riscv64': 'y'}>
 CONFIG_TOOLCHAIN_HAS_ZICBOM                     policy<{'riscv64': '-'}>
