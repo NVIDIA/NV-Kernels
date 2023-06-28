@@ -205,6 +205,7 @@ enum mapping_flags {
 	AS_LARGE_FOLIO_SUPPORT = 6,
 	AS_STABLE_WRITES,	/* must wait for writeback before modifying
 				   folio contents */
+	AS_RELEASE_ALWAYS,	/* Call ->release_folio(), even if no private data */
 };
 
 /**
@@ -288,6 +289,21 @@ static inline void mapping_set_stable_writes(struct address_space *mapping)
 static inline void mapping_clear_stable_writes(struct address_space *mapping)
 {
 	clear_bit(AS_STABLE_WRITES, &mapping->flags);
+}
+
+static inline bool mapping_release_always(const struct address_space *mapping)
+{
+	return test_bit(AS_RELEASE_ALWAYS, &mapping->flags);
+}
+
+static inline void mapping_set_release_always(struct address_space *mapping)
+{
+	set_bit(AS_RELEASE_ALWAYS, &mapping->flags);
+}
+
+static inline void mapping_clear_release_always(struct address_space *mapping)
+{
+	clear_bit(AS_RELEASE_ALWAYS, &mapping->flags);
 }
 
 static inline gfp_t mapping_gfp_mask(struct address_space * mapping)
