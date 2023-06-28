@@ -1,6 +1,6 @@
-linux-hwe-6.2 (6.2.0-25.25~22.04.1) jammy; urgency=medium
+linux-hwe-6.2 (6.2.0-25.25~22.04.2) jammy; urgency=medium
 
-  * jammy/linux-hwe-6.2: 6.2.0-25.25~22.04.1 -proposed tracker (LP: #2024539)
+  * jammy/linux-hwe-6.2: 6.2.0-25.25~22.04.2 -proposed tracker (LP: #2024539)
 
   * Packaging resync (LP: #1786013)
     - [Packaging] resync update-dkms-versions helper
