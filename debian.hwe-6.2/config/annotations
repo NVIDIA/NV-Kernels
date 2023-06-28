@@ -8,9 +8,6 @@ include "../../debian.master/config/annotations"
 CONFIG_RUST                                     policy<{'amd64': '-'}>
 CONFIG_RUST                                     note<'Rust should not be enabled in hwe kernels'>
 
-CONFIG_RUST_IS_AVAILABLE                        policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
-CONFIG_RUST_IS_AVAILABLE                        note<'required to enable Rust support, LP: #1993183'>
-
 
 # ---- Annotations without notes ----
 
