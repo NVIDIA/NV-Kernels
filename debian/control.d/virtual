@@ -1,14 +1,14 @@
 Package: linux-headers-virtual${variant:suffix}
 Architecture: amd64 arm64 armhf ppc64el s390x
 Section: kernel
-Depends: ${misc:Depends}, linux-headers-generic${variant:suffix} (= ${binary:Version}) [amd64 arm64 ppc64el s390x], linux-headers-generic-lpae${variant:suffix} (= ${binary:Version}) [armhf]
+Depends: ${misc:Depends}, linux-headers-generic${variant:suffix} (= ${binary:Version})
 Description: Virtual Linux kernel headers
  This package will always depend on linux-headers-generic.
 
 Package: linux-image-virtual${variant:suffix}
 Architecture: amd64 arm64 armhf ppc64el s390x
 Section: kernel
-Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic [amd64 arm64 ppc64el s390x], linux-image-${kernel-abi-version}-generic-lpae [armhf]
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic
 Provides: ${dkms:zfs-modules} ${dkms:virtualbox-guest-modules} ${dkms:wireguard-linux-compat-modules}
 Description: Virtual Linux kernel image
  This package will always depend on the latest minimal generic kernel image
@@ -18,7 +18,7 @@ Package: linux-tools-virtual${variant:suffix}
 Architecture: amd64 arm64 armhf ppc64el s390x
 Section: kernel
 Provides: linux-tools
-Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-generic [amd64 arm64 ppc64el s390x], linux-tools-${kernel-abi-version}-generic-lpae [armhf]
+Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-generic
 Description: Virtual Linux kernel tools
  This package will always depend on the latest minimal generic kernel tools
  used for virtual instances.
