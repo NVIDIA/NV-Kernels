@@ -12,9 +12,10 @@ CONFIG_RUST                                     note<'required to enable Rust su
 
 # ---- Annotations without notes ----
 
+CONFIG_ARM64_MODULE_PLTS                        policy<{'arm64': '-'}>
 CONFIG_AS_VERSION                               policy<{'amd64': '23800', 'arm64': '23800'}>
-CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"', 'arm64': '"aarch64-linux-gnu-gcc-12 (Ubuntu 12.1.0-2ubuntu1~22.04) 12.1.0"'}>
-CONFIG_GCC_VERSION                              policy<{'amd64': '120100', 'arm64': '120100'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-12 (Ubuntu 12.3.0-1ubuntu1~22.04) 12.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-12 (Ubuntu 12.3.0-1ubuntu1~22.04) 12.3.0"'}>
+CONFIG_GCC_VERSION                              policy<{'amd64': '120300', 'arm64': '120300'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '23800', 'arm64': '23800'}>
 CONFIG_PAHOLE_HAS_LANG_EXCLUDE                  policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '122', 'arm64': '122'}>
