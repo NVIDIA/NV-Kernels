@@ -351,6 +351,8 @@ CONFIG_LOAD_PPC_KEYS                            note<'LP: #1866909'>
 CONFIG_LOCALVERSION_AUTO                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_LOCALVERSION_AUTO                        note<'triggers packaging failures'>
 
+CONFIG_LOCK_MM_AND_FIND_VMA			policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': '-'}>
+
 CONFIG_MEMORY_HOTPLUG_DEFAULT_ONLINE            policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'n', 's390x': 'n'}>
 CONFIG_MEMORY_HOTPLUG_DEFAULT_ONLINE            note<'LP: #1848492'>
 
