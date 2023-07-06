@@ -391,6 +391,8 @@ static int ovl_show_options(struct seq_file *m, struct dentry *dentry)
 		seq_puts(m, ",volatile");
 	if (ofs->config.userxattr)
 		seq_puts(m, ",userxattr");
+	else
+		seq_puts(m, ",nouserxattr");
 	return 0;
 }
 
@@ -439,6 +441,7 @@ enum {
 	OPT_UUID_OFF,
 	OPT_NFS_EXPORT_ON,
 	OPT_USERXATTR,
+	OPT_NOUSERXATTR,
 	OPT_NFS_EXPORT_OFF,
 	OPT_XINO_ON,
 	OPT_XINO_OFF,
@@ -458,6 +461,7 @@ static const match_table_t ovl_tokens = {
 	{OPT_INDEX_ON,			"index=on"},
 	{OPT_INDEX_OFF,			"index=off"},
 	{OPT_USERXATTR,			"userxattr"},
+	{OPT_NOUSERXATTR,		"nouserxattr"},
 	{OPT_UUID_ON,			"uuid=on"},
 	{OPT_UUID_OFF,			"uuid=off"},
 	{OPT_NFS_EXPORT_ON,		"nfs_export=on"},
@@ -626,6 +630,10 @@ static int ovl_parse_opt(char *opt, struct ovl_config *config)
 
 		case OPT_USERXATTR:
 			config->userxattr = true;
+			break;
+
+		case OPT_NOUSERXATTR:
+			config->userxattr = false;
 			break;
 
 		default:
@@ -1926,6 +1934,8 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 	ofs->config.nfs_export = ovl_nfs_export_def;
 	ofs->config.xino = ovl_xino_def();
 	ofs->config.metacopy = ovl_metacopy_def;
+	if (sb->s_user_ns != &init_user_ns)
+		ofs->config.userxattr = true;
 	err = ovl_parse_opt((char *) data, &ofs->config);
 	if (err)
 		goto out_err;
