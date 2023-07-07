@@ -198,7 +198,7 @@ static int tpm_tis_spi_driver_probe(struct spi_device *spi)
 	const struct spi_device_id *spi_dev_id = spi_get_device_id(spi);
 	tpm_tis_spi_probe_func probe_func;
 
-	probe_func = device_get_match_data(&spi->dev);
+	probe_func = of_device_get_match_data(&spi->dev);
 	if (!probe_func) {
 		if (spi_dev_id) {
 			probe_func = (tpm_tis_spi_probe_func)spi_dev_id->driver_data;
@@ -227,7 +227,6 @@ static const struct spi_device_id tpm_tis_spi_id[] = {
 	{ "tpm_tis_spi", (unsigned long)tpm_tis_spi_probe },
 	{ "tpm_tis-spi", (unsigned long)tpm_tis_spi_probe },
 	{ "cr50", (unsigned long)cr50_spi_probe },
-	{ "tegra-tpm-spi", (unsigned long)tegra_tpm_spi_probe },
 	{}
 };
 MODULE_DEVICE_TABLE(spi, tpm_tis_spi_id);
@@ -237,7 +236,6 @@ static const struct of_device_id of_tis_spi_match[] = {
 	{ .compatible = "infineon,slb9670", .data = tpm_tis_spi_probe },
 	{ .compatible = "tcg,tpm_tis-spi", .data = tpm_tis_spi_probe },
 	{ .compatible = "google,cr50", .data = cr50_spi_probe },
-	{ .compatible = "nvidia,tegra-tpm-spi", .data = tegra_tpm_spi_probe },
 	{}
 };
 MODULE_DEVICE_TABLE(of, of_tis_spi_match);
