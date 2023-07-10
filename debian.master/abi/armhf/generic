@@ -4739,10 +4739,10 @@ EXPORT_SYMBOL	 drivers/usb/serial/usb_wwan 0xfbb66b2b	usb_wwan_tiocmset
 EXPORT_SYMBOL	 drivers/usb/serial/usbserial 0x93955163	usb_serial_suspend
 EXPORT_SYMBOL	 drivers/usb/serial/usbserial 0xbfb8f2c2	usb_serial_resume
 EXPORT_SYMBOL	 drivers/vdpa/vdpa 0x5d733fed	vdpa_set_status
-EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x28fda947	mdev_register_driver
-EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x5fb4f1c1	mdev_register_parent
-EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x6ed8283a	mdev_unregister_parent
-EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0xe8b76d7c	mdev_unregister_driver
+EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x2ab1cb68	mdev_unregister_driver
+EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x33960872	mdev_register_parent
+EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x41a5709b	mdev_unregister_parent
+EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0xd67633e4	mdev_register_driver
 EXPORT_SYMBOL	 drivers/vfio/vfio 0x05b8cfda	vfio_set_irqs_validate_and_prepare
 EXPORT_SYMBOL	 drivers/vfio/vfio 0x0f655355	vfio_info_add_capability
 EXPORT_SYMBOL	 drivers/vfio/vfio 0x51f16cdb	vfio_info_cap_shift
@@ -16771,6 +16771,7 @@ EXPORT_SYMBOL_GPL	 drivers/vdpa/vdpa 0xf2c41d42	vdpa_mgmtdev_unregister
 EXPORT_SYMBOL_GPL	 drivers/vdpa/vdpa 0xf602ab52	vdpa_mgmtdev_register
 EXPORT_SYMBOL_GPL	 drivers/vdpa/vdpa 0xf9bc55dc	vdpa_unregister_device
 EXPORT_SYMBOL_GPL	 drivers/vdpa/vdpa_sim/vdpa_sim 0x68f32f6a	vdpasim_create
+EXPORT_SYMBOL_GPL	 drivers/vfio/mdev/mdev 0x89027996	mdev_bus_type
 EXPORT_SYMBOL_GPL	 drivers/vfio/pci/vfio-pci-core 0x013d320c	vfio_pci_core_aer_err_detected
 EXPORT_SYMBOL_GPL	 drivers/vfio/pci/vfio-pci-core 0x0c40a15f	vfio_pci_core_close_device
 EXPORT_SYMBOL_GPL	 drivers/vfio/pci/vfio-pci-core 0x204fa0b6	vfio_pci_core_sriov_configure
