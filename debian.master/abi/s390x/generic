@@ -1997,10 +1997,10 @@ EXPORT_SYMBOL	 drivers/tty/serial/serial_core 0x851d6d65	uart_resume_port
 EXPORT_SYMBOL	 drivers/tty/serial/serial_core 0xbfe638cc	uart_unregister_driver
 EXPORT_SYMBOL	 drivers/tty/serial/serial_core 0xdbfc4e99	uart_get_baud_rate
 EXPORT_SYMBOL	 drivers/tty/serial/serial_core 0xf0209ebb	uart_match_port
-EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x7678d1fd	mdev_unregister_parent
-EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x8ac9075d	mdev_unregister_driver
-EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x8e82f757	mdev_register_driver
-EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0xba0bbe75	mdev_register_parent
+EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x0df24945	mdev_register_parent
+EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0x72cf6066	mdev_register_driver
+EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0xdbfbcdfc	mdev_unregister_driver
+EXPORT_SYMBOL	 drivers/vfio/mdev/mdev 0xe92858e3	mdev_unregister_parent
 EXPORT_SYMBOL	 drivers/vfio/vfio 0x34afb3e2	vfio_dma_rw
 EXPORT_SYMBOL	 drivers/vfio/vfio 0x4232a0c3	vfio_info_cap_shift
 EXPORT_SYMBOL	 drivers/vfio/vfio 0xaf8a4a7f	vfio_set_irqs_validate_and_prepare
@@ -8501,6 +8501,7 @@ EXPORT_SYMBOL_GPL	 drivers/uio/uio 0x0015c4ad	__devm_uio_register_device
 EXPORT_SYMBOL_GPL	 drivers/uio/uio 0x3d426b82	__uio_register_device
 EXPORT_SYMBOL_GPL	 drivers/uio/uio 0x58ce4d27	uio_event_notify
 EXPORT_SYMBOL_GPL	 drivers/uio/uio 0xb6129b23	uio_unregister_device
+EXPORT_SYMBOL_GPL	 drivers/vfio/mdev/mdev 0x3079beee	mdev_bus_type
 EXPORT_SYMBOL_GPL	 drivers/vfio/pci/vfio-pci-core 0x002b96f4	vfio_pci_core_unregister_device
 EXPORT_SYMBOL_GPL	 drivers/vfio/pci/vfio-pci-core 0x091acb63	vfio_pci_core_register_device
 EXPORT_SYMBOL_GPL	 drivers/vfio/pci/vfio-pci-core 0x0b1fe775	vfio_pci_core_disable
