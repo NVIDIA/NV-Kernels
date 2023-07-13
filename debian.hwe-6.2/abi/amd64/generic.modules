@@ -507,16 +507,6 @@ atmel_cs
 atmel_mxt_ts
 atmel_pci
 atmtcp
-atomisp
-atomisp-gc0310
-atomisp-gc2235
-atomisp-libmsrlisthelper
-atomisp-lm3554
-atomisp-mt9m114
-atomisp-ov2680
-atomisp-ov2722
-atomisp-ov5693
-atomisp_gmin_platform
 atp
 atp870u
 atusb
@@ -2232,6 +2222,7 @@ intel-wmi-thunderbolt
 intel-xhci-usb-role-switch
 intel-xway
 intel_atomisp2_led
+intel_atomisp2_pm
 intel_bxt_pmic_thermal
 intel_bxtwc_tmu
 intel_chtdc_ti_pwrbtn
@@ -5960,7 +5951,6 @@ virtio_mem
 virtio_net
 virtio_pmem
 virtio_rpmsg_bus
-virtio_scsi
 virtio_snd
 virtio_vdpa
 virtiofs
