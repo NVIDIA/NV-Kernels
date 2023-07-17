@@ -16,6 +16,17 @@ Description: Generic Linux kernel image
  This package will always depend on the latest generic kernel image
  available.
 
+Package: linux-image-uc-generic${variant:suffix}
+Architecture: amd64 arm64
+Section: kernel
+Depends: ${misc:Depends}, linux-image-uc-${kernel-abi-version}-generic, linux-modules-extra-${kernel-abi-version}-generic, linux-firmware, firmware-sof-signed [amd64], wireless-regdb
+Description: Generic Linux kernel image for Ubuntu Core
+ This package will always depend on the latest generic kernel image
+ available.
+ .
+ This kernel is suitable for staging into a kernel snap, and is not
+ suitable to be used directly on classic systems.
+
 Package: linux-tools-generic${variant:suffix}
 Architecture: amd64 armhf arm64 ppc64el s390x
 Section: kernel
