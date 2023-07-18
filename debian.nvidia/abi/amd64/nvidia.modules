@@ -2175,7 +2175,6 @@ intel_rapl_msr
 intel_sar
 intel_scu_ipcutil
 intel_scu_pltdrv
-intel_skl_int3472
 intel_soc_dts_iosf
 intel_soc_dts_thermal
 intel_soc_pmic_bxtwc
