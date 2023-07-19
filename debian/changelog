@@ -1,3 +1,12 @@
+linux-meta-unstable (6.5.0.2.2) mantic; urgency=medium
+
+  * Bump ABI 6.5.0-2
+
+  * Remove non-LPAE kernel flavor (LP: #2025265)
+    - [Packaging] Transition armhf generic-lpae to generic
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 19 Jul 2023 07:32:36 +0200
+
 linux-meta-unstable (6.5.0.1.1) mantic; urgency=medium
 
   * Bump ABI 6.5.0-1
