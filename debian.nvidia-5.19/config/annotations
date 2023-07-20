@@ -7,8 +7,9 @@ include "../../debian.hwe-5.19/config/annotations"
 CONFIG_LATENCYTOP                               policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y', 'arm64': 'n'}>
 CONFIG_HZ_1000                               	policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y', 'arm64': 'n'}>
 CONFIG_HZ_250                               	policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'y'}>
-CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'y'}>
+CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'y', 'arm64-nvidia': 'n', 'arm64-nvidia-64k': 'n'}>
 CONFIG_PREEMPT					                policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y', 'arm64': 'n'}>
+CONFIG_PREEMPT_NONE                             policy<{'amd64': 'n', 'arm64': 'y'}>
 
 CONFIG_COMEDI_TESTS_EXAMPLE			            policy<{'amd64': 'm', 'amd64-nvidia-lowlatency': 'n', 'arm64': 'm'}>
 CONFIG_TEST_DIV64				                policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'm', 'arm64': 'n'}>
@@ -32,3 +33,5 @@ CONFIG_ARM64_VA_BITS_52 			            policy<{'arm64-nvidia-64k': 'n'}>
 CONFIG_ARM64_PA_BITS_52 			            policy<{'arm64-nvidia-64k': 'n'}>
 
 CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE			policy<{'amd64': 'n', 'arm64': 'y'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            policy<{'arm64': 'n'}>
