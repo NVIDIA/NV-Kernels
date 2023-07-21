@@ -13945,6 +13945,7 @@ CONFIG_X86_PAT                                  policy<{'amd64': 'y'}>
 CONFIG_X86_PKG_TEMP_THERMAL                     policy<{'amd64': 'm'}>
 CONFIG_X86_PLATFORM_DEVICES                     policy<{'amd64': 'y'}>
 CONFIG_X86_PLATFORM_DRIVERS_DELL                policy<{'amd64': 'y'}>
+CONFIG_X86_PLATFORM_DRIVERS_HP                  policy<{'amd64': 'y'}>
 CONFIG_X86_PMEM_LEGACY                          policy<{'amd64': 'y'}>
 CONFIG_X86_PMEM_LEGACY_DEVICE                   policy<{'amd64': 'y'}>
 CONFIG_X86_PM_TIMER                             policy<{'amd64': 'y'}>
