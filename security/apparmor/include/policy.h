@@ -63,6 +63,11 @@ extern const char *const aa_profile_mode_names[];
 
 #define on_list_rcu(X) (!list_empty(X) && (X)->prev != LIST_POISON2)
 
+/* flags in the dfa accept2 table */
+enum dfa_accept_flags {
+	ACCEPT_FLAG_OWNER = 1,
+};
+
 /*
  * FIXME: currently need a clean way to replace and remove profiles as a
  * set.  It should be done at the namespace level.
@@ -128,6 +133,7 @@ static inline void aa_put_pdb(struct aa_policydb *pdb)
 		kref_put(&pdb->count, aa_pdb_free_kref);
 }
 
+/* lookup perm that doesn't have and object conditional */
 static inline struct aa_perms *aa_lookup_perms(struct aa_policydb *policy,
 					       aa_state_t state)
 {
@@ -138,7 +144,6 @@ static inline struct aa_perms *aa_lookup_perms(struct aa_policydb *policy,
 
 	return &(policy->perms[index]);
 }
-
 
 /* struct aa_data - generic data structure
  * key: name for retrieving this data
