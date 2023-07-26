@@ -79,19 +79,6 @@ Description: Header files related to Linux kernel version PKGVER
  that want the latest kernel headers. Please read
  /usr/share/doc/SRCPKGNAME-headers-PKGVER-ABINUM/debian.README.gz for details
 
-Package: SRCPKGNAME-tools-common
-Build-Profiles: <!stage1>
-Architecture: all
-Multi-Arch: foreign
-Section: kernel
-Priority: optional
-Provides: bpftool
-Depends: ${misc:Depends}, lsb-release
-Description: Linux kernel version specific tools for version PKGVER
- This package provides the architecture independent parts for kernel
- version locked tools (such as perf and x86_energy_perf_policy) for
- version PKGVER.
-
 Package: SRCPKGNAME-tools-PKGVER-ABINUM
 Build-Profiles: <!stage1>
 Architecture: amd64 arm64
@@ -104,17 +91,6 @@ Description: Linux kernel version specific tools for version PKGVER-ABINUM
  version PKGVER-ABINUM on
  =HUMAN=.
  You probably want to install linux-tools-PKGVER-ABINUM-<flavour>.
-
-Package: SRCPKGNAME-cloud-tools-common
-Build-Profiles: <!stage1>
-Architecture: all
-Multi-Arch: foreign
-Section: kernel
-Priority: optional
-Depends: ${misc:Depends}
-Description: Linux kernel version specific cloud tools for version PKGVER
- This package provides the architecture independent parts for kernel
- version locked tools for cloud tools for version PKGVER.
 
 Package: SRCPKGNAME-cloud-tools-PKGVER-ABINUM
 Build-Profiles: <!stage1>
