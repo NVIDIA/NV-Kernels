@@ -1000,7 +1000,7 @@ static int lynxfb_kick_out_firmware_fb(struct pci_dev *pdev)
 					IORESOURCE_ROM_SHADOW;
 #endif
 
-	return aperture_remove_conflicting_devices(base, size, primary, "sm750_fb1");
+	return aperture_remove_conflicting_devices(base, size, "sm750_fb1");
 }
 
 static int lynxfb_pci_probe(struct pci_dev *pdev,

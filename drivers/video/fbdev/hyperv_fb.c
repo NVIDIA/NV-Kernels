@@ -1078,7 +1078,7 @@ static int hvfb_getmem(struct hv_device *hdev, struct fb_info *info)
 getmem_done:
 	aperture_remove_conflicting_devices(info->apertures->ranges[0].base,
 					    info->apertures->ranges[0].size,
-					    false, KBUILD_MODNAME);
+					    KBUILD_MODNAME);
 
 	if (gen2vm) {
 		/* framebuffer is reallocated, clear screen_info to avoid misuse from kexec */
