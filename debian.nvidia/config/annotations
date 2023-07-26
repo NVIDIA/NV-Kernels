@@ -14,8 +14,13 @@ CONFIG_RUST                                     note<'required to enable Rust su
 
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
 CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
+CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
+CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
+CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
 CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-'}>
 CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'amd64': '-'}>
 CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': '-'}>
 CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-'}>
 CONFIG_SAMPLES_RUST                             policy<{'amd64': '-'}>
+CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
+CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': '-'}>
