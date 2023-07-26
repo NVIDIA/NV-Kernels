@@ -1628,7 +1628,6 @@ gpio
 gpio-104-dio-48e
 gpio-104-idi-48
 gpio-104-idio-16
-gpio-aaeon
 gpio-adp5520
 gpio-aggregator
 gpio-amd-fch
@@ -1991,7 +1990,6 @@ hv_sock
 hv_storvsc
 hv_utils
 hv_vmbus
-hwmon-aaeon
 hwmon-vid
 hwpoison-inject
 hx711
@@ -2563,7 +2561,6 @@ lec
 led-class-flash
 led-class-multicolor
 leds-88pm860x
-leds-aaeon
 leds-adp5520
 leds-apu
 leds-as3645a
@@ -3007,7 +3004,6 @@ meraki-mx100
 metro-usb
 metronomefb
 mf6x4
-mfd-aaeon
 mgag200
 mhi
 mhi_ep
