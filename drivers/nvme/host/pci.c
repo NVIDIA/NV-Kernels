@@ -32,6 +32,9 @@
 
 #include "trace.h"
 #include "nvme.h"
+#ifdef CONFIG_NVFS
+#include "nvfs.h"
+#endif
 
 #define SQ_SIZE(q)	((q)->q_depth << (q)->sqes)
 #define CQ_SIZE(q)	((q)->q_depth * sizeof(struct nvme_completion))
@@ -565,6 +568,9 @@ static void nvme_free_sgls(struct nvme_dev *dev, struct request *req)
 	}
 }
 
+#ifdef CONFIG_NVFS
+#include "nvfs-dma.h"
+#endif
 static void nvme_unmap_data(struct nvme_dev *dev, struct request *req)
 {
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
@@ -577,7 +583,12 @@ static void nvme_unmap_data(struct nvme_dev *dev, struct request *req)
 
 	WARN_ON_ONCE(!iod->sgt.nents);
 
+#ifdef CONFIG_NVFS
+	if (!nvme_nvfs_unmap_data(dev, req))
+		dma_unmap_sgtable(dev->dev, &iod->sgt, rq_dma_dir(req), 0);
+#else
 	dma_unmap_sgtable(dev->dev, &iod->sgt, rq_dma_dir(req), 0);
+#endif
 
 	if (iod->nr_allocations == 0)
 		dma_pool_free(dev->prp_small_pool, nvme_pci_iod_list(req)[0],
@@ -824,6 +835,12 @@ static blk_status_t nvme_map_data(struct nvme_dev *dev, struct request *req,
 	blk_status_t ret = BLK_STS_RESOURCE;
 	int rc;
 
+#ifdef CONFIG_NVFS
+	bool is_nvfs_io = false;
+	ret = nvme_nvfs_map_data(dev, req, cmnd, &is_nvfs_io);
+	if (is_nvfs_io)
+		return ret;
+#endif
 	if (blk_rq_nr_phys_segments(req) == 1) {
 		struct nvme_queue *nvmeq = req->mq_hctx->driver_data;
 		struct bio_vec bv = req_bvec(req);
