@@ -4,3 +4,4 @@ do_doc_package		= false
 
 do_zfs = true
 do_v4l2loopback = true
+do_tools_common = false
