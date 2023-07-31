@@ -1140,6 +1140,10 @@ void iommu_detach_device_pasid(struct iommu_domain *domain,
 			       struct device *dev, ioasid_t pasid);
 ioasid_t iommu_alloc_global_pasid(struct device *dev);
 void iommu_free_global_pasid(ioasid_t pasid);
+int iommu_group_set_qos_params(struct iommu_group *group,
+			       u16 partition, u8 perf_mon_grp);
+int iommu_group_get_qos_params(struct iommu_group *group,
+			       u16 *partition, u8 *perf_mon_grp);
 #else /* CONFIG_IOMMU_API */
 
 struct iommu_ops {};
@@ -1483,6 +1487,17 @@ static inline ioasid_t iommu_alloc_global_pasid(struct device *dev)
 }
 
 static inline void iommu_free_global_pasid(ioasid_t pasid) {}
+static inline int iommu_group_set_qos_params(struct iommu_group *group,
+					     u16 partition, u8 perf_mon_grp)
+{
+	return -ENODEV;
+}
+
+static inline int iommu_group_get_qos_params(struct iommu_group *group,
+					     u16 *partition, u8 *perf_mon_grp)
+{
+	return -ENODEV;
+}
 #endif /* CONFIG_IOMMU_API */
 
 #if IS_ENABLED(CONFIG_LOCKDEP) && IS_ENABLED(CONFIG_IOMMU_API)
