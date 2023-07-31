@@ -1095,6 +1095,11 @@ struct iommu_group *iommu_group_get_by_id(int id)
 }
 EXPORT_SYMBOL_GPL(iommu_group_get_by_id);
 
+struct kset *iommu_get_group_kset(void)
+{
+	return kset_get(iommu_group_kset);
+}
+
 /**
  * iommu_group_get_iommudata - retrieve iommu_data registered for a group
  * @group: the group
