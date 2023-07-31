@@ -4309,3 +4309,67 @@ int iommu_dma_prepare_msi(struct msi_desc *desc, phys_addr_t msi_addr)
 	return ret;
 }
 #endif /* CONFIG_IRQ_MSI_IOMMU */
+
+/*
+ * iommu_group_set_qos_params() - Set the QoS parameters for a group
+ * @group: the iommu group.
+ * @partition: the partition label all traffic from the group should use.
+ * @perf_mon_grp: the performance label all traffic from the group should use.
+ *
+ * Return: 0 on success, or an error.
+ */
+int iommu_group_set_qos_params(struct iommu_group *group,
+			       u16 partition, u8 perf_mon_grp)
+{
+	const struct iommu_ops *ops;
+	struct group_device *device;
+	int ret = -ENODEV;
+
+	mutex_lock(&group->mutex);
+	for_each_group_device(group, device) {
+		ops = dev_iommu_ops(device->dev);
+		if (!ops->set_group_qos_params) {
+			ret = -EOPNOTSUPP;
+			break;
+		}
+		ret = ops->set_group_qos_params(device->dev, partition, perf_mon_grp);
+		if (ret < 0)
+			break;
+	}
+	mutex_unlock(&group->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_NS_GPL(iommu_group_set_qos_params, "IOMMUFD_INTERNAL");
+
+/*
+ * iommu_group_get_qos_params() - Get the QoS parameters for a group
+ * @group: the iommu group.
+ * @partition: the partition label all traffic from the group uses.
+ * @perf_mon_grp: the performance label all traffic from the group uses.
+ *
+ * Return: 0 on success, or an error.
+ */
+int iommu_group_get_qos_params(struct iommu_group *group,
+			       u16 *partition, u8 *perf_mon_grp)
+{
+	const struct iommu_ops *ops;
+	struct group_device *device;
+	int ret = -ENODEV;
+
+	mutex_lock(&group->mutex);
+	for_each_group_device(group, device) {
+		ops = dev_iommu_ops(device->dev);
+		if (!ops->get_group_qos_params) {
+			ret = -EOPNOTSUPP;
+			break;
+		}
+		ret = ops->get_group_qos_params(device->dev, partition, perf_mon_grp);
+		if (!ret)
+			break;
+	}
+	mutex_unlock(&group->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_NS_GPL(iommu_group_get_qos_params, "IOMMUFD_INTERNAL");
