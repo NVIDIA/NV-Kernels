@@ -8,6 +8,7 @@
 #include <linux/cpu.h>
 #include <linux/cpumask.h>
 #include <linux/errno.h>
+#include <linux/iommu.h>
 #include <linux/limits.h>
 #include <linux/list.h>
 #include <linux/math.h>
@@ -297,6 +298,58 @@ bool resctrl_arch_match_rmid(struct task_struct *tsk, u32 closid, u32 rmid)
 		tsk_closid >>= 1;
 
 	return (tsk_closid == closid) && (tsk_rmid == rmid);
+}
+
+int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group, u32 closid,
+				       u32 rmid)
+{
+	u16 partid;
+
+	if (!IS_ENABLED(CONFIG_RESCTRL_IOMMU))
+		return 0;
+
+	if (cdp_enabled)
+		partid = closid << 1;
+	else
+		partid = closid;
+
+	return iommu_group_set_qos_params(group, partid, rmid);
+}
+
+bool resctrl_arch_match_iommu_closid(struct iommu_group *group, u32 closid)
+{
+	u16 partid;
+	int err = iommu_group_get_qos_params(group, &partid, NULL);
+
+	if (!IS_ENABLED(CONFIG_RESCTRL_IOMMU))
+		return false;
+
+	if (err)
+		return false;
+
+	if (cdp_enabled)
+		partid >>= 1;
+
+	return (partid == closid);
+}
+
+bool resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group,
+					  u32 closid, u32 rmid)
+{
+	u8 pmg;
+	u16 partid;
+	int err = iommu_group_get_qos_params(group, &partid, &pmg);
+
+	if (!IS_ENABLED(CONFIG_RESCTRL_IOMMU))
+		return false;
+
+	if (err)
+		return false;
+
+	if (cdp_enabled)
+		partid >>= 1;
+
+	return (partid == closid) && (rmid == pmg);
 }
 
 struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
