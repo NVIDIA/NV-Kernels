@@ -1195,6 +1195,10 @@ void iommu_detach_device_pasid(struct iommu_domain *domain,
 			       struct device *dev, ioasid_t pasid);
 ioasid_t iommu_alloc_global_pasid(struct device *dev);
 void iommu_free_global_pasid(ioasid_t pasid);
+int iommu_group_set_qos_params(struct iommu_group *group,
+			       u16 partition, u8 perf_mon_grp);
+int iommu_group_get_qos_params(struct iommu_group *group,
+			       u16 *partition, u8 *perf_mon_grp);
 
 /* PCI device reset functions */
 int pci_dev_reset_iommu_prepare(struct pci_dev *pdev);
@@ -1522,6 +1526,18 @@ static inline ioasid_t iommu_alloc_global_pasid(struct device *dev)
 }
 
 static inline void iommu_free_global_pasid(ioasid_t pasid) {}
+
+static inline int iommu_group_set_qos_params(struct iommu_group *group,
+					     u16 partition, u8 perf_mon_grp)
+{
+	return -ENODEV;
+}
+
+static inline int iommu_group_get_qos_params(struct iommu_group *group,
+					     u16 *partition, u8 *perf_mon_grp)
+{
+	return -ENODEV;
+}
 
 static inline int pci_dev_reset_iommu_prepare(struct pci_dev *pdev)
 {
