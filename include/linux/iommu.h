@@ -971,6 +971,7 @@ extern struct iommu_group *iommu_group_ref_get(struct iommu_group *group);
 extern void iommu_group_put(struct iommu_group *group);
 
 extern int iommu_group_id(struct iommu_group *group);
+struct kset *iommu_get_group_kset(void);
 extern struct iommu_domain *iommu_group_default_domain(struct iommu_group *);
 
 int iommu_set_pgtable_quirks(struct iommu_domain *domain,
@@ -1400,6 +1401,11 @@ static inline void iommu_group_put(struct iommu_group *group)
 static inline int iommu_group_id(struct iommu_group *group)
 {
 	return -ENODEV;
+}
+
+static inline struct kset *iommu_get_group_kset(void)
+{
+	return NULL;
 }
 
 static inline int iommu_set_pgtable_quirks(struct iommu_domain *domain,
