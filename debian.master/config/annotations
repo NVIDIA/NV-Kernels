@@ -3915,7 +3915,9 @@ CONFIG_DRM_RADEON_USERPTR                       policy<{'amd64': 'n', 'arm64': '
 CONFIG_DRM_RCAR_CMM                             policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DRM_RCAR_DU                              policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DRM_RCAR_DW_HDMI                         policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
-CONFIG_DRM_RCAR_LVDS                            policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'n'}>
+CONFIG_DRM_RCAR_LVDS                            policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': '-'}>
+CONFIG_DRM_RCAR_USE_CMM                         policy<{'arm64': 'y', 'armhf': 'y'}>
+CONFIG_DRM_RCAR_USE_LVDS                        policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': 'n'}>
 CONFIG_DRM_RCAR_VSP                             policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_DRM_RCAR_WRITEBACK                       policy<{'arm64': 'y'}>
 CONFIG_DRM_ROCKCHIP                             policy<{'arm64': 'm', 'armhf': 'm'}>
