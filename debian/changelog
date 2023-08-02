@@ -1,3 +1,13 @@
+linux-meta-unstable (6.5.0.4.5) mantic; urgency=medium
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] support zstd compressed modules
+
+  * Miscellaneous upstream changes
+    - Revert "UBUNTU: [Packaging] support compressed modules"
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 02 Aug 2023 08:04:47 +0200
+
 linux-meta-unstable (6.5.0.4.4) mantic; urgency=medium
 
   * Miscellaneous Ubuntu changes
