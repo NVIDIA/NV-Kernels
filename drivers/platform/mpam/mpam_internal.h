@@ -264,6 +264,13 @@ struct mpam_resctrl_res {
 	struct rdt_resource	resctrl_res;
 };
 
+struct mpam_quirk {
+	const char *desc;
+	bool (*init)(struct mpam_msc *msc);
+	u32 iidr;
+	u32 mask;
+};
+
 static inline int mpam_alloc_csu_mon(struct mpam_class *class)
 {
 	struct mpam_props *cprops = &class->props;

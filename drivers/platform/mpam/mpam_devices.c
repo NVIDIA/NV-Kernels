@@ -1711,6 +1711,33 @@ static void mpam_pcc_rx_callback(struct mbox_client *cl, void *msg)
 	/* TODO: wake up tasks blocked on this MSC's PCC channel */
 }
 
+static const struct mpam_quirk mpam_quirks[] = {
+	{
+	}
+};
+
+static void mpam_enable_quirks(void)
+{
+	const struct mpam_quirk *quirks;
+	struct mpam_msc *msc;
+	u32 iidr;
+
+	mutex_lock(&mpam_list_lock);
+
+	for (quirks = mpam_quirks; quirks->desc; quirks++) {
+		list_for_each_entry(msc, &mpam_all_msc, glbl_list) {
+			iidr = readl(msc->mapped_hwpage + MPAMF_IIDR);
+			if (quirks->iidr != (quirks->mask & iidr))
+				continue;
+			if (quirks->init(msc))
+				pr_info("msc%d enabling workaround for %s\n",
+					msc->id, quirks->desc);
+		}
+	}
+
+	mutex_unlock(&mpam_list_lock);
+}
+
 static int mpam_msc_drv_probe(struct platform_device *pdev)
 {
 	int err;
@@ -1828,8 +1855,10 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			err = mpam_dt_parse_resources(msc, plat_data);
 	}
 
-	if (!err && fw_num_msc == mpam_num_msc)
+	if (!err && fw_num_msc == mpam_num_msc) {
+		mpam_enable_quirks();
 		mpam_register_cpuhp_callbacks(&mpam_discovery_cpu_online);
+	}
 
 	return err;
 }
