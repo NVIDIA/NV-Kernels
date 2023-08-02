@@ -38,6 +38,15 @@
 
 DEFINE_STATIC_KEY_FALSE(mpam_enabled);
 
+#define T241_CHIPS_MAX			4
+#define T241_CHIP_NSLICES		12
+#define T241_SPARE_REG0_OFF		0x1b0000
+#define T241_SPARE_REG1_OFF		0x1c0000
+#define T241_CHIP_ID(phys)		FIELD_GET(GENMASK_ULL(44, 43), phys)
+#define T241_SHADOW_REG_OFF(sidx, pid)	(0x360048 + sidx * 0x10000 + pid * 8)
+static DEFINE_STATIC_KEY_FALSE(nvidia_t241_erratum);
+static void __iomem *t241_scratch_regs[T241_CHIPS_MAX];
+
 /*
  * mpam_list_lock protects the SRCU lists when writing. Once the
  * mpam_enabled key is enabled these lists are read-only,
@@ -1175,6 +1184,42 @@ static void mpam_reset_msc_bitmap(struct mpam_msc *msc, u16 reg, u16 wd)
 		__mpam_write_reg(msc, reg, bm);
 }
 
+static inline bool mpam_t241_erratum_is_enabled(void)
+{
+        return static_branch_likely(&nvidia_t241_erratum);
+}
+
+static void mpam_apply_t241_erratum(struct mpam_msc_ris *ris, u16 partid)
+{
+	int sidx, i, lcount = 1000;
+	void __iomem *regs;
+	u64 val0, val;
+
+	regs = t241_scratch_regs[T241_CHIP_ID(ris->msc->phys_hwpage)];
+
+	for (i = 0; i < lcount; i++) {
+		/* Read the shadow register at index 0 */
+		val0 = readq_relaxed(regs + T241_SHADOW_REG_OFF(0, partid));
+
+		/* Check if all the shadow registers have the same value */
+		for (sidx = 1; sidx < T241_CHIP_NSLICES; sidx++) {
+			val = readq_relaxed(regs +
+					    T241_SHADOW_REG_OFF(sidx, partid));
+			if (val != val0)
+				break;
+		}
+		if (sidx == T241_CHIP_NSLICES)
+			break;
+	}
+
+	if (i == lcount)
+		pr_warn("t241: inconsistent values in shadow regs");
+
+	/* Write a value zero to spare registers to take effect of MBW conf */
+	writeq_relaxed(0, regs + T241_SPARE_REG0_OFF);
+	writeq_relaxed(0, regs + T241_SPARE_REG1_OFF);
+}
+
 static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 				      struct mpam_config *cfg)
 {
@@ -1217,6 +1262,9 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 			mpam_write_partsel_reg(msc, MBW_MAX, cfg->mbw_max);
 		else
 			mpam_write_partsel_reg(msc, MBW_MAX, bwa_fract);
+
+		if (mpam_t241_erratum_is_enabled())
+			mpam_apply_t241_erratum(ris, partid);
 	}
 
 	if (mpam_has_feature(mpam_feat_mbw_prop, rprops))
@@ -1711,7 +1759,28 @@ static void mpam_pcc_rx_callback(struct mbox_client *cl, void *msg)
 	/* TODO: wake up tasks blocked on this MSC's PCC channel */
 }
 
+static bool mpam_enable_quirk_nvidia_t241(struct mpam_msc *msc)
+{
+	u32 id = T241_CHIP_ID(msc->phys_hwpage);
+	phys_addr_t phys;
+
+	/* Find the internal registers base addr from the CHIP ID */
+	phys = FIELD_PREP(GENMASK_ULL(45, 44), id) | 0x19000000ULL;
+
+	t241_scratch_regs[id] = ioremap(phys, SZ_8M);
+	WARN_ON_ONCE(!t241_scratch_regs[id]);
+	static_branch_inc(&nvidia_t241_erratum);
+
+	return true;
+}
+
 static const struct mpam_quirk mpam_quirks[] = {
+	{
+		.desc	= "NVIDIA T241 erratum T241-MPAM-1",
+		.iidr	= 0x2410036b,
+		.mask	= 0xffffffff,
+		.init	= mpam_enable_quirk_nvidia_t241,
+	},
 	{
 	}
 };
@@ -1805,6 +1874,7 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			}
 			msc->mapped_hwpage_sz = msc_res->end - msc_res->start;
 			msc->mapped_hwpage = io;
+			msc->phys_hwpage = msc_res->start;
 		} else if (msc->iface == MPAM_IFACE_PCC) {
 			msc->pcc_cl.dev = &pdev->dev;
 			msc->pcc_cl.rx_callback = mpam_pcc_rx_callback;

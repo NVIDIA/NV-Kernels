@@ -73,6 +73,7 @@ struct mpam_msc
 	 */
 	spinlock_t		part_sel_lock;
 	spinlock_t		mon_sel_lock;
+	phys_addr_t		phys_hwpage;
 	void __iomem *		mapped_hwpage;
 	size_t			mapped_hwpage_sz;
 
