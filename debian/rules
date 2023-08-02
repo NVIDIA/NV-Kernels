@@ -72,7 +72,11 @@ $(foreach _line,$(shell gawk '{ OFS = "!"; $$1 = $$1; print }' debian/dkms-versi
   ) \
 )
 dkms_virtualbox_version=$(KERNEL_ABI_VERSION)
-dkms_wireguard_version=$(shell /sbin/modinfo -F version /lib/modules/$(KERNEL_ABI_VERSION)-generic/kernel/drivers/net/wireguard/wireguard.ko)
+ifeq ($(wildcard /lib/modules/$(KERNEL_ABI_VERSION)-generic/kernel/drivers/net/wireguard/wireguard.ko.zst),)
+	dkms_wireguard_version := $(shell /sbin/modinfo -F version /lib/modules/$(KERNEL_ABI_VERSION)-generic/kernel/drivers/net/wireguard/wireguard.ko)
+else
+	dkms_wireguard_version := $(shell /sbin/modinfo -F version /lib/modules/$(KERNEL_ABI_VERSION)-generic/kernel/drivers/net/wireguard/wireguard.ko.zst)
+endif
 
 debian/control.d/dkms-%: module = $(patsubst debian/control.d/dkms-%,%,$@)
 debian/control.d/dkms-%: module_archs = $(dkms_$(patsubst debian/control.d/dkms-%,%,$@)_archs)
