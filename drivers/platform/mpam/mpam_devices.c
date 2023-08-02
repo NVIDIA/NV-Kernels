@@ -1189,13 +1189,21 @@ static inline bool mpam_t241_erratum_is_enabled(void)
         return static_branch_likely(&nvidia_t241_erratum);
 }
 
-static void mpam_apply_t241_erratum(struct mpam_msc_ris *ris, u16 partid)
+static void mpam_apply_t241_erratum(struct mpam_msc_ris *ris, u16 partid,
+				    struct mpam_config *cfg, u16 mbw_max)
 {
+	struct mpam_props *rprops = &ris->props;
 	int sidx, i, lcount = 1000;
 	void __iomem *regs;
+	u32 mbw_min, gap;
 	u64 val0, val;
 
 	regs = t241_scratch_regs[T241_CHIP_ID(ris->msc->phys_hwpage)];
+
+	/* Recommendation is to keep 5% gap between MBW_MAX and MBW_MIN */
+	gap = ((5 * 65536) / 100) - 1;
+	mbw_min = max_t(s32, mbw_max - gap, BIT(16 - rprops->bwa_wd));
+	mpam_write_partsel_reg(ris->msc, MBW_MIN, mbw_min);
 
 	for (i = 0; i < lcount; i++) {
 		/* Read the shadow register at index 0 */
@@ -1254,17 +1262,18 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 					      rprops->mbw_pbm_bits);
 	}
 
-	if (mpam_has_feature(mpam_feat_mbw_min, rprops))
+	if (mpam_has_feature(mpam_feat_mbw_min, rprops) &&
+	    (!mpam_t241_erratum_is_enabled()))
 		mpam_write_partsel_reg(msc, MBW_MIN, 0);
 
 	if (mpam_has_feature(mpam_feat_mbw_max, rprops)) {
 		if (mpam_has_feature(mpam_feat_mbw_max, cfg))
-			mpam_write_partsel_reg(msc, MBW_MAX, cfg->mbw_max);
-		else
-			mpam_write_partsel_reg(msc, MBW_MAX, bwa_fract);
+			bwa_fract = cfg->mbw_max;
+
+		mpam_write_partsel_reg(msc, MBW_MAX, bwa_fract);
 
 		if (mpam_t241_erratum_is_enabled())
-			mpam_apply_t241_erratum(ris, partid);
+			mpam_apply_t241_erratum(ris, partid, cfg, bwa_fract);
 	}
 
 	if (mpam_has_feature(mpam_feat_mbw_prop, rprops))
@@ -1776,7 +1785,7 @@ static bool mpam_enable_quirk_nvidia_t241(struct mpam_msc *msc)
 
 static const struct mpam_quirk mpam_quirks[] = {
 	{
-		.desc	= "NVIDIA T241 erratum T241-MPAM-1",
+		.desc	= "NVIDIA T241 erratum T241-MPAM-1 & T241-MPAM-4",
 		.iidr	= 0x2410036b,
 		.mask	= 0xffffffff,
 		.init	= mpam_enable_quirk_nvidia_t241,
