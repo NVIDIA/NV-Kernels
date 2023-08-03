@@ -315,7 +315,7 @@ CONFIG_IOMMU_DEBUGFS                            note<'LP: #1861057'>
 CONFIG_IPDDP                                    policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': '-'}>
 CONFIG_IPDDP                                    note<'LP: #1559772'>
 
-CONFIG_IPMMU_VMSA                               policy<{'arm64': 'n', 'armhf': 'n', 'riscv64': 'n'}>
+CONFIG_IPMMU_VMSA                               policy<{'arm64': 'n', 'armhf': 'n', 'riscv64': '-'}>
 CONFIG_IPMMU_VMSA                               note<'LP: #1718734'>
 
 CONFIG_IPV6                                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
