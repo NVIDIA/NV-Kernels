@@ -783,6 +783,8 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 	return kvm_arm_sys_reg_get_reg(vcpu, reg);
 }
 
+#define KVM_REG_ARM_PMCR_EL0		ARM64_SYS_REG(3, 3, 9, 12, 0)
+
 /*
  * The RMI ABI only enables setting the lower GPRs (x0-x7) and PC.
  * All other registers are reset to architectural or otherwise defined reset
@@ -799,6 +801,11 @@ static bool validate_realm_set_reg(struct kvm_vcpu *vcpu,
 		case KVM_REG_ARM_CORE_REG(regs.regs[0]) ...
 		     KVM_REG_ARM_CORE_REG(regs.regs[7]):
 		case KVM_REG_ARM_CORE_REG(regs.pc):
+			return true;
+		}
+	} else {
+		switch (reg->id) {
+		case KVM_REG_ARM_PMCR_EL0:
 			return true;
 		}
 	}
