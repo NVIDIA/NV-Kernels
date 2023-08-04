@@ -948,7 +948,6 @@ ddbridge
 ddbridge-dummy-fe
 de2104x
 de4x5
-decnet
 defxx
 denali
 denali_dt
@@ -1026,7 +1025,6 @@ dmard10
 dmfe
 dmm32at
 dmx3191d
-dn_rtmsg
 dnet
 dp83640
 dp83822
