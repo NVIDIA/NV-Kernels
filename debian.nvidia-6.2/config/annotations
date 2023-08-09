@@ -12,6 +12,9 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'{required for nvidia workl
 CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'n', 'arm64': 'y'}>
 CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'{required for nvidia workloads}'>
 
+CONFIG_MTD                                      policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_MTD                                      note<'boot essential on arm'>
+
 CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
 CONFIG_NR_CPUS                                  note<'LP: #1864198'>
 
@@ -29,6 +32,7 @@ CONFIG_RUST                                     note<'required to enable Rust su
 
 CONFIG_ARCH_SUPPORTS_SHADOW_CALL_STACK          policy<{'arm64': 'y'}>
 CONFIG_ARM64_MODULE_PLTS                        policy<{'arm64': '-'}>
+CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_CC_HAS_AUTO_VAR_INIT_PATTERN             policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO                policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO_BARE           policy<{'amd64': 'y', 'arm64': 'y'}>
@@ -41,6 +45,8 @@ CONFIG_INIT_STACK_ALL_ZERO                      policy<{'amd64': 'n', 'arm64': '
 CONFIG_KCOV                                     policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
 CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
+CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_MTD_SPI_NOR                              policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_PAHOLE_HAS_LANG_EXCLUDE                  policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125'}>
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
