@@ -210,6 +210,9 @@ CONFIG_FHANDLE                                  note<'LP:1412543'>
 CONFIG_FUSE_FS                                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_FUSE_FS                                  note<'not autoloadable'>
 
+CONFIG_FW_LOADER_COMPRESS_ZSTD                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
+CONFIG_FW_LOADER_COMPRESS_ZSTD                  note<'LP: #2028550'>
+
 CONFIG_FW_LOADER_USER_HELPER_FALLBACK           policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
 CONFIG_FW_LOADER_USER_HELPER_FALLBACK           note<'LP#1398458'>
 
@@ -2411,7 +2414,7 @@ CONFIG_CC_HAVE_STACKPROTECTOR_SYSREG            policy<{'arm64': 'y'}>
 CONFIG_CC_IS_GCC                                policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_CC_OPTIMIZE_FOR_SIZE                     policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
-CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'arm64': '"aarch64-linux-gnu-gcc (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'armhf': '"arm-linux-gnueabihf-gcc (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'ppc64el': '"powerpc64le-linux-gnu-gcc (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 's390x': '"s390x-linux-gnu-gcc (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'arm64': '"aarch64-linux-gnu-gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'armhf': '"arm-linux-gnueabihf-gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'ppc64el': '"powerpc64le-linux-gnu-gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 's390x': '"s390x-linux-gnu-gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"'}>
 CONFIG_CDNS_I3C_MASTER                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_CDROM                                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_CDROM_PKTCDVD                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
@@ -4795,8 +4798,6 @@ CONFIG_FW_CFG_SYSFS_CMDLINE                     policy<{'amd64': 'n', 'arm64': '
 CONFIG_FW_LOADER                                policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_FW_LOADER_COMPRESS                       policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_FW_LOADER_COMPRESS_XZ                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
-CONFIG_FW_LOADER_COMPRESS_ZSTD                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
-CONFIG_FW_LOADER_COMPRESS_ZSTD                  note<'LP: #2028550'>
 CONFIG_FW_LOADER_PAGED_BUF                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_FW_LOADER_USER_HELPER                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_FXAS21002C                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
@@ -4818,7 +4819,7 @@ CONFIG_GAMEPORT_L4                              policy<{'amd64': 'm', 'arm64': '
 CONFIG_GAMEPORT_NS558                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_GARP                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
 CONFIG_GART_IOMMU                               policy<{'amd64': 'y'}>
-CONFIG_GCC_VERSION                              policy<{'amd64': '110300', 'arm64': '110300', 'armhf': '110300', 'ppc64el': '110300', 's390x': '110300'}>
+CONFIG_GCC_VERSION                              policy<{'amd64': '110400', 'arm64': '110400', 'armhf': '110400', 'ppc64el': '110400', 's390x': '110400'}>
 CONFIG_GCOV_KERNEL                              policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
 CONFIG_GDB_SCRIPTS                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_GDS_FORCE_MITIGATION                     policy<{'amd64': 'y'}>
@@ -8669,7 +8670,7 @@ CONFIG_PAGE_POOL                                policy<{'amd64': 'y', 'arm64': '
 CONFIG_PAGE_REPORTING                           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_PAGE_TABLE_ISOLATION                     policy<{'amd64': 'y'}>
 CONFIG_PAHOLE_HAS_SPLIT_BTF                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
-CONFIG_PAHOLE_VERSION                           policy<{'amd64': '122', 'arm64': '122', 'armhf': '122', 'ppc64el': '122', 's390x': '122'}>
+CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125', 'armhf': '125', 'ppc64el': '125', 's390x': '125'}>
 CONFIG_PALMAS_GPADC                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_PANASONIC_LAPTOP                         policy<{'amd64': 'm'}>
 CONFIG_PANEL                                    policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
