@@ -1640,7 +1640,6 @@ static __cold void io_iopoll_try_reap_events(struct io_ring_ctx *ctx)
 static int io_iopoll_check(struct io_ring_ctx *ctx, long min)
 {
 	unsigned int nr_events = 0;
-	int ret = 0;
 	unsigned long check_cq;
 
 	if (!io_allowed_run_tw(ctx))
@@ -1666,6 +1665,8 @@ static int io_iopoll_check(struct io_ring_ctx *ctx, long min)
 		return 0;
 
 	do {
+		int ret = 0;
+
 		/*
 		 * If a submit got punted to a workqueue, we can have the
 		 * application entering polling for a command before it gets
@@ -1694,16 +1695,18 @@ static int io_iopoll_check(struct io_ring_ctx *ctx, long min)
 				break;
 		}
 		ret = io_do_iopoll(ctx, !min);
-		if (ret < 0)
-			break;
-		nr_events += ret;
-		ret = 0;
+		if (unlikely(ret < 0))
+			return ret;
 
 		if (task_sigpending(current))
 			return -EINTR;
-	} while (nr_events < min && !need_resched());
+		if (need_resched())
+			break;
 
-	return ret;
+		nr_events += ret;
+	} while (nr_events < min);
+
+	return 0;
 }
 
 void io_req_task_complete(struct io_kiocb *req, struct io_tw_state *ts)
