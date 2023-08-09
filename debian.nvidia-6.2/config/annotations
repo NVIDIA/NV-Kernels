@@ -12,6 +12,9 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'{required for nvidia workl
 CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'n', 'arm64': 'y'}>
 CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'{required for nvidia workloads}'>
 
+CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
+CONFIG_NR_CPUS                                  note<'LP: #1864198'>
+
 CONFIG_PREEMPT_NONE                             policy<{'amd64': 'n', 'arm64': 'y'}>
 CONFIG_PREEMPT_NONE                             note<'required for nvidia workloads'>
 
