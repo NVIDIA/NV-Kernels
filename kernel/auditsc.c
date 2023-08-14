@@ -2638,8 +2638,7 @@ void __audit_ipc_obj(struct kern_ipc_perm *ipcp)
 	context->ipc.gid = ipcp->gid;
 	context->ipc.mode = ipcp->mode;
 	context->ipc.has_perm = 0;
-	/* stacking scaffolding */
-	security_ipc_getsecid(ipcp, &context->ipc.oblob.scaffold.secid);
+	security_ipc_getlsmblob(ipcp, &context->ipc.oblob);
 	context->type = AUDIT_IPC;
 }
 
