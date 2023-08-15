@@ -50,6 +50,7 @@ CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_DEFAULT                    policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_MMU                        policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_PUSH                       policy<{'amd64': '-'}>
+CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125'}>
 CONFIG_PREEMPT                                  policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y'}>
 CONFIG_PREEMPTION                               policy<{'amd64-nvidia-lowlatency': 'y'}>
 CONFIG_PREEMPT_COUNT                            policy<{'amd64-nvidia-lowlatency': 'y'}>
