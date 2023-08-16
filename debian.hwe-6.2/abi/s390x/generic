@@ -9989,7 +9989,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x03d08dc6	metadata_dst_alloc_percpu
 EXPORT_SYMBOL_GPL	 vmlinux 0x03d44e0e	bus_get_kset
 EXPORT_SYMBOL_GPL	 vmlinux 0x03eadd44	init_user_ns
 EXPORT_SYMBOL_GPL	 vmlinux 0x03fb9e33	msg_zerocopy_put_abort
-EXPORT_SYMBOL_GPL	 vmlinux 0x04021110	find_extend_vma
 EXPORT_SYMBOL_GPL	 vmlinux 0x0402cbbf	preempt_notifier_inc
 EXPORT_SYMBOL_GPL	 vmlinux 0x040b3c68	cgroup_path_ns
 EXPORT_SYMBOL_GPL	 vmlinux 0x0411f735	driver_for_each_device
@@ -11565,7 +11564,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x643e4d3e	validate_xmit_skb_list
 EXPORT_SYMBOL_GPL	 vmlinux 0x64473fbd	fixed_phy_set_link_update
 EXPORT_SYMBOL_GPL	 vmlinux 0x64609d25	__tracepoint_devlink_trap_report
 EXPORT_SYMBOL_GPL	 vmlinux 0x64640d6f	crypto_register_aead
-EXPORT_SYMBOL_GPL	 vmlinux 0x64699807	__vfs_setxattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x64786375	kmsg_dump_get_buffer
 EXPORT_SYMBOL_GPL	 vmlinux 0x64816c6b	relay_close
 EXPORT_SYMBOL_GPL	 vmlinux 0x64953be4	pkcs7_verify
@@ -12293,7 +12291,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x924c46f8	zs_unmap_object
 EXPORT_SYMBOL_GPL	 vmlinux 0x926f1c81	espintcp_queue_out
 EXPORT_SYMBOL_GPL	 vmlinux 0x927cfb58	dm_start_time_ns_from_clone
 EXPORT_SYMBOL_GPL	 vmlinux 0x9285b157	__trace_array_puts
-EXPORT_SYMBOL_GPL	 vmlinux 0x928cd30a	__vfs_removexattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x9296c382	dst_cache_get_ip6
 EXPORT_SYMBOL_GPL	 vmlinux 0x929a3bc8	msi_unlock_descs
 EXPORT_SYMBOL_GPL	 vmlinux 0x929d0cb0	kvm_vcpu_write_guest

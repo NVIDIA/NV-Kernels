@@ -23532,7 +23532,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x81d810ce	phy_led_trigger_change_speed
 EXPORT_SYMBOL_GPL	 vmlinux 0x81dc8400	tcp_set_state
 EXPORT_SYMBOL_GPL	 vmlinux 0x81de4650	register_ftrace_direct_multi
 EXPORT_SYMBOL_GPL	 vmlinux 0x81e2bdf4	generic_handle_irq_safe
-EXPORT_SYMBOL_GPL	 vmlinux 0x81eaeb34	__vfs_removexattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x81eb875b	exportfs_encode_inode_fh
 EXPORT_SYMBOL_GPL	 vmlinux 0x81f372a2	unregister_ftrace_export
 EXPORT_SYMBOL_GPL	 vmlinux 0x82054651	crypto_grab_spawn
@@ -23693,7 +23692,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x87967b70	inode_dax
 EXPORT_SYMBOL_GPL	 vmlinux 0x8798770b	kill_pid_usb_asyncio
 EXPORT_SYMBOL_GPL	 vmlinux 0x87a3181f	__traceiter_fib6_table_lookup
 EXPORT_SYMBOL_GPL	 vmlinux 0x87a7ae3a	power_supply_get_property_from_supplier
-EXPORT_SYMBOL_GPL	 vmlinux 0x87a94a43	__vfs_setxattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x87b210d0	clkdev_create
 EXPORT_SYMBOL_GPL	 vmlinux 0x87c89a12	devlink_port_type_eth_set
 EXPORT_SYMBOL_GPL	 vmlinux 0x87cfe33b	rio_add_mport_pw_handler
@@ -25418,7 +25416,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0xc95317d9	gnttab_page_cache_init
 EXPORT_SYMBOL_GPL	 vmlinux 0xc954bd43	virtqueue_get_desc_addr
 EXPORT_SYMBOL_GPL	 vmlinux 0xc9561772	fb_destroy_modelist
 EXPORT_SYMBOL_GPL	 vmlinux 0xc9641b48	visitor32
-EXPORT_SYMBOL_GPL	 vmlinux 0xc96881a1	find_extend_vma
 EXPORT_SYMBOL_GPL	 vmlinux 0xc96eaad3	__tracepoint_ata_exec_command
 EXPORT_SYMBOL_GPL	 vmlinux 0xc9811b96	raw_seq_stop
 EXPORT_SYMBOL_GPL	 vmlinux 0xc9827693	__bpf_call_base
