@@ -19456,7 +19456,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x0bb41b64	phy_driver_is_genphy
 EXPORT_SYMBOL_GPL	 vmlinux 0x0bb84bb4	edac_get_sysfs_subsys
 EXPORT_SYMBOL_GPL	 vmlinux 0x0bb9c5db	__devm_regmap_init
 EXPORT_SYMBOL_GPL	 vmlinux 0x0bbe82b3	sm501_modify_reg
-EXPORT_SYMBOL_GPL	 vmlinux 0x0bd5adab	__vfs_removexattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x0bda0f85	of_irq_parse_one
 EXPORT_SYMBOL_GPL	 vmlinux 0x0beab600	usb_hcd_end_port_resume
 EXPORT_SYMBOL_GPL	 vmlinux 0x0bf32478	__SCK__tp_func_pelt_rt_tp
@@ -19484,7 +19483,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x0cc815df	snd_soc_link_compr_set_params
 EXPORT_SYMBOL_GPL	 vmlinux 0x0cc9d36c	iommu_group_claim_dma_owner
 EXPORT_SYMBOL_GPL	 vmlinux 0x0ccd35aa	fib_rule_matchall
 EXPORT_SYMBOL_GPL	 vmlinux 0x0cd0fe2b	__mmdrop
-EXPORT_SYMBOL_GPL	 vmlinux 0x0cd86710	__vfs_setxattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x0cdf4884	ata_sff_error_handler
 EXPORT_SYMBOL_GPL	 vmlinux 0x0ce3ca8b	wbt_disable_default
 EXPORT_SYMBOL_GPL	 vmlinux 0x0d02e5a4	gpiod_put_array
@@ -21146,7 +21144,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x4a17ed66	sysrq_mask
 EXPORT_SYMBOL_GPL	 vmlinux 0x4a2c9ad8	crc64_rocksoft
 EXPORT_SYMBOL_GPL	 vmlinux 0x4a30ac47	platform_device_add_data
 EXPORT_SYMBOL_GPL	 vmlinux 0x4a3ab3df	fscrypt_add_test_dummy_key
-EXPORT_SYMBOL_GPL	 vmlinux 0x4a4f7f7a	find_extend_vma
 EXPORT_SYMBOL_GPL	 vmlinux 0x4a5edd29	of_add_property
 EXPORT_SYMBOL_GPL	 vmlinux 0x4a7095cc	snd_soc_jack_report
 EXPORT_SYMBOL_GPL	 vmlinux 0x4a73b557	regcache_cache_bypass
