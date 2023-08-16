@@ -1513,8 +1513,11 @@ static int nvme_rdma_dma_map_req(struct ib_device *ibdev, struct request *rq,
         {
         bool is_nvfs_io = false;
         ret = nvme_rdma_nvfs_map_data(ibdev, rq, &is_nvfs_io, count);
-        if (is_nvfs_io)
-		return ret;
+        if (is_nvfs_io) {
+	        if (ret)
+	               goto out_free_table;
+                return 0;
+	}
         }
 #endif
 
