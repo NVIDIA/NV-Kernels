@@ -32,11 +32,7 @@
  */
 static inline void netlbl_netlink_auditinfo(struct netlbl_audit *audit_info)
 {
-	struct lsmblob blob;
-
-	security_current_getlsmblob_subj(&blob);
-	/* stacking scaffolding */
-	audit_info->secid = blob.scaffold.secid;
+	security_current_getlsmblob_subj(&audit_info->blob);
 	audit_info->loginuid = audit_get_loginuid(current);
 	audit_info->sessionid = audit_get_sessionid(current);
 }
