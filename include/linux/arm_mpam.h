@@ -8,6 +8,8 @@
 #include <linux/resctrl_types.h>
 #include <linux/types.h>
 
+#include <asm/mpam.h>
+
 struct mpam_msc;
 
 enum mpam_msc_iface {
