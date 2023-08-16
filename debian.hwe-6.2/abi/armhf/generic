@@ -20549,7 +20549,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x352b3813	maxim_charger_calc_reg_current
 EXPORT_SYMBOL_GPL	 vmlinux 0x352ec68b	bpf_offload_dev_destroy
 EXPORT_SYMBOL_GPL	 vmlinux 0x35420630	perf_trace_run_bpf_submit
 EXPORT_SYMBOL_GPL	 vmlinux 0x3556b79b	io_uring_cmd_complete_in_task
-EXPORT_SYMBOL_GPL	 vmlinux 0x355fc4d8	__vfs_removexattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x3565a929	utf8_data_table
 EXPORT_SYMBOL_GPL	 vmlinux 0x35661fff	usb_add_hcd
 EXPORT_SYMBOL_GPL	 vmlinux 0x35681ae3	__tracepoint_tcp_bad_csum
@@ -22366,7 +22365,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x784be6e3	wbc_detach_inode
 EXPORT_SYMBOL_GPL	 vmlinux 0x785875d3	irq_domain_xlate_onetwocell
 EXPORT_SYMBOL_GPL	 vmlinux 0x785a93b4	si_mem_available
 EXPORT_SYMBOL_GPL	 vmlinux 0x785e9245	mmc_send_tuning
-EXPORT_SYMBOL_GPL	 vmlinux 0x786e4bc6	find_extend_vma
 EXPORT_SYMBOL_GPL	 vmlinux 0x78705104	of_genpd_add_device
 EXPORT_SYMBOL_GPL	 vmlinux 0x787f39d4	tun_get_tx_ring
 EXPORT_SYMBOL_GPL	 vmlinux 0x78854cef	rio_unregister_scan
@@ -22759,7 +22757,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x868784cb	__symbol_get
 EXPORT_SYMBOL_GPL	 vmlinux 0x86b4bc3a	rtc_update_irq
 EXPORT_SYMBOL_GPL	 vmlinux 0x86cb8ebd	rio_release_inb_dbell
 EXPORT_SYMBOL_GPL	 vmlinux 0x86e7a634	alarm_start_relative
-EXPORT_SYMBOL_GPL	 vmlinux 0x86ea05e2	__vfs_setxattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x86f2ea2b	fsverity_prepare_setattr
 EXPORT_SYMBOL_GPL	 vmlinux 0x86f6b99d	synchronize_rcu_expedited
 EXPORT_SYMBOL_GPL	 vmlinux 0x86f85114	net_dec_egress_queue

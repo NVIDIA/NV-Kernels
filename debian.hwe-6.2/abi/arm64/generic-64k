@@ -24010,7 +24010,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x84a4008a	blk_next_bio
 EXPORT_SYMBOL_GPL	 vmlinux 0x84a8d0eb	of_changeset_revert
 EXPORT_SYMBOL_GPL	 vmlinux 0x84b1b534	pcc_mbox_request_channel
 EXPORT_SYMBOL_GPL	 vmlinux 0x84c55c2c	blk_mq_hctx_set_fq_lock_class
-EXPORT_SYMBOL_GPL	 vmlinux 0x84d45222	__vfs_setxattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x84d5c660	crypto_register_scomp
 EXPORT_SYMBOL_GPL	 vmlinux 0x84ef27f5	synth_event_add_fields
 EXPORT_SYMBOL_GPL	 vmlinux 0x84f71cca	__fscrypt_inode_uses_inline_crypto
@@ -24883,7 +24882,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0xa1a976eb	regulator_force_disable
 EXPORT_SYMBOL_GPL	 vmlinux 0xa1ad10b2	pinctrl_generic_get_group_name
 EXPORT_SYMBOL_GPL	 vmlinux 0xa1c4231f	kvm_set_pfn_dirty
 EXPORT_SYMBOL_GPL	 vmlinux 0xa1cab2e4	dev_pm_qos_expose_flags
-EXPORT_SYMBOL_GPL	 vmlinux 0xa1cddb35	__vfs_removexattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0xa1d6e1bf	xfrm_dev_state_add
 EXPORT_SYMBOL_GPL	 vmlinux 0xa1d8004a	videomode_from_timing
 EXPORT_SYMBOL_GPL	 vmlinux 0xa1ebc297	ata_bmdma_qc_prep
@@ -25017,7 +25015,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0xa665ec9d	fscrypt_ioctl_remove_key_all_users
 EXPORT_SYMBOL_GPL	 vmlinux 0xa666c88f	wm8350_device_init
 EXPORT_SYMBOL_GPL	 vmlinux 0xa6670640	usb_alloc_streams
 EXPORT_SYMBOL_GPL	 vmlinux 0xa67085fe	irq_domain_create_simple
-EXPORT_SYMBOL_GPL	 vmlinux 0xa67fd2a2	find_extend_vma
 EXPORT_SYMBOL_GPL	 vmlinux 0xa68c108a	usb_enable_ltm
 EXPORT_SYMBOL_GPL	 vmlinux 0xa6985317	kobject_create_and_add
 EXPORT_SYMBOL_GPL	 vmlinux 0xa6a088b7	fscrypt_match_name
