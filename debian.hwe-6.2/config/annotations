@@ -5,7 +5,7 @@
 
 include "../../debian.master/config/annotations"
 
-CONFIG_RUST                                     policy<{'amd64': '-'}>
+CONFIG_RUST                                     policy<{'amd64': 'n'}>
 CONFIG_RUST                                     note<'Rust should not be enabled in hwe kernels'>
 
 
