@@ -164,4 +164,9 @@ static inline void mpam_thread_switch(struct task_struct *tsk)
 	write_sysreg_s(regval, SYS_MPAM0_EL1);
 	WRITE_ONCE(per_cpu(arm64_mpam_current, cpu), regval);
 }
+
+static inline u64 resctrl_arch_get_cpu_msr(void)
+{
+	return read_sysreg_s(SYS_MPAM0_EL1);
+}
 #endif /* __ASM__MPAM_H */
