@@ -19397,7 +19397,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x14b195f8	dev_pm_genpd_get_next_hrtimer
 EXPORT_SYMBOL_GPL	 vmlinux 0x14d42093	bpf_trace_run1
 EXPORT_SYMBOL_GPL	 vmlinux 0x14d51a71	__traceiter_ata_tf_load
 EXPORT_SYMBOL_GPL	 vmlinux 0x1510e25e	devm_kstrdup
-EXPORT_SYMBOL_GPL	 vmlinux 0x15155903	find_extend_vma
 EXPORT_SYMBOL_GPL	 vmlinux 0x1524e416	srcu_notifier_call_chain
 EXPORT_SYMBOL_GPL	 vmlinux 0x153704e4	sata_port_ops
 EXPORT_SYMBOL_GPL	 vmlinux 0x1537c7f2	opal_ipmi_recv
@@ -23464,7 +23463,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0xb5bffb27	ipv4_sk_redirect
 EXPORT_SYMBOL_GPL	 vmlinux 0xb5c7c927	of_pm_clk_add_clk
 EXPORT_SYMBOL_GPL	 vmlinux 0xb5d27e0e	tc3589x_reg_read
 EXPORT_SYMBOL_GPL	 vmlinux 0xb5d4c1ab	i2c_new_smbus_alert_device
-EXPORT_SYMBOL_GPL	 vmlinux 0xb5d54f6b	__vfs_setxattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0xb5de3a52	register_btf_kfunc_id_set
 EXPORT_SYMBOL_GPL	 vmlinux 0xb605a9c8	iommu_tce_table_get
 EXPORT_SYMBOL_GPL	 vmlinux 0xb606c4a9	xhci_get_ep_ctx
@@ -24532,7 +24530,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0xdfcb6c90	mctrl_gpio_set
 EXPORT_SYMBOL_GPL	 vmlinux 0xdfd05250	l3mdev_master_upper_ifindex_by_index_rcu
 EXPORT_SYMBOL_GPL	 vmlinux 0xdff568cb	klist_iter_init
 EXPORT_SYMBOL_GPL	 vmlinux 0xdff82ab4	ack_all_badblocks
-EXPORT_SYMBOL_GPL	 vmlinux 0xdffb8ebc	__vfs_removexattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0xdffd5ff5	iomap_seek_data
 EXPORT_SYMBOL_GPL	 vmlinux 0xe015a12d	kstrdup_quotable_file
 EXPORT_SYMBOL_GPL	 vmlinux 0xe0235356	netdev_rx_handler_register

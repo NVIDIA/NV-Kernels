@@ -22774,7 +22774,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x59e640c0	halt_poll_ns
 EXPORT_SYMBOL_GPL	 vmlinux 0x59edfeb8	phy_rate_matching_to_str
 EXPORT_SYMBOL_GPL	 vmlinux 0x59f32720	mpi_subm
 EXPORT_SYMBOL_GPL	 vmlinux 0x59f8b7c6	ms_hyperv
-EXPORT_SYMBOL_GPL	 vmlinux 0x59faedfb	__vfs_removexattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0x5a12e60c	__SCK__tp_func_sched_update_nr_running_tp
 EXPORT_SYMBOL_GPL	 vmlinux 0x5a1d134a	rcu_momentary_dyntick_idle
 EXPORT_SYMBOL_GPL	 vmlinux 0x5a229368	arch_apei_enable_cmcff
@@ -25025,7 +25024,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0xa6dc0d97	tegra_read_ram_code
 EXPORT_SYMBOL_GPL	 vmlinux 0xa6dcab9a	sk_clone_lock
 EXPORT_SYMBOL_GPL	 vmlinux 0xa6e1a69d	kick_all_cpus_sync
 EXPORT_SYMBOL_GPL	 vmlinux 0xa6e39f53	crypto_register_alg
-EXPORT_SYMBOL_GPL	 vmlinux 0xa6ec94c3	find_extend_vma
 EXPORT_SYMBOL_GPL	 vmlinux 0xa6ee15ca	__tracepoint_rpm_suspend
 EXPORT_SYMBOL_GPL	 vmlinux 0xa7067007	pci_epc_stop
 EXPORT_SYMBOL_GPL	 vmlinux 0xa7073757	bio_add_zone_append_page
@@ -25801,7 +25799,6 @@ EXPORT_SYMBOL_GPL	 vmlinux 0xc2feda41	rtnl_put_cacheinfo
 EXPORT_SYMBOL_GPL	 vmlinux 0xc3153b31	input_ff_flush
 EXPORT_SYMBOL_GPL	 vmlinux 0xc32649f0	irq_domain_remove
 EXPORT_SYMBOL_GPL	 vmlinux 0xc329d404	mmc_regulator_set_vqmmc
-EXPORT_SYMBOL_GPL	 vmlinux 0xc333f632	__vfs_setxattr_noperm
 EXPORT_SYMBOL_GPL	 vmlinux 0xc3358905	inode_dax
 EXPORT_SYMBOL_GPL	 vmlinux 0xc335920b	mmu_interval_notifier_insert
 EXPORT_SYMBOL_GPL	 vmlinux 0xc340e246	zynqmp_pm_request_node
