@@ -23,18 +23,18 @@ CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO                policy<{'amd64': '-', 'arm64': '
 CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO_BARE           policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
 CONFIG_CC_HAVE_SHADOW_CALL_STACK                policy<{'arm64': '-'}>
 CONFIG_CC_HAVE_STACKPROTECTOR_TLS               policy<{'armhf': '-', 'riscv64': 'y'}>
-CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'armhf': '"arm-linux-gnueabihf-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'ppc64el': '"powerpc64le-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 'riscv64': '"riscv64-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"', 's390x': '"s390x-linux-gnu-gcc-11 (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0"'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'arm64': '"aarch64-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'armhf': '"arm-linux-gnueabihf-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'ppc64el': '"powerpc64le-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'riscv64': '"riscv64-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 's390x': '"s390x-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"'}>
 CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
 CONFIG_DMA_COHERENT_POOL                        policy<{'amd64': 'y', 'arm64': 'y', 'riscv64': '-'}>
 CONFIG_DMA_DIRECT_REMAP                         policy<{'arm64': 'y', 'riscv64': '-'}>
 CONFIG_DMA_NONCOHERENT_MMAP                     policy<{'arm64': 'y', 'armhf': 'y', 'riscv64': '-'}>
-CONFIG_GCC_VERSION                              policy<{'amd64': '110300', 'arm64': '110300', 'armhf': '110300', 'ppc64el': '110300', 'riscv64': '110300', 's390x': '110300'}>
+CONFIG_GCC_VERSION                              policy<{'amd64': '110400', 'arm64': '110400', 'armhf': '110400', 'ppc64el': '110400', 'riscv64': '110400', 's390x': '110400'}>
 CONFIG_INIT_STACK_ALL_PATTERN                   policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
 CONFIG_INIT_STACK_ALL_ZERO                      policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
 CONFIG_INIT_STACK_NONE                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_KCOV                                     policy<{'amd64': 'n', 'arm64': '-', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': '-'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '23800', 'arm64': '23800', 'armhf': '23800', 'ppc64el': '23800', 'riscv64': '23800', 's390x': '23800'}>
-CONFIG_PAHOLE_VERSION                           policy<{'amd64': '122', 'arm64': '122', 'armhf': '122', 'ppc64el': '122', 'riscv64': '122', 's390x': '122'}>
+CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125', 'armhf': '125', 'ppc64el': '125', 'riscv64': '125', 's390x': '125'}>
 CONFIG_RISCV_DMA_NONCOHERENT                    policy<{'riscv64': '-'}>
 CONFIG_RISCV_ISA_ZICBOM                         policy<{'riscv64': '-'}>
 CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-'}>
