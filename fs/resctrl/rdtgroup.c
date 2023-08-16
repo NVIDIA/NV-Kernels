@@ -29,6 +29,7 @@
 #include <linux/slab.h>
 #include <linux/task_work.h>
 #include <linux/user_namespace.h>
+#include <linux/wait.h>
 
 #include <uapi/linux/magic.h>
 
@@ -986,6 +987,60 @@ unlock:
 	mutex_unlock(&rdtgroup_mutex);
 
 	return ret;
+}
+
+struct get_cpu_msr {
+	struct callback_head	work;
+
+	bool			done;
+	u64			cpu_msr;
+};
+
+
+static void resctrl_get_cpu_msr(struct callback_head *head)
+{
+	struct get_cpu_msr *get_cpu_msr = container_of(head, struct get_cpu_msr, work);
+
+	get_cpu_msr->cpu_msr = resctrl_arch_get_cpu_msr();
+	wmb();
+	get_cpu_msr->done = true;
+
+}
+
+static DECLARE_WAIT_QUEUE_HEAD(get_cpu_msr_wait);
+
+int proc_resctrl_cpu_msr_show(struct seq_file *s, struct pid_namespace *ns,
+			      struct pid *pid, struct task_struct *tsk)
+{
+	DEFINE_WAIT(wait);
+	struct get_cpu_msr get_cpu_msr;
+	struct mm_struct *mm = tsk->active_mm;
+
+	/* We'd wait too long for a kernel thread to run task_work */
+	if (mm == &init_mm)
+		return -EIO;
+
+	get_cpu_msr.done = false;
+	init_task_work(&get_cpu_msr.work, resctrl_get_cpu_msr);
+
+	if (tsk != current)
+		task_work_add(tsk, &get_cpu_msr.work, TWA_SIGNAL);
+	else
+		resctrl_get_cpu_msr(&get_cpu_msr.work);
+
+	while(!get_cpu_msr.done && !signal_pending(current)) {
+		prepare_to_wait(&get_cpu_msr_wait, &wait, TASK_INTERRUPTIBLE);
+		schedule_timeout_interruptible(HZ);
+	}
+
+	finish_wait(&get_cpu_msr_wait, &wait);
+
+	if (signal_pending(current))
+		return -ETIMEDOUT;
+
+	seq_printf(s, "0x%llx\n", get_cpu_msr.cpu_msr);
+
+	return 0;
 }
 #endif
 

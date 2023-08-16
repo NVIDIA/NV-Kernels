@@ -144,6 +144,15 @@ static inline void __resctrl_sched_in(struct task_struct *tsk)
 	}
 }
 
+static inline u64 resctrl_arch_get_cpu_msr(void)
+{
+	unsigned long val;
+
+	rdmsrl(MSR_IA32_PQR_ASSOC, val);
+
+	return val;
+}
+
 static inline unsigned int resctrl_arch_round_mon_val(unsigned int val)
 {
 	unsigned int scale = boot_cpu_data.x86_cache_occ_scale;

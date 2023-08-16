@@ -25,6 +25,11 @@ int proc_resctrl_show(struct seq_file *m,
 		      struct pid *pid,
 		      struct task_struct *tsk);
 
+int proc_resctrl_cpu_msr_show(struct seq_file *m,
+		      struct pid_namespace *ns,
+		      struct pid *pid,
+		      struct task_struct *tsk);
+
 #endif
 
 /* max value for struct rdt_domain's mbps_val */
