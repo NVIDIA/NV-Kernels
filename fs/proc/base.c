@@ -3315,6 +3315,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 #endif
 #ifdef CONFIG_PROC_CPU_RESCTRL
 	ONE("cpu_resctrl_groups", S_IRUGO, proc_resctrl_show),
+	ONE("cpu_resctrl_msr_val", S_IRUGO, proc_resctrl_cpu_msr_show),
 #endif
 	ONE("oom_score",  S_IRUGO, proc_oom_score),
 	REG("oom_adj",    S_IRUGO|S_IWUSR, proc_oom_adj_operations),
