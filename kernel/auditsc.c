@@ -1109,7 +1109,7 @@ static int audit_log_pid_context(struct audit_context *context, pid_t pid,
 			 from_kuid(&init_user_ns, auid),
 			 from_kuid(&init_user_ns, uid), sessionid);
 	if (lsmblob_is_set(blob)) {
-		if (security_lsmblob_to_secctx(blob, &ctx.context, &ctx.len)) {
+		if (security_lsmblob_to_secctx(blob, &ctx) < 0) {
 			audit_log_format(ab, " obj=(none)");
 			rc = 1;
 		} else {
@@ -1370,7 +1370,7 @@ static void audit_log_time(struct audit_context *context, struct audit_buffer **
 
 static void show_special(struct audit_context *context, int *call_panic)
 {
-	struct lsmcontext lsmcxt;
+	struct lsmcontext lsmctx;
 	struct audit_buffer *ab;
 	int i;
 
@@ -1393,16 +1393,12 @@ static void show_special(struct audit_context *context, int *call_panic)
 				 from_kgid(&init_user_ns, context->ipc.gid),
 				 context->ipc.mode);
 		if (lsmblob_is_set(&context->ipc.oblob)) {
-			char *ctx = NULL;
-			u32 len;
-
 			if (security_lsmblob_to_secctx(&context->ipc.oblob,
-						       &ctx, &len)) {
+						       &lsmctx) < 0) {
 				*call_panic = 1;
 			} else {
-				audit_log_format(ab, " obj=%s", ctx);
-				lsmcontext_init(&lsmcxt, ctx, len, 0);
-				security_release_secctx(&lsmcxt);
+				audit_log_format(ab, " obj=%s", lsmctx.context);
+				security_release_secctx(&lsmctx);
 			}
 		}
 		if (context->ipc.has_perm) {
@@ -1563,8 +1559,7 @@ static void audit_log_name(struct audit_context *context, struct audit_names *n,
 	if (lsmblob_is_set(&n->oblob)) {
 		struct lsmcontext ctx;
 
-		if (security_lsmblob_to_secctx(&n->oblob, &ctx.context,
-					       &ctx.len)) {
+		if (security_lsmblob_to_secctx(&n->oblob, &ctx) < 0) {
 			if (call_panic)
 				*call_panic = 2;
 		} else {

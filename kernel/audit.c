@@ -1475,9 +1475,8 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 		if (lsmblob_is_set(&audit_sig_lsm)) {
 			err = security_lsmblob_to_secctx(&audit_sig_lsm,
-							 &lsmctx.context,
-							 &lsmctx.len);
-			if (err)
+							 &lsmctx);
+			if (err < 0)
 				return err;
 		}
 		sig_data_size = struct_size(sig_data, ctx, lsmctx.len);
@@ -2192,8 +2191,8 @@ int audit_log_task_context(struct audit_buffer *ab)
 	if (!lsmblob_is_set(&blob))
 		return 0;
 
-	error = security_lsmblob_to_secctx(&blob, &ctx.context, &ctx.len);
-	if (error) {
+	error = security_lsmblob_to_secctx(&blob, &ctx);
+	if (error < 0) {
 		if (error != -EINVAL)
 			goto error_path;
 		return 0;

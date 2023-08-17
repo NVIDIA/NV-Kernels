@@ -4222,30 +4222,28 @@ EXPORT_SYMBOL(security_secid_to_secctx);
 /**
  * security_lsmblob_to_secctx() - Convert a lsmblob to a secctx
  * @blob: lsm specific information
- * @secdata: secctx
- * @seclen: secctx length
+ * @cp: the LSM context
  *
- * Convert a @blob entry to security context.  If @secdata is NULL the
- * length of the result will be returned in @seclen, but no @secdata
- * will be returned.  This does mean that the length could change between
- * calls to check the length and the next call which actually allocates
- * and returns the @secdata.
+ * Convert a @blob entry to security context. If @cp is NULL the
+ * length of the result will be returned, but no data will be returned.
+ * This does mean that the length could change between calls to check
+ * the length and the next call which actually allocates and returns
+ * the data.
  *
- * Return: Return 0 on success, error on failure.
+ * Return: Return length of data on success, error on failure.
  */
-int security_lsmblob_to_secctx(struct lsmblob *blob, char **secdata,
-			       u32 *seclen)
+int security_lsmblob_to_secctx(struct lsmblob *blob, struct lsmcontext *cp)
 {
 	struct security_hook_list *hp;
 	int rc;
 
 	hlist_for_each_entry(hp, &security_hook_heads.lsmblob_to_secctx, list) {
-		rc = hp->hook.lsmblob_to_secctx(blob, secdata, seclen);
-		if (rc != LSM_RET_DEFAULT(secid_to_secctx))
+		rc = hp->hook.lsmblob_to_secctx(blob, cp);
+		if (rc != LSM_RET_DEFAULT(lsmblob_to_secctx))
 			return rc;
 	}
 
-	return LSM_RET_DEFAULT(secid_to_secctx);
+	return LSM_RET_DEFAULT(lsmblob_to_secctx);
 }
 EXPORT_SYMBOL(security_lsmblob_to_secctx);
 

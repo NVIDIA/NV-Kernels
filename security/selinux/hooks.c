@@ -6639,16 +6639,28 @@ static int selinux_secid_to_secctx(u32 secid, struct lsmcontext *cp)
 	return seclen;
 }
 
-static int selinux_lsmblob_to_secctx(struct lsmblob *blob, char **secdata,
-				     u32 *seclen)
+static int selinux_lsmblob_to_secctx(struct lsmblob *blob,
+				     struct lsmcontext *cp)
 {
 	u32 secid = blob->selinux.secid;
+	u32 seclen;
+	u32 ret;
 
 	/* stacking scaffolding */
 	if (!secid)
 		secid = blob->scaffold.secid;
 
-	return security_sid_to_context(secid, secdata, seclen);
+	if (cp) {
+		cp->id = LSM_ID_SELINUX;
+		ret = security_sid_to_context(secid, &cp->context, &cp->len);
+		if (ret < 0)
+			return ret;
+		return cp->len;
+	}
+	ret = security_sid_to_context(secid, NULL, &seclen);
+	if (ret < 0)
+		return ret;
+	return seclen;
 }
 
 static int selinux_secctx_to_secid(const char *secdata, u32 seclen, u32 *secid)
