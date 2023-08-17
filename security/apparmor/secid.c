@@ -68,8 +68,6 @@ int apparmor_secid_to_secctx(u32 secid, struct lsmcontext *cp)
 	int flags = FLAG_VIEW_SUBNS | FLAG_HIDDEN_UNCONFINED | FLAG_ABS_ROOT;
 	int len;
 
-	AA_BUG(!seclen);
-
 	if (!label)
 		return -EINVAL;
 
@@ -93,15 +91,12 @@ int apparmor_secid_to_secctx(u32 secid, struct lsmcontext *cp)
 	return len;
 }
 
-int apparmor_lsmblob_to_secctx(struct lsmblob *blob, char **secdata,
-			       u32 *seclen)
+int apparmor_lsmblob_to_secctx(struct lsmblob *blob, struct lsmcontext *cp)
 {
 	/* TODO: cache secctx and ref count so we don't have to recreate */
 	struct aa_label *label;
 	int flags = FLAG_VIEW_SUBNS | FLAG_HIDDEN_UNCONFINED | FLAG_ABS_ROOT;
 	int len;
-
-	AA_BUG(!seclen);
 
 	/* stacking scaffolding */
 	if (!blob->apparmor.label && blob->scaffold.secid)
@@ -115,8 +110,8 @@ int apparmor_lsmblob_to_secctx(struct lsmblob *blob, char **secdata,
 	if (apparmor_display_secid_mode)
 		flags |= FLAG_SHOW_MODE;
 
-	if (secdata)
-		len = aa_label_asxprint(secdata, root_ns, label,
+	if (cp)
+		len = aa_label_asxprint(&cp->context, root_ns, label,
 					flags, GFP_ATOMIC);
 	else
 		len = aa_label_snxprint(NULL, 0, root_ns, label, flags);
@@ -124,9 +119,12 @@ int apparmor_lsmblob_to_secctx(struct lsmblob *blob, char **secdata,
 	if (len < 0)
 		return -ENOMEM;
 
-	*seclen = len;
+	if (cp) {
+		cp->len = len;
+		cp->id = LSM_ID_APPARMOR;
+	}
 
-	return 0;
+	return len;
 }
 
 int apparmor_secctx_to_secid(const char *secdata, u32 seclen, u32 *secid)

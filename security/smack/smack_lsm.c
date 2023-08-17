@@ -4840,19 +4840,23 @@ static int smack_secid_to_secctx(u32 secid, struct lsmcontext *cp)
  *
  * Exists for audit code.
  */
-static int smack_lsmblob_to_secctx(struct lsmblob *blob, char **secdata,
-				   u32 *seclen)
+static int smack_lsmblob_to_secctx(struct lsmblob *blob, struct lsmcontext *cp)
 {
 	struct smack_known *skp = blob->smack.skp;
+	int len;
 
 	/* stacking scaffolding */
 	if (!skp && blob->scaffold.secid)
 		skp = smack_from_secid(blob->scaffold.secid);
 
-	if (secdata)
-		*secdata = skp->smk_known;
-	*seclen = strlen(skp->smk_known);
-	return 0;
+	len = strlen(skp->smk_known);
+
+	if (cp) {
+		cp->context = skp->smk_known;
+		cp->len = len;
+		cp->id = LSM_ID_SMACK;
+	}
+	return len;
 }
 
 /**
