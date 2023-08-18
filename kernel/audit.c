@@ -2242,20 +2242,18 @@ static void audit_buffer_aux_end(struct audit_buffer *ab)
 	ab->skb = skb_peek(&ab->skb_list);
 }
 
-int audit_log_task_context(struct audit_buffer *ab)
+int audit_log_subject_context(struct audit_buffer *ab, struct lsmblob *blob)
 {
 	struct lsmcontext ctx;
-	struct lsmblob blob;
 	bool space = false;
 	int error;
 	int i;
 
-	security_current_getlsmblob_subj(&blob);
-	if (!lsmblob_is_set(&blob))
+	if (!lsmblob_is_set(blob))
 		return 0;
 
 	if (lsm_blob_cnt < 2) {
-		error = security_lsmblob_to_secctx(&blob, &ctx, LSM_ID_UNDEF);
+		error = security_lsmblob_to_secctx(blob, &ctx, LSM_ID_UNDEF);
 		if (error < 0) {
 			if (error != -EINVAL)
 				goto error_path;
@@ -2274,7 +2272,7 @@ int audit_log_task_context(struct audit_buffer *ab)
 	for (i = 0; i < lsm_active_cnt; i++) {
 		if (!lsm_idlist[i]->lsmblob)
 			continue;
-		error = security_lsmblob_to_secctx(&blob, &ctx,
+		error = security_lsmblob_to_secctx(blob, &ctx,
 						   lsm_idlist[i]->id);
 		if (error < 0) {
 			if (error == -EOPNOTSUPP)
@@ -2294,8 +2292,17 @@ int audit_log_task_context(struct audit_buffer *ab)
 	return 0;
 
 error_path:
-	audit_panic("error in audit_log_task_context");
+	audit_panic("error in audit_log_subject_context");
 	return error;
+}
+EXPORT_SYMBOL(audit_log_subject_context);
+
+int audit_log_task_context(struct audit_buffer *ab)
+{
+	struct lsmblob blob;
+
+	security_current_getlsmblob_subj(&blob);
+	return audit_log_subject_context(ab, &blob);
 }
 EXPORT_SYMBOL(audit_log_task_context);
 
