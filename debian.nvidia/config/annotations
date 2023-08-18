@@ -15,7 +15,6 @@ CONFIG_NOUVEAU_LEGACY_CTX_SUPPORT               note<'Selects CONFIG_DRM_LEGACY 
 # ---- Annotations without notes ----
 
 CONFIG_AAEON_IWMI_WDT                           policy<{'amd64': '-'}>
-CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"'}>
 CONFIG_CEC_GPIO                                 policy<{'amd64-nvidia-lowlatency': 'm'}>
 CONFIG_CEC_PIN                                  policy<{'amd64-nvidia-lowlatency': 'y'}>
 CONFIG_CEC_PIN_ERROR_INJ                        policy<{'amd64-nvidia-lowlatency': 'n'}>
@@ -25,7 +24,6 @@ CONFIG_DEBUG_PREEMPT                            policy<{'amd64-nvidia-lowlatency
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n'}>
 CONFIG_DRM_NOUVEAU_BACKLIGHT                    policy<{'amd64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-'}>
-CONFIG_GCC_VERSION                              policy<{'amd64': '110400'}>
 CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
 CONFIG_GPIO_LJCA                                policy<{'amd64': '-'}>
 CONFIG_HZ                                       policy<{'amd64': '250', 'amd64-nvidia-lowlatency': '1000'}>
@@ -50,7 +48,6 @@ CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_DEFAULT                    policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_MMU                        policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_PUSH                       policy<{'amd64': '-'}>
-CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125'}>
 CONFIG_PREEMPT                                  policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y'}>
 CONFIG_PREEMPTION                               policy<{'amd64-nvidia-lowlatency': 'y'}>
 CONFIG_PREEMPT_COUNT                            policy<{'amd64-nvidia-lowlatency': 'y'}>
