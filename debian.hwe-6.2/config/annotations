@@ -34,7 +34,6 @@ CONFIG_INIT_STACK_ALL_ZERO                      policy<{'amd64': '-', 'arm64': '
 CONFIG_INIT_STACK_NONE                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_KCOV                                     policy<{'amd64': 'n', 'arm64': '-', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': '-'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '23800', 'arm64': '23800', 'armhf': '23800', 'ppc64el': '23800', 'riscv64': '23800', 's390x': '23800'}>
-CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125', 'armhf': '125', 'ppc64el': '125', 'riscv64': '125', 's390x': '125'}>
 CONFIG_RISCV_DMA_NONCOHERENT                    policy<{'riscv64': '-'}>
 CONFIG_RISCV_ISA_ZICBOM                         policy<{'riscv64': '-'}>
 CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-'}>
