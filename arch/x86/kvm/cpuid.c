@@ -187,7 +187,13 @@ static void kvm_vcpu_after_set_cpuid(struct kvm_vcpu *vcpu)
 		best->ecx |= XFEATURE_MASK_FPSSE;
 	}
 
-	vcpu->arch.guest_fpu.fpstate->user_xfeatures = vcpu->arch.guest_supported_xcr0;
+	/*
+	 * FP+SSE can always be saved/restored via KVM_{G,S}ET_XSAVE, even if
+	 * XSAVE/XCRO are not exposed to the guest, and even if XSAVE isn't
+	 * supported by the host.
+	 */
+	vcpu->arch.guest_fpu.fpstate->user_xfeatures = vcpu->arch.guest_supported_xcr0 |
+						       XFEATURE_MASK_FPSSE;
 
 	kvm_update_pv_runtime(vcpu);
 
