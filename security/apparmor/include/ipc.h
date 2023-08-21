@@ -17,6 +17,9 @@
 #include "inode.h"
 #include "perms.h"
 
+#define SIGUNKNOWN 0
+#define MAXMAPPED_SIG 35
+
 struct aa_msg_sec {
 	struct aa_label *label;
 };

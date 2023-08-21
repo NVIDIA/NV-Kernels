@@ -371,6 +371,7 @@ struct aa_profile *aa_alloc_profile(const char *hname, struct aa_proxy *proxy,
 	profile->label.flags |= FLAG_PROFILE;
 	profile->label.vec[0] = profile;
 
+	profile->signal = SIGKILL;
 	aa_audit_cache_init(&profile->learning_cache);
 
 	/* refcount released by caller */
