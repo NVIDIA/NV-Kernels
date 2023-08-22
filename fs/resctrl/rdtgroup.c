@@ -3596,6 +3596,7 @@ static int rdtgroup_mkdir_ctrl_mon(struct kernfs_node *parent_kn,
 	ret = 0;
 
 	rdtgrp->closid = closid;
+	pr_err("XYZZY: Allocated PARTID %u for ctrl-group '%s'\n", closid, name);
 
 	ret = mkdir_rdt_prepare_rmid_alloc(rdtgrp);
 	if (ret)
