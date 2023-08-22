@@ -145,7 +145,7 @@ static inline void resctrl_arch_set_rmid(struct task_struct *tsk, u32 rmid)
 
 static inline void mpam_thread_switch(struct task_struct *tsk)
 {
-	u64 oldregval;
+	u64 oldregval, tmp;
 	int cpu = smp_processor_id();
 	u64 regval = mpam_get_regval(tsk);
 
@@ -157,6 +157,13 @@ static inline void mpam_thread_switch(struct task_struct *tsk)
 		regval = READ_ONCE(per_cpu(arm64_mpam_default, cpu));
 
 	oldregval = READ_ONCE(per_cpu(arm64_mpam_current, cpu));
+
+	/* Check the value isn't being changed behind our back! */
+	tmp = read_sysreg_s(SYS_MPAM0_EL1);
+	if (oldregval != tmp)
+		pr_err_ratelimited("XYZZY: MPAM0_EL1 read 0x%llx expected 0x%llx\n",
+				   tmp, oldregval);
+
 	if (oldregval == regval)
 		return;
 
