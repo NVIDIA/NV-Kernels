@@ -1,2 +1,2 @@
 zfs-linux 2.1.9-2ubuntu1.1 modulename=zfs debpath=pool/universe/z/%package%/zfs-dkms_%version%_all.deb arch=amd64 arch=arm64 rprovides=spl-modules rprovides=spl-dkms rprovides=zfs-modules rprovides=zfs-dkms
-mstflint 4.24.0-1~jammy modulename=mstflint_access debpath=pool/universe/m/%package%/mstflint-dkms_%version%_all.deb arch=amd64 arch=arm64 rprovides=mstflint-modules rprovides=mstflint-dkms
+mstflint 4.25.0-1~jammy modulename=mstflint_access debpath=pool/universe/m/%package%/mstflint-dkms_%version%_all.deb arch=amd64 arch=arm64 rprovides=mstflint-modules rprovides=mstflint-dkms
