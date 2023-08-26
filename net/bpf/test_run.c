@@ -542,6 +542,7 @@ struct bpf_fentry_test_t {
 
 int noinline bpf_fentry_test7(struct bpf_fentry_test_t *arg)
 {
+	asm volatile ("");
 	return (long)arg;
 }
 
