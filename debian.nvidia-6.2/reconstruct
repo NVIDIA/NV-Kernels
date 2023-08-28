@@ -1,5 +1,15 @@
 # Recreate any symlinks created since the orig.
 # Remove any files deleted from the orig.
+rm -f 'arch/alpha/include/asm/bugs.h'
+rm -f 'arch/ia64/include/asm/bugs.h'
+rm -f 'arch/m68k/include/asm/bugs.h'
+rm -f 'arch/parisc/include/asm/bugs.h'
+rm -f 'arch/powerpc/include/asm/bugs.h'
+rm -f 'arch/sh/include/asm/bugs.h'
+rm -f 'arch/sparc/include/asm/bugs.h'
+rm -f 'arch/um/include/asm/bugs.h'
+rm -f 'arch/xtensa/include/asm/bugs.h'
+rm -f 'include/asm-generic/bugs.h'
 rm -f 'net/sched/cls_tcindex.c'
 rm -f 'scripts/is_rust_module.sh'
 rm -f 'tools/testing/selftests/net/bpf/Makefile'
