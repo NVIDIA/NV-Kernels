@@ -5462,7 +5462,7 @@ void security_audit_rule_free(void *lsmrule)
 
 /**
  * security_audit_rule_match() - Check if a label matches an audit rule
- * @secid: security label
+ * @lsmblob: security label
  * @field: LSM audit field
  * @op: matching operator
  * @lsmrule: audit rule
@@ -5473,9 +5473,9 @@ void security_audit_rule_free(void *lsmrule)
  * Return: Returns 1 if secid matches the rule, 0 if it does not, -ERRNO on
  *         failure.
  */
-int security_audit_rule_match(u32 secid, u32 field, u32 op, void *lsmrule)
+int security_audit_rule_match(struct lsmblob *blob, u32 field, u32 op, void *lsmrule)
 {
-	return call_int_hook(audit_rule_match, 0, secid, field, op, lsmrule,
+	return call_int_hook(audit_rule_match, 0, blob, field, op, lsmrule,
 			     LSM_ID_UNDEF);
 }
 #endif /* CONFIG_AUDIT */
@@ -5497,10 +5497,10 @@ void ima_filter_rule_free(void *lsmrule, int lsmid)
 	call_void_hook(audit_rule_free, lsmrule, lsmid);
 }
 
-int ima_filter_rule_match(u32 secid, u32 field, u32 op, void *lsmrule,
-			  int lsmid)
+int ima_filter_rule_match(struct lsmblob *blob, u32 field, u32 op,
+			  void *lsmrule, int lsmid)
 {
-	return call_int_hook(audit_rule_match, 0, secid, field, op, lsmrule,
+	return call_int_hook(audit_rule_match, 0, blob, field, op, lsmrule,
 			     lsmid);
 }
 #endif /* CONFIG_IMA_LSM_RULES */

@@ -396,8 +396,8 @@ LSM_HOOK(int, 0, key_getsecurity, struct key *key, char **buffer)
 LSM_HOOK(int, 0, audit_rule_init, u32 field, u32 op, char *rulestr,
 	 void **lsmrule, int lsmid)
 LSM_HOOK(int, 0, audit_rule_known, struct audit_krule *krule)
-LSM_HOOK(int, 0, audit_rule_match, u32 secid, u32 field, u32 op, void *lsmrule,
-	 int lsmid)
+LSM_HOOK(int, 0, audit_rule_match, struct lsmblob *blob, u32 field, u32 op,
+	 void *lsmrule, int lsmid)
 LSM_HOOK(void, LSM_RET_VOID, audit_rule_free, void *lsmrule, int lsmid)
 #endif /* CONFIG_AUDIT */
 

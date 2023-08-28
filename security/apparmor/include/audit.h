@@ -203,6 +203,7 @@ void aa_audit_rule_free(void *vrule, int lsmid);
 int aa_audit_rule_init(u32 field, u32 op, char *rulestr, void **vrule,
 		       int lsmid);
 int aa_audit_rule_known(struct audit_krule *rule);
-int aa_audit_rule_match(u32 sid, u32 field, u32 op, void *vrule, int lsmid);
+int aa_audit_rule_match(struct lsmblob *blob, u32 field, u32 op, void *vrule,
+			int lsmid);
 
 #endif /* __AA_AUDIT_H */
