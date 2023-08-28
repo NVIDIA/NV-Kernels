@@ -21,21 +21,24 @@
  *	@op: the operator the rule uses
  *	@rulestr: the text "target" of the rule
  *	@rule: pointer to the new rule structure returned via this
+ *	@lsmid: the relevant LSM
  *
  *	Returns 0 if successful, -errno if not.  On success, the rule structure
  *	will be allocated internally.  The caller must free this structure with
  *	selinux_audit_rule_free() after use.
  */
-int selinux_audit_rule_init(u32 field, u32 op, char *rulestr, void **rule);
+int selinux_audit_rule_init(u32 field, u32 op, char *rulestr, void **rule,
+			    int lsmid);
 
 /**
  *	selinux_audit_rule_free - free an selinux audit rule structure.
  *	@rule: pointer to the audit rule to be freed
+ *	@lsmid: which LSM this rule relates to
  *
  *	This will free all memory associated with the given rule.
  *	If @rule is NULL, no operation is performed.
  */
-void selinux_audit_rule_free(void *rule);
+void selinux_audit_rule_free(void *rule, int lsmid);
 
 /**
  *	selinux_audit_rule_match - determine if a context ID matches a rule.
@@ -43,11 +46,12 @@ void selinux_audit_rule_free(void *rule);
  *	@field: the field this rule refers to
  *	@op: the operator the rule uses
  *	@rule: pointer to the audit rule to check against
+ *	@lsmid: the relevant LSM
  *
  *	Returns 1 if the context id matches the rule, 0 if it does not, and
  *	-errno on failure.
  */
-int selinux_audit_rule_match(u32 sid, u32 field, u32 op, void *rule);
+int selinux_audit_rule_match(u32 sid, u32 field, u32 op, void *rule, int lsmid);
 
 /**
  *	selinux_audit_rule_known - check to see if rule contains selinux fields.
