@@ -3498,17 +3498,20 @@ struct selinux_audit_rule {
 	struct context au_ctxt;
 };
 
-void selinux_audit_rule_free(void *vrule)
+void selinux_audit_rule_free(void *vrule, int lsmid)
 {
 	struct selinux_audit_rule *rule = vrule;
 
+	if (lsmid != LSM_ID_UNDEF || lsmid != LSM_ID_SELINUX)
+		return;
 	if (rule) {
 		context_destroy(&rule->au_ctxt);
 		kfree(rule);
 	}
 }
 
-int selinux_audit_rule_init(u32 field, u32 op, char *rulestr, void **vrule)
+int selinux_audit_rule_init(u32 field, u32 op, char *rulestr, void **vrule,
+			    int lsmid)
 {
 	struct selinux_state *state = &selinux_state;
 	struct selinux_policy *policy;
@@ -3522,6 +3525,8 @@ int selinux_audit_rule_init(u32 field, u32 op, char *rulestr, void **vrule)
 
 	*rule = NULL;
 
+	if (lsmid != LSM_ID_UNDEF || lsmid != LSM_ID_SELINUX)
+		return 0;
 	if (!selinux_initialized())
 		return -EOPNOTSUPP;
 
@@ -3603,7 +3608,7 @@ int selinux_audit_rule_init(u32 field, u32 op, char *rulestr, void **vrule)
 
 err:
 	rcu_read_unlock();
-	selinux_audit_rule_free(tmprule);
+	selinux_audit_rule_free(tmprule, LSM_ID_SELINUX);
 	*rule = NULL;
 	return rc;
 }
@@ -3633,7 +3638,7 @@ int selinux_audit_rule_known(struct audit_krule *rule)
 	return 0;
 }
 
-int selinux_audit_rule_match(u32 sid, u32 field, u32 op, void *vrule)
+int selinux_audit_rule_match(u32 sid, u32 field, u32 op, void *vrule, int lsmid)
 {
 	struct selinux_state *state = &selinux_state;
 	struct selinux_policy *policy;
@@ -3642,6 +3647,8 @@ int selinux_audit_rule_match(u32 sid, u32 field, u32 op, void *vrule)
 	struct selinux_audit_rule *rule = vrule;
 	int match = 0;
 
+	if (lsmid != LSM_ID_UNDEF || lsmid != LSM_ID_SELINUX)
+		return 0;
 	if (unlikely(!rule)) {
 		WARN_ONCE(1, "selinux_audit_rule_match: missing rule\n");
 		return -ENOENT;
