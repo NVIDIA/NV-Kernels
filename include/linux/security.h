@@ -286,6 +286,8 @@ int unregister_blocking_lsm_notifier(struct notifier_block *nb);
 extern int security_init(void);
 extern int early_security_init(void);
 extern u64 lsm_name_to_attr(const char *name);
+extern u64 lsm_name_to_id(const char *name);
+extern const char *lsm_id_to_name(u64 id);
 
 /* Security operations */
 int security_binder_set_context_mgr(const struct cred *mgr);
@@ -537,6 +539,16 @@ static inline  int unregister_blocking_lsm_notifier(struct notifier_block *nb)
 static inline u64 lsm_name_to_attr(const char *name)
 {
 	return LSM_ATTR_UNDEF;
+}
+
+static inline u64 lsm_name_to_id(const char *name)
+{
+	return LSM_ID_UNDEF;
+}
+
+static inline const char *lsm_id_to_name(u64 id)
+{
+	return NULL;
 }
 
 static inline void security_free_mnt_opts(void **mnt_opts)
@@ -2044,25 +2056,27 @@ static inline void security_audit_rule_free(void *lsmrule)
 #endif /* CONFIG_AUDIT */
 
 #if defined(CONFIG_IMA_LSM_RULES) && defined(CONFIG_SECURITY)
-int ima_filter_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule);
-int ima_filter_rule_match(u32 secid, u32 field, u32 op, void *lsmrule);
-void ima_filter_rule_free(void *lsmrule);
+int ima_filter_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule,
+			 int lsmid);
+int ima_filter_rule_match(u32 secid, u32 field, u32 op, void *lsmrule,
+			  int lsmid);
+void ima_filter_rule_free(void *lsmrule, int lsmid);
 
 #else
 
 static inline int ima_filter_rule_init(u32 field, u32 op, char *rulestr,
-					   void **lsmrule)
+				       void **lsmrule, int lsmid)
 {
 	return 0;
 }
 
 static inline int ima_filter_rule_match(u32 secid, u32 field, u32 op,
-					    void *lsmrule)
+					void *lsmrule, int lsmid)
 {
 	return 0;
 }
 
-static inline void ima_filter_rule_free(void *lsmrule)
+static inline void ima_filter_rule_free(void *lsmrule, int lsmid)
 { }
 
 #endif /* defined(CONFIG_IMA_LSM_RULES) && defined(CONFIG_SECURITY) */

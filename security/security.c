@@ -272,6 +272,46 @@ static void __init initialize_lsm(struct lsm_info *lsm)
 u32 lsm_active_cnt __ro_after_init;
 const struct lsm_id *lsm_idlist[LSM_CONFIG_COUNT];
 
+/**
+ * lsm_name_to_id - get the LSM ID for a registered LSM
+ * @name: the name of the LSM
+ *
+ * Returns the LSM ID associated with the named LSM or
+ * LSM_ID_UNDEF if the name isn't recongnized.
+ */
+u64 lsm_name_to_id(const char *name)
+{
+	int i;
+
+	for (i = 0; i < LSM_CONFIG_COUNT; i++) {
+		if (!lsm_idlist[i]->name)
+			return LSM_ID_UNDEF;
+		if (!strcmp(name, lsm_idlist[i]->name))
+			return lsm_idlist[i]->id;
+	}
+	return LSM_ID_UNDEF;
+}
+
+/**
+ * lsm_id_to_name - get the LSM name for a registered LSM ID
+ * @id: the ID of the LSM
+ *
+ * Returns the LSM name associated with the LSM ID or
+ * NULL if the ID isn't recongnized.
+ */
+const char *lsm_id_to_name(u64 id)
+{
+	int i;
+
+	for (i = 0; i < LSM_CONFIG_COUNT; i++) {
+		if (!lsm_idlist[i]->name)
+			return NULL;
+		if (id == lsm_idlist[i]->id)
+			return lsm_idlist[i]->name;
+	}
+	return NULL;
+}
+
 /* Populate ordered LSMs list from comma-separated LSM name list. */
 static void __init ordered_lsm_parse(const char *order, const char *origin)
 {
@@ -5390,7 +5430,8 @@ int security_key_getsecurity(struct key *key, char **buffer)
  */
 int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule)
 {
-	return call_int_hook(audit_rule_init, 0, field, op, rulestr, lsmrule);
+	return call_int_hook(audit_rule_init, 0, field, op, rulestr, lsmrule,
+			     LSM_ID_UNDEF);
 }
 
 /**
@@ -5416,7 +5457,7 @@ int security_audit_rule_known(struct audit_krule *krule)
  */
 void security_audit_rule_free(void *lsmrule)
 {
-	call_void_hook(audit_rule_free, lsmrule);
+	call_void_hook(audit_rule_free, lsmrule, LSM_ID_UNDEF);
 }
 
 /**
@@ -5434,7 +5475,8 @@ void security_audit_rule_free(void *lsmrule)
  */
 int security_audit_rule_match(u32 secid, u32 field, u32 op, void *lsmrule)
 {
-	return call_int_hook(audit_rule_match, 0, secid, field, op, lsmrule);
+	return call_int_hook(audit_rule_match, 0, secid, field, op, lsmrule,
+			     LSM_ID_UNDEF);
 }
 #endif /* CONFIG_AUDIT */
 
@@ -5443,19 +5485,23 @@ int security_audit_rule_match(u32 secid, u32 field, u32 op, void *lsmrule)
  * The integrity subsystem uses the same hooks as
  * the audit subsystem.
  */
-int ima_filter_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule)
+int ima_filter_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule,
+			 int lsmid)
 {
-	return call_int_hook(audit_rule_init, 0, field, op, rulestr, lsmrule);
+	return call_int_hook(audit_rule_init, 0, field, op, rulestr, lsmrule,
+			     lsmid);
 }
 
-void ima_filter_rule_free(void *lsmrule)
+void ima_filter_rule_free(void *lsmrule, int lsmid)
 {
-	call_void_hook(audit_rule_free, lsmrule);
+	call_void_hook(audit_rule_free, lsmrule, lsmid);
 }
 
-int ima_filter_rule_match(u32 secid, u32 field, u32 op, void *lsmrule)
+int ima_filter_rule_match(u32 secid, u32 field, u32 op, void *lsmrule,
+			  int lsmid)
 {
-	return call_int_hook(audit_rule_match, 0, secid, field, op, lsmrule);
+	return call_int_hook(audit_rule_match, 0, secid, field, op, lsmrule,
+			     lsmid);
 }
 #endif /* CONFIG_IMA_LSM_RULES */
 

@@ -4673,16 +4673,20 @@ static int smack_post_notification(const struct cred *w_cred,
  * @op: required testing operator (=, !=, >, <, ...)
  * @rulestr: smack label to be audited
  * @vrule: pointer to save our own audit rule representation
+ * @lsmid: the relevant LSM
  *
  * Prepare to audit cases where (@field @op @rulestr) is true.
  * The label to be audited is created if necessay.
  */
-static int smack_audit_rule_init(u32 field, u32 op, char *rulestr, void **vrule)
+static int smack_audit_rule_init(u32 field, u32 op, char *rulestr, void **vrule,
+				 int lsmid)
 {
 	struct smack_known *skp;
 	char **rule = (char **)vrule;
 	*rule = NULL;
 
+	if (lsmid != LSM_ID_UNDEF || lsmid != LSM_ID_SMACK)
+		return 0;
 	if (field != AUDIT_SUBJ_USER && field != AUDIT_OBJ_USER)
 		return -EINVAL;
 
@@ -4727,15 +4731,19 @@ static int smack_audit_rule_known(struct audit_krule *krule)
  * @field: audit rule flags given from user-space
  * @op: required testing operator
  * @vrule: smack internal rule presentation
+ * @lsmid: the relevant LSM
  *
  * The core Audit hook. It's used to take the decision of
  * whether to audit or not to audit a given object.
  */
-static int smack_audit_rule_match(u32 secid, u32 field, u32 op, void *vrule)
+static int smack_audit_rule_match(u32 secid, u32 field, u32 op, void *vrule,
+				  int lsmid)
 {
 	struct smack_known *skp;
 	char *rule = vrule;
 
+	if (lsmid != LSM_ID_UNDEF || lsmid != LSM_ID_SMACK)
+		return 0;
 	if (unlikely(!rule)) {
 		WARN_ONCE(1, "Smack: missing rule\n");
 		return -ENOENT;
