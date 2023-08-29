@@ -462,6 +462,7 @@ void security_cred_free(struct cred *cred);
 int security_prepare_creds(struct cred *new, const struct cred *old, gfp_t gfp);
 void security_transfer_creds(struct cred *new, const struct cred *old);
 void security_cred_getsecid(const struct cred *c, u32 *secid);
+void security_cred_getlsmblob(const struct cred *c, struct lsmblob *blob);
 int security_kernel_act_as(struct cred *new, u32 secid);
 int security_kernel_create_files_as(struct cred *new, struct inode *inode);
 int security_kernel_module_request(char *kmod_name);
@@ -1157,6 +1158,12 @@ static inline void security_transfer_creds(struct cred *new,
 }
 
 static inline void security_cred_getsecid(const struct cred *c, u32 *secid)
+{
+	*secid = 0;
+}
+
+static inline void security_cred_getlsmblob(const struct cred *c,
+					    struct lsmblob *blob)
 {
 	*secid = 0;
 }
