@@ -98,7 +98,8 @@ struct audit_buffer *netlbl_audit_start_common(int type,
 			 audit_info->sessionid);
 
 	if (lsmblob_is_set(&audit_info->blob) &&
-	    security_lsmblob_to_secctx(&audit_info->blob, &ctx) >= 0) {
+	    security_lsmblob_to_secctx(&audit_info->blob, &ctx,
+				       LSM_ID_UNDEF) >= 0) {
 		audit_log_format(audit_buf, " subj=%s", ctx.context);
 		security_release_secctx(&ctx);
 	}
