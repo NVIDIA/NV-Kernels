@@ -1109,7 +1109,7 @@ static int audit_log_pid_context(struct audit_context *context, pid_t pid,
 			 from_kuid(&init_user_ns, auid),
 			 from_kuid(&init_user_ns, uid), sessionid);
 	if (lsmblob_is_set(blob)) {
-		if (security_lsmblob_to_secctx(blob, &ctx) < 0) {
+		if (security_lsmblob_to_secctx(blob, &ctx, LSM_ID_UNDEF) < 0) {
 			audit_log_format(ab, " obj=(none)");
 			rc = 1;
 		} else {
@@ -1394,7 +1394,8 @@ static void show_special(struct audit_context *context, int *call_panic)
 				 context->ipc.mode);
 		if (lsmblob_is_set(&context->ipc.oblob)) {
 			if (security_lsmblob_to_secctx(&context->ipc.oblob,
-						       &lsmctx) < 0) {
+						       &lsmctx,
+						       LSM_ID_UNDEF) < 0) {
 				*call_panic = 1;
 			} else {
 				audit_log_format(ab, " obj=%s", lsmctx.context);
@@ -1559,7 +1560,8 @@ static void audit_log_name(struct audit_context *context, struct audit_names *n,
 	if (lsmblob_is_set(&n->oblob)) {
 		struct lsmcontext ctx;
 
-		if (security_lsmblob_to_secctx(&n->oblob, &ctx) < 0) {
+		if (security_lsmblob_to_secctx(&n->oblob, &ctx,
+					       LSM_ID_UNDEF) < 0) {
 			if (call_panic)
 				*call_panic = 2;
 		} else {

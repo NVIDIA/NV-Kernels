@@ -4222,6 +4222,7 @@ EXPORT_SYMBOL(security_secid_to_secctx);
  * security_lsmblob_to_secctx() - Convert a lsmblob to a secctx
  * @blob: lsm specific information
  * @cp: the LSM context
+ * @lsmid: which security module to report
  *
  * Convert a @blob entry to security context. If @cp is NULL the
  * length of the result will be returned, but no data will be returned.
@@ -4231,15 +4232,15 @@ EXPORT_SYMBOL(security_secid_to_secctx);
  *
  * Return: Return length of data on success, error on failure.
  */
-int security_lsmblob_to_secctx(struct lsmblob *blob, struct lsmcontext *cp)
+int security_lsmblob_to_secctx(struct lsmblob *blob, struct lsmcontext *cp,
+			       int lsmid)
 {
 	struct security_hook_list *hp;
-	int rc;
 
 	hlist_for_each_entry(hp, &security_hook_heads.lsmblob_to_secctx, list) {
-		rc = hp->hook.lsmblob_to_secctx(blob, cp);
-		if (rc != LSM_RET_DEFAULT(lsmblob_to_secctx))
-			return rc;
+		if (lsmid != hp->lsmid->id && lsmid != LSM_ID_UNDEF)
+			continue;
+		return hp->hook.lsmblob_to_secctx(blob, cp);
 	}
 
 	return LSM_RET_DEFAULT(lsmblob_to_secctx);
