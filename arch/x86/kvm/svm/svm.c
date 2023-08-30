@@ -3761,6 +3761,8 @@ static noinstr void svm_vcpu_enter_exit(struct kvm_vcpu *vcpu)
 
 	kvm_guest_enter_irqoff();
 
+	amd_clear_divider();
+
 	if (sev_es_guest(vcpu->kvm)) {
 		__svm_sev_es_vcpu_run(vmcb_pa);
 	} else {
