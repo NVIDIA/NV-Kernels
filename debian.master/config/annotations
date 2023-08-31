@@ -3043,6 +3043,7 @@ CONFIG_CPU_PJ4B                                 policy<{'armhf': 'y'}>
 CONFIG_CPU_PM                                   policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_CPU_RMAP                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_CPU_SPECTRE                              policy<{'armhf': 'y'}>
+CONFIG_CPU_SRSO                                 policy<{'amd64': 'y'}>
 CONFIG_CPU_SUP_AMD                              policy<{'amd64': 'y'}>
 CONFIG_CPU_SUP_CENTAUR                          policy<{'amd64': 'y'}>
 CONFIG_CPU_SUP_HYGON                            policy<{'amd64': 'y'}>
