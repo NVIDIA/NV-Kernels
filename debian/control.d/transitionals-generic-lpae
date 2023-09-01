@@ -26,7 +26,7 @@ Description: Generic LPAE Linux kernel tools (dummy transitional package)
 Package: linux-generic-lpae
 Architecture: armhf
 Section: oldlibs
-Depends: linux-generic-wip
+Depends: linux-generic
 Description: Complete Generic LPAE Linux kernel and headers (dummy transitional package)
  Transitional package for upgrades. This package can be safely removed.
 
