@@ -70,7 +70,7 @@ static void free_list_evsel(struct list_head* list_evsel)
 %type <num> PE_VALUE_SYM_HW
 %type <num> PE_VALUE_SYM_SW
 %type <num> PE_VALUE_SYM_TOOL
-%type <num> PE_TERM
+%type <term_type> PE_TERM
 %type <num> value_sym
 %type <str> PE_RAW
 %type <str> PE_NAME
@@ -112,6 +112,7 @@ static void free_list_evsel(struct list_head* list_evsel)
 {
 	char *str;
 	u64 num;
+	enum parse_events__term_type term_type;
 	struct list_head *list_evsel;
 	struct list_head *list_terms;
 	struct parse_events_term *term;
@@ -777,8 +778,7 @@ PE_TERM_HW
 PE_TERM '=' name_or_raw
 {
 	struct parse_events_term *term;
-	int err = parse_events_term__str(&term, (enum parse_events__term_type)$1,
-					/*config=*/NULL, $3, &@1, &@3);
+	int err = parse_events_term__str(&term, $1, /*config=*/NULL, $3, &@1, &@3);
 
 	if (err) {
 		free($3);
@@ -790,8 +790,7 @@ PE_TERM '=' name_or_raw
 PE_TERM '=' PE_TERM_HW
 {
 	struct parse_events_term *term;
-	int err = parse_events_term__str(&term, (enum parse_events__term_type)$1,
-					 /*config=*/NULL, $3.str, &@1, &@3);
+	int err = parse_events_term__str(&term, $1, /*config=*/NULL, $3.str, &@1, &@3);
 
 	if (err) {
 		free($3.str);
@@ -803,10 +802,7 @@ PE_TERM '=' PE_TERM_HW
 PE_TERM '=' PE_TERM
 {
 	struct parse_events_term *term;
-	int err = parse_events_term__term(&term,
-					  (enum parse_events__term_type)$1,
-					  (enum parse_events__term_type)$3,
-					  &@1, &@3);
+	int err = parse_events_term__term(&term, $1, $3, &@1, &@3);
 
 	if (err)
 		PE_ABORT(err);
@@ -817,8 +813,9 @@ PE_TERM '=' PE_TERM
 PE_TERM '=' PE_VALUE
 {
 	struct parse_events_term *term;
-	int err = parse_events_term__num(&term, (enum parse_events__term_type)$1,
-					 /*config=*/NULL, $3, /*novalue=*/false, &@1, &@3);
+	int err = parse_events_term__num(&term, $1,
+					 /*config=*/NULL, $3, /*novalue=*/false,
+					 &@1, &@3);
 
 	if (err)
 		PE_ABORT(err);
@@ -829,9 +826,9 @@ PE_TERM '=' PE_VALUE
 PE_TERM
 {
 	struct parse_events_term *term;
-	int err = parse_events_term__num(&term, (enum parse_events__term_type)$1,
-					/*config=*/NULL, /*num=*/1, /*novalue=*/true,
-					&@1, /*loc_val=*/NULL);
+	int err = parse_events_term__num(&term, $1,
+					 /*config=*/NULL, /*num=*/1, /*novalue=*/true,
+					 &@1, /*loc_val=*/NULL);
 
 	if (err)
 		PE_ABORT(err);
