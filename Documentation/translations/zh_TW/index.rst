@@ -70,10 +70,10 @@ TODOlist:
    :maxdepth: 2
 
    process/index
+   dev-tools/index
 
 TODOList:
 
-* dev-tools/index
 * doc-guide/index
 * kernel-hacking/index
 * trace/index
