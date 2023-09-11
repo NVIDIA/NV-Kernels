@@ -10,6 +10,7 @@
 #include <linux/bitmap.h>
 #include <linux/cacheinfo.h>
 #include <linux/cpu.h>
+#include <linux/cpu_pm.h>
 #include <linux/cpumask.h>
 #include <linux/device.h>
 #include <linux/errno.h>
@@ -2283,6 +2284,29 @@ static void mpam_debugfs_setup(void)
 	}
 }
 
+static int mpam_pm_notifier(struct notifier_block *self,
+			    unsigned long cmd, void *v)
+{
+	u64 regval;
+	int cpu = smp_processor_id();
+
+	switch (cmd) {
+        case CPU_PM_EXIT:
+		/* open coded to avoid hitting debug logic in mpam_thread_switch() */
+		regval = READ_ONCE(per_cpu(arm64_mpam_current, cpu));
+		write_sysreg_s(0, SYS_MPAM1_EL1);
+		write_sysreg_s(regval, SYS_MPAM0_EL1);
+
+		return NOTIFY_OK;
+        default:
+                return NOTIFY_DONE;
+	}
+}
+
+static struct notifier_block mpam_pm_nb = {
+        .notifier_call = mpam_pm_notifier,
+};
+
 static void mpam_enable_once(void)
 {
 	int err;
@@ -2337,6 +2361,8 @@ static void mpam_enable_once(void)
 	spin_lock(&partid_max_lock);
 	partid_max_published = true;
 	spin_unlock(&partid_max_lock);
+
+	cpu_pm_register_notifier(&mpam_pm_nb);
 
 	static_branch_enable(&mpam_enabled);
 	mpam_register_cpuhp_callbacks(mpam_cpu_online);
