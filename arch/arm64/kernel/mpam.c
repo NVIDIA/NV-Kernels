@@ -7,7 +7,11 @@
 #include <linux/jump_label.h>
 #include <linux/percpu.h>
 
+/* Number of registers for virtualising PARTID mapping */
+u8 mpam_num_vpm;
+
 DEFINE_STATIC_KEY_FALSE(arm64_mpam_has_hcr);
+DEFINE_STATIC_KEY_FALSE(arm64_mpam_has_vpm);
 DEFINE_PER_CPU(u64, arm64_mpam_default);
 DEFINE_PER_CPU(u64, arm64_mpam_current);
 
