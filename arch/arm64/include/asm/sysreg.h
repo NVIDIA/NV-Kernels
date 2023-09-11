@@ -526,7 +526,6 @@
 #define SYS_MPAMVPMV_EL2		sys_reg(3, 4, 10, 4, 1)
 #define SYS_MPAM2_EL2			sys_reg(3, 4, 10, 5, 0)
 #define __SYS__MPAMVPMx_EL2(x)		sys_reg(3, 4, 10, 6, x)
-#define SYS_MPAMVPM0_EL2		__SYS__MPAMVPMx_EL2(0)
 #define SYS_MPAMVPM1_EL2		__SYS__MPAMVPMx_EL2(1)
 #define SYS_MPAMVPM2_EL2		__SYS__MPAMVPMx_EL2(2)
 #define SYS_MPAMVPM3_EL2		__SYS__MPAMVPMx_EL2(3)

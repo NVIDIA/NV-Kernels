@@ -2337,13 +2337,19 @@ cpu_enable_mpam(const struct arm64_cpu_capabilities *entry)
 
 static void mpam_extra_caps(void)
 {
+	u32 num_vpm;
 	u64 idr = read_sanitised_ftr_reg(SYS_MPAMIDR_EL1);
 
 	if (!IS_ENABLED(CONFIG_ARM64_MPAM))
 		return;
 
-	if (idr & MPAMIDR_HAS_HCR)
+	if (idr & MPAMIDR_HAS_HCR) {
 		__enable_mpam_hcr();
+
+		num_vpm = FIELD_GET(MPAMIDR_VPMR_MAX, idr);
+		if (num_vpm)
+			__enable_mpam_vpm(num_vpm);
+	}
 }
 
 static const struct arm64_cpu_capabilities arm64_features[] = {

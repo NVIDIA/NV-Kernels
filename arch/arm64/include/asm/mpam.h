@@ -51,8 +51,10 @@
 #define MPAM_VPM_PARTIDS_PER_REG	(MPAM_VPM_REG_LEN / MPAM_VPM_PARTID_LEN)
 #define MPAM_VPM_MAX_PARTID		(MPAM_VPM_NUM_REGS * MPAM_VPM_PARTIDS_PER_REG)
 
+extern u8 mpam_num_vpm;
 
 DECLARE_STATIC_KEY_FALSE(arm64_mpam_has_hcr);
+DECLARE_STATIC_KEY_FALSE(arm64_mpam_has_vpm);
 DECLARE_STATIC_KEY_FALSE(mpam_enabled);
 DECLARE_PER_CPU(u64, arm64_mpam_default);
 DECLARE_PER_CPU(u64, arm64_mpam_current);
@@ -78,6 +80,15 @@ static inline void __init __enable_mpam_hcr(void)
 {
 	if (IS_ENABLED(CONFIG_ARM64_MPAM))
 		static_branch_enable(&arm64_mpam_has_hcr);
+}
+
+static inline void __init __enable_mpam_vpm(u8 num_vpm)
+{
+	if (!IS_ENABLED(CONFIG_ARM64_MPAM))
+		return;
+
+	mpam_num_vpm = num_vpm;
+	static_branch_enable(&arm64_mpam_has_vpm);
 }
 
 /*
@@ -143,6 +154,24 @@ static inline void resctrl_arch_set_rmid(struct task_struct *tsk, u32 rmid)
 #endif
 }
 
+static inline void __report_corrupted_mpam0_el1(u64 oldregval)
+{
+	bool can_read_vpm = is_kernel_in_hyp_mode() && static_branch_likely(&arm64_mpam_has_vpm);
+
+	/*
+	 * Nothing else in linux ever touches the VPM registers. Did those
+	 * preserve their value?
+	 */
+	if (can_read_vpm && oldregval == read_sysreg_s(SYS_MPAMVPM0_EL2)) {
+		pr_err_ratelimited(FW_BUG "XYZZY: MPAM0_EL1 corrupted, but not MPAMVPM0_EL2)\n");
+		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
+	} else {
+		pr_err_ratelimited("XYZZY: MPAM0_EL1 read 0x%llx expected 0x%llx\n",
+				   read_sysreg_s(SYS_MPAM0_EL1), oldregval);
+
+	}
+}
+
 static inline void mpam_thread_switch(struct task_struct *tsk)
 {
 	u64 oldregval, tmp;
@@ -161,15 +190,24 @@ static inline void mpam_thread_switch(struct task_struct *tsk)
 	/* Check the value isn't being changed behind our back! */
 	tmp = read_sysreg_s(SYS_MPAM0_EL1);
 	if (oldregval != tmp)
-		pr_err_ratelimited("XYZZY: MPAM0_EL1 read 0x%llx expected 0x%llx\n",
-				   tmp, oldregval);
-
-	if (oldregval == regval)
+		__report_corrupted_mpam0_el1(oldregval);
+	else if (oldregval == regval)
 		return;
 
 	/* Synchronising this write is left until the ERET to EL0 */
 	write_sysreg_s(regval, SYS_MPAM0_EL1);
 	WRITE_ONCE(per_cpu(arm64_mpam_current, cpu), regval);
+
+	/*
+	 * Trusted Firmware doesn't save/restore the EL1&0 sysregs when EL3
+	 * does a world switch, it expects S-EL2 to save/restore the registers
+	 * it may corrupt. Guess what happens if S-EL2 didn't get the memo!
+	 *
+	 * EL3 does save/restore the MPAMVPM<n>_EL2 sysregs ... stash MPAM0_EL1
+	 * in there to catch corruption due to this firmware bug.
+	 */
+	if (is_kernel_in_hyp_mode() && static_branch_likely(&arm64_mpam_has_vpm))
+		write_sysreg_s(regval, SYS_MPAMVPM0_EL2);
 }
 
 static inline u64 resctrl_arch_get_cpu_msr(void)
