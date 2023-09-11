@@ -2400,6 +2400,9 @@ test_has_mpam(const struct arm64_cpu_capabilities *entry, int scope)
 static void __maybe_unused
 cpu_enable_mpam(const struct arm64_cpu_capabilities *entry)
 {
+	int cpu = smp_processor_id();
+	u64 regval = READ_ONCE(per_cpu(arm64_mpam_current, cpu));
+
 	/*
 	 * Access by the kernel (at EL1) should use the reserved PARTID
 	 * which is configured unrestricted. This avoids priority-inversion
@@ -2407,6 +2410,7 @@ cpu_enable_mpam(const struct arm64_cpu_capabilities *entry)
 	 * been throttled to release the lock.
 	 */
 	write_sysreg_s(0, SYS_MPAM1_EL1);
+	write_sysreg_s(regval, SYS_MPAM0_EL1);
 }
 
 static void mpam_extra_caps(void)
