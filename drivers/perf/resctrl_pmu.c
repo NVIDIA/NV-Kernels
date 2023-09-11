@@ -144,7 +144,7 @@ static int resctrl_pmu_event_init(struct perf_event *event)
 			return -EINVAL;
 	}
 
-	hwc->idx = resctrl_arch_mon_ctx_alloc_no_wait(r, event_num);
+	hwc->idx = resctrl_arch_mon_ctx_alloc(r, event_num);
 	if (hwc->idx == -ENOSPC)
 		return -ENOSPC;
 	event->destroy = resctrl_pmu_event_destroy;
