@@ -1026,7 +1026,6 @@ ddbridge
 ddbridge-dummy-fe
 de2104x
 de4x5
-decnet
 defxx
 dell-laptop
 dell-rbtn
@@ -1115,7 +1114,6 @@ dmfe
 dmi-sysfs
 dmm32at
 dmx3191d
-dn_rtmsg
 dnet
 dp83640
 dp83822
@@ -5173,7 +5171,6 @@ surfacepro3_button
 svc-i3c-master
 svgalib
 switchtec
-sx8
 sx8654
 sx9310
 sx9500
