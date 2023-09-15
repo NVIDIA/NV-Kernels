@@ -1,3 +1,11 @@
+dropped:
+UBUNTU: SAUCE: drm/i915/quirks: Add multiple VBT quirk for HP ZBook Power G10
+UBUNTU: SAUCE: ceph: print the client global_id in all the debug logs
+UBUNTU: SAUCE: ceph: handle idmapped mounts in create_request_message()
+UBUNTU: SAUCE: ceph: add enable_unsafe_idmap module parameter
+UBUNTU: SAUCE: ceph: allow idmapped getattr inode op
+UBUNTU: SAUCE: ceph: allow idmapped setattr inode op
+
 UBUNTU: SAUCE: Revert "perf tools: Use Python devtools for version autodetection rather than runtime" # we should have python3-dev in our build chroot at this point
 
 UBUNTU: SAUCE: Revert "radix-tree: Use local_lock for protection" # required by nvidia, but it's a latency degradation for everyone
