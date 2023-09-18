@@ -4487,6 +4487,10 @@ static size_t vxlan_get_size(const struct net_device *dev)
 		nla_total_size(sizeof(__u8)) + /* IFLA_VXLAN_REMCSUM_TX */
 		nla_total_size(sizeof(__u8)) + /* IFLA_VXLAN_REMCSUM_RX */
 		nla_total_size(sizeof(__u8)) + /* IFLA_VXLAN_LOCALBYPASS */
+		nla_total_size(0) + /* IFLA_VXLAN_GBP */
+		nla_total_size(0) + /* IFLA_VXLAN_GPE */
+		nla_total_size(0) + /* IFLA_VXLAN_REMCSUM_NOPARTIAL */
+		nla_total_size(sizeof(__u8)) + /* IFLA_VXLAN_VNIFILTER */
 		nla_total_size(sizeof(struct ip_fan_map) * 256) +
 		0;
 }
