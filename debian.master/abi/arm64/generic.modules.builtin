@@ -379,6 +379,7 @@ serial_core
 serial_mctrl_gpio
 serio
 sg
+sh-sci
 sh_cmt
 sh_tmu
 sha1_generic
