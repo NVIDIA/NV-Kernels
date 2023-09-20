@@ -6326,7 +6326,6 @@ EXPORT_SYMBOL	 vmlinux 0x0a68165d	seq_printf
 EXPORT_SYMBOL	 vmlinux 0x0a770832	register_memory_notifier
 EXPORT_SYMBOL	 vmlinux 0x0a865b32	rproc_alloc
 EXPORT_SYMBOL	 vmlinux 0x0a894f55	seq_read_iter
-EXPORT_SYMBOL	 vmlinux 0x0a92ec74	boot_cpu_data
 EXPORT_SYMBOL	 vmlinux 0x0aa309cf	synchronize_hardirq
 EXPORT_SYMBOL	 vmlinux 0x0aaccc92	pci_remap_iospace
 EXPORT_SYMBOL	 vmlinux 0x0ac9894d	d_instantiate
@@ -8544,7 +8543,6 @@ EXPORT_SYMBOL	 vmlinux 0x6e6b9a82	pci_bus_find_capability
 EXPORT_SYMBOL	 vmlinux 0x6e720ff2	rtnl_unlock
 EXPORT_SYMBOL	 vmlinux 0x6e7ba8a1	page_mapping
 EXPORT_SYMBOL	 vmlinux 0x6e7e48fa	xfrm_dev_state_flush
-EXPORT_SYMBOL	 vmlinux 0x6e841389	cpu_info
 EXPORT_SYMBOL	 vmlinux 0x6e9dd606	__symbol_put
 EXPORT_SYMBOL	 vmlinux 0x6ea7575d	acpi_dispatch_gpe
 EXPORT_SYMBOL	 vmlinux 0x6ea9363b	force_sig
@@ -10378,6 +10376,7 @@ EXPORT_SYMBOL	 vmlinux 0xc1f0ba96	alloc_pages_vma
 EXPORT_SYMBOL	 vmlinux 0xc1f2746d	__napi_schedule
 EXPORT_SYMBOL	 vmlinux 0xc1f851b8	param_ops_charp
 EXPORT_SYMBOL	 vmlinux 0xc2107992	tc_setup_flow_action
+EXPORT_SYMBOL	 vmlinux 0xc224abae	boot_cpu_data
 EXPORT_SYMBOL	 vmlinux 0xc23f5fe2	ip_defrag
 EXPORT_SYMBOL	 vmlinux 0xc2424641	agp3_generic_cleanup
 EXPORT_SYMBOL	 vmlinux 0xc24ab696	zero_fill_bio
@@ -10608,6 +10607,7 @@ EXPORT_SYMBOL	 vmlinux 0xcccc94f4	inet_sk_set_state
 EXPORT_SYMBOL	 vmlinux 0xccd4c999	__sg_page_iter_start
 EXPORT_SYMBOL	 vmlinux 0xccef37e4	ZSTD_DStreamOutSize
 EXPORT_SYMBOL	 vmlinux 0xccfb7972	ilookup
+EXPORT_SYMBOL	 vmlinux 0xccfb7c06	cpu_info
 EXPORT_SYMBOL	 vmlinux 0xccfb9e07	dst_default_metrics
 EXPORT_SYMBOL	 vmlinux 0xccfd2ebc	scsi_dev_info_list_del_keyed
 EXPORT_SYMBOL	 vmlinux 0xcd01b8e6	acpi_attach_data
@@ -21082,6 +21082,7 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x386c715f	debugfs_attr_write
 EXPORT_SYMBOL_GPL	 vmlinux 0x38708e25	inet_peer_base_init
 EXPORT_SYMBOL_GPL	 vmlinux 0x38719aab	ata_sff_error_handler
 EXPORT_SYMBOL_GPL	 vmlinux 0x38722f80	kernel_fpu_end
+EXPORT_SYMBOL_GPL	 vmlinux 0x388264ea	amd_clear_divider
 EXPORT_SYMBOL_GPL	 vmlinux 0x388ec5a9	rtnl_link_register
 EXPORT_SYMBOL_GPL	 vmlinux 0x389b64a2	static_key_count
 EXPORT_SYMBOL_GPL	 vmlinux 0x38aa1397	gpiod_add_lookup_table
