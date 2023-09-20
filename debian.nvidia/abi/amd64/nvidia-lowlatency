@@ -6324,7 +6324,6 @@ EXPORT_SYMBOL	 vmlinux 0x0a770832	register_memory_notifier
 EXPORT_SYMBOL	 vmlinux 0x0a7f9c7a	netdev_err
 EXPORT_SYMBOL	 vmlinux 0x0a80f609	page_pool_return_skb_page
 EXPORT_SYMBOL	 vmlinux 0x0a8b5f45	param_set_uint
-EXPORT_SYMBOL	 vmlinux 0x0a92ec74	boot_cpu_data
 EXPORT_SYMBOL	 vmlinux 0x0a999f91	filemap_fdatawrite
 EXPORT_SYMBOL	 vmlinux 0x0aa2fb3a	fb_set_var
 EXPORT_SYMBOL	 vmlinux 0x0aa309cf	synchronize_hardirq
@@ -8511,7 +8510,6 @@ EXPORT_SYMBOL	 vmlinux 0x6e313e56	__tracepoint_kmem_cache_alloc_node
 EXPORT_SYMBOL	 vmlinux 0x6e563cfd	ppp_unregister_compressor
 EXPORT_SYMBOL	 vmlinux 0x6e5b8651	xz_dec_run
 EXPORT_SYMBOL	 vmlinux 0x6e720ff2	rtnl_unlock
-EXPORT_SYMBOL	 vmlinux 0x6e841389	cpu_info
 EXPORT_SYMBOL	 vmlinux 0x6e8fbe5a	bio_integrity_trim
 EXPORT_SYMBOL	 vmlinux 0x6e9dd606	__symbol_put
 EXPORT_SYMBOL	 vmlinux 0x6e9e9cc0	__wait_on_buffer
@@ -10391,6 +10389,7 @@ EXPORT_SYMBOL	 vmlinux 0xc20b6b91	tcf_register_action
 EXPORT_SYMBOL	 vmlinux 0xc20f57b5	remove_proc_entry
 EXPORT_SYMBOL	 vmlinux 0xc20f7050	pci_pme_active
 EXPORT_SYMBOL	 vmlinux 0xc21f939e	shmem_aops
+EXPORT_SYMBOL	 vmlinux 0xc224abae	boot_cpu_data
 EXPORT_SYMBOL	 vmlinux 0xc2424641	agp3_generic_cleanup
 EXPORT_SYMBOL	 vmlinux 0xc24c2d0c	mdio_device_create
 EXPORT_SYMBOL	 vmlinux 0xc2573363	tcf_idrinfo_destroy
@@ -10624,6 +10623,7 @@ EXPORT_SYMBOL	 vmlinux 0xccde9e74	__netlink_kernel_create
 EXPORT_SYMBOL	 vmlinux 0xcce93108	dev_uc_del
 EXPORT_SYMBOL	 vmlinux 0xccef37e4	ZSTD_DStreamOutSize
 EXPORT_SYMBOL	 vmlinux 0xccf1a0e3	pnp_disable_dev
+EXPORT_SYMBOL	 vmlinux 0xccfb7c06	cpu_info
 EXPORT_SYMBOL	 vmlinux 0xccfb9e07	dst_default_metrics
 EXPORT_SYMBOL	 vmlinux 0xccfd2ebc	scsi_dev_info_list_del_keyed
 EXPORT_SYMBOL	 vmlinux 0xcd01b8e6	acpi_attach_data
@@ -21055,6 +21055,7 @@ EXPORT_SYMBOL_GPL	 vmlinux 0x38708e25	inet_peer_base_init
 EXPORT_SYMBOL_GPL	 vmlinux 0x38722f80	kernel_fpu_end
 EXPORT_SYMBOL_GPL	 vmlinux 0x3879c49e	debugfs_create_x32
 EXPORT_SYMBOL_GPL	 vmlinux 0x387aeff5	disk_update_readahead
+EXPORT_SYMBOL_GPL	 vmlinux 0x388264ea	amd_clear_divider
 EXPORT_SYMBOL_GPL	 vmlinux 0x38839792	vfs_getxattr
 EXPORT_SYMBOL_GPL	 vmlinux 0x388ebe63	usb_role_switch_find_by_fwnode
 EXPORT_SYMBOL_GPL	 vmlinux 0x389b64a2	static_key_count
