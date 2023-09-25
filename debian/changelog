@@ -1,3 +1,16 @@
+linux-meta-unstable (6.6.0-2.2) mantic; urgency=medium
+
+  * Master version: 6.6.0-2.2
+
+  * Remove non-LPAE kernel flavor (LP: #2025265)
+    - [Packaging] Fixup armhf lpae transitional
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] allow meta version to use dashes when computing ABI
+    - [Packaging] Reuse update-version from linux-signed
+
+ -- Dimitri John Ledkov <dimitri.ledkov@canonical.com>  Mon, 25 Sep 2023 23:50:59 +0100
+
 linux-meta-unstable (6.5.0.4.5) mantic; urgency=medium
 
   * Miscellaneous Ubuntu changes
