@@ -16,11 +16,9 @@ SERIES=$(shell dpkg-parsechangelog -SDistribution | sed -e 's/-\(security\|updat
 SOURCE=$(shell dpkg-parsechangelog -SSource)
 KERNEL_SOURCE=$(shell echo "$(SOURCE)" | sed -e 's/-meta//')
 
-# 5 digit versions (2.6.38.<abi>.<upload>, 3 digit kernel base versions (2.6.38)
-KERNEL_VERSION=$(shell dpkg-parsechangelog -SVersion | cut -d. -f1-3)
-KERNEL_ABI=$(shell dpkg-parsechangelog -SVersion | cut -d. -f4)
-
-KERNEL_ABI_VERSION=$(KERNEL_VERSION)-$(KERNEL_ABI)
+# 5 digit versions (2.6.38[.-]<abi>.<upload>, 3 digit kernel base versions (2.6.38)
+KERNEL_ABI_VERSION=$(shell dpkg-parsechangelog -SVersion | sed -ne 's/\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)[\.\-]\([0-9]*\)\..*/\1.\2.\3-\4/p')
+KERNEL_VERSION=$(shell echo "$(KERNEL_ABI_VERSION)" | sed -ne 's/[\.\-][0-9]*$$//p')
 
 # Get variants, assuming primary if debian/variants is not present
 variants = --
