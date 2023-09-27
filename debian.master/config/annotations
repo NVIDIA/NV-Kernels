@@ -1511,6 +1511,8 @@ CONFIG_ARM64_ERRATUM_1508412                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_1530923                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_1542419                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_1742098                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2054223                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2067961                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_2441007                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_2441009                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_2457168                    policy<{'arm64': 'y'}>
@@ -1548,6 +1550,7 @@ CONFIG_ARM64_VA_BITS_52                         policy<{'arm64-generic-64k': 'n'
 CONFIG_ARM64_WORKAROUND_CLEAN_CACHE             policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_REPEAT_TLBI             policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_SPECULATIVE_AT          policy<{'arm64': 'y'}>
+CONFIG_ARM64_WORKAROUND_TSB_FLUSH_FAILURE       policy<{'arm64': 'y'}>
 CONFIG_ARMADA375_USBCLUSTER_PHY                 policy<{'armhf': 'y'}>
 CONFIG_ARMADA_370_CLK                           policy<{'armhf': 'y'}>
 CONFIG_ARMADA_370_XP_IRQ                        policy<{'armhf': 'y'}>
