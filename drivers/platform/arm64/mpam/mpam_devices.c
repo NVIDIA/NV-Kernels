@@ -2099,6 +2099,8 @@ static pgprot_t get_pcc_area_mem_attribute(phys_addr_t addr)
 	return __acpi_get_mem_attribute(addr);
 }
 
+static void mpam_msc_drv_remove(struct platform_device *pdev);
+
 static int mpam_msc_drv_probe(struct platform_device *pdev)
 {
 	int err;
@@ -2118,8 +2120,14 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 		}
 		init_garbage(msc);
 
-		INIT_LIST_HEAD_RCU(&msc->glbl_list);
+		mutex_init(&msc->probe_lock);
+		mutex_init(&msc->part_sel_lock);
+		mutex_init(&msc->outer_mon_sel_lock);
+		spin_lock_init(&msc->inner_mon_sel_lock);
+		msc->id = mpam_num_msc++;
 		msc->pdev = pdev;
+		INIT_LIST_HEAD_RCU(&msc->glbl_list);
+		INIT_LIST_HEAD_RCU(&msc->ris);
 
 		err = get_msc_affinity(msc);
 		if (err)
@@ -2131,19 +2139,9 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			break;
 		}
 
-		mutex_init(&msc->probe_lock);
-		mutex_init(&msc->part_sel_lock);
-		mutex_init(&msc->outer_mon_sel_lock);
-		spin_lock_init(&msc->inner_mon_sel_lock);
-		msc->id = mpam_num_msc++;
-		INIT_LIST_HEAD_RCU(&msc->ris);
-
 		err = mpam_msc_setup_error_irq(msc);
-		if (err) {
-			devm_kfree(&pdev->dev, msc);
-			msc = ERR_PTR(err);
+		if (err)
 			break;
-		}
 
 		if (device_property_read_u32(&pdev->dev, "pcc-channel",
 					     &msc->pcc_subspace_id))
@@ -2156,7 +2154,6 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 								    &msc_res);
 			if (IS_ERR(io)) {
 				pr_err("Failed to map MSC base address\n");
-				devm_kfree(&pdev->dev, msc);
 				err = PTR_ERR(io);
 				break;
 			}
@@ -2173,7 +2170,6 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 								 msc->pcc_subspace_id);
 			if (IS_ERR(msc->pcc_chan)) {
 				pr_err("Failed to request MSC PCC channel\n");
-				devm_kfree(&pdev->dev, msc);
 				err = PTR_ERR(msc->pcc_chan);
 				break;
 			}
@@ -2184,7 +2180,6 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			if (IS_ERR(io)) {
 				pr_err("Failed to map MSC base address\n");
 				pcc_mbox_free_channel(msc->pcc_chan);
-				devm_kfree(&pdev->dev, msc);
 				err = PTR_ERR(io);
 				break;
 			}
@@ -2214,6 +2209,9 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 
 	if (!err && fw_num_msc == mpam_num_msc)
 		mpam_register_cpuhp_callbacks(&mpam_discovery_cpu_online);
+
+	if (err && msc)
+		mpam_msc_drv_remove(pdev);
 
 	return err;
 }
