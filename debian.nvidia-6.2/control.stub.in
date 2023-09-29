@@ -44,6 +44,8 @@ Build-Depends:
  bindgen-0.56 [amd64],
  clang [amd64],
  llvm [amd64],
+ nvidia-dkms-kernel <!stage1>,
+ nvidia-kernel-source <!stage1>,
 Build-Depends-Indep:
  xmlto <!stage1>,
  docbook-utils <!stage1>,
