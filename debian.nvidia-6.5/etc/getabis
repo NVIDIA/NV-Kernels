@@ -1,0 +1,13 @@
+repo_list=(
+	"http://archive.ubuntu.com/ubuntu/pool/main/l/linux-nvidia-6.5"
+	"http://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux-nvidia-6.5"
+	"http://archive.ubuntu.com/ubuntu/pool/universe/l/linux-nvidia-6.5"
+	"http://ports.ubuntu.com/ubuntu-ports/pool/universe/l/linux-nvidia-6.5"
+	"http://ppa.launchpad.net/canonical-kernel-team/nvidia/ubuntu/pool/main/l/linux-nvidia-6.5"
+	"http://ppa.launchpad.net/canonical-kernel-team/nvidia2/ubuntu/pool/main/l/linux-nvidia-6.5"
+)
+
+package_prefixes linux-buildinfo
+
+getall amd64 nvidia
+getall arm64 nvidia nvidia-64k
