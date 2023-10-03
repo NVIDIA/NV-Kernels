@@ -1,0 +1,12 @@
+# Menu: HEADER
+# FORMAT: 4
+# ARCH: amd64 arm64
+# FLAVOUR: amd64-nvidia arm64-nvidia arm64-nvidia-64k
+# FLAVOUR_DEP: {'amd64-nvidia': 'amd64-generic', 'arm64-nvidia': 'arm64-generic', 'arm64-nvidia-64k': 'arm64-generic-64k'}
+
+include "../../debian.master/config/annotations"
+
+CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_RUST                                     note<'required to enable Rust support, LP: #1993183'>
+
+# ---- Annotations without notes ----
