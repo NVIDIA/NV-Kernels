@@ -617,7 +617,7 @@ struct arm_smmu_priq {
 
 /* High-level stream table and context descriptor structures */
 struct arm_smmu_ctx_desc {
-	u16				asid;
+	u32				asid;
 };
 
 struct arm_smmu_ctx_desc_cfg {
@@ -816,6 +816,7 @@ struct arm_smmu_domain {
 	spinlock_t			devices_lock;
 
 	struct mmu_notifier		mmu_notifier;
+	bool				btm_invalidation;
 };
 
 /* The following are exposed for testing purposes. */
@@ -847,7 +848,7 @@ void arm_smmu_make_s2_domain_ste(struct arm_smmu_ste *target,
 				 bool ats_enabled);
 void arm_smmu_make_sva_cd(struct arm_smmu_cd *target,
 			  struct arm_smmu_master *master, struct mm_struct *mm,
-			  u16 asid);
+			  u16 asid, bool btm_invalidation);
 #endif
 
 struct arm_smmu_master_domain {
