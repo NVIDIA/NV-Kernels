@@ -35,11 +35,9 @@
 #define MODULE_NAME_LEN MAX_PARAM_PREFIX_LEN
 
 struct modversion_info {
-	/* Offset of the next modversion entry in relation to this one. */
-	u32 next;
-	u32 crc;
-	char name[]; /* Flexible array member */
-} __packed;
+	unsigned long crc;
+	char name[MODULE_NAME_LEN];
+};
 
 struct module;
 struct exception_table_entry;
