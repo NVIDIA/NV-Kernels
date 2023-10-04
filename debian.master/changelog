@@ -1,6 +1,10 @@
-linux (6.2.0-36.36) lunar; urgency=medium
+linux (6.2.0-36.37) lunar; urgency=medium
 
-  * lunar/linux: 6.2.0-36.36 -proposed tracker (LP: #2038076)
+  * lunar/linux: 6.2.0-36.37 -proposed tracker (LP: #2038076)
+
+  * Regression for ubuntu_bpf test build caused by upstream bdeeed3498c7
+    (LP: #2035181)
+    - selftests/bpf: fix static assert compilation issue for test_cls_*.c
 
   * CVE-2023-4244
     - netfilter: nf_tables: don't skip expired elements during walk
