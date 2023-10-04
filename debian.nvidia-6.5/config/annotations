@@ -9,4 +9,26 @@ include "../../debian.master/config/annotations"
 CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_RUST                                     note<'required to enable Rust support, LP: #1993183'>
 
+CONFIG_RUST_IS_AVAILABLE                        policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_RUST_IS_AVAILABLE                        note<'required to enable Rust support, LP: #1993183'>
+
+
 # ---- Annotations without notes ----
+
+CONFIG_AS_VERSION                               policy<{'amd64': '23800', 'arm64': '23800'}>
+CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-12 (Ubuntu 12.3.0-1ubuntu1~22.04) 12.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-12 (Ubuntu 12.3.0-1ubuntu1~22.04) 12.3.0"'}>
+CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
+CONFIG_DEBUG_INFO_COMPRESSED_ZSTD               policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_GCC_VERSION                              policy<{'amd64': '120300', 'arm64': '120300'}>
+CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
+CONFIG_LD_VERSION                               policy<{'amd64': '23800', 'arm64': '23800'}>
+CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
+CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
+CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-'}>
+CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'amd64': '-'}>
+CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': '-'}>
+CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-'}>
+CONFIG_SAMPLES_RUST                             policy<{'amd64': '-'}>
+CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
+CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': '-'}>
