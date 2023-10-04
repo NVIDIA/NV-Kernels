@@ -1607,7 +1607,7 @@ iommu_group_alloc_default_domain(struct iommu_group *group, int req_type)
 	 */
 	if (ops->default_domain) {
 		if (req_type != ops->default_domain->type)
-			return ERR_PTR(-EINVAL);
+			return NULL;
 		return ops->default_domain;
 	}
 
