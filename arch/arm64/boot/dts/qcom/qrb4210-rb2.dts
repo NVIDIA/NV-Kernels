@@ -510,7 +510,6 @@
 
 &usb_dwc3 {
 	maximum-speed = "super-speed";
-	dr_mode = "peripheral";
 };
 
 &usb_hsphy {
