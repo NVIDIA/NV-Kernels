@@ -1496,6 +1496,7 @@ firmware:       ti-connectivity/wl18xx-fw-4.bin
 firmware:       ti_3410.fw
 firmware:       ti_5052.fw
 firmware:       tigon/tg3.bin
+firmware:       tigon/tg357766.bin
 firmware:       tigon/tg3_tso.bin
 firmware:       tigon/tg3_tso5.bin
 firmware:       ttusb-budget/dspbootcode.bin
