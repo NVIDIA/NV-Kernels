@@ -1524,6 +1524,7 @@ CONFIG_ARM64_ERRATUM_2441009                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_2457168                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_2645198                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_2658417                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2966298                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_819472                     policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_824069                     policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_826319                     policy<{'arm64': 'y'}>
@@ -2616,7 +2617,6 @@ CONFIG_CIFS_STATS2                              policy<{'amd64': 'n', 'arm64': '
 CONFIG_CIFS_SWN_UPCALL                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CIFS_UPCALL                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CIFS_XATTR                               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
-CONFIG_CIO2_BRIDGE                              policy<{'amd64': 'y'}>
 CONFIG_CIO_DAC                                  policy<{'amd64': 'm'}>
 CONFIG_CIO_INJECT                               policy<{'s390x': 'n'}>
 CONFIG_CLANG_VERSION                            policy<{'amd64': '0', 'arm64': '0', 'armhf': '0', 'ppc64el': '0', 'riscv64': '0', 's390x': '0'}>
@@ -6181,11 +6181,13 @@ CONFIG_ILLEGAL_POINTER_VALUE                    policy<{'amd64': '0xdead00000000
 CONFIG_IMA_APPRAISE_BOOTPARAM                   policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_IMA_APPRAISE_BUILD_POLICY                policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_IMA_APPRAISE_MODSIG                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_IMA_BLACKLIST_KEYRING                    policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_IMA_DEFAULT_HASH                         policy<{'amd64': '"sha1"', 'arm64': '"sha1"', 'armhf': '"sha1"', 'ppc64el': '"sha256"', 'riscv64': '"sha1"', 's390x': '"sha1"'}>
 CONFIG_IMA_DEFAULT_HASH_SHA1                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'n', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_IMA_DEFAULT_HASH_SHA512                  policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_IMA_DEFAULT_TEMPLATE                     policy<{'amd64': '"ima-ng"', 'arm64': '"ima-ng"', 'armhf': '"ima-ng"', 'ppc64el': '"ima-sig"', 'riscv64': '"ima-ng"', 's390x': '"ima-ng"'}>
 CONFIG_IMA_DISABLE_HTABLE                       policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
+CONFIG_IMA_LOAD_X509                            policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_IMA_LSM_RULES                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_IMA_MEASURE_ASYMMETRIC_KEYS              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_IMA_MEASURE_PCR_IDX                      policy<{'amd64': '10', 'arm64': '10', 'armhf': '10', 'ppc64el': '10', 'riscv64': '10', 's390x': '10'}>
@@ -6645,7 +6647,7 @@ CONFIG_IPQ_GCC_806X                             policy<{'arm64': '-', 'armhf': '
 CONFIG_IPQ_GCC_8074                             policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_IPQ_GCC_9574                             policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_IPQ_LCC_806X                             policy<{'arm64': '-', 'armhf': 'm'}>
-CONFIG_IPU_BRIDGE                               policy<{'amd64': 'm'}>
+CONFIG_IPU_BRIDGE                               policy<{'amd64': 'm', 'arm64': 'm', 'riscv64': 'm'}>
 CONFIG_IPV6_FOU                                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_IPV6_FOU_TUNNEL                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_IPV6_GRE                                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
