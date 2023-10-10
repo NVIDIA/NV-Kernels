@@ -134,6 +134,7 @@ firmware:       amdgpu/gc_11_0_0_me.bin
 firmware:       amdgpu/gc_11_0_0_mec.bin
 firmware:       amdgpu/gc_11_0_0_mes.bin
 firmware:       amdgpu/gc_11_0_0_mes1.bin
+firmware:       amdgpu/gc_11_0_0_mes_2.bin
 firmware:       amdgpu/gc_11_0_0_pfp.bin
 firmware:       amdgpu/gc_11_0_0_rlc.bin
 firmware:       amdgpu/gc_11_0_0_toc.bin
@@ -142,6 +143,7 @@ firmware:       amdgpu/gc_11_0_1_me.bin
 firmware:       amdgpu/gc_11_0_1_mec.bin
 firmware:       amdgpu/gc_11_0_1_mes.bin
 firmware:       amdgpu/gc_11_0_1_mes1.bin
+firmware:       amdgpu/gc_11_0_1_mes_2.bin
 firmware:       amdgpu/gc_11_0_1_pfp.bin
 firmware:       amdgpu/gc_11_0_1_rlc.bin
 firmware:       amdgpu/gc_11_0_2_imu.bin
@@ -149,6 +151,7 @@ firmware:       amdgpu/gc_11_0_2_me.bin
 firmware:       amdgpu/gc_11_0_2_mec.bin
 firmware:       amdgpu/gc_11_0_2_mes.bin
 firmware:       amdgpu/gc_11_0_2_mes1.bin
+firmware:       amdgpu/gc_11_0_2_mes_2.bin
 firmware:       amdgpu/gc_11_0_2_pfp.bin
 firmware:       amdgpu/gc_11_0_2_rlc.bin
 firmware:       amdgpu/gc_11_0_3_imu.bin
@@ -156,6 +159,7 @@ firmware:       amdgpu/gc_11_0_3_me.bin
 firmware:       amdgpu/gc_11_0_3_mec.bin
 firmware:       amdgpu/gc_11_0_3_mes.bin
 firmware:       amdgpu/gc_11_0_3_mes1.bin
+firmware:       amdgpu/gc_11_0_3_mes_2.bin
 firmware:       amdgpu/gc_11_0_3_pfp.bin
 firmware:       amdgpu/gc_11_0_3_rlc.bin
 firmware:       amdgpu/gc_11_0_4_imu.bin
@@ -163,6 +167,7 @@ firmware:       amdgpu/gc_11_0_4_me.bin
 firmware:       amdgpu/gc_11_0_4_mec.bin
 firmware:       amdgpu/gc_11_0_4_mes.bin
 firmware:       amdgpu/gc_11_0_4_mes1.bin
+firmware:       amdgpu/gc_11_0_4_mes_2.bin
 firmware:       amdgpu/gc_11_0_4_pfp.bin
 firmware:       amdgpu/gc_11_0_4_rlc.bin
 firmware:       amdgpu/green_sardine_asd.bin
@@ -1969,6 +1974,12 @@ firmware:       rtl_bt/rtl8723b_config.bin
 firmware:       rtl_bt/rtl8723b_fw.bin
 firmware:       rtl_bt/rtl8723bs_config.bin
 firmware:       rtl_bt/rtl8723bs_fw.bin
+firmware:       rtl_bt/rtl8723cs_cg_config.bin
+firmware:       rtl_bt/rtl8723cs_cg_fw.bin
+firmware:       rtl_bt/rtl8723cs_vf_config.bin
+firmware:       rtl_bt/rtl8723cs_vf_fw.bin
+firmware:       rtl_bt/rtl8723cs_xx_config.bin
+firmware:       rtl_bt/rtl8723cs_xx_fw.bin
 firmware:       rtl_bt/rtl8723ds_config.bin
 firmware:       rtl_bt/rtl8723ds_fw.bin
 firmware:       rtl_bt/rtl8761a_config.bin
@@ -1977,6 +1988,8 @@ firmware:       rtl_bt/rtl8821a_config.bin
 firmware:       rtl_bt/rtl8821a_fw.bin
 firmware:       rtl_bt/rtl8822b_config.bin
 firmware:       rtl_bt/rtl8822b_fw.bin
+firmware:       rtl_bt/rtl8851bu_config.bin
+firmware:       rtl_bt/rtl8851bu_fw.bin
 firmware:       rtl_bt/rtl8852au_config.bin
 firmware:       rtl_bt/rtl8852au_fw.bin
 firmware:       rtl_bt/rtl8852bu_config.bin
