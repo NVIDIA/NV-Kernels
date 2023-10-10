@@ -582,7 +582,6 @@ baycom_par
 baycom_ser_fdx
 baycom_ser_hdx
 bcache
-bch
 bcm-keypad
 bcm-phy-lib
 bcm-phy-ptp
@@ -840,7 +839,6 @@ chcr
 chipone-icn6211
 chipone_icn8318
 chipone_icn8505
-chipreg
 chnl_net
 chromeos_acpi
 chromeos_privacy_screen
@@ -923,8 +921,6 @@ cls_flower
 cls_fw
 cls_matchall
 cls_route
-cls_rsvp
-cls_rsvp6
 cls_u32
 cm109
 cm32181
@@ -3132,7 +3128,6 @@ mali-dp
 mantis
 mantis_core
 map_absent
-map_funcs
 map_ram
 map_rom
 marvell
@@ -3572,7 +3567,6 @@ mt9t112
 mt9v011
 mt9v032
 mt9v111
-mtd
 mtd_blkdevs
 mtd_dataflash
 mtdblock
@@ -3658,7 +3652,6 @@ n5pf
 n_gsm
 n_hdlc
 nand
-nandcore
 nandsim
 national
 natsemi
@@ -6164,7 +6157,6 @@ spi-mtk-nor
 spi-mtk-snfi
 spi-mux
 spi-mxic
-spi-nor
 spi-npcm-fiu
 spi-npcm-pspi
 spi-nxp-fspi
