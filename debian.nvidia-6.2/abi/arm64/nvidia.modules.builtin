@@ -39,6 +39,7 @@ axg
 axg-aoclk
 backlight
 battery
+bch
 bcm84881
 binfmt_elf
 binfmt_script
@@ -52,6 +53,7 @@ cfbcopyarea
 cfbfillrect
 cfbimgblt
 charger-manager
+chipreg
 clk-apmixed
 clk-bm1880
 clk-cpu-dyndiv
@@ -247,6 +249,7 @@ lzo
 lzo-rle
 lzo_compress
 lzo_decompress
+map_funcs
 max14577
 max310x
 max77686
@@ -274,11 +277,13 @@ mpi
 mq-deadline
 msm_serial
 mt6323-poweroff
+mtd
 mtk-eint
 mv_xor_v2
 mx3fb
 mxc-clk
 n_null
+nandcore
 nfs_ssc
 nls_base
 nls_cp437
@@ -424,6 +429,7 @@ slhc
 smc91x
 spi-fsl-lib
 spi-fsl-spi
+spi-nor
 spi-omap2-mcspi
 spm
 squashfs
