@@ -972,6 +972,11 @@ int iwl_mvm_ppag_send_cmd(struct iwl_mvm *mvm)
 	int i, j, ret, num_sub_bands, cmd_size;
 	s8 *gain;
 
+	/* many firmware images for JF lie about this */
+	if (CSR_HW_RFID_TYPE(mvm->trans->hw_rf_id) ==
+	    CSR_HW_RFID_TYPE(CSR_HW_RF_ID_TYPE_JF))
+		return 0;
+
 	if (!fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_SET_PPAG)) {
 		IWL_DEBUG_RADIO(mvm,
 				"PPAG capability not supported by FW, command not sent.\n");
