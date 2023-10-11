@@ -1,0 +1,18 @@
+#!/bin/bash -eu
+
+. debian/debian.env
+
+# Ovveride default GCC version to the default in Jammy
+GCC="gcc-11"
+
+# Override options in rules.d/hooks.mk (normally master does not have this
+# file but it got added for generic annotations enforcement.
+cat <<EOD >>"${DEBIAN}/rules.d/hooks.mk"
+do_libc_dev_package	= false
+do_doc_package		= false
+do_tools_common		= false
+do_tools_host		= false
+do_lib_rust		= false
+gcc	= $GCC
+EOD
+
