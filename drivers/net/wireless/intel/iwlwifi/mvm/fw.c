@@ -1029,7 +1029,7 @@ int iwl_mvm_ppag_send_cmd(struct iwl_mvm *mvm)
 		IWL_ERR(mvm, "failed to send PER_PLATFORM_ANT_GAIN_CMD (%d)\n",
 			ret);
 
-	return ret;
+	return 0;
 }
 
 static const struct dmi_system_id dmi_ppag_approved_list[] = {
