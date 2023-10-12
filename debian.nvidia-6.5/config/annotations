@@ -6,10 +6,10 @@
 
 include "../../debian.master/config/annotations"
 
-CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_RUST                                     policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_RUST                                     note<'required to enable Rust support, LP: #1993183'>
 
-CONFIG_RUST_IS_AVAILABLE                        policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_RUST_IS_AVAILABLE                        policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_RUST_IS_AVAILABLE                        note<'required to enable Rust support, LP: #1993183'>
 
 
