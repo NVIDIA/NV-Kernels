@@ -744,6 +744,9 @@ CONFIG_VIRTIO_MMIO                              note<'LP: #1557689'>
 CONFIG_VIRTIO_NET                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_VIRTIO_NET                               note<'KVM paravirt support -- not autoloadable'>
 
+CONFIG_WWAN                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'm', 's390x': 'n'}>
+CONFIG_WWAN                                     note<'LP: #2033406'>
+
 CONFIG_X509_CERTIFICATE_PARSER                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_X509_CERTIFICATE_PARSER                  note<'module signing'>
 
@@ -14565,7 +14568,6 @@ CONFIG_WM8350_WATCHDOG                          policy<{'amd64': 'm', 'arm64': '
 CONFIG_WMI_BMOF                                 policy<{'amd64': 'm'}>
 CONFIG_WQ_POWER_EFFICIENT_DEFAULT               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'n'}>
 CONFIG_WQ_WATCHDOG                              policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
-CONFIG_WWAN                                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'm', 's390x': 'n'}>
 CONFIG_WWAN_DEBUGFS                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_WWAN_HWSIM                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_WW_MUTEX_SELFTEST                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
