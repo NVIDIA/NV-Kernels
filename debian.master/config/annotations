@@ -792,6 +792,9 @@ CONFIG_VMWARE_VMCI                              note<'LP: #1978145'>
 CONFIG_VMWARE_VMCI_VSOCKETS                     policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_VMWARE_VMCI_VSOCKETS                     note<'LP: #1978145'>
 
+CONFIG_WWAN                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
+CONFIG_WWAN                                     note<'LP: #2033406'>
+
 CONFIG_X509_CERTIFICATE_PARSER                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_X509_CERTIFICATE_PARSER                  note<'module signing'>
 
@@ -13901,7 +13904,6 @@ CONFIG_WM8350_WATCHDOG                          policy<{'amd64': 'm', 'arm64': '
 CONFIG_WMI_BMOF                                 policy<{'amd64': 'm'}>
 CONFIG_WQ_POWER_EFFICIENT_DEFAULT               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y'}>
 CONFIG_WQ_WATCHDOG                              policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
-CONFIG_WWAN                                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
 CONFIG_WWAN_HWSIM                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_WW_MUTEX_SELFTEST                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
 CONFIG_X25                                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
