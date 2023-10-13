@@ -210,10 +210,8 @@ struct acpi_iort_node;
 #define STRTAB_L1_DESC_SPAN		GENMASK_ULL(4, 0)
 #define STRTAB_L1_DESC_L2PTR_MASK	GENMASK_ULL(51, 6)
 
-#define STRTAB_STE_DWORDS		8
-
 struct arm_smmu_ste {
-	__le64 data[STRTAB_STE_DWORDS];
+	__le64 data[8];
 };
 
 #define STRTAB_NUM_L2_STES (1 << STRTAB_SPLIT)
@@ -603,10 +601,6 @@ struct arm_smmu_priq {
 };
 
 /* High-level stream table and context descriptor structures */
-struct arm_smmu_strtab_l1_desc {
-	struct arm_smmu_strtab_l2	*l2ptr;
-};
-
 struct arm_smmu_ctx_desc {
 	u16				asid;
 };
@@ -639,11 +633,19 @@ struct arm_smmu_s2_cfg {
 };
 
 struct arm_smmu_strtab_cfg {
-	__le64				*strtab;
-	dma_addr_t			strtab_dma;
-	struct arm_smmu_strtab_l1_desc	*l1_desc;
-	unsigned int			num_l1_ents;
-
+	union {
+		struct {
+			struct arm_smmu_ste *table;
+			dma_addr_t ste_dma;
+			unsigned int num_ents;
+		} linear;
+		struct {
+			struct arm_smmu_strtab_l1 *l1tab;
+			struct arm_smmu_strtab_l2 **l2ptrs;
+			dma_addr_t l1_dma;
+			unsigned int num_l1_ents;
+		} l2;
+	};
 	u64				strtab_base;
 	u32				strtab_base_cfg;
 };
