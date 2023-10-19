@@ -740,9 +740,10 @@ static void mpam_resctrl_pick_mba(void)
 
 bool resctrl_arch_is_evt_configurable(enum resctrl_event_id evt)
 {
+	struct mpam_props *cprops;
+
 	switch (evt) {
         case QOS_L3_MBM_LOCAL_EVENT_ID:
-		struct mpam_props *cprops;
 
 		if (!mbm_local_class)
 			return false;
