@@ -95,6 +95,21 @@ bool resctrl_arch_is_mbm_total_enabled(void)
 	return mpam_resctrl_counters[QOS_L3_MBM_TOTAL_EVENT_ID];
 }
 
+bool resctrl_arch_mbm_has_long_counter(void)
+{
+	struct mpam_class *class = NULL;
+
+	if (mpam_resctrl_counters[QOS_L3_MBM_LOCAL_EVENT_ID]) {
+		class = mpam_resctrl_counters[QOS_L3_MBM_LOCAL_EVENT_ID];
+		return !!mpam_has_feature(mpam_feat_msmon_mbwu_63counter, &class->props);
+	} else if (mpam_resctrl_counters[QOS_L3_MBM_TOTAL_EVENT_ID]) {
+		class = mpam_resctrl_counters[QOS_L3_MBM_TOTAL_EVENT_ID];
+		return !!mpam_has_feature(mpam_feat_msmon_mbwu_63counter, &class->props);
+	}
+
+	return false;
+}
+
 bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level rid)
 {
 	switch (rid) {
