@@ -1294,10 +1294,12 @@ CONFIG_ARCH_MIGHT_HAVE_PC_PARPORT               policy<{'amd64': 'y', 'armhf': '
 CONFIG_ARCH_MIGHT_HAVE_PC_SERIO                 policy<{'amd64': 'y', 'ppc64el': 'y'}>
 CONFIG_ARCH_MILBEAUT                            policy<{'armhf': 'y'}>
 CONFIG_ARCH_MILBEAUT_M10V                       policy<{'armhf': 'y'}>
-CONFIG_ARCH_MMAP_RND_BITS                       policy<{'amd64': '28', 'arm64': '18', 'armhf': '8', 'ppc64el': '28', 'riscv64': '18'}>
+CONFIG_ARCH_MMAP_RND_BITS                       policy<{'amd64': '32', 'arm64': '33', 'arm64-generic-64k': '29', 'armhf': '16', 'ppc64el': '29', 'riscv64': '24'}>
+CONFIG_ARCH_MMAP_RND_BITS                       note<'LP: #1983357'>
 CONFIG_ARCH_MMAP_RND_BITS_MAX                   policy<{'amd64': '32', 'arm64': '33', 'arm64-generic-64k': '29', 'armhf': '16', 'ppc64el': '29', 'riscv64': '24'}>
 CONFIG_ARCH_MMAP_RND_BITS_MIN                   policy<{'amd64': '28', 'arm64': '18', 'arm64-generic-64k': '14', 'armhf': '8', 'ppc64el': '14', 'riscv64': '18'}>
-CONFIG_ARCH_MMAP_RND_COMPAT_BITS                policy<{'amd64': '8', 'arm64': '11', 'ppc64el': '8'}>
+CONFIG_ARCH_MMAP_RND_COMPAT_BITS                policy<{'amd64': '16', 'arm64': '16', 'ppc64el': '13', 'riscv64': '17'}>
+CONFIG_ARCH_MMAP_RND_COMPAT_BITS                note<'LP: #1983357'>
 CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MAX            policy<{'amd64': '16', 'arm64': '16', 'ppc64el': '13', 'riscv64': '17'}>
 CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MIN            policy<{'amd64': '8', 'arm64': '11', 'arm64-generic-64k': '7', 'ppc64el': '7', 'riscv64': '8'}>
 CONFIG_ARCH_MMP                                 policy<{'armhf': 'n'}>
