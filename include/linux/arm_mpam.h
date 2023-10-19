@@ -75,6 +75,7 @@ bool resctrl_arch_mon_can_overflow(void);
 bool resctrl_arch_is_llc_occupancy_enabled(void);
 bool resctrl_arch_is_mbm_local_enabled(void);
 bool resctrl_arch_is_mbm_total_enabled(void);
+bool resctrl_arch_mbm_has_long_counter(void);
 
 void resctrl_arch_set_cpu_default_closid(int cpu, u32 closid);
 void resctrl_arch_set_closid_rmid(struct task_struct *tsk, u32 closid, u32 rmid);
