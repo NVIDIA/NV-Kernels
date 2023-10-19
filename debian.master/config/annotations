@@ -1358,7 +1358,7 @@ CONFIG_ARCH_R8A779A0                            policy<{'arm64': 'y'}>
 CONFIG_ARCH_R8A779F0                            policy<{'arm64': 'y'}>
 CONFIG_ARCH_R8A779G0                            policy<{'arm64': 'y'}>
 CONFIG_ARCH_R9A06G032                           policy<{'armhf': 'y'}>
-CONFIG_ARCH_R9A07G043                           policy<{'arm64': 'y', 'riscv64': 'y'}>
+CONFIG_ARCH_R9A07G043                           policy<{'arm64': 'y', 'riscv64': '-'}>
 CONFIG_ARCH_R9A07G044                           policy<{'arm64': 'y'}>
 CONFIG_ARCH_R9A07G054                           policy<{'arm64': 'y'}>
 CONFIG_ARCH_R9A09G011                           policy<{'arm64': 'y'}>
@@ -1371,7 +1371,7 @@ CONFIG_ARCH_REALVIEW                            policy<{'armhf': 'n'}>
 CONFIG_ARCH_RENESAS                             policy<{'arm64': 'y', 'armhf': 'y', 'riscv64': 'y'}>
 CONFIG_ARCH_RMOBILE                             policy<{'armhf': 'y'}>
 CONFIG_ARCH_RV64I                               policy<{'riscv64': 'y'}>
-CONFIG_ARCH_RZG2L                               policy<{'arm64': 'y', 'riscv64': 'y'}>
+CONFIG_ARCH_RZG2L                               policy<{'arm64': 'y', 'riscv64': '-'}>
 CONFIG_ARCH_RZN1                                policy<{'armhf': 'y'}>
 CONFIG_ARCH_S32                                 policy<{'arm64': 'y'}>
 CONFIG_ARCH_S5PV210                             policy<{'armhf': 'n'}>
@@ -2689,7 +2689,7 @@ CONFIG_CLK_R8A779A0                             policy<{'arm64': 'y'}>
 CONFIG_CLK_R8A779F0                             policy<{'arm64': 'y'}>
 CONFIG_CLK_R8A779G0                             policy<{'arm64': 'y'}>
 CONFIG_CLK_R9A06G032                            policy<{'armhf': 'y'}>
-CONFIG_CLK_R9A07G043                            policy<{'arm64': 'y', 'riscv64': 'y'}>
+CONFIG_CLK_R9A07G043                            policy<{'arm64': 'y', 'riscv64': '-'}>
 CONFIG_CLK_R9A07G044                            policy<{'arm64': 'y'}>
 CONFIG_CLK_R9A07G054                            policy<{'arm64': 'y'}>
 CONFIG_CLK_R9A09G011                            policy<{'arm64': 'y'}>
@@ -2716,7 +2716,7 @@ CONFIG_CLK_RK3588                               policy<{'arm64': 'y'}>
 CONFIG_CLK_RV110X                               policy<{'armhf': 'y'}>
 CONFIG_CLK_RV1126                               policy<{'armhf': 'y'}>
 CONFIG_CLK_RZA1                                 policy<{'armhf': 'y'}>
-CONFIG_CLK_RZG2L                                policy<{'arm64': 'y', 'riscv64': 'y'}>
+CONFIG_CLK_RZG2L                                policy<{'arm64': 'y', 'riscv64': '-'}>
 CONFIG_CLK_SH73A0                               policy<{'armhf': 'y'}>
 CONFIG_CLK_SIFIVE                               policy<{'riscv64': 'y'}>
 CONFIG_CLK_SIFIVE_PRCI                          policy<{'riscv64': 'y'}>
@@ -3832,7 +3832,6 @@ CONFIG_DMA_DIRECT_REMAP                         policy<{'arm64': 'y', 'riscv64':
 CONFIG_DMA_ENGINE                               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_DMA_ENGINE_RAID                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y'}>
 CONFIG_DMA_FENCE_TRACE                          policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
-CONFIG_DMA_GLOBAL_POOL                          policy<{'riscv64': 'y'}>
 CONFIG_DMA_MAP_BENCHMARK                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_DMA_NONCOHERENT_MMAP                     policy<{'arm64': 'y', 'armhf': 'y', 'riscv64': 'y'}>
 CONFIG_DMA_NUMA_CMA                             policy<{'arm64': 'y', 'riscv64': 'y'}>
@@ -4647,7 +4646,6 @@ CONFIG_EROFS_FS_ZIP                             policy<{'amd64': 'y', 'arm64': '
 CONFIG_EROFS_FS_ZIP_DEFLATE                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_EROFS_FS_ZIP_LZMA                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_ERRATA_ANDES                             policy<{'riscv64': 'y'}>
-CONFIG_ERRATA_ANDES_CMO                         policy<{'riscv64': 'y'}>
 CONFIG_ERRATA_SIFIVE                            policy<{'riscv64': 'y'}>
 CONFIG_ERRATA_SIFIVE_CIP_1200                   policy<{'riscv64': 'y'}>
 CONFIG_ERRATA_SIFIVE_CIP_453                    policy<{'riscv64': 'y'}>
@@ -9857,7 +9855,7 @@ CONFIG_PINCTRL_RK805                            policy<{'arm64': 'm', 'armhf': '
 CONFIG_PINCTRL_ROCKCHIP                         policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_PINCTRL_RZA1                             policy<{'armhf': 'y'}>
 CONFIG_PINCTRL_RZA2                             policy<{'armhf': 'y'}>
-CONFIG_PINCTRL_RZG2L                            policy<{'arm64': 'y', 'riscv64': 'y'}>
+CONFIG_PINCTRL_RZG2L                            policy<{'arm64': 'y', 'riscv64': '-'}>
 CONFIG_PINCTRL_RZN1                             policy<{'armhf': 'y'}>
 CONFIG_PINCTRL_RZV2M                            policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_S32CC                            policy<{'arm64': 'y'}>
@@ -10269,7 +10267,7 @@ CONFIG_PWM_PCA9685                              policy<{'amd64': 'm', 'arm64': '
 CONFIG_PWM_RCAR                                 policy<{'arm64': 'm', 'armhf': 'm', 'riscv64': 'm'}>
 CONFIG_PWM_RENESAS_TPU                          policy<{'arm64': 'm', 'armhf': 'm', 'riscv64': 'm'}>
 CONFIG_PWM_ROCKCHIP                             policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_PWM_RZ_MTU3                              policy<{'arm64': 'm', 'riscv64': 'm'}>
+CONFIG_PWM_RZ_MTU3                              policy<{'arm64': 'm', 'riscv64': '-'}>
 CONFIG_PWM_SAMSUNG                              policy<{'armhf': 'n'}>
 CONFIG_PWM_SIFIVE                               policy<{'riscv64': 'm'}>
 CONFIG_PWM_SL28CPLD                             policy<{'arm64': 'm'}>
@@ -10739,7 +10737,7 @@ CONFIG_RENESAS_RPCIF                            policy<{'arm64': 'm', 'armhf': '
 CONFIG_RENESAS_RZA1_IRQC                        policy<{'armhf': 'y'}>
 CONFIG_RENESAS_RZAWDT                           policy<{'arm64': 'm', 'armhf': 'm', 'riscv64': 'm'}>
 CONFIG_RENESAS_RZG2LWDT                         policy<{'arm64': 'm', 'armhf': 'm', 'riscv64': 'm'}>
-CONFIG_RENESAS_RZG2L_IRQC                       policy<{'arm64': 'y', 'riscv64': 'y'}>
+CONFIG_RENESAS_RZG2L_IRQC                       policy<{'arm64': 'y', 'riscv64': '-'}>
 CONFIG_RENESAS_RZN1WDT                          policy<{'arm64': 'm', 'armhf': 'm', 'riscv64': 'm'}>
 CONFIG_RENESAS_USB_DMAC                         policy<{'arm64': 'm', 'armhf': 'm', 'riscv64': 'm'}>
 CONFIG_RENESAS_WDT                              policy<{'arm64': 'm', 'armhf': 'm', 'riscv64': 'm'}>
@@ -10757,7 +10755,7 @@ CONFIG_RESET_NUVOTON_MA35D1                     policy<{'arm64': 'y'}>
 CONFIG_RESET_POLARFIRE_SOC                      policy<{'riscv64': 'y'}>
 CONFIG_RESET_QCOM_AOSS                          policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_RESET_QCOM_PDC                           policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_RESET_RZG2L_USBPHY_CTRL                  policy<{'arm64': 'm', 'riscv64': 'm'}>
+CONFIG_RESET_RZG2L_USBPHY_CTRL                  policy<{'arm64': 'm', 'riscv64': '-'}>
 CONFIG_RESET_SCMI                               policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_RESET_SIMPLE                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_RESET_SOCFPGA                            policy<{'armhf': 'y'}>
@@ -11152,11 +11150,11 @@ CONFIG_RV_REACT_PRINTK                          policy<{'amd64': 'y', 'arm64': '
 CONFIG_RWSEM_SPIN_ON_OWNER                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_RXKAD                                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_RXPERF                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
-CONFIG_RZG2L_ADC                                policy<{'arm64': 'm', 'riscv64': 'm'}>
+CONFIG_RZG2L_ADC                                policy<{'arm64': 'm', 'riscv64': '-'}>
 CONFIG_RZG2L_THERMAL                            policy<{'arm64': 'm', 'armhf': 'm', 'riscv64': 'm'}>
 CONFIG_RZN1_DMAMUX                              policy<{'armhf': 'm'}>
-CONFIG_RZ_DMAC                                  policy<{'arm64': 'm', 'riscv64': 'm'}>
-CONFIG_RZ_MTU3                                  policy<{'arm64': 'y', 'riscv64': 'y'}>
+CONFIG_RZ_DMAC                                  policy<{'arm64': 'm', 'riscv64': '-'}>
+CONFIG_RZ_MTU3                                  policy<{'arm64': 'y', 'riscv64': '-'}>
 CONFIG_RZ_MTU3_CNT                              policy<{'arm64': 'm'}>
 CONFIG_S2IO                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
 CONFIG_S390                                     policy<{'s390x': 'y'}>
@@ -12620,7 +12618,7 @@ CONFIG_SND_SOC_RT715_SDCA_SDW                   policy<{'amd64': 'm', 'arm64': '
 CONFIG_SND_SOC_RT715_SDW                        policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SND_SOC_RT722_SDCA_SDW                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SND_SOC_RT9120                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
-CONFIG_SND_SOC_RZ                               policy<{'arm64': 'm', 'riscv64': 'm'}>
+CONFIG_SND_SOC_RZ                               policy<{'arm64': 'm', 'riscv64': '-'}>
 CONFIG_SND_SOC_SAMSUNG                          policy<{'armhf': 'n'}>
 CONFIG_SND_SOC_SC7180                           policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_SND_SOC_SC7280                           policy<{'arm64': 'm', 'armhf': 'm'}>
