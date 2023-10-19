@@ -48,6 +48,7 @@ clk-cpu-dyndiv
 clk-cpumux
 clk-dualdiv
 clk-gate
+clk-imx-acm
 clk-imx-lpcg-scu
 clk-imx-scu
 clk-imx8mm
@@ -241,6 +242,7 @@ gpio-davinci
 gpio-generic
 gpio-mxc
 gpio-pl061
+gpio-sifive
 gpio-tegra
 gpio-tegra186
 gpio-xilinx
@@ -299,6 +301,7 @@ lzo
 lzo-rle
 lzo_compress
 lzo_decompress
+marvell_gti_wdt
 max14577
 max310x
 max77686
@@ -310,6 +313,7 @@ mdio-bitbang
 mdio_devres
 meson-aoclk
 meson-clk-measure
+meson-clkc-utils
 meson-ee-pwrc
 meson-eeclk
 meson-gx-pwrc-vpu
@@ -324,7 +328,6 @@ mq-deadline
 msm_serial
 mtk-eint
 mtk-regulator-coupler
-mx3fb
 mxc-clk
 n_null
 nls_base
@@ -346,6 +349,7 @@ pcie-altera
 pcie-altera-msi
 pcie-kirin
 pcie-mediatek
+pcie-microchip-host
 pcs-lynx
 phy-meson-axg-mipi-pcie-analog
 phy-meson-axg-pcie
@@ -407,7 +411,6 @@ reset-imx7
 reset-meson
 reset-qcom-aoss
 rfkill
-rk8xx-core
 rng
 rng-core
 roles
@@ -474,6 +477,7 @@ thermal
 ti-cpufreq
 ti-msgmgr
 ti-opp-supply
+ti-sysc
 ti_sci
 tpm
 tpm_crb
