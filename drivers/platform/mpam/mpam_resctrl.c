@@ -81,6 +81,17 @@ bool resctrl_arch_is_mbm_total_enabled(void)
 	return mbm_total_class;
 }
 
+bool resctrl_arch_mbm_has_long_counter(void)
+{
+	if (mbm_local_class)
+		return !!mpam_has_feature(mpam_feat_msmon_mbwu_63counter, &mbm_local_class->props);
+
+	if (mbm_total_class)
+		return !!mpam_has_feature(mpam_feat_msmon_mbwu_63counter, &mbm_total_class->props);
+
+	return false;
+}
+
 bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level rid)
 {
 	switch (rid) {
