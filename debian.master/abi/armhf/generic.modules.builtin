@@ -166,6 +166,7 @@ gpio-generic
 gpio-mxc
 gpio-omap
 gpio-pl061
+gpio-sifive
 gpio-tegra
 gpio-twl4030
 gpio-twl6040
@@ -223,6 +224,7 @@ md5
 mdio-bitbang
 mdio_devres
 meson-clk-measure
+meson-clkc-utils
 meson-ee-pwrc
 meson-gx-pwrc-vpu
 meson_uart
@@ -240,7 +242,6 @@ mtdblock
 mtk-eint
 mtk-regulator-coupler
 musb_hdrc
-mx3fb
 mxc-clk
 n_null
 nand
@@ -269,6 +270,7 @@ pci-host-generic
 pcie-altera
 pcie-altera-msi
 pcie-mediatek
+pcie-microchip-host
 phy-generic
 phy-gmii-sel
 phy-meson-axg-mipi-pcie-analog
@@ -312,7 +314,6 @@ reset-imx7
 reset-meson
 reset-qcom-aoss
 rfkill
-rk8xx-core
 rng
 rng-core
 roles

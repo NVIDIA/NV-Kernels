@@ -93,6 +93,7 @@ governor_powersave
 governor_simpleondemand
 governor_userspace
 gpio-generic
+gpio-sifive
 gpio-xilinx
 gxt4500
 hmac
@@ -152,6 +153,7 @@ oid_registry
 palmas
 pci-host-common
 pci-host-generic
+pcie-microchip-host
 pinctrl-as3722
 pinctrl-microchip-sgpio
 pinctrl-ocelot
@@ -171,7 +173,6 @@ regmap-i2c
 regmap-mmio
 regmap-spi
 rfkill
-rk8xx-core
 rng
 rng-core
 roles
