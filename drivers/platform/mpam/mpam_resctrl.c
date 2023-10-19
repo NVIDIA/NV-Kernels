@@ -318,28 +318,37 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 void *resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r, int evtid)
 {
 	struct mpam_resctrl_res *res;
-	u32 *ret = kmalloc(sizeof(*ret), GFP_KERNEL);
+	u32 *ctx = kmalloc(sizeof(*ctx), GFP_KERNEL);
+	int err;
 
-	if (!ret)
+	if (!ctx)
 		return ERR_PTR(-ENOMEM);
 
 	switch (evtid) {
 	case QOS_L3_OCCUP_EVENT_ID:
 		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
 
-		*ret = mpam_alloc_csu_mon(res->class);
-		return ret;
+		err = mpam_alloc_csu_mon(res->class);
+		break;
 	case QOS_L3_MBM_LOCAL_EVENT_ID:
 	case QOS_L3_MBM_TOTAL_EVENT_ID:
 		if (mpam_monitors_free_runing)
 			return mon_is_rmid_idx;
 		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
 
-		*ret = mpam_alloc_mbwu_mon(res->class);
-		return ret;
+		err = mpam_alloc_mbwu_mon(res->class);
+		break;
+	default:
+		err = -EOPNOTSUPP;
 	}
 
-	return ERR_PTR(-EOPNOTSUPP);
+	if (err < 0) {
+		kfree(ctx);
+		return ERR_PTR(err);
+	}
+
+	*ctx = err;
+	return ctx;
 }
 
 void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid,
