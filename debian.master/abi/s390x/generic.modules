@@ -123,6 +123,8 @@ crc8
 cryptd
 crypto_engine
 crypto_user
+cs42l43
+cs42l43-i2c
 ctcm
 curve25519-generic
 cuse
@@ -249,10 +251,12 @@ gfs2
 ghash_s390
 gpio-aggregator
 gpio-bt8xx
+gpio-ds4520
 gpio-generic
 gpio-idio-16
 gpio-pci-idio-16
 gpio-pcie-idio-24
+gpio-regmap
 gpio-sim
 grace
 gre
@@ -260,6 +264,7 @@ gtp
 hangcheck-timer
 hfcpci
 hmcdrv
+i2c-algo-bit
 i2c-core
 i2c-dev
 i2c-mux
@@ -399,6 +404,7 @@ libsas
 linear
 llc
 lockd
+loongson
 lru_cache
 lrw
 lxt
@@ -423,11 +429,13 @@ macsec
 macvlan
 macvtap
 marvell
+marvell-88q2xxx
 marvell10g
 md-cluster
 md4
 mdev
 mdio-i2c
+mdio-mscc-miim
 memory-notifier-error-inject
 mena21_wdt
 mfd-core
@@ -596,6 +604,7 @@ nls_iso8859-9
 nls_koi8-r
 nls_koi8-ru
 nls_koi8-u
+nls_ucs2_utils
 nls_utf8
 notifier-error-inject
 nsh
@@ -647,6 +656,7 @@ psnap
 ptp
 ptp_clockmatrix
 ptp_ines
+ptp_mock
 qdio
 qeth
 qeth_l2
@@ -671,6 +681,7 @@ rds_rdma
 rds_tcp
 realtek
 regmap-i2c
+regmap-mmio
 rmd160
 rnbd-client
 rnbd-server
@@ -735,7 +746,6 @@ sha3_256_s390
 sha3_512_s390
 sha512_s390
 sha_common
-shiftfs
 siox-bus-gpio
 siox-core
 sit
@@ -750,7 +760,6 @@ smc_diag
 smsc
 smsgiucv_app
 softdog
-spl
 st
 st_drv
 ste10Xp
@@ -950,11 +959,8 @@ xt_u32
 xxhash_generic
 z3fold
 zcrypt
-zcrypt_cex2a
-zcrypt_cex2c
 zcrypt_cex4
 zfcp
-zfs
 zonefs
 zram
 zstd
