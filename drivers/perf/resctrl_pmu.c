@@ -66,7 +66,6 @@ static struct rdt_resource *resctrl_event_get_resource(u16 event_num)
 
 static void resctrl_pmu_event_destroy(struct perf_event *event)
 {
-	struct hw_perf_event *hwc = &event->hw;
 	u16 event_num = get_event(event);
 	struct rdt_resource *r;
 
@@ -74,7 +73,7 @@ static void resctrl_pmu_event_destroy(struct perf_event *event)
 	if (!r)
 		return;
 
-	resctrl_arch_mon_ctx_free(r, event_num, hwc->idx);
+	resctrl_arch_mon_ctx_free(r, event_num, event->pmu_private);
 }
 
 static int resctrl_pmu_event_init(struct perf_event *event)
@@ -144,9 +143,9 @@ static int resctrl_pmu_event_init(struct perf_event *event)
 			return -EINVAL;
 	}
 
-	hwc->idx = resctrl_arch_mon_ctx_alloc_no_wait(r, event_num);
-	if (hwc->idx == -ENOSPC)
-		return -ENOSPC;
+	event->pmu_private = resctrl_arch_mon_ctx_alloc_no_wait(r, event_num);
+	if (event->pmu_private && IS_ERR(event->pmu_private))
+		return PTR_ERR(event->pmu_private);
 	event->destroy = resctrl_pmu_event_destroy;
 	local64_set(&hwc->prev_count, 0);
 	local64_set(&event->count, 0);
@@ -183,7 +182,8 @@ static void resctrl_pmu_event_update(struct perf_event *event)
 		prev = local64_read(&hwc->prev_count);
 
 		err = resctrl_arch_rmid_read(r, d, closid, rmid,
-					     event_num, &now, hwc->idx);
+					     event_num, &now,
+					     event->pmu_private);
 		if (err)
 			return;
 	} while (local64_cmpxchg(&hwc->prev_count, prev, now) != prev);
