@@ -100,6 +100,11 @@ static inline bool resctrl_arch_is_mbm_local_enabled(void)
 	return (rdt_mon_features & (1 << QOS_L3_MBM_LOCAL_EVENT_ID));
 }
 
+static bool resctrl_arch_mbm_has_long_counter(void)
+{
+	return false;
+}
+
 /*
  * __resctrl_sched_in() - Writes the task's CLOSid/RMID to IA32_PQR_MSR
  *

@@ -79,6 +79,7 @@ bool resctrl_arch_mon_capable(void);
 bool resctrl_arch_is_llc_occupancy_enabled(void);
 bool resctrl_arch_is_mbm_local_enabled(void);
 bool resctrl_arch_is_mbm_total_enabled(void);
+bool resctrl_arch_mbm_has_long_counter(void);
 
 /* reset cached configurations, then all devices */
 void resctrl_arch_reset_resources(void);

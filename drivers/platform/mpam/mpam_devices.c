@@ -870,6 +870,8 @@ static void read_msmon_ctl_flt_vals(struct mon_read *m, u32 *ctl_val,
 	case mpam_feat_msmon_mbwu:
 		*ctl_val = mpam_read_monsel_reg(msc, CFG_MBWU_CTL);
 		*flt_val = mpam_read_monsel_reg(msc, CFG_MBWU_FLT);
+		if (mpam_ris_has_mbwu_long_counter(m->ris))
+			*ctl_val &= ~MSMON_CFG_x_CTL_OFLOW_STATUS;
 		break;
 	default:
 		return;
