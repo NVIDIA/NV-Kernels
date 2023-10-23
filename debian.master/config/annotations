@@ -12,6 +12,12 @@ CONFIG_ACPI_CUSTOM_METHOD                       note<'SECURITY: allows arbitrary
 CONFIG_AGP                                      policy<{'amd64': 'y', 'ppc64el': 'y'}>
 CONFIG_AGP                                      note<'not autoloadable'>
 
+CONFIG_ARCH_MMAP_RND_BITS                       policy<{'amd64': '32', 'arm64': '33', 'arm64-generic-64k': '29', 'armhf': '16', 'ppc64el': '29', 'riscv64': '24'}>
+CONFIG_ARCH_MMAP_RND_BITS                       note<'LP: #1983357'>
+
+CONFIG_ARCH_MMAP_RND_COMPAT_BITS                policy<{'amd64': '16', 'arm64': '16', 'ppc64el': '13', 'riscv64': '-'}>
+CONFIG_ARCH_MMAP_RND_COMPAT_BITS                note<'LP: #1983357'>
+
 CONFIG_ARCH_ROCKCHIP                            policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_ARCH_ROCKCHIP                            note<'LP: #1825222'>
 
@@ -1294,12 +1300,8 @@ CONFIG_ARCH_MIGHT_HAVE_PC_PARPORT               policy<{'amd64': 'y', 'armhf': '
 CONFIG_ARCH_MIGHT_HAVE_PC_SERIO                 policy<{'amd64': 'y', 'ppc64el': 'y'}>
 CONFIG_ARCH_MILBEAUT                            policy<{'armhf': 'y'}>
 CONFIG_ARCH_MILBEAUT_M10V                       policy<{'armhf': 'y'}>
-CONFIG_ARCH_MMAP_RND_BITS                       policy<{'amd64': '32', 'arm64': '33', 'arm64-generic-64k': '29', 'armhf': '16', 'ppc64el': '29', 'riscv64': '24'}>
-CONFIG_ARCH_MMAP_RND_BITS                       note<'LP: #1983357'>
 CONFIG_ARCH_MMAP_RND_BITS_MAX                   policy<{'amd64': '32', 'arm64': '33', 'arm64-generic-64k': '29', 'armhf': '16', 'ppc64el': '29', 'riscv64': '24'}>
 CONFIG_ARCH_MMAP_RND_BITS_MIN                   policy<{'amd64': '28', 'arm64': '18', 'arm64-generic-64k': '14', 'armhf': '8', 'ppc64el': '14', 'riscv64': '18'}>
-CONFIG_ARCH_MMAP_RND_COMPAT_BITS                policy<{'amd64': '16', 'arm64': '16', 'ppc64el': '13', 'riscv64': '17'}>
-CONFIG_ARCH_MMAP_RND_COMPAT_BITS                note<'LP: #1983357'>
 CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MAX            policy<{'amd64': '16', 'arm64': '16', 'ppc64el': '13', 'riscv64': '17'}>
 CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MIN            policy<{'amd64': '8', 'arm64': '11', 'arm64-generic-64k': '7', 'ppc64el': '7', 'riscv64': '8'}>
 CONFIG_ARCH_MMP                                 policy<{'armhf': 'n'}>
@@ -9643,8 +9645,8 @@ CONFIG_PHY_ROCKCHIP_PCIE                        policy<{'arm64': 'm', 'armhf': '
 CONFIG_PHY_ROCKCHIP_SNPS_PCIE3                  policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_PHY_ROCKCHIP_TYPEC                       policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_PHY_ROCKCHIP_USB                         policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_PHY_RTK_RTD_USB2PHY                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
-CONFIG_PHY_RTK_RTD_USB3PHY                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
+CONFIG_PHY_RTK_RTD_USB2PHY                      policy<{'amd64': '-', 'arm64': 'm', 'armhf': 'm', 'ppc64el': '-', 'riscv64': '-'}>
+CONFIG_PHY_RTK_RTD_USB3PHY                      policy<{'amd64': '-', 'arm64': 'm', 'armhf': 'm', 'ppc64el': '-', 'riscv64': '-'}>
 CONFIG_PHY_SAMSUNG_UFS                          policy<{'armhf': 'n'}>
 CONFIG_PHY_SAMSUNG_USB2                         policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_PHY_SPARX5_SERDES                        policy<{'amd64': '-', 'arm64': 'm', 'armhf': '-', 'ppc64el': '-'}>
@@ -13583,6 +13585,7 @@ CONFIG_TI_ICSS_IEP                              policy<{'arm64': 'm', 'armhf': '
 CONFIG_TI_K3_AM65_CPSW_NUSS                     policy<{'arm64': 'm'}>
 CONFIG_TI_K3_AM65_CPSW_SWITCHDEV                policy<{'arm64': 'y'}>
 CONFIG_TI_K3_AM65_CPTS                          policy<{'arm64': 'm'}>
+CONFIG_TI_K3_CPPI_DESC_POOL                     policy<{'arm64': 'm'}>
 CONFIG_TI_K3_DSP_REMOTEPROC                     policy<{'arm64': 'm'}>
 CONFIG_TI_K3_PSIL                               policy<{'arm64': 'y'}>
 CONFIG_TI_K3_R5_REMOTEPROC                      policy<{'arm64': 'm'}>
