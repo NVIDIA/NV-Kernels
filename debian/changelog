@@ -1,3 +1,9 @@
+linux-meta-unstable (6.6.0-8.8) mantic; urgency=medium
+
+  * Master version: 6.6.0-8.8
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Tue, 24 Oct 2023 10:55:51 +0200
+
 linux-meta-unstable (6.6.0-7.7) mantic; urgency=medium
 
   * Master version: 6.6.0-7.7
