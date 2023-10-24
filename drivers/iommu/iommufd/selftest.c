@@ -111,6 +111,7 @@ enum selftest_obj_type {
 
 struct mock_dev {
 	struct device dev;
+	unsigned long flags;
 };
 
 struct selftest_obj {
@@ -387,7 +388,7 @@ static void mock_dev_release(struct device *dev)
 	kfree(mdev);
 }
 
-static struct mock_dev *mock_dev_create(void)
+static struct mock_dev *mock_dev_create(unsigned long dev_flags)
 {
 	struct mock_dev *mdev;
 	int rc;
@@ -397,6 +398,7 @@ static struct mock_dev *mock_dev_create(void)
 		return ERR_PTR(-ENOMEM);
 
 	device_initialize(&mdev->dev);
+	mdev->flags = dev_flags;
 	mdev->dev.release = mock_dev_release;
 	mdev->dev.bus = &iommufd_mock_bus_type.bus;
 
@@ -432,6 +434,7 @@ static int iommufd_test_mock_domain(struct iommufd_ucmd *ucmd,
 	struct iommufd_device *idev;
 	struct selftest_obj *sobj;
 	u32 pt_id = cmd->id;
+	u32 dev_flags = 0;
 	u32 idev_id;
 	int rc;
 
@@ -442,7 +445,10 @@ static int iommufd_test_mock_domain(struct iommufd_ucmd *ucmd,
 	sobj->idev.ictx = ucmd->ictx;
 	sobj->type = TYPE_IDEV;
 
-	sobj->idev.mock_dev = mock_dev_create();
+	if (cmd->op == IOMMU_TEST_OP_MOCK_DOMAIN_FLAGS)
+		dev_flags = cmd->mock_domain_flags.dev_flags;
+
+	sobj->idev.mock_dev = mock_dev_create(dev_flags);
 	if (IS_ERR(sobj->idev.mock_dev)) {
 		rc = PTR_ERR(sobj->idev.mock_dev);
 		goto out_sobj;
@@ -1025,6 +1031,7 @@ int iommufd_test(struct iommufd_ucmd *ucmd)
 						 cmd->add_reserved.start,
 						 cmd->add_reserved.length);
 	case IOMMU_TEST_OP_MOCK_DOMAIN:
+	case IOMMU_TEST_OP_MOCK_DOMAIN_FLAGS:
 		return iommufd_test_mock_domain(ucmd, cmd);
 	case IOMMU_TEST_OP_MOCK_DOMAIN_REPLACE:
 		return iommufd_test_mock_domain_replace(
