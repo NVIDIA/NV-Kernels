@@ -3830,8 +3830,6 @@ phy-pxa-28nm-hsic
 phy-pxa-28nm-usb2
 phy-qcom-usb-hs
 phy-qcom-usb-hsic
-phy-rtk-usb2
-phy-rtk-usb3
 phy-tahvo
 phy-tusb1210
 phylink
