@@ -997,14 +997,8 @@ late_initcall(resctrl_arch_late_init);
 
 static void __exit resctrl_arch_exit(void)
 {
-	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_L3);
-
 	cpuhp_remove_state(rdt_online);
-
-	rdtgroup_exit();
-
-	if (r->mon_capable)
-		rdt_put_mon_l3_config(r);
+	resctrl_exit();
 }
 
 __exitcall(resctrl_arch_exit);
