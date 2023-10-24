@@ -539,6 +539,8 @@ enum {
 #define sm_supported(iommu)	(intel_iommu_sm && ecap_smts((iommu)->ecap))
 #define pasid_supported(iommu)	(sm_supported(iommu) &&			\
 				 ecap_pasid((iommu)->ecap))
+#define nested_supported(iommu)	(sm_supported(iommu) &&			\
+				 ecap_nest((iommu)->ecap))
 
 struct pasid_entry;
 struct pasid_state_entry;
