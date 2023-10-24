@@ -337,13 +337,6 @@ int iommufd_hw_pagetable_attach(struct iommufd_hw_pagetable *hwpt,
 		goto err_unlock;
 	}
 
-	/* Try to upgrade the domain we have */
-	if (idev->enforce_cache_coherency) {
-		rc = iommufd_hw_pagetable_enforce_cc(hwpt);
-		if (rc)
-			goto err_unlock;
-	}
-
 	rc = iopt_table_enforce_dev_resv_regions(&hwpt->ioas->iopt, idev->dev,
 						 &idev->igroup->sw_msi_start);
 	if (rc)
@@ -424,8 +417,8 @@ iommufd_device_do_replace(struct iommufd_device *idev,
 {
 	struct iommufd_group *igroup = idev->igroup;
 	struct iommufd_hw_pagetable *old_hwpt;
-	unsigned int num_devices = 0;
 	struct iommufd_device *cur;
+	unsigned int num_devices;
 	int rc;
 
 	mutex_lock(&idev->igroup->lock);
@@ -443,16 +436,6 @@ iommufd_device_do_replace(struct iommufd_device *idev,
 	if (hwpt == igroup->hwpt) {
 		mutex_unlock(&idev->igroup->lock);
 		return NULL;
-	}
-
-	/* Try to upgrade the domain we have */
-	list_for_each_entry(cur, &igroup->device_list, group_item) {
-		num_devices++;
-		if (cur->enforce_cache_coherency) {
-			rc = iommufd_hw_pagetable_enforce_cc(hwpt);
-			if (rc)
-				goto err_unlock;
-		}
 	}
 
 	old_hwpt = igroup->hwpt;
@@ -481,6 +464,7 @@ iommufd_device_do_replace(struct iommufd_device *idev,
 
 	igroup->hwpt = hwpt;
 
+	num_devices = list_count_nodes(&igroup->device_list);
 	/*
 	 * Move the refcounts held by the device_list to the new hwpt. Retain a
 	 * refcount for this thread as the caller will free it.
