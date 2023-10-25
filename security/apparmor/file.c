@@ -166,7 +166,9 @@ static int check_user(struct aa_profile *profile,
 	}
 
 	/* update based on node data for audit */
-	ad->request = node->data.request;
+	perms->deny = node->data.denied;
+	perms->allow = node->data.request & ~node->data.denied;
+	ad->request |= node->data.request;
 	ad->denied = node->data.denied;
 	ad->error = node->data.error;
 
