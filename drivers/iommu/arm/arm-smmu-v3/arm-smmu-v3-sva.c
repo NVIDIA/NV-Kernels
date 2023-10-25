@@ -447,10 +447,7 @@ static int arm_smmu_share_asid(struct arm_smmu_device *smmu,
 	 * the S2 :( Or we simply ignore BTM entirely as we are doing now.
 	 */
 	if (!(smmu_domain->smmu->features & ARM_SMMU_FEAT_BTM))
-		return xa_alloc(&smmu->asid_map, &smmu_domain->asid,
-				smmu_domain,
-				XA_LIMIT(1, (1 << smmu->asid_bits) - 1),
-				GFP_KERNEL);
+		return arm_smmu_domain_alloc_id(smmu, smmu_domain);
 
 	/* At this point the caller ensures we have a mmget() */
 	smmu_domain->asid = arm64_mm_context_get(mm);
