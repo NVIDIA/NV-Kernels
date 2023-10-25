@@ -975,6 +975,9 @@ static long build_v3_unotif(struct aa_knotif *knotif, void __user *buf,
 	if (!build_append_str(buf, pos, max_size, knotif->ad->name,
 			      unotif.file.name, size))
 		return size;
+
+	/* set size after appending strings */
+	unotif.common.len = size;
 	/* now the struct, at the start of user mem */
 	if (copy_to_user(buf, &unotif, sizeof(unotif)))
 		return -EFAULT;
