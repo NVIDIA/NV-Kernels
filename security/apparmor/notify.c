@@ -1023,8 +1023,7 @@ long aa_listener_unotif_recv(struct aa_listener *listener, void __user *buf,
 	do {
 		knotif = listener_pop_and_hold_knotif(listener);
 		if (!knotif) {
-			ret = -ENOENT;
-			break;
+			return -ENOENT;
 		}
 		AA_DEBUG(DEBUG_UPCALL, "id %lld: removed notif from listener queue",
 			 knotif->id);
