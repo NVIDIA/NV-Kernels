@@ -148,6 +148,10 @@ static void int3472_get_func_and_polarity(u8 type, const char **func, u32 *polar
 		*func = "power-enable";
 		*polarity = GPIO_ACTIVE_HIGH;
 		break;
+	case INT3472_GPIO_TYPE_HANDSHAKE:
+		*func = "handshake";
+		*polarity = GPIO_ACTIVE_HIGH;
+		break;
 	default:
 		*func = "unknown";
 		*polarity = GPIO_ACTIVE_HIGH;
@@ -239,6 +243,7 @@ static int skl_int3472_handle_gpio_resources(struct acpi_resource *ares,
 	switch (type) {
 	case INT3472_GPIO_TYPE_RESET:
 	case INT3472_GPIO_TYPE_POWERDOWN:
+	case INT3472_GPIO_TYPE_HANDSHAKE:
 		ret = skl_int3472_map_gpio_to_sensor(int3472, agpio, func, polarity);
 		if (ret)
 			err_msg = "Failed to map GPIO pin to sensor\n";
