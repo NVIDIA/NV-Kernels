@@ -616,10 +616,6 @@ struct arm_smmu_priq {
 };
 
 /* High-level stream table and context descriptor structures */
-struct arm_smmu_ctx_desc {
-	u32				asid;
-};
-
 struct arm_smmu_ctx_desc_cfg {
 	union {
 		struct {
@@ -651,10 +647,6 @@ arm_smmu_cdtab_allocated(struct arm_smmu_ctx_desc_cfg *cfg)
 {
 	return cfg->linear.table || cfg->l2.l1tab;
 }
-
-struct arm_smmu_s2_cfg {
-	u16				vmid;
-};
 
 struct arm_smmu_strtab_cfg {
 	union {
@@ -805,8 +797,8 @@ struct arm_smmu_domain {
 
 	enum arm_smmu_domain_stage	stage;
 	union {
-		struct arm_smmu_ctx_desc	cd;
-		struct arm_smmu_s2_cfg		s2_cfg;
+		u32 asid;
+		u16 vmid;
 	};
 
 	struct iommu_domain		domain;

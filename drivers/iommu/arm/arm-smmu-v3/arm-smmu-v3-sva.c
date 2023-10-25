@@ -19,7 +19,7 @@ static int arm_smmu_realloc_s1_domain_asid(struct arm_smmu_device *smmu,
 					   struct arm_smmu_domain *smmu_domain)
 {
 	struct arm_smmu_master_domain *master_domain;
-	u32 old_asid = smmu_domain->cd.asid;
+	u32 old_asid = smmu_domain->asid;
 	struct arm_smmu_cd target_cd;
 	unsigned long flags;
 	int ret;
@@ -38,7 +38,7 @@ static int arm_smmu_realloc_s1_domain_asid(struct arm_smmu_device *smmu,
 	 * and we achieve eventual consistency. For the brief period where the
 	 * old ASID is still in the CD entries it will become incoherent.
 	 */
-	ret = xa_alloc(&smmu->asid_map, &smmu_domain->cd.asid, smmu_domain,
+	ret = xa_alloc(&smmu->asid_map, &smmu_domain->asid, smmu_domain,
 		       XA_LIMIT(1, (1 << smmu->asid_bits) - 1), GFP_KERNEL);
 	if (ret)
 		return ret;
@@ -173,7 +173,7 @@ static void arm_smmu_mm_arch_invalidate_secondary_tlbs(struct mmu_notifier *mn,
 	}
 
 	if (!smmu_domain->btm_invalidation) {
-		ioasid_t asid = READ_ONCE(smmu_domain->cd.asid);
+		ioasid_t asid = READ_ONCE(smmu_domain->asid);
 
 		if (!size)
 			arm_smmu_tlb_inv_asid(smmu_domain->smmu, asid);
@@ -210,14 +210,14 @@ static void arm_smmu_mm_release(struct mmu_notifier *mn, struct mm_struct *mm)
 
 		/* An SVA ASID never changes, no asid_lock required */
 		arm_smmu_make_sva_cd(&target, master, NULL,
-				     smmu_domain->cd.asid,
+				     smmu_domain->asid,
 				     smmu_domain->btm_invalidation);
 		arm_smmu_write_cd_entry(master, master_domain->ssid, cdptr,
 					&target);
 	}
 	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
 
-	arm_smmu_tlb_inv_asid(smmu_domain->smmu, smmu_domain->cd.asid);
+	arm_smmu_tlb_inv_asid(smmu_domain->smmu, smmu_domain->asid);
 	arm_smmu_atc_inv_domain(smmu_domain, 0, 0);
 }
 
@@ -380,7 +380,7 @@ static int arm_smmu_sva_set_dev_pasid(struct iommu_domain *domain,
 	 * This does not need the arm_smmu_asid_lock because SVA domains never
 	 * get reassigned
 	 */
-	arm_smmu_make_sva_cd(&target, master, domain->mm, smmu_domain->cd.asid,
+	arm_smmu_make_sva_cd(&target, master, domain->mm, smmu_domain->asid,
 			     smmu_domain->btm_invalidation);
 	ret = arm_smmu_set_pasid(master, smmu_domain, id, &target);
 
@@ -447,16 +447,16 @@ static int arm_smmu_share_asid(struct arm_smmu_device *smmu,
 	 * the S2 :( Or we simply ignore BTM entirely as we are doing now.
 	 */
 	if (!(smmu_domain->smmu->features & ARM_SMMU_FEAT_BTM))
-		return xa_alloc(&smmu->asid_map, &smmu_domain->cd.asid,
+		return xa_alloc(&smmu->asid_map, &smmu_domain->asid,
 				smmu_domain,
 				XA_LIMIT(1, (1 << smmu->asid_bits) - 1),
 				GFP_KERNEL);
 
 	/* At this point the caller ensures we have a mmget() */
-	smmu_domain->cd.asid = arm64_mm_context_get(mm);
+	smmu_domain->asid = arm64_mm_context_get(mm);
 
 	mutex_lock(&smmu->asid_lock);
-	old_s1_domain = xa_store(&smmu->asid_map, smmu_domain->cd.asid,
+	old_s1_domain = xa_store(&smmu->asid_map, smmu_domain->asid,
 				 smmu_domain, GFP_KERNEL);
 	if (xa_err(old_s1_domain)) {
 		ret = xa_err(old_s1_domain);
@@ -490,7 +490,7 @@ static int arm_smmu_share_asid(struct arm_smmu_device *smmu,
 	goto out_unlock;
 
 out_restore_s1:
-	xa_store(&smmu->asid_map, smmu_domain->cd.asid, old_s1_domain,
+	xa_store(&smmu->asid_map, smmu_domain->asid, old_s1_domain,
 		 GFP_KERNEL);
 out_put_asid:
 	arm64_mm_context_put(mm);
