@@ -261,14 +261,8 @@ CONFIG_IMA                                      note<'LP:1643652'>
 CONFIG_IMA_APPRAISE                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_IMA_APPRAISE                             note<'LP:1643652'>
 
-CONFIG_IMA_APPRAISE_SIGNED_INIT                 policy<{'ppc64el': 'n'}>
-CONFIG_IMA_APPRAISE_SIGNED_INIT                 note<'LP:1667490'>
-
 CONFIG_IMA_ARCH_POLICY                          policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'y', 's390x': 'n'}>
 CONFIG_IMA_ARCH_POLICY                          note<'LP:1866909'>
-
-CONFIG_IMA_BLACKLIST_KEYRING                    policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
-CONFIG_IMA_BLACKLIST_KEYRING                    note<'LP:1667490'>
 
 CONFIG_IMA_DEFAULT_HASH_SHA256                  policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'y', 's390x': 'n'}>
 CONFIG_IMA_DEFAULT_HASH_SHA256                  note<'LP:1643652'>
@@ -279,23 +273,14 @@ CONFIG_IMA_KEXEC                                note<'LP:1643652'>
 CONFIG_IMA_KEYRINGS_PERMIT_SIGNED_BY_BUILTIN_OR_SECONDARY policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
 CONFIG_IMA_KEYRINGS_PERMIT_SIGNED_BY_BUILTIN_OR_SECONDARY note<'LP:1667490'>
 
-CONFIG_IMA_LOAD_X509                            policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'y', 's390x': 'n'}>
-CONFIG_IMA_LOAD_X509                            note<'LP:1643652'>
-
 CONFIG_IMA_READ_POLICY                          policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'y', 's390x': 'n'}>
 CONFIG_IMA_READ_POLICY                          note<'LP:1866909'>
 
 CONFIG_IMA_SIG_TEMPLATE                         policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'y', 's390x': 'n'}>
 CONFIG_IMA_SIG_TEMPLATE                         note<'LP:1643652'>
 
-CONFIG_IMA_TRUSTED_KEYRING                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
-CONFIG_IMA_TRUSTED_KEYRING                      note<'LP:1643652'>
-
 CONFIG_IMA_WRITE_POLICY                         policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
 CONFIG_IMA_WRITE_POLICY                         note<'LP:1667490'>
-
-CONFIG_IMA_X509_PATH                            policy<{'ppc64el': '"/etc/keys/x509_ima.der"'}>
-CONFIG_IMA_X509_PATH                            note<'LP:1643652'>
 
 CONFIG_INPUT_UINPUT                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y'}>
 CONFIG_INPUT_UINPUT                             note<'LP:584812'>
