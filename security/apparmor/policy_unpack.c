@@ -1144,6 +1144,8 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
 		goto fail;
 	}
 
+	aa_compute_profile_mediates(profile);
+
 	return profile;
 
 fail:
