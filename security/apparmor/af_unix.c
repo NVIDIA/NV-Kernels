@@ -47,7 +47,7 @@ static inline int unix_fs_perm(const char *op, u32 mask,
 	AA_BUG(!u);
 	AA_BUG(!UNIX_FS(aa_unix_sk(u)));
 
-	if (unconfined(label) || !LABEL_MEDIATES(label, AA_CLASS_FILE))
+	if (unconfined(label) || !label_mediates(label, AA_CLASS_FILE))
 		return 0;
 
 	mask &= NET_FS_PERMS;
