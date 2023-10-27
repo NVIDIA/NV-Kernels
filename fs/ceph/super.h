@@ -1041,8 +1041,7 @@ extern struct inode *ceph_get_inode(struct super_block *sb,
 				    struct inode *newino);
 extern struct inode *ceph_get_snapdir(struct inode *parent);
 extern int ceph_fill_file_size(struct inode *inode, int issued,
-			       u32 truncate_seq, u64 truncate_size,
-			       u64 size, int newcaps);
+			       u32 truncate_seq, u64 truncate_size, u64 size);
 extern void ceph_fill_file_time(struct inode *inode, int issued,
 				u64 time_warp_seq, struct timespec64 *ctime,
 				struct timespec64 *mtime,
