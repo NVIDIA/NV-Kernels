@@ -1253,7 +1253,7 @@ static int apparmor_userns_create(const struct cred *cred)
 	label = begin_current_label_crit_section();
 	/* remove unprivileged_userns_restricted check when unconfined is updated */
 	if (aa_unprivileged_userns_restricted ||
-	    LABEL_MEDIATES(label, AA_CLASS_NS)) {
+	    label_mediates(label, AA_CLASS_NS)) {
 		DEFINE_AUDIT_DATA(ad, LSM_AUDIT_DATA_TASK, AA_CLASS_NS,
 				  OP_USERNS_CREATE);
 		ad.subj_cred = current_cred();
