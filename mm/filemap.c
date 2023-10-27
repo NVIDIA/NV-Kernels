@@ -973,12 +973,10 @@ struct folio *filemap_alloc_folio(gfp_t gfp, unsigned int order)
 			n = cpuset_mem_spread_node();
 			folio = __folio_alloc_node(gfp, order, n);
 		} while (!folio && read_mems_allowed_retry(cpuset_mems_cookie));
-	} else {
-		folio = folio_alloc(gfp, order);
+
+		return folio;
 	}
-	if (folio)
-		VM_BUG_ON_FOLIO(folio->private, folio);
-	return folio;
+	return folio_alloc(gfp, order);
 }
 EXPORT_SYMBOL(filemap_alloc_folio);
 #endif
