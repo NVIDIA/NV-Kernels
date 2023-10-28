@@ -791,7 +791,6 @@ static int irdma_create_qp(struct ib_qp *ibqp,
 	struct irdma_create_qp_req req;
 	struct irdma_create_qp_resp uresp = {};
 	u32 qp_num = 0;
-	int ret;
 	int err_code;
 	int sq_size;
 	int rq_size;
@@ -923,9 +922,8 @@ static int irdma_create_qp(struct ib_qp *ibqp,
 	if (dev->hw_attrs.uk_attrs.hw_rev > IRDMA_GEN_1)
 		init_info.qp_uk_init_info.qp_caps |= IRDMA_PUSH_MODE;
 
-	ret = irdma_sc_qp_init(qp, &init_info);
-	if (ret) {
-		err_code = -EPROTO;
+	err_code = irdma_sc_qp_init(qp, &init_info);
+	if (err_code) {
 		ibdev_dbg(&iwdev->ibdev, "VERBS: qp_init fail\n");
 		goto error;
 	}
@@ -1778,7 +1776,6 @@ static int irdma_resize_cq(struct ib_cq *ibcq, int entries,
 	struct irdma_device *iwdev;
 	struct irdma_pci_f *rf;
 	struct irdma_cq_buf *cq_buf = NULL;
-	int status = 0;
 	unsigned long flags;
 	int ret;
 
@@ -1871,12 +1868,10 @@ static int irdma_resize_cq(struct ib_cq *ibcq, int entries,
 	cqp_info->in.u.cq_modify.cq = &iwcq->sc_cq;
 	cqp_info->in.u.cq_modify.scratch = (uintptr_t)cqp_request;
 	cqp_info->post_sq = 1;
-	status = irdma_handle_cqp_op(rf, cqp_request);
+	ret = irdma_handle_cqp_op(rf, cqp_request);
 	irdma_put_cqp_request(&rf->cqp, cqp_request);
-	if (status) {
-		ret = -EPROTO;
+	if (ret)
 		goto error;
-	}
 
 	spin_lock_irqsave(&iwcq->lock, flags);
 	if (cq_buf) {
@@ -1931,7 +1926,6 @@ static int irdma_create_cq(struct ib_cq *ibcq,
 	struct irdma_sc_cq *cq;
 	struct irdma_sc_dev *dev = &rf->sc_dev;
 	struct irdma_cq_init_info info = {};
-	int status;
 	struct irdma_cqp_request *cqp_request;
 	struct cqp_cmds_info *cqp_info;
 	struct irdma_cq_uk_init_info *ukinfo = &info.cq_uk_init_info;
@@ -2082,12 +2076,10 @@ static int irdma_create_cq(struct ib_cq *ibcq,
 	cqp_info->in.u.cq_create.cq = cq;
 	cqp_info->in.u.cq_create.check_overflow = true;
 	cqp_info->in.u.cq_create.scratch = (uintptr_t)cqp_request;
-	status = irdma_handle_cqp_op(rf, cqp_request);
+	err_code = irdma_handle_cqp_op(rf, cqp_request);
 	irdma_put_cqp_request(&rf->cqp, cqp_request);
-	if (status) {
-		err_code = -ENOMEM;
+	if (err_code)
 		goto cq_free_rsrc;
-	}
 
 	if (udata) {
 		struct irdma_create_cq_resp resp = {};
@@ -2516,7 +2508,6 @@ static int irdma_hw_alloc_stag(struct irdma_device *iwdev,
 	struct irdma_allocate_stag_info *info;
 	struct irdma_pd *iwpd = to_iwpd(iwmr->ibmr.pd);
 	int status;
-	int err = 0;
 	struct irdma_cqp_request *cqp_request;
 	struct cqp_cmds_info *cqp_info;
 
@@ -2538,10 +2529,8 @@ static int irdma_hw_alloc_stag(struct irdma_device *iwdev,
 	cqp_info->in.u.alloc_stag.scratch = (uintptr_t)cqp_request;
 	status = irdma_handle_cqp_op(iwdev->rf, cqp_request);
 	irdma_put_cqp_request(&iwdev->rf->cqp, cqp_request);
-	if (status)
-		err = -ENOMEM;
 
-	return err;
+	return status;
 }
 
 /**
@@ -2557,9 +2546,8 @@ static struct ib_mr *irdma_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
 	struct irdma_pble_alloc *palloc;
 	struct irdma_pbl *iwpbl;
 	struct irdma_mr *iwmr;
-	int status;
 	u32 stag;
-	int err_code = -ENOMEM;
+	int err_code;
 
 	iwmr = kzalloc(sizeof(*iwmr), GFP_KERNEL);
 	if (!iwmr)
@@ -2581,9 +2569,9 @@ static struct ib_mr *irdma_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
 	iwmr->type = IRDMA_MEMREG_TYPE_MEM;
 	palloc = &iwpbl->pble_alloc;
 	iwmr->page_cnt = max_num_sg;
-	status = irdma_get_pble(iwdev->rf->pble_rsrc, palloc, iwmr->page_cnt,
-				true);
-	if (status)
+	err_code = irdma_get_pble(iwdev->rf->pble_rsrc, palloc, iwmr->page_cnt,
+				  true);
+	if (err_code)
 		goto err_get_pble;
 
 	err_code = irdma_hw_alloc_stag(iwdev, iwmr);
@@ -2654,10 +2642,9 @@ static int irdma_hwreg_mr(struct irdma_device *iwdev, struct irdma_mr *iwmr,
 	struct irdma_reg_ns_stag_info *stag_info;
 	struct irdma_pd *iwpd = to_iwpd(iwmr->ibmr.pd);
 	struct irdma_pble_alloc *palloc = &iwpbl->pble_alloc;
-	int status;
-	int err = 0;
 	struct irdma_cqp_request *cqp_request;
 	struct cqp_cmds_info *cqp_info;
+	int ret;
 
 	cqp_request = irdma_alloc_and_get_cqp_request(&iwdev->rf->cqp, true);
 	if (!cqp_request)
@@ -2694,12 +2681,10 @@ static int irdma_hwreg_mr(struct irdma_device *iwdev, struct irdma_mr *iwmr,
 	cqp_info->post_sq = 1;
 	cqp_info->in.u.mr_reg_non_shared.dev = &iwdev->rf->sc_dev;
 	cqp_info->in.u.mr_reg_non_shared.scratch = (uintptr_t)cqp_request;
-	status = irdma_handle_cqp_op(iwdev->rf, cqp_request);
+	ret = irdma_handle_cqp_op(iwdev->rf, cqp_request);
 	irdma_put_cqp_request(&iwdev->rf->cqp, cqp_request);
-	if (status)
-		err = -ENOMEM;
 
-	return err;
+	return ret;
 }
 
 /**
@@ -2879,7 +2864,6 @@ struct ib_mr *irdma_reg_phys_mr(struct ib_pd *pd, u64 addr, u64 size, int access
 	struct irdma_device *iwdev = to_iwdev(pd->device);
 	struct irdma_pbl *iwpbl;
 	struct irdma_mr *iwmr;
-	int status;
 	u32 stag;
 	int ret;
 
@@ -2907,10 +2891,9 @@ struct ib_mr *irdma_reg_phys_mr(struct ib_pd *pd, u64 addr, u64 size, int access
 	iwmr->pgaddrmem[0] = addr;
 	iwmr->len = size;
 	iwmr->page_size = SZ_4K;
-	status = irdma_hwreg_mr(iwdev, iwmr, access);
-	if (status) {
+	ret = irdma_hwreg_mr(iwdev, iwmr, access);
+	if (ret) {
 		irdma_free_stag(iwdev, stag);
-		ret = -ENOMEM;
 		goto err;
 	}
 
@@ -3039,7 +3022,6 @@ static int irdma_post_send(struct ib_qp *ibqp,
 	struct irdma_qp_uk *ukqp;
 	struct irdma_sc_dev *dev;
 	struct irdma_post_sq_info info;
-	int ret;
 	int err = 0;
 	unsigned long flags;
 	bool inv_stag;
@@ -3095,7 +3077,7 @@ static int irdma_post_send(struct ib_qp *ibqp,
 					info.op.inline_send.qkey = ud_wr(ib_wr)->remote_qkey;
 					info.op.inline_send.dest_qp = ud_wr(ib_wr)->remote_qpn;
 				}
-				ret = irdma_uk_inline_send(ukqp, &info, false);
+				err = irdma_uk_inline_send(ukqp, &info, false);
 			} else {
 				info.op.send.num_sges = ib_wr->num_sge;
 				info.op.send.sg_list = ib_wr->sg_list;
@@ -3106,14 +3088,7 @@ static int irdma_post_send(struct ib_qp *ibqp,
 					info.op.send.qkey = ud_wr(ib_wr)->remote_qkey;
 					info.op.send.dest_qp = ud_wr(ib_wr)->remote_qpn;
 				}
-				ret = irdma_uk_send(ukqp, &info, false);
-			}
-
-			if (ret) {
-				if (ret == -ENOMEM)
-					err = -ENOMEM;
-				else
-					err = -EINVAL;
+				err = irdma_uk_send(ukqp, &info, false);
 			}
 			break;
 		case IB_WR_RDMA_WRITE_WITH_IMM:
@@ -3139,20 +3114,13 @@ static int irdma_post_send(struct ib_qp *ibqp,
 						rdma_wr(ib_wr)->remote_addr;
 				info.op.inline_rdma_write.rem_addr.lkey =
 						rdma_wr(ib_wr)->rkey;
-				ret = irdma_uk_inline_rdma_write(ukqp, &info, false);
+				err = irdma_uk_inline_rdma_write(ukqp, &info, false);
 			} else {
 				info.op.rdma_write.lo_sg_list = (void *)ib_wr->sg_list;
 				info.op.rdma_write.num_lo_sges = ib_wr->num_sge;
 				info.op.rdma_write.rem_addr.addr = rdma_wr(ib_wr)->remote_addr;
 				info.op.rdma_write.rem_addr.lkey = rdma_wr(ib_wr)->rkey;
-				ret = irdma_uk_rdma_write(ukqp, &info, false);
-			}
-
-			if (ret) {
-				if (ret == -ENOMEM)
-					err = -ENOMEM;
-				else
-					err = -EINVAL;
+				err = irdma_uk_rdma_write(ukqp, &info, false);
 			}
 			break;
 		case IB_WR_RDMA_READ_WITH_INV:
@@ -3169,22 +3137,13 @@ static int irdma_post_send(struct ib_qp *ibqp,
 			info.op.rdma_read.rem_addr.lkey = rdma_wr(ib_wr)->rkey;
 			info.op.rdma_read.lo_sg_list = (void *)ib_wr->sg_list;
 			info.op.rdma_read.num_lo_sges = ib_wr->num_sge;
-
-			ret = irdma_uk_rdma_read(ukqp, &info, inv_stag, false);
-			if (ret) {
-				if (ret == -ENOMEM)
-					err = -ENOMEM;
-				else
-					err = -EINVAL;
-			}
+			err = irdma_uk_rdma_read(ukqp, &info, inv_stag, false);
 			break;
 		case IB_WR_LOCAL_INV:
 			info.op_type = IRDMA_OP_TYPE_INV_STAG;
 			info.local_fence = info.read_fence;
 			info.op.inv_local_stag.target_stag = ib_wr->ex.invalidate_rkey;
-			ret = irdma_uk_stag_local_invalidate(ukqp, &info, true);
-			if (ret)
-				err = -ENOMEM;
+			err = irdma_uk_stag_local_invalidate(ukqp, &info, true);
 			break;
 		case IB_WR_REG_MR: {
 			struct irdma_mr *iwmr = to_iwmr(reg_wr(ib_wr)->mr);
@@ -3206,10 +3165,8 @@ static int irdma_post_send(struct ib_qp *ibqp,
 			stag_info.local_fence = ib_wr->send_flags & IB_SEND_FENCE;
 			if (iwmr->npages > IRDMA_MIN_PAGES_PER_FMR)
 				stag_info.chunk_size = 1;
-			ret = irdma_sc_mr_fast_register(&iwqp->sc_qp, &stag_info,
+			err = irdma_sc_mr_fast_register(&iwqp->sc_qp, &stag_info,
 							true);
-			if (ret)
-				err = -ENOMEM;
 			break;
 		}
 		default:
@@ -3253,7 +3210,6 @@ static int irdma_post_recv(struct ib_qp *ibqp,
 	struct irdma_qp *iwqp;
 	struct irdma_qp_uk *ukqp;
 	struct irdma_post_rq_info post_recv = {};
-	int ret = 0;
 	unsigned long flags;
 	int err = 0;
 
@@ -3265,14 +3221,10 @@ static int irdma_post_recv(struct ib_qp *ibqp,
 		post_recv.num_sges = ib_wr->num_sge;
 		post_recv.wr_id = ib_wr->wr_id;
 		post_recv.sg_list = ib_wr->sg_list;
-		ret = irdma_uk_post_receive(ukqp, &post_recv);
-		if (ret) {
+		err = irdma_uk_post_receive(ukqp, &post_recv);
+		if (err) {
 			ibdev_dbg(&iwqp->iwdev->ibdev,
-				  "VERBS: post_recv err %d\n", ret);
-			if (ret == -ENOMEM)
-				err = -ENOMEM;
-			else
-				err = -EINVAL;
+				  "VERBS: post_recv err %d\n", err);
 			goto out;
 		}
 
