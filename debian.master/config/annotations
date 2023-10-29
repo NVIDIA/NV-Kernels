@@ -261,8 +261,8 @@ CONFIG_IMA_APPRAISE                             note<'LP: #1643652'>
 CONFIG_IMA_ARCH_POLICY                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_IMA_ARCH_POLICY                          note<'LP: #1866909'>
 
-CONFIG_IMA_DEFAULT_HASH_SHA256                  policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'y', 'riscv64': 'n', 's390x': 'n'}>
-CONFIG_IMA_DEFAULT_HASH_SHA256                  note<'LP: #1643652'>
+CONFIG_IMA_DEFAULT_HASH_SHA256                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_IMA_DEFAULT_HASH_SHA256                  note<'LP: #2041735'>
 
 CONFIG_IMA_KEXEC                                policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_IMA_KEXEC                                note<'LP: #1643652'>
@@ -6184,8 +6184,8 @@ CONFIG_IMA_APPRAISE_BOOTPARAM                   policy<{'amd64': 'y', 'arm64': '
 CONFIG_IMA_APPRAISE_BUILD_POLICY                policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_IMA_APPRAISE_MODSIG                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_IMA_BLACKLIST_KEYRING                    policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
-CONFIG_IMA_DEFAULT_HASH                         policy<{'amd64': '"sha1"', 'arm64': '"sha1"', 'armhf': '"sha1"', 'ppc64el': '"sha256"', 'riscv64': '"sha1"', 's390x': '"sha1"'}>
-CONFIG_IMA_DEFAULT_HASH_SHA1                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'n', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_IMA_DEFAULT_HASH                         policy<{'amd64': '"sha256"', 'arm64': '"sha256"', 'armhf': '"sha256"', 'ppc64el': '"sha256"', 'riscv64': '"sha256"', 's390x': '"sha256"'}>
+CONFIG_IMA_DEFAULT_HASH_SHA1                    policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_IMA_DEFAULT_HASH_SHA512                  policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_IMA_DEFAULT_TEMPLATE                     policy<{'amd64': '"ima-ng"', 'arm64': '"ima-ng"', 'armhf': '"ima-ng"', 'ppc64el': '"ima-sig"', 'riscv64': '"ima-ng"', 's390x': '"ima-ng"'}>
 CONFIG_IMA_DISABLE_HTABLE                       policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
