@@ -44,6 +44,11 @@
 
 #include "xprt_rdma.h"
 #include <trace/events/rpcrdma.h>
+#ifdef CONFIG_NVFS
+#define NVFS_FRWR
+#include "nvfs.h"
+#include "nvfs_rpc_rdma.h"
+#endif
 
 static void frwr_cid_init(struct rpcrdma_ep *ep,
 			  struct rpcrdma_mr *mr)
@@ -58,6 +63,13 @@ static void frwr_mr_unmap(struct rpcrdma_xprt *r_xprt, struct rpcrdma_mr *mr)
 {
 	if (mr->mr_device) {
 		trace_xprtrdma_mr_unmap(mr);
+#ifdef CONFIG_NVFS
+		if (rpcrdma_nvfs_unmap_data(mr->mr_device->dma_device,
+					    mr->mr_sg, mr->mr_nents, mr->mr_dir))
+			pr_debug("rpcrdma_nvfs_unmap_data device %s mr->mr_sg: %p , nents: %d\n",
+				 mr->mr_device->name, mr->mr_sg, mr->mr_nents);
+		else
+#endif
 		ib_dma_unmap_sg(mr->mr_device, mr->mr_sg, mr->mr_nents,
 				mr->mr_dir);
 		mr->mr_device = NULL;
@@ -286,6 +298,9 @@ struct rpcrdma_mr_seg *frwr_map(struct rpcrdma_xprt *r_xprt,
 				int nsegs, bool writing, __be32 xid,
 				struct rpcrdma_mr *mr)
 {
+#ifdef CONFIG_NVFS
+	bool is_nvfs_io = false;
+#endif
 	struct rpcrdma_ep *ep = r_xprt->rx_ep;
 	struct ib_reg_wr *reg_wr;
 	int i, n, dma_nents;
@@ -308,11 +323,23 @@ struct rpcrdma_mr_seg *frwr_map(struct rpcrdma_xprt *r_xprt,
 	}
 	mr->mr_dir = rpcrdma_data_dir(writing);
 	mr->mr_nents = i;
-
-	dma_nents = ib_dma_map_sg(ep->re_id->device, mr->mr_sg, mr->mr_nents,
-				  mr->mr_dir);
-	if (!dma_nents)
+#ifdef CONFIG_NVFS
+	dma_nents = rpcrdma_nvfs_map_data(ep->re_id->device->dma_device,
+					  mr->mr_sg, i, mr->mr_dir,
+					  &is_nvfs_io);
+	if (dma_nents == -EIO) {
 		goto out_dmamap_err;
+	} else if (is_nvfs_io) {
+		pr_debug("rpcrdma_nvfs_map_data device %s mr->mr_sg: %p , nents: %d\n",
+			 ep->re_id->device->name, mr->mr_sg, mr->mr_nents);
+	} else
+#endif
+	{
+		dma_nents = ib_dma_map_sg(ep->re_id->device, mr->mr_sg, mr->mr_nents,
+					  mr->mr_dir);
+		if (!dma_nents)
+			goto out_dmamap_err;
+	}
 	mr->mr_device = ep->re_id->device;
 
 	ibmr = mr->mr_ibmr;
