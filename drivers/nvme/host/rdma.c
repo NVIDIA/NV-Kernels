@@ -27,6 +27,9 @@
 #include "nvme.h"
 #include "fabrics.h"
 
+#ifdef CONFIG_NVFS
+#include "nvfs.h"
+#endif
 
 #define NVME_RDMA_CM_TIMEOUT_MS		3000		/* 3 second */
 
@@ -1208,6 +1211,9 @@ static int nvme_rdma_inv_rkey(struct nvme_rdma_queue *queue,
 	return ib_post_send(queue->qp, &wr, NULL);
 }
 
+#ifdef CONFIG_NVFS
+#include "nvfs-rdma.h"
+#endif
 static void nvme_rdma_dma_unmap_req(struct ib_device *ibdev, struct request *rq)
 {
 	struct nvme_rdma_request *req = blk_mq_rq_to_pdu(rq);
@@ -1218,6 +1224,11 @@ static void nvme_rdma_dma_unmap_req(struct ib_device *ibdev, struct request *rq)
 		sg_free_table_chained(&req->metadata_sgl->sg_table,
 				      NVME_INLINE_METADATA_SG_CNT);
 	}
+
+#ifdef CONFIG_NVFS
+	if (nvme_rdma_nvfs_unmap_data(ibdev, rq))
+		return;
+#endif
 
 	ib_dma_unmap_sg(ibdev, req->data_sgl.sg_table.sgl, req->data_sgl.nents,
 			rq_dma_dir(rq));
@@ -1466,6 +1477,18 @@ static int nvme_rdma_dma_map_req(struct ib_device *ibdev, struct request *rq,
 			NVME_INLINE_SG_CNT);
 	if (ret)
 		return -ENOMEM;
+
+#ifdef CONFIG_NVFS
+        {
+        bool is_nvfs_io = false;
+        ret = nvme_rdma_nvfs_map_data(ibdev, rq, &is_nvfs_io, count);
+        if (is_nvfs_io) {
+	        if (ret)
+	               goto out_free_table;
+                return 0;
+	}
+        }
+#endif
 
 	req->data_sgl.nents = blk_rq_map_sg(rq->q, rq,
 					    req->data_sgl.sg_table.sgl);
