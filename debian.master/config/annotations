@@ -9033,7 +9033,7 @@ CONFIG_NVME_TARGET_RDMA                         policy<{'amd64': 'm', 'arm64': '
 CONFIG_NVME_TARGET_TCP                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_NVME_TCP                                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_NVME_VERBOSE_ERRORS                      policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
-CONFIG_NVSW_SN2201                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm'}>
+CONFIG_NVSW_SN2201                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': '-'}>
 CONFIG_NV_TCO                                   policy<{'amd64': 'm'}>
 CONFIG_NXP_C45_TJA11XX_PHY                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
 CONFIG_NXP_CBTX_PHY                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
