@@ -1469,6 +1469,7 @@ static void section_rela(struct module *mod, struct elf_info *elf,
 		return;
 
 	for (rela = start; rela < stop; rela++) {
+		Elf_Sym *tsym;
 		r.r_offset = TO_NATIVE(rela->r_offset);
 #if KERNEL_ELFCLASS == ELFCLASS64
 		if (elf->hdr->e_machine == EM_MIPS) {
@@ -1485,7 +1486,8 @@ static void section_rela(struct module *mod, struct elf_info *elf,
 		r.r_info = TO_NATIVE(rela->r_info);
 		r_sym = ELF_R_SYM(r.r_info);
 #endif
-		r.r_addend = TO_NATIVE(rela->r_addend);
+		tsym = elf->symtab_start + r_sym;
+		r.r_addend = tsym->st_value + TO_NATIVE(rela->r_addend);
 		switch (elf->hdr->e_machine) {
 		case EM_RISCV:
 			if (!strcmp("__ex_table", fromsec) &&
@@ -1499,7 +1501,7 @@ static void section_rela(struct module *mod, struct elf_info *elf,
 			break;
 		}
 
-		check_section_mismatch(mod, elf, elf->symtab_start + r_sym,
+		check_section_mismatch(mod, elf, tsym,
 				       fsecndx, fromsec, r.r_offset, r.r_addend);
 	}
 }
