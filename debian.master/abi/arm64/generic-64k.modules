@@ -2845,6 +2845,7 @@ joydump
 jr3_pci
 jsa1212
 jsm
+k3-cppi-desc-pool
 k3_bandgap
 k3_j72xx_bandgap
 k3dma
