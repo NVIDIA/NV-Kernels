@@ -3174,13 +3174,20 @@ void security_transfer_creds(struct cred *new, const struct cred *old)
  * @c: credentials
  * @secid: secid value
  *
- * Retrieve the security identifier of the cred structure @c.  In case of
- * failure, @secid will be set to zero.
+ * Retrieve the first available security identifier of the
+ * cred structure @c.  In case of failure, @secid will be set to zero.
+ * Currently only used by binder.
  */
 void security_cred_getsecid(const struct cred *c, u32 *secid)
 {
+	struct security_hook_list *hp;
+
+	hlist_for_each_entry(hp, &security_hook_heads.cred_getsecid, list) {
+		hp->hook.cred_getsecid(c, secid);
+		return;
+	}
+
 	*secid = 0;
-	call_void_hook(cred_getsecid, c, secid);
 }
 EXPORT_SYMBOL(security_cred_getsecid);
 
