@@ -5423,7 +5423,6 @@ sfp
 sgi_w1
 sgp30
 sgp40
-sh-sci
 sh_eth
 sh_mmcif
 sh_mobile_lcdcfb
@@ -6187,7 +6186,6 @@ spi-synquacer
 spi-tegra114
 spi-tegra20-sflash
 spi-tegra20-slink
-spi-tegra210-quad
 spi-thunderx
 spi-tle62x0
 spi-wpcm-fiu
@@ -6628,7 +6626,6 @@ tpm_st33zp24_i2c
 tpm_st33zp24_spi
 tpm_tis_i2c
 tpm_tis_i2c_cr50
-tpm_tis_spi
 tpm_tis_synquacer
 tpm_vtpm_proxy
 tps23861
