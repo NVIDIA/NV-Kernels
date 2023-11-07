@@ -418,7 +418,7 @@ CONFIG_NO_HZ_IDLE                               policy<{'amd64': 'y', 'arm64': '
 CONFIG_NO_HZ_IDLE                               note<'LP: #1413968'>
 
 CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '256', 'armhf': '4', 'ppc64el': '2048', 'riscv64': '32', 's390x': '512'}>
-CONFIG_NR_CPUS                                  note<'LP: #1864198'>
+CONFIG_NR_CPUS                                  note<'LP: #1967889 (riscv64), LP: #1864198 (s390x)'>
 
 CONFIG_NUMA                                     policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_NUMA                                     note<'LP: #1557690'>
