@@ -523,8 +523,7 @@ static void apparmor_inode_free_security(struct inode *inode)
  */
 static int apparmor_inode_init_security(struct inode *inode, struct inode *dir,
 				       const struct qstr *qstr,
-				       const char **name,
-				       void **value, size_t *len)
+				       struct xattr *xattrs, int *xattr_count)
 {
 	struct aa_inode_sec *isec = apparmor_inode(inode);
 
