@@ -8155,7 +8155,6 @@ EXPORT_SYMBOL	 vmlinux 0x5edc2ce2	cdrom_mode_sense
 EXPORT_SYMBOL	 vmlinux 0x5f08ac7e	nd_region_to_nstype
 EXPORT_SYMBOL	 vmlinux 0x5f091e39	unregister_nls
 EXPORT_SYMBOL	 vmlinux 0x5f098b2a	in6addr_interfacelocal_allrouters
-EXPORT_SYMBOL	 vmlinux 0x5f199b65	module_layout
 EXPORT_SYMBOL	 vmlinux 0x5f1eef6f	skb_headers_offset_update
 EXPORT_SYMBOL	 vmlinux 0x5f2467ec	__mod_node_page_state
 EXPORT_SYMBOL	 vmlinux 0x5f25c699	udp_lib_unhash
@@ -9263,6 +9262,7 @@ EXPORT_SYMBOL	 vmlinux 0x8f44353d	phy_ethtool_ksettings_set
 EXPORT_SYMBOL	 vmlinux 0x8f449b21	tcp_child_process
 EXPORT_SYMBOL	 vmlinux 0x8f53e55b	flow_rule_match_meta
 EXPORT_SYMBOL	 vmlinux 0x8f595b11	snd_major
+EXPORT_SYMBOL	 vmlinux 0x8f678b07	__stack_chk_guard
 EXPORT_SYMBOL	 vmlinux 0x8f67eb95	sock_diag_put_filterinfo
 EXPORT_SYMBOL	 vmlinux 0x8f7a200d	sock_no_listen
 EXPORT_SYMBOL	 vmlinux 0x8f8f657f	bsearch
@@ -11685,6 +11685,7 @@ EXPORT_SYMBOL	 vmlinux 0xfa6b00f6	mipi_dsi_dcs_get_pixel_format
 EXPORT_SYMBOL	 vmlinux 0xfa705a3f	phy_ethtool_get_wol
 EXPORT_SYMBOL	 vmlinux 0xfa72be38	xa_get_order
 EXPORT_SYMBOL	 vmlinux 0xfa730374	zero_fill_bio
+EXPORT_SYMBOL	 vmlinux 0xfa763012	module_layout
 EXPORT_SYMBOL	 vmlinux 0xfa77bc33	__skb_pad
 EXPORT_SYMBOL	 vmlinux 0xfa7a0886	config_item_put
 EXPORT_SYMBOL	 vmlinux 0xfaa05516	__nd_driver_register

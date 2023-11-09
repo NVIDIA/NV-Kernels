@@ -8663,6 +8663,7 @@ EXPORT_SYMBOL	 vmlinux 0x7adb49bd	skb_unlink
 EXPORT_SYMBOL	 vmlinux 0x7adc0fbf	rb_replace_node_rcu
 EXPORT_SYMBOL	 vmlinux 0x7ae482f5	phy_start_cable_test
 EXPORT_SYMBOL	 vmlinux 0x7ae5d317	qe_get_snum
+EXPORT_SYMBOL	 vmlinux 0x7af170e6	module_layout
 EXPORT_SYMBOL	 vmlinux 0x7b01387c	component_match_add_release
 EXPORT_SYMBOL	 vmlinux 0x7b273a17	ip_options_rcv_srr
 EXPORT_SYMBOL	 vmlinux 0x7b2f0703	hdmi_infoframe_log
@@ -10242,7 +10243,6 @@ EXPORT_SYMBOL	 vmlinux 0xc32c71af	register_inetaddr_validator_notifier
 EXPORT_SYMBOL	 vmlinux 0xc346c19c	make_kuid
 EXPORT_SYMBOL	 vmlinux 0xc3591a4b	of_get_child_by_name
 EXPORT_SYMBOL	 vmlinux 0xc359fb65	abort
-EXPORT_SYMBOL	 vmlinux 0xc35b82dc	module_layout
 EXPORT_SYMBOL	 vmlinux 0xc37b4087	irq_domain_set_info
 EXPORT_SYMBOL	 vmlinux 0xc37f9c6e	cpufreq_update_policy
 EXPORT_SYMBOL	 vmlinux 0xc38c83b8	mod_timer

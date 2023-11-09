@@ -6272,6 +6272,7 @@ EXPORT_SYMBOL	 vmlinux 0xc16be39d	iter_div_u64_rem
 EXPORT_SYMBOL	 vmlinux 0xc16fe12d	__memcpy
 EXPORT_SYMBOL	 vmlinux 0xc1819e64	blkdev_get_by_path
 EXPORT_SYMBOL	 vmlinux 0xc194be5f	ccw_device_get_mdc
+EXPORT_SYMBOL	 vmlinux 0xc1a53c8e	module_layout
 EXPORT_SYMBOL	 vmlinux 0xc1a891db	__lock_buffer
 EXPORT_SYMBOL	 vmlinux 0xc1c5ac15	netdev_offload_xstats_get
 EXPORT_SYMBOL	 vmlinux 0xc1c9f5b3	folio_set_bh
@@ -6530,7 +6531,6 @@ EXPORT_SYMBOL	 vmlinux 0xcf2d9883	tty_insert_flip_string_fixed_flag
 EXPORT_SYMBOL	 vmlinux 0xcf2ea86b	__tracepoint_mmap_lock_acquire_returned
 EXPORT_SYMBOL	 vmlinux 0xcf33ea6b	tcp_close
 EXPORT_SYMBOL	 vmlinux 0xcf3b69b3	netdev_stats_to_stats64
-EXPORT_SYMBOL	 vmlinux 0xcf4958ec	module_layout
 EXPORT_SYMBOL	 vmlinux 0xcf66c8ac	ihold
 EXPORT_SYMBOL	 vmlinux 0xcf7e30e7	simple_nosetlease
 EXPORT_SYMBOL	 vmlinux 0xcf8868e1	iucv_if
