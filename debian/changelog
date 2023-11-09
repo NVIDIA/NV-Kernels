@@ -1,3 +1,16 @@
+linux-meta-unstable (6.6.0-10.10) mantic; urgency=medium
+
+  * Master version: 6.6.0-10.10
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync git-ubuntu-log
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] Hard-code wireguard module version
+    - debian/scripts/misc/git-ubuntu-log -- update from master
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Thu, 09 Nov 2023 12:05:37 +0200
+
 linux-meta-unstable (6.6.0-9.9) mantic; urgency=medium
 
   * Master version: 6.6.0-9.9
