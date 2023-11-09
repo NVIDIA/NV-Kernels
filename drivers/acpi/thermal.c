@@ -107,7 +107,7 @@ struct acpi_thermal_passive {
 	unsigned long temperature;
 	unsigned long tc1;
 	unsigned long tc2;
-	unsigned long tsp;
+	unsigned long sampling_period;
 	bool valid;
 };
 
@@ -285,11 +285,18 @@ static int acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 					tz->trips.passive.tc2 = tmp;
 
 				status = acpi_evaluate_integer(tz->device->handle,
-							       "_TSP", NULL, &tmp);
-				if (ACPI_FAILURE(status))
-					tz->trips.passive.valid = false;
-				else
-					tz->trips.passive.tsp = tmp;
+							       "_TFP", NULL, &tmp);
+				if (ACPI_FAILURE(status)) {
+					status = acpi_evaluate_integer(tz->device->handle,
+								       "_TSP", NULL, &tmp);
+					if (ACPI_FAILURE(status))
+						tz->trips.passive.valid = false;
+					else
+						tz->trips.passive.sampling_period = tmp * 100;
+
+				} else {
+					tz->trips.passive.sampling_period = tmp;
+				}
 			}
 		}
 	}
@@ -761,7 +768,7 @@ static int acpi_thermal_register_thermal_zone(struct acpi_thermal *tz)
 	if (tz->trips.passive.valid)
 		tz->thermal_zone = thermal_zone_device_register("acpitz", trips, 0, tz,
 								&acpi_thermal_zone_ops, NULL,
-								tz->trips.passive.tsp * 100,
+								tz->trips.passive.sampling_period,
 								tz->polling_frequency * 100);
 	else
 		tz->thermal_zone =
