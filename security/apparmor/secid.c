@@ -90,6 +90,42 @@ int apparmor_secid_to_secctx(u32 secid, char **secdata, u32 *seclen)
 	return 0;
 }
 
+int apparmor_lsmblob_to_secctx(struct lsmblob *blob, char **secdata,
+			       u32 *seclen)
+{
+	/* TODO: cache secctx and ref count so we don't have to recreate */
+	struct aa_label *label;
+	int flags = FLAG_VIEW_SUBNS | FLAG_HIDDEN_UNCONFINED | FLAG_ABS_ROOT;
+	int len;
+
+	AA_BUG(!seclen);
+
+	/* stacking scaffolding */
+	if (!blob->apparmor.label && blob->scaffold.secid)
+		label = aa_secid_to_label(blob->scaffold.secid);
+	else
+		label = blob->apparmor.label;
+
+	if (!label)
+		return -EINVAL;
+
+	if (apparmor_display_secid_mode)
+		flags |= FLAG_SHOW_MODE;
+
+	if (secdata)
+		len = aa_label_asxprint(secdata, root_ns, label,
+					flags, GFP_ATOMIC);
+	else
+		len = aa_label_snxprint(NULL, 0, root_ns, label, flags);
+
+	if (len < 0)
+		return -ENOMEM;
+
+	*seclen = len;
+
+	return 0;
+}
+
 int apparmor_secctx_to_secid(const char *secdata, u32 seclen, u32 *secid)
 {
 	struct aa_label *label;
