@@ -3374,33 +3374,33 @@ int security_task_getsid(struct task_struct *p)
 }
 
 /**
- * security_current_getsecid_subj() - Get the current task's subjective secid
- * @secid: secid value
+ * security_current_getlsmblob_subj() - Current task's subjective LSM data
+ * @blob: lsm specific information
  *
  * Retrieve the subjective security identifier of the current task and return
- * it in @secid.  In case of failure, @secid will be set to zero.
+ * it in @blob.
  */
-void security_current_getsecid_subj(u32 *secid)
+void security_current_getlsmblob_subj(struct lsmblob *blob)
 {
-	*secid = 0;
-	call_void_hook(current_getsecid_subj, secid);
+	lsmblob_init(blob);
+	call_void_hook(current_getlsmblob_subj, blob);
 }
-EXPORT_SYMBOL(security_current_getsecid_subj);
+EXPORT_SYMBOL(security_current_getlsmblob_subj);
 
 /**
- * security_task_getsecid_obj() - Get a task's objective secid
+ * security_task_getlsmblob_obj() - Get a task's objective LSM data
  * @p: target task
- * @secid: secid value
+ * @blob: lsm specific information
  *
  * Retrieve the objective security identifier of the task_struct in @p and
- * return it in @secid. In case of failure, @secid will be set to zero.
+ * return it in @blob.
  */
-void security_task_getsecid_obj(struct task_struct *p, u32 *secid)
+void security_task_getlsmblob_obj(struct task_struct *p, struct lsmblob *blob)
 {
-	*secid = 0;
-	call_void_hook(task_getsecid_obj, p, secid);
+	lsmblob_init(blob);
+	call_void_hook(task_getlsmblob_obj, p, blob);
 }
-EXPORT_SYMBOL(security_task_getsecid_obj);
+EXPORT_SYMBOL(security_task_getlsmblob_obj);
 
 /**
  * security_task_setnice() - Check if setting a task's nice value is allowed
