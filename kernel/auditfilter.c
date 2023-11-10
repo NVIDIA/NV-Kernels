@@ -1370,8 +1370,7 @@ int audit_filter(int msgtype, unsigned int listtype)
 			case AUDIT_SUBJ_CLR:
 				if (f->lsm_rule) {
 					/* stacking scaffolding */
-					security_current_getsecid_subj(
-							&blob.scaffold.secid);
+					security_current_getlsmblob_subj(&blob);
 					result = security_audit_rule_match(
 						   &blob, f->type, f->op,
 						   f->lsm_rule);
