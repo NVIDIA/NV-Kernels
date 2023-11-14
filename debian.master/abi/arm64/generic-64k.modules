@@ -3670,6 +3670,7 @@ mtk-svs
 mtk-uart-apdma
 mtk-vpu
 mtk_dp
+mtk_iommu
 mtk_nand
 mtk_rpmsg
 mtk_scp
@@ -7299,6 +7300,7 @@ wm97xx-ts
 wp512
 wpcm450-soc
 wusb3801
+wwan
 wwan_hwsim
 x25
 x9250
