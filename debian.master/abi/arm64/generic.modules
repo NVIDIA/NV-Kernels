@@ -7113,6 +7113,7 @@ wm8994-regulator
 wm97xx-ts
 wp512
 wusb3801
+wwan
 wwan_hwsim
 x25
 x_tables
