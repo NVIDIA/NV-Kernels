@@ -4126,11 +4126,10 @@ int security_getprocattr(struct task_struct *p, int lsmid, const char *name,
 {
 	struct security_hook_list *hp;
 
-	hlist_for_each_entry(hp, &security_hook_heads.getprocattr, list) {
-		if (lsmid != 0 && lsmid != hp->lsmid->id)
-			continue;
-		return hp->hook.getprocattr(p, name, value);
-	}
+	hlist_for_each_entry(hp, &security_hook_heads.getprocattr, list)
+		if (lsmid == LSM_ID_UNDEF || lsmid == hp->lsmid->id)
+			return hp->hook.getprocattr(p, name, value);
+
 	return LSM_RET_DEFAULT(getprocattr);
 }
 
