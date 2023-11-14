@@ -213,6 +213,7 @@ class Annotation(Config):
                 configs = {**configs, **self.search_config(arch=arch, flavour=flavour).keys()}
 
         # Import configs from the Kconfig object into Annotations
+        flavour_arg = flavour
         if flavour is not None:
             flavour = arch + f'-{flavour}'
         else:
@@ -226,7 +227,7 @@ class Annotation(Config):
                 if 'policy' in self.config[conf]:
                     # Add a TODO if a config with a note is changing and print
                     # a warning
-                    old_val = self.search_config(config=conf, arch=arch, flavour=flavour)
+                    old_val = self.search_config(config=conf, arch=arch, flavour=flavour_arg)
                     if old_val:
                         old_val = old_val[conf]
                     if val != old_val and "note" in self.config[conf]:
