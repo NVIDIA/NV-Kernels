@@ -6695,6 +6695,7 @@ wm8994
 wm8994-regulator
 wm97xx-ts
 wp512
+wwan
 wwan_hwsim
 x25
 x_tables
