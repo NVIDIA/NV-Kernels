@@ -1,4 +1,4 @@
-linux-unstable (6.6.0-10.10) mantic; urgency=medium
+linux-unstable (6.6.0-10.10) noble; urgency=medium
 
   * mantic/linux-unstable: 6.6.0-10.10 -proposed tracker (LP: #2043088)
 
