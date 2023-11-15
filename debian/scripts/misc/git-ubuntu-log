@@ -120,7 +120,7 @@ for key in keys:
                 try:
                     # urllib.request.urlcleanup()
                     request = urllib.request.Request('https://api.launchpad.net/devel/bugs/' + bug)
-                    request.add_header('Cache-Control', 'max-age=0')
+                    request.add_header('Cache-Control', 'no-cache')
                     with urllib.request.urlopen(request) as response:
                         data = response.read()
                         bug_info = json.loads(data.decode('utf-8'))
