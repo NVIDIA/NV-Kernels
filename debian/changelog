@@ -1,3 +1,16 @@
+linux-meta-unstable (6.6.0-11.11) noble; urgency=medium
+
+  * Master version: 6.6.0-11.11
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync git-ubuntu-log
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] move to Noble
+    - debian/dkms-versions -- update from master
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Wed, 15 Nov 2023 14:54:51 +0100
+
 linux-meta-unstable (6.6.0-10.10) noble; urgency=medium
 
   * Master version: 6.6.0-10.10
