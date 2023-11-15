@@ -638,9 +638,10 @@ static void batch_unpin(struct pfn_batch *batch, struct iopt_pages *pages,
 		size_t to_unpin = min_t(size_t, npages,
 					batch->npfns[cur] - first_page_off);
 
-		unpin_user_page_range_dirty_lock(
-			pfn_to_page(batch->pfns[cur] + first_page_off),
-			to_unpin, pages->writable);
+		if (pfn_valid(batch->pfns[cur] + first_page_off))
+			unpin_user_page_range_dirty_lock(
+				pfn_to_page(batch->pfns[cur] + first_page_off),
+				to_unpin, pages->writable);
 		iopt_pages_sub_npinned(pages, to_unpin);
 		cur++;
 		first_page_off = 0;
@@ -733,13 +734,49 @@ static void pfn_reader_user_destroy(struct pfn_reader_user *user,
 	user->upages = NULL;
 }
 
+static int follow_fault_pfn(struct vm_area_struct *vma, struct mm_struct *mm,
+	       unsigned long vaddr, unsigned long *pfn,
+	       bool write_fault)
+{
+   pte_t *ptep;
+   spinlock_t *ptl;
+   int ret;
+
+   ret = follow_pte(vma->vm_mm, vaddr, &ptep, &ptl);
+   if (ret) {
+       bool unlocked = false;
+
+       ret = fixup_user_fault(mm, vaddr,
+		      FAULT_FLAG_REMOTE |
+		      (write_fault ?  FAULT_FLAG_WRITE : 0),
+		      &unlocked);
+       if (unlocked)
+	   return -EAGAIN;
+
+       if (ret)
+	   return ret;
+
+       ret = follow_pte(vma->vm_mm, vaddr, &ptep, &ptl);
+       if (ret)
+	   return ret;
+   }
+
+   if (write_fault && !pte_write(*ptep))
+       ret = -EFAULT;
+   else
+       *pfn = pte_pfn(*ptep);
+
+   pte_unmap_unlock(ptep, ptl);
+   return ret;
+}
+
 static int pfn_reader_user_pin(struct pfn_reader_user *user,
 			       struct iopt_pages *pages,
 			       unsigned long start_index,
 			       unsigned long last_index)
 {
 	bool remote_mm = pages->source_mm != current->mm;
-	unsigned long npages;
+	unsigned long start, npages;
 	uintptr_t uptr;
 	long rc;
 
@@ -789,6 +826,34 @@ static int pfn_reader_user_pin(struct pfn_reader_user *user,
 					   user->gup_flags, user->upages,
 					   &user->locked);
 	}
+
+	if (rc < 0) {
+		struct vm_area_struct *vma;
+		unsigned long pfn;
+		start = untagged_addr(uptr);
+
+		/* fast path above doesn't hold the lock */
+		if (!user->locked)
+			mmap_read_lock(pages->source_mm);
+retry:
+		vma = vma_lookup(pages->source_mm, start);
+		if (vma && vma->vm_flags & VM_PFNMAP) {
+			rc = follow_fault_pfn(vma, pages->source_mm, start,
+					&pfn, pages->writable);
+			if (rc == -EAGAIN)
+				goto retry;
+			if (!rc) {
+				if (!pfn_valid(pfn))
+					rc = 1;
+				else
+					rc = -EFAULT;
+				user->upages[0] = pfn_to_page(pfn);
+			}
+		}
+		if (!user->locked)
+			mmap_read_unlock(pages->source_mm);
+	}
+
 	if (rc <= 0) {
 		if (WARN_ON(!rc))
 			return -EFAULT;
@@ -1095,10 +1160,10 @@ static void pfn_reader_release_pins(struct pfn_reader *pfns)
 	if (pfns->user.upages_end > pfns->batch_end_index) {
 		size_t npages = pfns->user.upages_end - pfns->batch_end_index;
 
-		/* Any pages not transferred to the batch are just unpinned */
-		unpin_user_pages(pfns->user.upages + (pfns->batch_end_index -
-						      pfns->user.upages_start),
-				 npages);
+		if (pfn_valid(page_to_pfn(pfns->user.upages[0])))
+			/* Any pages not transferred to the batch are just unpinned */
+			unpin_user_pages(pfns->user.upages + (pfns->batch_end_index -
+							 pfns->user.upages_start), npages);
 		iopt_pages_sub_npinned(pages, npages);
 		pfns->user.upages_end = pfns->batch_end_index;
 	}
