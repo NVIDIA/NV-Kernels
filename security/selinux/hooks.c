@@ -2799,7 +2799,7 @@ static int selinux_fs_context_submount(struct fs_context *fc,
 	if (!(sbsec->flags & (FSCONTEXT_MNT|CONTEXT_MNT|DEFCONTEXT_MNT)))
 		return 0;
 
-	opts = kzalloc(sizeof(*opts), GFP_KERNEL);
+	opts = lsm_mnt_opts_alloc(GFP_KERNEL);
 	if (!opts)
 		return -ENOMEM;
 
@@ -2821,8 +2821,12 @@ static int selinux_fs_context_dup(struct fs_context *fc,
 	if (!src)
 		return 0;
 
-	fc->security = kmemdup(src, sizeof(*src), GFP_KERNEL);
-	return fc->security ? 0 : -ENOMEM;
+	fc->security = lsm_mnt_opts_alloc(GFP_KERNEL);
+	if (!fc->security)
+		return -ENOMEM;
+
+	memcpy(fc->security, src, sizeof(*src));
+	return 0;
 }
 
 static const struct fs_parameter_spec selinux_fs_parameters[] = {
