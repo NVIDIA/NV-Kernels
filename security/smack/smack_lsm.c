@@ -639,7 +639,7 @@ static int smack_fs_context_submount(struct fs_context *fc,
 	struct smack_mnt_opts *ctx;
 	struct inode_smack *isp;
 
-	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+	ctx = lsm_mnt_opts_alloc(GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
 	fc->security = ctx;
@@ -690,7 +690,7 @@ static int smack_fs_context_dup(struct fs_context *fc,
 	if (!src)
 		return 0;
 
-	fc->security = kzalloc(sizeof(struct smack_mnt_opts), GFP_KERNEL);
+	fc->security = lsm_mnt_opts_alloc(GFP_KERNEL);
 	if (!fc->security)
 		return -ENOMEM;
 
