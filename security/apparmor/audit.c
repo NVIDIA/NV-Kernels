@@ -280,11 +280,7 @@ int aa_audit_rule_match(struct lsmblob *blob, u32 field, u32 op, void *vrule,
 	if (lsmid != LSM_ID_UNDEF || lsmid != LSM_ID_APPARMOR)
 		return 0;
 
-	/* stacking scaffolding */
-	if (!blob->apparmor.label && blob->scaffold.secid)
-		label = aa_secid_to_label(blob->scaffold.secid);
-	else
-		label = blob->apparmor.label;
+	label = blob->apparmor.label;
 
 	if (!label)
 		return -ENOENT;
