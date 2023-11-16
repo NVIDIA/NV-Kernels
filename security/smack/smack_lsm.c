@@ -1645,11 +1645,7 @@ static int smack_inode_listsecurity(struct inode *inode, char *buffer,
  */
 static void smack_inode_getlsmblob(struct inode *inode, struct lsmblob *blob)
 {
-	struct smack_known *skp = smk_of_inode(inode);
-
-	blob->smack.skp = skp;
-	/* stacking scaffolding */
-	blob->scaffold.secid = skp->smk_secid;
+	blob->smack.skp = smk_of_inode(inode);
 }
 
 /*
@@ -2157,8 +2153,6 @@ static void smack_cred_getlsmblob(const struct cred *cred,
 {
 	rcu_read_lock();
 	blob->smack.skp = smk_of_task(smack_cred(cred));
-	/* stacking scaffolding */
-	blob->scaffold.secid = blob->smack.skp->smk_secid;
 	rcu_read_unlock();
 }
 
@@ -2260,11 +2254,7 @@ static int smack_task_getsid(struct task_struct *p)
  */
 static void smack_current_getlsmblob_subj(struct lsmblob *blob)
 {
-	struct smack_known *skp = smk_of_current();
-
-	blob->smack.skp = skp;
-	/* stacking scaffolding */
-	blob->scaffold.secid = skp->smk_secid;
+	blob->smack.skp = smk_of_current();
 }
 
 /**
@@ -2277,11 +2267,7 @@ static void smack_current_getlsmblob_subj(struct lsmblob *blob)
 static void smack_task_getlsmblob_obj(struct task_struct *p,
 				      struct lsmblob *blob)
 {
-	struct smack_known *skp = smk_of_task_struct_obj(p);
-
-	blob->smack.skp = skp;
-	/* stacking scaffolding */
-	blob->scaffold.secid = skp->smk_secid;
+	blob->smack.skp = smk_of_task_struct_obj(p);
 }
 
 /**
@@ -3452,11 +3438,8 @@ static void smack_ipc_getlsmblob(struct kern_ipc_perm *ipp,
 				 struct lsmblob *blob)
 {
 	struct smack_known **iskpp = smack_ipc(ipp);
-	struct smack_known *iskp = *iskpp;
 
-	blob->smack.skp = iskp;
-	/* stacking scaffolding */
-	blob->scaffold.secid = iskp->smk_secid;
+	blob->smack.skp = *iskpp;
 }
 
 /**
@@ -4797,10 +4780,6 @@ static int smack_audit_rule_match(struct lsmblob *blob, u32 field, u32 op,
 	if (field != AUDIT_SUBJ_USER && field != AUDIT_OBJ_USER)
 		return 0;
 
-	/* stacking scaffolding */
-	if (!skp && blob->scaffold.secid)
-		skp = smack_from_secid(blob->scaffold.secid);
-
 	/*
 	 * No need to do string comparisons. If a match occurs,
 	 * both pointers will point to the same smack_known
@@ -4862,10 +4841,6 @@ static int smack_lsmblob_to_secctx(struct lsmblob *blob, struct lsmcontext *cp)
 {
 	struct smack_known *skp = blob->smack.skp;
 	int len;
-
-	/* stacking scaffolding */
-	if (!skp && blob->scaffold.secid)
-		skp = smack_from_secid(blob->scaffold.secid);
 
 	len = strlen(skp->smk_known);
 
