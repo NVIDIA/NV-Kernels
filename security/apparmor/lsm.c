@@ -986,8 +986,6 @@ static void apparmor_current_getlsmblob_subj(struct lsmblob *blob)
 	struct aa_label *label = __begin_current_label_crit_section();
 
 	blob->apparmor.label = label;
-	/* stacking scaffolding */
-	blob->scaffold.secid = label->secid;
 	__end_current_label_crit_section(label);
 }
 
@@ -997,8 +995,6 @@ static void apparmor_task_getlsmblob_obj(struct task_struct *p,
 	struct aa_label *label = aa_get_task_label(p);
 
 	blob->apparmor.label = label;
-	/* stacking scaffolding */
-	blob->scaffold.secid = label->secid;
 	aa_put_label(label);
 }
 

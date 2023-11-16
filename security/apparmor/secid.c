@@ -98,11 +98,7 @@ int apparmor_lsmblob_to_secctx(struct lsmblob *blob, struct lsmcontext *cp)
 	int flags = FLAG_VIEW_SUBNS | FLAG_HIDDEN_UNCONFINED | FLAG_ABS_ROOT;
 	int len;
 
-	/* stacking scaffolding */
-	if (!blob->apparmor.label && blob->scaffold.secid)
-		label = aa_secid_to_label(blob->scaffold.secid);
-	else
-		label = blob->apparmor.label;
+	label = blob->apparmor.label;
 
 	if (!label)
 		return -EINVAL;
