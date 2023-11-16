@@ -561,6 +561,7 @@ static int smack_sb_alloc_security(struct super_block *sb)
 }
 
 struct smack_mnt_opts {
+	bool initialized;
 	const char *fsdefault;
 	const char *fsfloor;
 	const char *fshat;
@@ -568,24 +569,37 @@ struct smack_mnt_opts {
 	const char *fstransmute;
 };
 
+static inline struct smack_mnt_opts *smack_mnt_opts(void *mnt_opts)
+{
+	if (mnt_opts)
+		return mnt_opts + smack_blob_sizes.lbs_mnt_opts;
+	return NULL;
+}
+
 static void smack_free_mnt_opts(void *mnt_opts)
 {
-	kfree(mnt_opts);
+	struct smack_mnt_opts *opts;
+
+	if (mnt_opts) {
+		opts = smack_mnt_opts(mnt_opts);
+		opts->initialized = false;
+	}
 }
 
 static int smack_add_opt(int token, const char *s, void **mnt_opts)
 {
-	struct smack_mnt_opts *opts = *mnt_opts;
+	struct smack_mnt_opts *opts;
 	struct smack_known *skp;
 
-	if (!opts) {
-		opts = kzalloc(sizeof(struct smack_mnt_opts), GFP_KERNEL);
-		if (!opts)
-			return -ENOMEM;
-		*mnt_opts = opts;
-	}
 	if (!s)
-		return -ENOMEM;
+		return -EINVAL;
+
+	if (!*mnt_opts) {
+		*mnt_opts = lsm_mnt_opts_alloc(GFP_KERNEL);
+		if (!*mnt_opts)
+			return -ENOMEM;
+	}
+	opts = smack_mnt_opts(*mnt_opts);
 
 	skp = smk_import_entry(s, 0);
 	if (IS_ERR(skp))
@@ -618,6 +632,7 @@ static int smack_add_opt(int token, const char *s, void **mnt_opts)
 		opts->fstransmute = skp->smk_known;
 		break;
 	}
+	opts->initialized = true;
 	return 0;
 
 out_opt_err:
@@ -639,10 +654,12 @@ static int smack_fs_context_submount(struct fs_context *fc,
 	struct smack_mnt_opts *ctx;
 	struct inode_smack *isp;
 
-	ctx = lsm_mnt_opts_alloc(GFP_KERNEL);
-	if (!ctx)
-		return -ENOMEM;
-	fc->security = ctx;
+	if (!fc->security) {
+		fc->security = lsm_mnt_opts_alloc(GFP_KERNEL);
+		if (!fc->security)
+			return -ENOMEM;
+	}
+	ctx = smack_mnt_opts(fc->security);
 
 	sbsp = smack_superblock(reference);
 	isp = smack_inode(reference->s_root->d_inode);
@@ -672,6 +689,7 @@ static int smack_fs_context_submount(struct fs_context *fc,
 				return -ENOMEM;
 		}
 	}
+	ctx->initialized = true;
 	return 0;
 }
 
@@ -685,16 +703,21 @@ static int smack_fs_context_submount(struct fs_context *fc,
 static int smack_fs_context_dup(struct fs_context *fc,
 				struct fs_context *src_fc)
 {
-	struct smack_mnt_opts *dst, *src = src_fc->security;
+	struct smack_mnt_opts *src;
+	struct smack_mnt_opts *dst;
 
+	src = smack_mnt_opts(src_fc->security);
 	if (!src)
 		return 0;
 
-	fc->security = lsm_mnt_opts_alloc(GFP_KERNEL);
-	if (!fc->security)
-		return -ENOMEM;
+	if (!fc->security) {
+		fc->security = lsm_mnt_opts_alloc(GFP_KERNEL);
+		if (!fc->security)
+			return -ENOMEM;
+	}
 
-	dst = fc->security;
+	dst = smack_mnt_opts(fc->security);
+	dst->initialized = src->initialized;
 	dst->fsdefault = src->fsdefault;
 	dst->fsfloor = src->fsfloor;
 	dst->fshat = src->fshat;
@@ -804,7 +827,7 @@ static int smack_set_mnt_opts(struct super_block *sb,
 	struct superblock_smack *sp = smack_superblock(sb);
 	struct inode_smack *isp;
 	struct smack_known *skp;
-	struct smack_mnt_opts *opts = mnt_opts;
+	struct smack_mnt_opts *opts = smack_mnt_opts(mnt_opts);
 	bool transmute = false;
 
 	if (sp->smk_flags & SMK_SB_INITIALIZED)
@@ -837,7 +860,7 @@ static int smack_set_mnt_opts(struct super_block *sb,
 
 	sp->smk_flags |= SMK_SB_INITIALIZED;
 
-	if (opts) {
+	if (opts && opts->initialized) {
 		if (opts->fsdefault) {
 			skp = smk_import_entry(opts->fsdefault, 0);
 			if (IS_ERR(skp))
