@@ -7026,6 +7026,7 @@ struct lsm_blob_sizes selinux_blob_sizes __ro_after_init = {
 	.lbs_sock = sizeof(struct sk_security_struct),
 	.lbs_superblock = sizeof(struct superblock_security_struct),
 	.lbs_xattr_count = SELINUX_INODE_INIT_XATTRS,
+	.lbs_mnt_opts = sizeof(struct selinux_mnt_opts),
 	.lbs_secmark = true,
 };
 
