@@ -156,5 +156,6 @@ extern struct lsm_info __start_early_lsm_info[], __end_early_lsm_info[];
 		__aligned(sizeof(unsigned long))
 
 extern int lsm_inode_alloc(struct inode *inode);
+extern void *lsm_mnt_opts_alloc(gfp_t priority);
 
 #endif /* ! __LINUX_LSM_HOOKS_H */

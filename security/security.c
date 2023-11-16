@@ -1391,6 +1391,18 @@ void security_sb_free(struct super_block *sb)
 }
 
 /**
+ * lsm_mnt_opts_alloc - allocate a mnt_opts blob
+ * @priority: memory allocation priority
+ *
+ * Returns a newly allocated mnt_opts blob or NULL if
+ * memory isn't available.
+ */
+void *lsm_mnt_opts_alloc(gfp_t priority)
+{
+	return kzalloc(blob_sizes.lbs_mnt_opts, priority);
+}
+
+/**
  * security_free_mnt_opts() - Free memory associated with mount options
  * @mnt_opts: LSM processed mount options
  *
