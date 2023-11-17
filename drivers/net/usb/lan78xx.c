@@ -3912,13 +3912,13 @@ static void lan78xx_disconnect(struct usb_interface *intf)
 	if (!dev)
 		return;
 
-	set_bit(EVENT_DEV_DISCONNECT, &dev->flags);
-
 	udev = interface_to_usbdev(intf);
 	net = dev->net;
 
 	unregister_netdev(net);
 
+	timer_shutdown_sync(&dev->stat_monitor);
+	set_bit(EVENT_DEV_DISCONNECT, &dev->flags);
 	cancel_delayed_work_sync(&dev->wq);
 
 	phydev = net->phydev;
@@ -3932,9 +3932,6 @@ static void lan78xx_disconnect(struct usb_interface *intf)
 		fixed_phy_unregister(phydev);
 
 	usb_scuttle_anchored_urbs(&dev->deferred);
-
-	if (timer_pending(&dev->stat_monitor))
-		del_timer_sync(&dev->stat_monitor);
 
 	lan78xx_unbind(dev, intf);
 
