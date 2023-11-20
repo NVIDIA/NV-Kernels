@@ -1,0 +1,36 @@
+#!/bin/bash -eu
+#
+# debian/control sanity checks
+#
+
+echo "II: Checking debian/control"
+
+. debian/debian.env
+
+source_name=$(dpkg-parsechangelog -l"${DEBIAN}"/changelog -SSource)
+linux_source=$(grep -P '^Package:\s*linux.*-source-\d+\.\d+\.\d+' debian/control | sed 's/^Package:\s*//')
+
+case "${source_name}___${linux_source}" in
+	linux___linux-source-*)
+		# Main kernel package produces linux-source
+		true
+		;;
+	linux-*___)
+		# Non-main kernel package must *not* produce linux-source
+		true
+		;;
+	*)
+		# All other combinations are packaging mistakes
+		if [ -n "${linux_source}" ] ; then
+			echo "EE: debian/control contains invalid package stanza:" >&2
+			echo "Package: ${linux_source}" >&2
+		else
+			echo "EE: debian/control is missing package stanza:" >&2
+			echo "Package: linux-source-PKGVER" >&2
+		fi
+		exit 1
+		;;
+esac
+
+echo "II: Done"
+exit 0

@@ -213,6 +213,7 @@ $(DEBIAN)/control.stub: 				\
 .PHONY: debian/control
 debian/control: $(DEBIAN)/control.stub
 	cp $(DEBIAN)/control.stub debian/control
+	debian/scripts/checks/control-check
 
 debian/canonical-certs.pem: $(wildcard $(DROOT)/certs/*-all.pem) $(wildcard $(DROOT)/certs/*-$(arch).pem) $(wildcard $(DEBIAN)/certs/*-all.pem) $(wildcard $(DEBIAN)/certs/*-$(arch).pem)
 	for cert in $(sort $(notdir $^));					\
