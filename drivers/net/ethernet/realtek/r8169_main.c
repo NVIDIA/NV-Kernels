@@ -15,6 +15,7 @@
 #include <linux/etherdevice.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/dmi.h>
 #include <linux/ethtool.h>
 #include <linux/phy.h>
 #include <linux/if_vlan.h>
@@ -5164,11 +5165,87 @@ done:
 	rtl_rar_set(tp, mac_addr);
 }
 
+static bool rtl_aspm_dell_workaround(struct rtl8169_private *tp)
+{
+	static const struct dmi_system_id sysids[] = {
+		{
+			.ident = "Dell",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+				DMI_MATCH(DMI_PRODUCT_NAME, "Vostro 16 5640"),
+				DMI_MATCH(DMI_PRODUCT_SKU, "0CA0"),
+			},
+		},
+		{
+			.ident = "Dell",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+				DMI_MATCH(DMI_PRODUCT_NAME, "Vostro 14 3440"),
+				DMI_MATCH(DMI_PRODUCT_SKU, "0CA5"),
+			},
+		},
+		{
+			.ident = "Dell",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+				DMI_MATCH(DMI_PRODUCT_NAME, "Vostro 14 3440"),
+				DMI_MATCH(DMI_PRODUCT_SKU, "0CA6"),
+			},
+		},
+		{
+			.ident = "Dell",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+				DMI_MATCH(DMI_PRODUCT_NAME, "Latitude 3450"),
+				DMI_MATCH(DMI_PRODUCT_SKU, "0C99"),
+			},
+		},
+		{
+			.ident = "Dell",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+				DMI_MATCH(DMI_PRODUCT_NAME, "Latitude 3450"),
+				DMI_MATCH(DMI_PRODUCT_SKU, "0C97"),
+			},
+		},
+		{
+			.ident = "Dell",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+				DMI_MATCH(DMI_PRODUCT_NAME, "Latitude 3550"),
+				DMI_MATCH(DMI_PRODUCT_SKU, "0C9A"),
+			},
+		},
+		{
+			.ident = "Dell",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+				DMI_MATCH(DMI_PRODUCT_NAME, "Latitude 3550"),
+				DMI_MATCH(DMI_PRODUCT_SKU, "0C98"),
+			},
+		},
+		{}
+	};
+
+	if (tp->mac_version == RTL_GIGA_MAC_VER_46 && dmi_check_system(sysids))
+		return true;
+
+	return false;
+}
+
 /* register is set if system vendor successfully tested ASPM 1.2 */
 static bool rtl_aspm_is_safe(struct rtl8169_private *tp)
 {
+	 /* definition of 0xc0b2,
+	  * 0: L1
+	  * 1: ASPM L1.0
+	  * 2: ASPM L0s
+	  * 3: CLKEREQ
+	  * 4-7: Reserved
+	  */
 	if (tp->mac_version >= RTL_GIGA_MAC_VER_61 &&
-	    r8168_mac_ocp_read(tp, 0xc0b2) & 0xf)
+		r8168_mac_ocp_read(tp, 0xc0b2) & 0xf ||
+		rtl_aspm_dell_workaround(tp))
 		return true;
 
 	return false;
