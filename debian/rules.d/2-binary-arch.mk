@@ -567,8 +567,8 @@ define dh_all
 	dh_installchangelogs -p$(1)
 	dh_installdocs -p$(1)
 	dh_compress -p$(1)
-	# Compress kernel modules
-	find debian/$(1) -name '*.ko' -print0 | xargs -0 -n1 -P $(CONCURRENCY_LEVEL) zstd -19 --quiet --rm
+	# Compress kernel modules, on mantic+
+	$(if $(do_zstd_ko),find debian/$(1) -name '*.ko' -print0 | xargs -0 -n1 -P $(CONCURRENCY_LEVEL) zstd -19 --quiet --rm, true)
 	dh_fixperms -p$(1) -X/boot/
 	dh_shlibdeps -p$(1) $(shlibdeps_opts)
 	dh_installdeb -p$(1)
@@ -621,7 +621,7 @@ binary-%: checks-%
 	dh_testroot
 
 	$(call dh_all,$(pkgimg)) -- -Znone
-	$(call dh_all,$(pkgimg_mods)) -- -Znone
+	$(call dh_all,$(pkgimg_mods))$(if $(do_zstd_ko), -- -Znone)
 
 ifeq ($(do_extras_package),true)
   ifeq ($(ship_extras_package),false)
@@ -633,13 +633,13 @@ ifeq ($(do_extras_package),true)
 		| tee -a $(target_flavour).not-shipped.log;
   else
 	if [ -f $(DEBIAN)/control.d/$(target_flavour).inclusion-list ] ; then \
-		$(call dh_all_inline,$(pkgimg_ex)) -- -Znone; \
+		$(call dh_all_inline,$(pkgimg_ex))$(if $(do_zstd_ko), -- -Znone); \
 	fi
   endif
 endif
 
 	$(foreach _m,$(all_standalone_dkms_modules), \
-	  $(if $(enable_$(_m)),$(call dh_all,$(dkms_$(_m)_pkg_name)-$*) -- -Znone;)\
+	  $(if $(enable_$(_m)),$(call dh_all,$(dkms_$(_m)_pkg_name)-$*)$(if $(do_zstd_ko), -- -Znone);)\
 	)
 
 	$(call dh_all,$(pkgbldinfo))

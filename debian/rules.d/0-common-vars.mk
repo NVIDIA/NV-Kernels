@@ -199,6 +199,12 @@ do_dtbs=false
 # FIPS check
 do_fips_checks=false
 
+# ZSTD compressed kernel modules
+do_zstd_ko=true
+ifeq ($(series),jammy)
+do_zstd_ko=
+endif
+
 # Support parallel=<n> in DEB_BUILD_OPTIONS (see #209008)
 #
 # These 2 environment variables set the -j value of the kernel build. For example,
