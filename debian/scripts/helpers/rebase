@@ -39,7 +39,18 @@ usage+="-r RELEASE_REPO		Git repository to fetch the reference branch from."$'\n
 usage+="-b REMOTE_BRANCH	Remote branch to fetch from."$'\n'
 usage+="-l LOCAL_BRANCH		Use LOCAL_BRANCH as the reference branch."$'\n'
 usage+="-o 			Rebase against own kernel."$'\n'
-usage+="-d 			Dry run (do not rebase)."
+usage+="-d,--dry-run		Dry run (do not rebase)."
+
+# Convert long options to short options
+for arg in "$@"
+do
+	shift
+	case "$arg" in
+		'--dry-run') set -- "$@" '-d' ;;
+		'--'*) echo "usage: ${usage}"; exit ;;
+		*) set -- "$@" "$arg" ;;
+	esac
+done
 
 #
 # command line options:
