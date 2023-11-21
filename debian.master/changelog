@@ -1,4 +1,4 @@
-linux-unstable (6.6.0-12.12) noble; urgency=medium
+linux (6.6.0-12.12) noble; urgency=medium
 
   * noble/linux-unstable: 6.6.0-12.12 -proposed tracker (LP: #2043664)
 
