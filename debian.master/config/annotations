@@ -708,6 +708,9 @@ CONFIG_VFIO                                     note<'LP: #1636733'>
 CONFIG_VFIO_PCI                                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_VFIO_PCI                                 note<'LP: #1636733'>
 
+CONFIG_VFIO_PCI_ZDEV_KVM                        policy<{'s390x': 'y'}>
+CONFIG_VFIO_PCI_ZDEV_KVM                        note<'LP: #2042853'>
+
 CONFIG_VIDEO_VIMC                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_VIDEO_VIMC                               note<'LP: #1831482'>
 
@@ -14572,7 +14575,6 @@ CONFIG_VFIO_PCI_IGD                             policy<{'amd64': 'y'}>
 CONFIG_VFIO_PCI_INTX                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_VFIO_PCI_MMAP                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_VFIO_PCI_VGA                             policy<{'amd64': 'y'}>
-CONFIG_VFIO_PCI_ZDEV_KVM                        policy<{'s390x': 'n'}>
 CONFIG_VFIO_PLATFORM                            policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_VFIO_PLATFORM_AMDXGBE_RESET              policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_VFIO_PLATFORM_BASE                       policy<{'arm64': 'm', 'armhf': 'm'}>
