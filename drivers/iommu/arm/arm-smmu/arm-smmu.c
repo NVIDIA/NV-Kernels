@@ -1116,11 +1116,6 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	struct arm_smmu_device *smmu;
 	int ret;
 
-	if (!fwspec || fwspec->ops != &arm_smmu_ops) {
-		dev_err(dev, "cannot attach to SMMU, is it on the same bus?\n");
-		return -ENXIO;
-	}
-
 	/*
 	 * FIXME: The arch/arm DMA API code tries to attach devices to its own
 	 * domains between of_xlate() and probe_device() - we have no way to cope
@@ -1357,21 +1352,8 @@ static struct iommu_device *arm_smmu_probe_device(struct device *dev)
 		fwspec = dev_iommu_fwspec_get(dev);
 		if (ret)
 			goto out_free;
-	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
-		smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
-
-		/*
-		 * Defer probe if the relevant SMMU instance hasn't finished
-		 * probing yet. This is a fragile hack and we'd ideally
-		 * avoid this race in the core code. Until that's ironed
-		 * out, however, this is the most pragmatic option on the
-		 * table.
-		 */
-		if (!smmu)
-			return ERR_PTR(dev_err_probe(dev, -EPROBE_DEFER,
-						"smmu dev has not bound yet\n"));
 	} else {
-		return ERR_PTR(-ENODEV);
+		smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
 	}
 
 	ret = -EINVAL;
