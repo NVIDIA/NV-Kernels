@@ -48,7 +48,6 @@ do_cloud_tools=$(sort $(filter-out false,$(do_tools_hyperv)))
 do_tools_common?=true
 do_tools_host?=false
 do_tools_perf_jvmti?=false
-do_enforce_all?=false
 
 # Default settings for DKMS modules.
 $(foreach _m,$(all_dkms_modules), \

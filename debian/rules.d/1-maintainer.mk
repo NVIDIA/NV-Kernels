@@ -66,7 +66,6 @@ printenv:
 	@echo " sipl_signed              = $(sipl_signed)"
 	@echo
 	@echo "do_skip_checks            = $(do_skip_checks)"
-	@echo "do_enforce_all            = $(do_enforce_all)"
 	@echo "do_full_build             = $(do_full_build)"
 	@echo "do_mainline_build         = $(do_mainline_build)"
 	@echo "do_dbgsym_package         = $(do_dbgsym_package)"
