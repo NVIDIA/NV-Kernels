@@ -14855,7 +14855,7 @@ CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC                 policy<{'armhf': 'n'}>
 CONFIG_VIDEO_SAMSUNG_S5P_G2D                    policy<{'armhf': 'n'}>
 CONFIG_VIDEO_SAMSUNG_S5P_JPEG                   policy<{'armhf': 'n'}>
 CONFIG_VIDEO_SAMSUNG_S5P_MFC                    policy<{'armhf': 'n'}>
-CONFIG_VIDEO_SOLO6X10                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
+CONFIG_VIDEO_SOLO6X10                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'n', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_VIDEO_SONY_BTF_MPX                       policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_VIDEO_STK1160                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_VIDEO_STM32_DCMI                         policy<{'arm64': 'm'}>
