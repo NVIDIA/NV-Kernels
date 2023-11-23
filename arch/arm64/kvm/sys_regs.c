@@ -537,21 +537,29 @@ static bool trap_oslar_el1(struct kvm_vcpu *vcpu,
 	return true;
 }
 
-static bool workaround_bad_mpam_abi(struct kvm_vcpu *vcpu,
-				    struct sys_reg_params *p,
-				    const struct sys_reg_desc *r)
+static bool trap_mpam(struct kvm_vcpu *vcpu,
+		      struct sys_reg_params *p,
+		      const struct sys_reg_desc *r)
 {
+	u64 aa64pfr0_el1 = IDREG(vcpu->kvm, SYS_ID_AA64PFR0_EL1);
+
 	/*
-	 * The ID register can't be removed without breaking migration,
-	 * but MPAMIDR_EL1 can advertise all-zeroes, indicating there are zero
-	 * PARTID/PMG supported by the CPU, allowing the other two trapped
-	 * registers (MPAM1_EL1 and MPAM0_EL1) to be treated as RAZ/WI.
+	 * What did we expose to the guest?
+	 * Earlier guests may have seen the ID bits, which can't be removed
+	 * without breaking migration, but MPAMIDR_EL1 can advertise all-zeroes,
+	 * indicating there are zero PARTID/PMG supported by the CPU, allowing
+	 * the other two trapped registers (MPAM1_EL1 and MPAM0_EL1) to be
+	 * treated as RAZ/WI.
 	 * Emulating MPAM1_EL1 as RAZ/WI means the guest sees the MPAMEN bit
 	 * as clear, and realises MPAM isn't usable on this CPU.
 	 */
-	p->regval = 0;
+	if (FIELD_GET(ID_AA64PFR0_EL1_MPAM_MASK, aa64pfr0_el1)) {
+		p->regval = 0;
+		return true;
+	}
 
-	return true;
+	kvm_inject_undefined(vcpu);
+	return false;
 }
 
 static bool trap_oslsr_el1(struct kvm_vcpu *vcpu,
@@ -1452,6 +1460,36 @@ static s64 kvm_arm64_ftr_safe_value(u32 id, const struct arm64_ftr_bits *ftrp,
 	return arm64_ftr_safe_value(&kvm_ftr, new, cur);
 }
 
+static u64 kvm_arm64_ftr_max(struct kvm_vcpu *vcpu,
+			     const struct sys_reg_desc *rd)
+{
+	u64 pfr0, val = rd->reset(vcpu, rd);
+	u32 field, id = reg_to_encoding(rd);
+
+	/*
+	 * Some values may reset to a lower value than can be supported,
+	 * get the maximum feature value.
+	 */
+	switch (id) {
+	case SYS_ID_AA64PFR0_EL1:
+		pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+
+		/*
+		 * MPAM resets to 0, but migration of MPAM=1 guests is needed.
+		 * See trap_mpam() for more.
+		 */
+		field = cpuid_feature_extract_unsigned_field(pfr0, ID_AA64PFR0_EL1_MPAM_SHIFT);
+		if (field == ID_AA64PFR0_EL1_MPAM_1) {
+			val &= ~ID_AA64PFR0_EL1_MPAM_MASK;
+			val |= FIELD_PREP(ID_AA64PFR0_EL1_MPAM_MASK, ID_AA64PFR0_EL1_MPAM_1);
+		}
+
+		break;
+	}
+
+	return val;
+}
+
 /*
  * arm64_check_features() - Check if a feature register value constitutes
  * a subset of features indicated by the idreg's KVM sanitised limit.
@@ -1472,8 +1510,7 @@ static int arm64_check_features(struct kvm_vcpu *vcpu,
 	const struct arm64_ftr_bits *ftrp = NULL;
 	u32 id = reg_to_encoding(rd);
 	u64 writable_mask = rd->val;
-	u64 limit = rd->reset(vcpu, rd);
-	u64 mask = 0;
+	u64 limit, mask = 0;
 
 	/*
 	 * Hidden and unallocated ID registers may not have a corresponding
@@ -1487,6 +1524,7 @@ static int arm64_check_features(struct kvm_vcpu *vcpu,
 	if (!ftr_reg)
 		return -EINVAL;
 
+	limit = kvm_arm64_ftr_max(vcpu, rd);
 	ftrp = ftr_reg->ftr_bits;
 
 	for (; ftrp && ftrp->width; ftrp++) {
@@ -1693,6 +1731,14 @@ static u64 read_sanitised_id_aa64pfr0_el1(struct kvm_vcpu *vcpu,
 	}
 
 	val &= ~ID_AA64PFR0_EL1_AMU_MASK;
+
+	/*
+	 * MPAM is disabled by default as KVM also needs a set of PARTID to
+	 * program the MPAMVPMx_EL2 PARTID remapping registers with. But some
+	 * older kernels let the guest see the ID bit. Turning it on causes
+	 * the registers to be emulated as RAZ/WI. See trap_mpam() for more.
+	 */
+	val &= ~ID_AA64PFR0_EL1_MPAM_MASK;
 
 	return val;
 }
@@ -2302,7 +2348,6 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	  .set_user = set_id_reg,
 	  .reset = read_sanitised_id_aa64pfr0_el1,
 	  .val = ~(ID_AA64PFR0_EL1_AMU |
-		   ID_AA64PFR0_EL1_MPAM |
 		   ID_AA64PFR0_EL1_SVE |
 		   ID_AA64PFR0_EL1_RAS |
 		   ID_AA64PFR0_EL1_GIC |
@@ -2445,11 +2490,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ SYS_DESC(SYS_LOREA_EL1), trap_loregion },
 	{ SYS_DESC(SYS_LORN_EL1), trap_loregion },
 	{ SYS_DESC(SYS_LORC_EL1), trap_loregion },
-	{ SYS_DESC(SYS_MPAMIDR_EL1), workaround_bad_mpam_abi },
+	{ SYS_DESC(SYS_MPAMIDR_EL1), trap_mpam },
 	{ SYS_DESC(SYS_LORID_EL1), trap_loregion },
 
-	{ SYS_DESC(SYS_MPAM1_EL1), workaround_bad_mpam_abi },
-	{ SYS_DESC(SYS_MPAM0_EL1), workaround_bad_mpam_abi },
+	{ SYS_DESC(SYS_MPAM1_EL1), trap_mpam },
+	{ SYS_DESC(SYS_MPAM0_EL1), trap_mpam },
 	{ SYS_DESC(SYS_VBAR_EL1), access_rw, reset_val, VBAR_EL1, 0 },
 	{ SYS_DESC(SYS_DISR_EL1), NULL, reset_val, DISR_EL1, 0 },
 
