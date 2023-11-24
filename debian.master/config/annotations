@@ -3150,7 +3150,7 @@ CONFIG_COMPACT_UNEVICTABLE_DEFAULT              policy<{'amd64': '1', 'arm64': '
 CONFIG_COMPAL_LAPTOP                            policy<{'amd64': 'm'}>
 CONFIG_COMPAT                                   policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'y'}>
 CONFIG_COMPAT_32                                policy<{'amd64': 'y'}>
-CONFIG_COMPAT_32BIT_TIME                        policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'n', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_COMPAT_32BIT_TIME                        policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'y'}>
 CONFIG_COMPAT_ALIGNMENT_FIXUPS                  policy<{'arm64': 'n'}>
 CONFIG_COMPAT_BINFMT_ELF                        policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': '-', 's390x': 'y'}>
 CONFIG_COMPAT_FOR_U64_ALIGNMENT                 policy<{'amd64': 'y'}>
