@@ -1,15 +1,6 @@
 # We don't want make removing intermediary stamps
 .SECONDARY :
 
-# Prepare the out-of-tree build directory
-ifeq ($(do_full_source),true)
-build_cd = cd $(builddir)/build-$*; #
-build_O  =
-else
-build_cd =
-build_O  = O=$(builddir)/build-$*
-endif
-
 # TODO this is probably wrong, and should be using $(DEB_HOST_MULTIARCH)
 shlibdeps_opts = $(if $(CROSS_COMPILE),-- -l$(CROSS_COMPILE:%-=/usr/%)/lib)
 
@@ -24,8 +15,6 @@ $(stampdir)/stamp-prepare-tree-%: debian/scripts/fix-filenames
 	@echo Debug: $@
 	install -d $(builddir)/build-$*
 	touch $(builddir)/build-$*/ubuntu-build
-	[ "$(do_full_source)" != 'true' ] && true || \
-		rsync -a --exclude debian --exclude debian.master --exclude $(DEBIAN) * $(builddir)/build-$*
 	if [ -e $(commonconfdir)/config.common.ubuntu ]; then \
 		cat $(commonconfdir)/config.common.ubuntu $(archconfdir)/config.common.$(arch) $(archconfdir)/config.flavour.$(target_flavour) > $(builddir)/build-$*/.config; \
 	else \
@@ -36,8 +25,8 @@ $(stampdir)/stamp-prepare-tree-%: debian/scripts/fix-filenames
 		sed -ie 's/.*CONFIG_UBUNTU_ODM_DRIVERS.*/# CONFIG_UBUNTU_ODM_DRIVERS is not set/' \
 		    $(builddir)/build-$*/.config
 	find $(builddir)/build-$* -name "*.ko" | xargs rm -f
-	$(build_cd) $(kmake) $(build_O) $(conc_level) rustavailable || true
-	$(build_cd) $(kmake) $(build_O) $(conc_level) olddefconfig
+	$(kmake) O=$(builddir)/build-$* $(conc_level) rustavailable || true
+	$(kmake) O=$(builddir)/build-$* $(conc_level) olddefconfig
 	touch $@
 
 # Used by developers as a shortcut to prepare a tree for compilation.
@@ -52,12 +41,12 @@ $(stampdir)/stamp-build-%: target_flavour = $*
 $(stampdir)/stamp-build-%: bldimg = $(call custom_override,build_image,$*)
 $(stampdir)/stamp-build-%: $(stampdir)/stamp-prepare-%
 	@echo Debug: $@ build_image $(build_image) bldimg $(bldimg)
-	$(build_cd) $(kmake) $(build_O) $(conc_level) $(bldimg) modules $(if $(filter true,$(do_dtbs)),dtbs)
+	$(kmake) O=$(builddir)/build-$* $(conc_level) $(bldimg) modules $(if $(filter true,$(do_dtbs)),dtbs)
 
 ifeq ($(do_dbgsym_package),true)
 	# The target scripts_gdb is part of "all", so we need to call it manually
 	if grep -q CONFIG_GDB_SCRIPTS=y $(builddir)/build-$*/.config; then \
-		$(build_cd) $(kmake) $(build_O) $(conc_level) scripts_gdb ; \
+		$(kmake) O=$(builddir)/build-$* $(conc_level) scripts_gdb ; \
 	fi
 endif
 
@@ -164,7 +153,7 @@ endif
 		$(pkgdir)/boot/System.map-$(abi_release)-$*
 
 ifeq ($(do_dtbs),true)
-	$(build_cd) $(kmake) $(build_O) $(conc_level) dtbs_install \
+	$(kmake) O=$(builddir)/build-$* $(conc_level) dtbs_install \
 		INSTALL_DTBS_PATH=$(pkgdir)/lib/firmware/$(abi_release)-$*/device-tree
 endif
 
@@ -174,7 +163,7 @@ ifeq ($(no_dumpfile),)
 	chmod 0600 $(pkgdir)/boot/vmcoreinfo-$(abi_release)-$*
 endif
 
-	$(build_cd) $(kmake) $(build_O) $(conc_level) modules_install $(vdso) \
+	$(kmake) O=$(builddir)/build-$* $(conc_level) modules_install $(vdso) \
 		INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=$(pkgdir)/
 
 	#
@@ -287,7 +276,7 @@ ifeq ($(do_dbgsym_package),true)
 		install -m644 -D $(builddir)/build-$*/scripts/gdb/linux/* \
 			--target-directory=$(dbgpkgdir)/usr/share/gdb/auto-load/boot/vmlinux-$(abi_release)-$*/scripts/gdb/linux; \
 	fi
-	$(build_cd) $(kmake) $(build_O) modules_install $(vdso) \
+	$(kmake) O=$(builddir)/build-$* modules_install $(vdso) \
 		INSTALL_MOD_PATH=$(dbgpkgdir)/usr/lib/debug
 	# Add .gnu_debuglink sections only after all/DKMS modules are built.
 	rm -f $(dbgpkgdir)/usr/lib/debug/lib/modules/$(abi_release)-$*/build
