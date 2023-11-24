@@ -568,7 +568,7 @@ define dh_all
 	dh_installdocs -p$(1)
 	dh_compress -p$(1)
 	# Compress kernel modules, on mantic+
-	$(if $(do_zstd_ko),find debian/$(1) -name '*.ko' -print0 | xargs -0 -n1 -P $(CONCURRENCY_LEVEL) zstd -19 --quiet --rm, true)
+	$(if $(do_zstd_ko),find debian/$(1) -name '*.ko' -print0 | xargs -0 -n1 -P $(CONCURRENCY_LEVEL) -r zstd -19 --quiet --rm, true)
 	dh_fixperms -p$(1) -X/boot/
 	dh_shlibdeps -p$(1) $(shlibdeps_opts)
 	dh_installdeb -p$(1)
