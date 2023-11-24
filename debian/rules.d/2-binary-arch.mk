@@ -251,17 +251,6 @@ ifeq ($(do_doc_package),true)
 	chmod 644 $(bindoc)/changelog.Debian.old.gz
 endif
 
-ifneq ($(skipsub),true)
-	for sub in $($(*)_sub); do					\
-		if ! (TO=$$sub FROM=$* ABI_RELEASE=$(abi_release) $(SHELL)		\
-			$(DROOT)/scripts/sub-flavour); then exit 1; fi;		\
-		/sbin/depmod -b debian/$(bin_pkg_name)-$$sub		\
-			-ea -F debian/$(bin_pkg_name)-$$sub/boot/System.map-$(abi_release)-$* \
-			$(abi_release)-$*;					\
-		$(call install_control,$(bin_pkg_name)--$$sub,image,postinst postrm preinst prerm); \
-	done
-endif
-
 ifeq ($(do_dbgsym_package),true)
 	# Debug image is simple
 	install -m644 -D $(builddir)/build-$*/vmlinux \
@@ -631,13 +620,6 @@ endif
 	$(call dh_all,$(pkghdr))
 ifeq ($(do_lib_rust),true)
 	$(call dh_all,$(pkgrust))
-endif
-
-ifneq ($(skipsub),true)
-	@set -e; for sub in $($(*)_sub); do		\
-		pkg=$(bin_pkg_name)-$$sub;		\
-		$(call dh_all_inline,$$pkg);		\
-	done
 endif
 
 ifeq ($(do_dbgsym_package),true)

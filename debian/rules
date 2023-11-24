@@ -192,7 +192,7 @@ $(DEBIAN)/control.stub: 				\
 		debian/canonical-revoked-certs.pem	\
 		$(DROOT)/control.d/flavour-module.stub	\
 		$(DEBIAN)/changelog			\
-		$(wildcard $(DEBIAN)/control.d/* $(DEBIAN)/sub-flavours/*.vars)
+		$(wildcard $(DEBIAN)/control.d/*)
 	for i in $(control_files); do                                           \
 	  cat $$i;                                                              \
 	  echo "";                                                              \

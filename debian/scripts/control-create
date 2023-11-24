@@ -9,21 +9,16 @@ any_signed=$2
 
 [ "$provides" != '' ] && provides="$provides, "
 
-if [ "$is_sub" = "" ]; then
-	flavour=$(basename $vars | sed 's/.*\.//')
-	stub="${DEBIAN}/control.d/flavour-control.stub debian/control.d/flavour-buildinfo.stub"
-	if [ "$any_signed" = 'true' ]; then
-		sign_me_pkg="-unsigned"
-		sign_me_txt=" unsigned"
-		sign_peer_pkg=""
-	else
-		sign_me_pkg=""
-		sign_me_txt=""
-		sign_peer_pkg="-unsigned"
-	fi
+flavour=$(basename $vars | sed 's/.*\.//')
+stub="${DEBIAN}/control.d/flavour-control.stub debian/control.d/flavour-buildinfo.stub"
+if [ "$any_signed" = 'true' ]; then
+	sign_me_pkg="-unsigned"
+	sign_me_txt=" unsigned"
+	sign_peer_pkg=""
 else
-	flavour=$(basename $vars .vars)
-	stub=${DEBIAN}/sub-flavours/control.stub
+	sign_me_pkg=""
+	sign_me_txt=""
+	sign_peer_pkg="-unsigned"
 fi
 
 cat $stub | grep -v '^#' | sed \
