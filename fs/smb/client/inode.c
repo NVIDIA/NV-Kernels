@@ -742,7 +742,7 @@ static void cifs_open_info_to_fattr(struct cifs_fattr *fattr, struct cifs_open_i
 		fattr->cf_dtype = DT_BLK;
 	} else if (symlink || reparse_tag == IO_REPARSE_TAG_SYMLINK ||
 		   reparse_tag == IO_REPARSE_TAG_NFS) {
-		fattr->cf_mode = S_IFLNK;
+		fattr->cf_mode = S_IFLNK | cifs_sb->ctx->file_mode;
 		fattr->cf_dtype = DT_LNK;
 	} else if (fattr->cf_cifsattrs & ATTR_DIRECTORY) {
 		fattr->cf_mode = S_IFDIR | cifs_sb->ctx->dir_mode;
