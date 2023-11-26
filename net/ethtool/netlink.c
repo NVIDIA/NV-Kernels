@@ -531,6 +531,7 @@ cont:
 			idx++;
 		}
 
+		ret = 0;
 	}
 	rtnl_unlock();
 
