@@ -6,6 +6,15 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_ACPI_MPAM                                policy<{'amd64': '-', 'arm64': 'y'}>
+CONFIG_ACPI_MPAM                                note<'LP: #2122432'>
+
+CONFIG_AMPERE_ERRATUM_AC04_CPU_23               policy<{'arm64': 'y'}>
+CONFIG_AMPERE_ERRATUM_AC04_CPU_23               note<'LP: #2122432'>
+
+CONFIG_ARCH_HAS_CPU_RESCTRL                     policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ARCH_HAS_CPU_RESCTRL                     note<'LP: #2122432'>
+
 CONFIG_ARM64_BRBE                               policy<{'arm64': 'y'}>
 CONFIG_ARM64_BRBE                               note<'LP: #2118663'>
 
@@ -33,17 +42,38 @@ CONFIG_ARM64_ERRATUM_2224489                    note<'Required for Grace enablem
 CONFIG_ARM64_ERRATUM_2253138                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_2253138                    note<'Required for Grace enablement'>
 
+CONFIG_ARM64_MPAM                               policy<{'amd64': '-', 'arm64': 'y'}>
+CONFIG_ARM64_MPAM                               note<'LP: #2122432'>
+
+CONFIG_ARM64_MPAM_DRIVER                        policy<{'arm64': 'y'}>
+CONFIG_ARM64_MPAM_DRIVER                        note<'LP: #2122432'>
+
+CONFIG_ARM64_MPAM_DRIVER_DEBUG                  policy<{'amd64': '-', 'arm64': 'n'}>
+CONFIG_ARM64_MPAM_DRIVER_DEBUG                  note<'LP: #2122432'>
+
+CONFIG_ARM64_MPAM_RESCTRL_FS                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_MPAM_RESCTRL_FS                    note<'LP: #2122432'>
+
+CONFIG_ARM64_SME                                policy<{'arm64': 'y'}>
+CONFIG_ARM64_SME                                note<'LP: #2122432'>
+
 CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE note<'Required for Grace enablement'>
 
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE note<'Required for Grace enablement'>
 
+CONFIG_ARM_CPU_RESCTRL                          policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_ARM_CPU_RESCTRL                          note<'LP: #2122432'>
+
 CONFIG_ARM_FFA_TRANSPORT                        policy<{'arm64': 'y'}>
 CONFIG_ARM_FFA_TRANSPORT                        note<'LP: #2111511'>
 
 CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      note<'LP: #2095028'>
+
+CONFIG_BATTERY_HUAWEI_GAOKUN                    policy<{'arm64': '-'}>
+CONFIG_BATTERY_HUAWEI_GAOKUN                    note<'LP: #2122432'>
 
 CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '32', 'arm64-nvidia': '128', 'arm64-nvidia-64k': '1024'}>
 CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2095028'>
@@ -129,11 +159,17 @@ CONFIG_DRM_NOUVEAU_SIL164                       note<'Disable nouveau for NVIDIA
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          note<'Disable nouveau for NVIDIA kernels'>
 
+CONFIG_EC_HUAWEI_GAOKUN                         policy<{'arm64': 'n'}>
+CONFIG_EC_HUAWEI_GAOKUN                         note<'LP: #2122432'>
+
 CONFIG_EFI_CAPSULE_LOADER                       policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_EFI_CAPSULE_LOADER                       note<'LP: #2067111'>
 
 CONFIG_ETM4X_IMPDEF_FEATURE                     policy<{'arm64': 'n'}>
 CONFIG_ETM4X_IMPDEF_FEATURE                     note<'Required for Grace enablement'>
+
+CONFIG_FTRACE_SORT_STARTUP_TEST                 policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_FTRACE_SORT_STARTUP_TEST                 note<'LP: #2122432'>
 
 CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
 CONFIG_GPIO_AAEON                               note<'Disable all Ubuntu ODM drivers'>
@@ -195,8 +231,23 @@ CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablem
 CONFIG_PINCTRL_MT8901                           policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_MT8901                           note<'LP: #2117784'>
 
+CONFIG_PROC_CPU_RESCTRL                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_PROC_CPU_RESCTRL                         note<'LP: #2122432'>
+
 CONFIG_R8127                                    policy<{'amd64': 'n', 'arm64': 'm'}>
 CONFIG_R8127                                    note<'LP: #2109730'>
+
+CONFIG_RESCTRL_FS                               policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_RESCTRL_FS                               note<'LP: #2122432'>
+
+CONFIG_RESCTRL_FS_PSEUDO_LOCK                   policy<{'amd64': 'y', 'arm64': '-'}>
+CONFIG_RESCTRL_FS_PSEUDO_LOCK                   note<'LP: #2122432'>
+
+CONFIG_RESCTRL_IOMMU                            policy<{'amd64': '-', 'arm64': 'y'}>
+CONFIG_RESCTRL_IOMMU                            note<'LP: #2122432'>
+
+CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID           policy<{'amd64': '-', 'arm64': 'y'}>
+CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID           note<'LP: #2122432'>
 
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablement'>
@@ -218,6 +269,9 @@ CONFIG_TCG_TIS_SPI                              note<'Ensures the TPM is availab
 
 CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM drivers'>
+
+CONFIG_UCSI_HUAWEI_GAOKUN                       policy<{'arm64': '-'}>
+CONFIG_UCSI_HUAWEI_GAOKUN                       note<'LP: #2122432'>
 
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
