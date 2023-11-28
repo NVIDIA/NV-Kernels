@@ -1046,6 +1046,7 @@ int nfsd_dispatch(struct svc_rqst *rqstp)
 {
 	const struct svc_procedure *proc = rqstp->rq_procinfo;
 	__be32 *statp = rqstp->rq_accept_statp;
+	__be32 *nfs_reply;
 
 	/*
 	 * Give the xdr decoder a chance to change this if it wants
@@ -1065,6 +1066,7 @@ int nfsd_dispatch(struct svc_rqst *rqstp)
 		goto out_dropit;
 	}
 
+	nfs_reply = xdr_inline_decode(&rqstp->rq_res_stream, 0);
 	*statp = proc->pc_func(rqstp);
 	if (test_bit(RQ_DROPME, &rqstp->rq_flags))
 		goto out_update_drop;
@@ -1072,7 +1074,7 @@ int nfsd_dispatch(struct svc_rqst *rqstp)
 	if (!proc->pc_encode(rqstp, &rqstp->rq_res_stream))
 		goto out_encode_err;
 
-	nfsd_cache_update(rqstp, rqstp->rq_cachetype, statp + 1);
+	nfsd_cache_update(rqstp, rqstp->rq_cachetype, nfs_reply);
 out_cached_reply:
 	return 1;
 
