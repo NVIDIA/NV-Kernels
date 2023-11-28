@@ -102,3 +102,12 @@ mptcp_lib_kversion_ge() {
 
 	mptcp_lib_fail_if_expected_feature "kernel version ${1} lower than ${v}"
 }
+
+# $1: PID
+mptcp_lib_kill_wait() {
+	[ "${1}" -eq 0 ] && return 0
+
+	kill -SIGUSR1 "${1}" > /dev/null 2>&1
+	kill "${1}" > /dev/null 2>&1
+	wait "${1}" 2>/dev/null
+}
