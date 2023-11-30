@@ -203,13 +203,13 @@ static void accum_label_info(struct aa_label *new)
 	long u = FLAG_UNCONFINED;
 	int i;
 
-	AA_BUG(!new->vec);
+	AA_BUG(!new || !new->vec);
 
 	/* size == 1 is a profile and flags must be set as part of creation */
 	if (new->size == 1)
-	       return;
+		return;
 
-       for (i = 0; i < new->size; i++) {
+	for (i = 0; i < new->size; i++) {
 		u |= new->vec[i]->label.flags & (FLAG_DEBUG1 | FLAG_DEBUG2 |
 						 FLAG_STALE);
 		if (!(u & new->vec[i]->label.flags & FLAG_UNCONFINED))
@@ -885,7 +885,6 @@ static struct aa_label *vec_create_and_insert_label(struct aa_profile **vec,
 
 	for (i = 0; i < len; i++)
 		new->vec[i] = aa_get_profile(vec[i]);
-
 	write_lock_irqsave(&ls->lock, flags);
 	label = __label_insert(ls, new, false);
 	write_unlock_irqrestore(&ls->lock, flags);
@@ -2094,6 +2093,7 @@ static struct aa_label *__label_update(struct aa_label *label)
 			AA_BUG(tmp == label);
 			goto remove;
 		}
+
 		if (labels_set(label) != labels_set(new)) {
 			write_unlock_irqrestore(&ls->lock, flags);
 			tmp = aa_label_insert(labels_set(new), new);

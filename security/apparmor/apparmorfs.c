@@ -828,7 +828,7 @@ static void profile_query_cb(struct aa_profile *profile, struct aa_perms *perms,
 	struct aa_perms tmp = { };
 	aa_state_t state = DFA_NOMATCH;
 
-	if (profile_unconfined(profile))
+	if (!profile_mediates_safe(profile, *match_str))
 		return;
 	if (rules->file->dfa && *match_str == AA_CLASS_FILE) {
 		state = aa_dfa_match_len(rules->file->dfa,
