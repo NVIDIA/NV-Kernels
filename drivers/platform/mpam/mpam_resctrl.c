@@ -611,16 +611,7 @@ static u32 mbw_pbm_to_percent(unsigned long mbw_pbm, struct mpam_props *cprops)
 
 static u32 mbw_max_to_percent(u16 mbw_max, struct mpam_props *cprops)
 {
-	u8 bit;
-	u32 divisor = 2, value = 0;
-
-	for (bit = 15; bit; bit--) {
-		if (mbw_max & BIT(bit))
-			value += MAX_MBA_BW / divisor;
-		divisor <<= 1;
-	}
-
-	return value;
+	return DIV_ROUND_CLOSEST((mbw_max + 1) * 100, 65536);
 }
 
 static u32 percent_to_mbw_pbm(u8 pc, struct mpam_props *cprops)
@@ -637,26 +628,7 @@ static u32 percent_to_mbw_pbm(u8 pc, struct mpam_props *cprops)
 
 static u16 percent_to_mbw_max(u8 pc, struct mpam_props *cprops)
 {
-	u8 bit;
-	u32 divisor = 2, value = 0;
-
-	if (WARN_ON_ONCE(cprops->bwa_wd > 15))
-		return MAX_MBA_BW;
-
-	for (bit = 15; bit; bit--) {
-		if (pc >= MAX_MBA_BW / divisor) {
-			pc -= MAX_MBA_BW / divisor;
-			value |= BIT(bit);
-		}
-		divisor <<= 1;
-
-		if (!pc || !(MAX_MBA_BW / divisor))
-			break;
-	}
-
-	value &= GENMASK(15, 15 - cprops->bwa_wd);
-
-	return value;
+	return (((pc * 65536) / 100) - 1);
 }
 
 /* Test whether we can export MPAM_CLASS_CACHE:{2,3}? */
@@ -1049,6 +1021,8 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
 	partid = resctrl_get_config_index(closid, t);
 	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r))
 		return -EINVAL;
+
+	cfg = dom->comp->cfg[partid];
 
 	switch (r->rid) {
 	case RDT_RESOURCE_L2:
