@@ -245,8 +245,8 @@ static int profile_tracee_perm(const struct cred *cred,
 			       struct aa_label *tracer, u32 request,
 			       struct apparmor_audit_data *ad)
 {
-	if (profile_unconfined(tracee) || unconfined(tracer) ||
-	    !ANY_RULE_MEDIATES(&tracee->rules, AA_CLASS_PTRACE))
+	if (!profile_mediates(tracee, AA_CLASS_PTRACE) ||
+	    !label_mediates(tracer, AA_CLASS_PTRACE))
 		return 0;
 
 	return profile_ptrace_perm(cred, tracee, tracer, request, ad);
@@ -257,14 +257,11 @@ static int profile_tracer_perm(const struct cred *cred,
 			       struct aa_label *tracee, u32 request,
 			       struct apparmor_audit_data *ad)
 {
-	if (profile_unconfined(tracer))
-		return 0;
-
-	if (ANY_RULE_MEDIATES(&tracer->rules, AA_CLASS_PTRACE))
+	if (profile_mediates(tracer, AA_CLASS_PTRACE))
 		return profile_ptrace_perm(cred, tracer, tracee, request, ad);
 
 	/* profile uses the old style capability check for ptrace */
-	if (&tracer->label == tracee)
+	if (&tracer->label == tracee || !profile_mediates(tracer, AA_CLASS_CAP))
 		return 0;
 
 	ad->subj_label = &tracer->label;
@@ -324,7 +321,6 @@ int aa_profile_ns_perm(struct aa_profile *profile,
 
 	ad->subj_label = &profile->label;
 	ad->request = request;
-
 
 	/* TODO: rework unconfined profile/dfa to mediate user ns, then
 	 * we can drop the unconfined test

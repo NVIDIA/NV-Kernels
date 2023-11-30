@@ -234,7 +234,7 @@ static int common_perm(const char *op, const struct path *path, u32 mask,
 	int error = 0;
 
 	label = __begin_current_label_crit_section();
-	if (!unconfined(label))
+	if (label_mediates(label, AA_CLASS_FILE))
 		error = aa_path_perm(op, current_cred(), label, path, 0, mask,
 				     cond);
 	__end_current_label_crit_section(label);
@@ -381,7 +381,7 @@ static int apparmor_path_link(struct dentry *old_dentry, const struct path *new_
 		return 0;
 
 	label = begin_current_label_crit_section();
-	if (!unconfined(label))
+	if (label_mediates(label, AA_CLASS_FILE))
 		error = aa_path_link(current_cred(), label, old_dentry, new_dir,
 				     new_dentry);
 	end_current_label_crit_section(label);
@@ -402,7 +402,7 @@ static int apparmor_path_rename(const struct path *old_dir, struct dentry *old_d
 		return 0;
 
 	label = begin_current_label_crit_section();
-	if (!unconfined(label)) {
+	if (label_mediates(label, AA_CLASS_FILE)) {
 		struct mnt_idmap *idmap = mnt_idmap(old_dir->mnt);
 		vfsuid_t vfsuid;
 		struct path old_path = { .mnt = old_dir->mnt,
@@ -646,7 +646,7 @@ static int apparmor_file_open(struct file *file)
 	}
 
 	label = aa_get_newest_cred_label(file->f_cred);
-	if (!unconfined(label)) {
+	if (label_mediates(label, AA_CLASS_FILE)) {
 		struct mnt_idmap *idmap = file_mnt_idmap(file);
 		struct inode *inode = file_inode(file);
 		vfsuid_t vfsuid;
@@ -916,7 +916,7 @@ static int apparmor_sb_mount(const char *dev_name, const struct path *path,
 	flags &= ~AA_MS_IGNORE_MASK;
 
 	label = __begin_current_label_crit_section();
-	if (!unconfined(label)) {
+	if (label_mediates(label, AA_CLASS_MOUNT)) {
 		if (flags & MS_REMOUNT)
 			error = aa_remount(current_cred(), label, path, flags,
 					   data);
@@ -946,7 +946,7 @@ static int apparmor_move_mount(const struct path *from_path,
 	int error = 0;
 
 	label = __begin_current_label_crit_section();
-	if (!unconfined(label))
+	if (label_mediates(label, AA_CLASS_MOUNT))
 		error = aa_move_mount(current_cred(), label, from_path,
 				      to_path);
 	__end_current_label_crit_section(label);
@@ -960,7 +960,7 @@ static int apparmor_sb_umount(struct vfsmount *mnt, int flags)
 	int error = 0;
 
 	label = __begin_current_label_crit_section();
-	if (!unconfined(label))
+	if (label_mediates(label, AA_CLASS_MOUNT))
 		error = aa_umount(current_cred(), label, mnt, flags);
 	__end_current_label_crit_section(label);
 
@@ -974,7 +974,7 @@ static int apparmor_sb_pivotroot(const struct path *old_path,
 	int error = 0;
 
 	label = aa_get_current_label();
-	if (!unconfined(label))
+	if (label_mediates(label, AA_CLASS_MOUNT))
 		error = aa_pivotroot(current_cred(), label, old_path, new_path);
 	aa_put_label(label);
 
@@ -1401,7 +1401,7 @@ static int apparmor_socket_create(int family, int type, int protocol, int kern)
 	AA_BUG(in_interrupt());
 
 	label = begin_current_label_crit_section();
-	if (!(kern || unconfined(label)))
+	if (!kern && label_mediates(label, AA_CLASS_NET))
 		error = af_select(family,
 				  create_perm(label, family, type, protocol),
 				  aa_af_perm(current_cred(), label,

@@ -376,7 +376,7 @@ int __aa_path_perm(const char *op,  const struct cred *subj_cred,
 						    typeof(*rules), list);
 	int e = 0;
 
-	if (profile_unconfined(profile) ||
+	if (!profile_mediates(profile, AA_CLASS_FILE) ||
 	    ((flags & PATH_SOCK_COND) && !RULE_MEDIATES_AF(rules, AF_UNIX)))
 		return 0;
 	aa_str_perms(rules->file, rules->file->start[AA_CLASS_FILE],
@@ -398,7 +398,7 @@ static int profile_path_perm(const char *op, const struct cred *subj_cred,
 	const char *name;
 	int error;
 
-	if (profile_unconfined(profile))
+	if (!profile_mediates(profile, AA_CLASS_FILE))
 		return 0;
 
 	error = path_name(op, subj_cred, &profile->label, path,
