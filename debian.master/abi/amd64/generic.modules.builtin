@@ -84,6 +84,7 @@ evdev
 exportfs
 ext4
 extcon-core
+failover
 fan
 fat
 fb
@@ -164,6 +165,7 @@ mpi
 mq-deadline
 n_null
 nd_e820
+net_failover
 nls_base
 nls_cp437
 ohci-hcd
@@ -212,6 +214,7 @@ sg
 sha1_generic
 sha256_generic
 sha3_generic
+sha512-ssse3
 sha512_generic
 sig
 skcipher
@@ -253,6 +256,7 @@ virtio_balloon
 virtio_blk
 virtio_console
 virtio_mmio
+virtio_net
 virtio_pci
 virtio_pci_legacy_dev
 virtio_pci_modern_dev
@@ -260,7 +264,6 @@ virtio_ring
 virtio_scsi
 vivaldi-fmap
 watchdog
-wwan
 wwnr
 x509_key_parser
 xen-acpi-processor

@@ -1510,7 +1510,6 @@ f81232
 f81534
 f81601
 f81604
-failover
 fakelb
 fan53555
 fan53880
@@ -3594,7 +3593,6 @@ neofb
 net1080
 net2272
 net2280
-net_failover
 netconsole
 netdevsim
 netfs
@@ -5333,7 +5331,6 @@ sha1-arm-ce
 sha1-arm-neon
 sha2-arm-ce
 sha256-arm
-sha512-arm
 shark2
 shmob-drm
 sht15
@@ -6772,7 +6769,6 @@ virtio_bt
 virtio_crypto
 virtio_dma_buf
 virtio_input
-virtio_net
 virtio_pmem
 virtio_rpmsg_bus
 virtio_snd

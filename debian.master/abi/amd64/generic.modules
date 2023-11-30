@@ -1448,7 +1448,6 @@ f81232
 f81534
 f81601
 f81604
-failover
 fakelb
 fam15h_power
 fan53555
@@ -3346,7 +3345,6 @@ neofb
 net1080
 net2272
 net2280
-net_failover
 netconsole
 netdevsim
 netfs
@@ -4660,7 +4658,6 @@ sgp30
 sgp40
 sha1-ssse3
 sha256-ssse3
-sha512-ssse3
 shark2
 sht15
 sht21
@@ -5445,6 +5442,7 @@ spi-zynqmp-gqspi
 spi_ks8995
 spidev
 spinand
+spl
 spmi
 sprd_serial
 sps30
@@ -6022,6 +6020,7 @@ v4l2-flash-led-class
 v4l2-fwnode
 v4l2-mem2mem
 v4l2-tpg
+v4l2loopback
 vboxguest
 vboxsf
 vboxvideo
@@ -6088,7 +6087,6 @@ virtio_crypto
 virtio_dma_buf
 virtio_input
 virtio_mem
-virtio_net
 virtio_pmem
 virtio_rpmsg_bus
 virtio_snd
@@ -6248,6 +6246,7 @@ wmi-bmof
 wp512
 wpcm450-soc
 wusb3801
+wwan
 wwan_hwsim
 x25
 x38_edac
@@ -6411,6 +6410,7 @@ zd1301
 zd1301_demod
 zet6223
 zforce_ts
+zfs
 zhenhua
 ziirave_wdt
 zinitix
