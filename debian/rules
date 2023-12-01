@@ -79,7 +79,6 @@ ifneq ($(DEB_BUILD_PROFILE),)
 endif
 ifneq ($(filter stage1,$(DEB_BUILD_PROFILES)),)
     do_tools=false
-    do_doc_package=false
     do_source_package=false
     do_flavour_image_package=false
     do_flavour_header_package=false
@@ -166,7 +165,7 @@ distclean: clean
 # Builds the image, arch headers and debug packages
 include $(DROOT)/rules.d/2-binary-arch.mk
 
-# Builds the source, doc and linux-headers indep packages
+# Builds the source and linux-headers indep packages
 include $(DROOT)/rules.d/3-binary-indep.mk
 
 # Various checks to be performed on builds
@@ -176,11 +175,6 @@ control_files := $(DEBIAN)/control.stub.in
 ifeq ($(do_libc_dev_package),true)
 ifneq (,$(wildcard $(DEBIAN)/control.d/linux-libc-dev.stub))
 	control_files += $(DEBIAN)/control.d/linux-libc-dev.stub
-endif
-endif
-ifeq ($(do_doc_package),true)
-ifneq (,$(wildcard $(DEBIAN)/control.d/linux-doc.stub))
-	control_files += $(DEBIAN)/control.d/linux-doc.stub
 endif
 endif
 
