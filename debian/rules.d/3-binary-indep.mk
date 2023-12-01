@@ -4,7 +4,7 @@ build-indep:
 
 # The binary-indep dependency chain is:
 #
-# install-headers <- install-doc <- install-source <- install-tools <- install-indep <- binary-indep
+# install-headers <- install-source <- install-tools <- install-indep <- binary-indep
 # install-headers <- binary-headers
 #
 indep_hdrpkg = $(indep_hdrs_pkg_name)
@@ -30,30 +30,6 @@ ifeq ($(do_flavour_header_package),true)
 	find $(indep_hdrdir) -name \*.o -or -name \*.cmd -exec rm -f {} \;
 endif
 	@touch $@
-
-docpkg = $(doc_pkg_name)
-docdir = $(CURDIR)/debian/$(docpkg)/usr/share/doc/$(docpkg)
-.PHONY: install-doc
-install-doc: $(stampdir)/stamp-prepare-indep
-	@echo Debug: $@
-ifeq ($(do_doc_package),true)
-	dh_testdir
-	dh_testroot
-
-	install -d $(docdir)
-ifeq ($(do_doc_package_content),true)
-	# First the html docs. We skip these for autobuilds
-	install -d $(docdir)/$(doc_pkg_name)-tmp
-	$(kmake) O=$(docdir)/$(doc_pkg_name)-tmp htmldocs
-	install -d $(docdir)/html
-	rsync -aL $(docdir)/$(doc_pkg_name)-tmp/Documentation/output/ \
-		$(docdir)/html/
-	rm -rf $(docdir)/$(doc_pkg_name)-tmp
-endif
-	# Copy the rest
-	cp -a Documentation/* $(docdir)
-	find $(docdir) -name .gitignore | xargs rm -f
-endif
 
 srcpkg = linux-source-$(release)
 srcdir = $(CURDIR)/debian/$(srcpkg)/usr/src/$(srcpkg)
@@ -182,7 +158,7 @@ $(stampdir)/stamp-prepare-indep:
 	@touch $@
 
 .PHONY: install-indep
-install-indep: $(stampdir)/stamp-install-headers install-doc install-source install-tools
+install-indep: $(stampdir)/stamp-install-headers install-source install-tools
 	@echo Debug: $@
 
 # This is just to make it easy to call manually. Normally done in
