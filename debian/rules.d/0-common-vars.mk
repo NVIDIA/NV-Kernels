@@ -230,10 +230,9 @@ kmake = make ARCH=$(build_arch) \
 	HOSTCC=$(HOSTCC) \
 	CC=$(CROSS_COMPILE)$(gcc) \
 	BINDGEN=bindgen-0.65 \
-	KERNELVERSION=$(abi_release)-$(target_flavour) \
+	KERNELRELEASE=$(abi_release)-$(target_flavour) \
 	CONFIG_DEBUG_SECTION_MISMATCH=y \
 	KBUILD_BUILD_VERSION="$(uploadnum)" \
-	LOCALVERSION= localver-extra= \
 	CFLAGS_MODULE="-DPKG_ABI=$(abinum)" \
 	PYTHON=$(PYTHON)
 ifneq ($(LOCAL_ENV_CC),)
