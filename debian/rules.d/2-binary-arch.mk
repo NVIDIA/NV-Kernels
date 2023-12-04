@@ -662,7 +662,7 @@ ifeq ($(do_any_tools),true)
 endif
 	touch $@
 
-$(stampdir)/stamp-build-perarch: $(stampdir)/stamp-prepare-perarch install-arch-headers
+$(stampdir)/stamp-build-perarch: $(stampdir)/stamp-prepare-perarch install-arch-headers build-arch
 	@echo Debug: $@
 ifeq ($(do_linux_tools),true)
 ifeq ($(do_tools_usbip),true)
