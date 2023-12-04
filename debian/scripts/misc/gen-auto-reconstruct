@@ -34,14 +34,6 @@ fi
 		echo "[ ! -L '$name' ] && ln -sf '$link' '$name'"
 	done
 
-	# Identify all removed files since the proffered tag.
-	echo "# Remove any files deleted from the orig."
-	git diff "$tag.." --raw --no-renames | awk '(/^:/ && $5 == "D") { print $NF }' | \
-	while read name
-	do
-		echo "rm -f '$name'"
-	done
-
 	# Identify files with execute permissions added since the proffered tag.
 	git diff "$tag.." --raw --no-renames | awk -F '[: \t]' '{print $2, $3, $NF }' | \
 	while IFS=" " read old new name
@@ -53,10 +45,18 @@ fi
 			added=$(( new & 0111 ))
 			if [ "$added" -ne 0 ]; then
 				echo "chmod +x '$name'"
-			else
+                       elif [ "$new" -ne 0 ]; then
 				echo "chmod -x '$name'"
 			fi
 		fi
+	done
+
+       # Identify all removed files since the proffered tag.
+	echo "# Remove any files deleted from the orig."
+	git diff "$tag.." --raw --no-renames | awk '(/^:/ && $5 == "D") { print $NF }' | \
+	while read name
+	do
+		echo "rm -f '$name'"
 	done
 
 	# All done, make sure this does not complete in error.
