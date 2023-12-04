@@ -573,7 +573,6 @@ baycom_par
 baycom_ser_fdx
 baycom_ser_hdx
 bcache
-bch
 bcm-keypad
 bcm-phy-lib
 bcm-phy-ptp
@@ -839,7 +838,6 @@ chcr
 chipone-icn6211
 chipone_icn8318
 chipone_icn8505
-chipreg
 chnl_net
 chromeos_acpi
 chromeos_privacy_screen
@@ -1589,7 +1587,6 @@ f81232
 f81534
 f81601
 f81604
-failover
 fakelb
 fan53555
 fan53880
@@ -3191,7 +3188,6 @@ mali-dp
 mantis
 mantis_core
 map_absent
-map_funcs
 map_ram
 map_rom
 marvell
@@ -3639,7 +3635,6 @@ mt9t112
 mt9v011
 mt9v032
 mt9v111
-mtd
 mtd_blkdevs
 mtd_dataflash
 mtdblock
@@ -3726,7 +3721,6 @@ n5pf
 n_gsm
 n_hdlc
 nand
-nandcore
 nandsim
 national
 natsemi
@@ -3752,7 +3746,6 @@ neofb
 net1080
 net2272
 net2280
-net_failover
 netconsole
 netdevsim
 netfs
@@ -5550,7 +5543,6 @@ sha2-ce
 sha256-arm64
 sha3-ce
 shark2
-shiftfs
 shmob-drm
 sht15
 sht21
@@ -6342,7 +6334,6 @@ spi-synquacer
 spi-tegra114
 spi-tegra20-sflash
 spi-tegra20-slink
-spi-tegra210-quad
 spi-thunderx
 spi-tle62x0
 spi-wpcm-fiu
@@ -6352,7 +6343,6 @@ spi-zynqmp-gqspi
 spi_ks8995
 spidev
 spinand
-spl
 spmi
 spmi-mtk-pmif
 spmi-pmic-arb
@@ -6816,7 +6806,6 @@ tpm_st33zp24_i2c
 tpm_st33zp24_spi
 tpm_tis_i2c
 tpm_tis_i2c_cr50
-tpm_tis_spi
 tpm_tis_synquacer
 tpm_vtpm_proxy
 tps23861
@@ -7160,7 +7149,6 @@ virtio_crypto
 virtio_dma_buf
 virtio_input
 virtio_mem
-virtio_net
 virtio_pmem
 virtio_rpmsg_bus
 virtio_snd
@@ -7478,7 +7466,6 @@ zd1301
 zd1301_demod
 zet6223
 zforce_ts
-zfs
 zhenhua
 ziirave_wdt
 zinitix
