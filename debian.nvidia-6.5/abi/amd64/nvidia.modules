@@ -1406,7 +1406,6 @@ f81232
 f81534
 f81601
 f81604
-failover
 fakelb
 fam15h_power
 fan53555
@@ -1601,7 +1600,6 @@ gpio
 gpio-104-dio-48e
 gpio-104-idi-48
 gpio-104-idio-16
-gpio-aaeon
 gpio-adp5520
 gpio-aggregator
 gpio-amd-fch
@@ -1972,7 +1970,6 @@ hv_sock
 hv_storvsc
 hv_utils
 hv_vmbus
-hwmon-aaeon
 hwmon-vid
 hwpoison-inject
 hx711
@@ -2553,7 +2550,6 @@ lec
 led-class-flash
 led-class-multicolor
 leds-88pm860x
-leds-aaeon
 leds-adp5520
 leds-apu
 leds-as3645a
@@ -3010,7 +3006,6 @@ meraki-mx100
 metro-usb
 metronomefb
 mf6x4
-mfd-aaeon
 mgag200
 mhi
 mhi_ep
@@ -3282,7 +3277,6 @@ neofb
 net1080
 net2272
 net2280
-net_failover
 netconsole
 netdevsim
 netfs
@@ -4568,7 +4562,6 @@ sgp40
 sha1-ssse3
 sha256-ssse3
 shark2
-shiftfs
 sht15
 sht21
 sht3x
@@ -5332,7 +5325,6 @@ spi-zynqmp-gqspi
 spi_ks8995
 spidev
 spinand
-spl
 spmi
 sprd_serial
 sps30
@@ -5909,7 +5901,6 @@ v4l2-flash-led-class
 v4l2-fwnode
 v4l2-mem2mem
 v4l2-tpg
-v4l2loopback
 vboxguest
 vboxsf
 vboxvideo
@@ -5978,7 +5969,6 @@ virtio_crypto
 virtio_dma_buf
 virtio_input
 virtio_mem
-virtio_net
 virtio_pmem
 virtio_rpmsg_bus
 virtio_snd
@@ -6300,7 +6290,6 @@ zd1301
 zd1301_demod
 zet6223
 zforce_ts
-zfs
 zhenhua
 ziirave_wdt
 zinitix
