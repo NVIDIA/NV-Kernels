@@ -160,7 +160,7 @@ ifeq ($(no_dumpfile),)
 endif
 
 	$(kmake) O=$(builddir)/build-$* $(conc_level) modules_install $(vdso) \
-		INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=$(pkgdir)/
+		INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=$(pkgdir)
 
 	#
 	# Build module blacklists:
