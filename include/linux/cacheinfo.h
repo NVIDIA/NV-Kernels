@@ -48,7 +48,7 @@ extern unsigned int coherency_max_size;
  * keeping, the remaining members form the core properties of the cache
  */
 struct cacheinfo {
-	unsigned int id;
+	unsigned long id;
 	enum cache_type type;
 	unsigned int level;
 	unsigned int coherency_line_size;
@@ -140,7 +140,7 @@ static inline struct cacheinfo *get_cpu_cacheinfo_level(int cpu, int level)
  * Get the id of the cache associated with @cpu at level @level.
  * cpuhp lock must be held.
  */
-static inline int get_cpu_cacheinfo_id(int cpu, int level)
+static inline unsigned long get_cpu_cacheinfo_id(int cpu, int level)
 {
 	struct cacheinfo *ci = get_cpu_cacheinfo_level(cpu, level);
 
