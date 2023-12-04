@@ -295,6 +295,38 @@ static struct acpi_pptt_processor *acpi_find_processor_node(struct acpi_table_he
 	return NULL;
 }
 
+/* parent_node points into the table, but the table isn't provided. */
+static void acpi_pptt_get_child_cpus(struct acpi_pptt_processor *parent_node,
+				     cpumask_t *cpus)
+{
+	struct acpi_pptt_processor *cpu_node;
+	struct acpi_table_header *table_hdr;
+	acpi_status status;
+	u32 acpi_id;
+	int cpu;
+
+	status = acpi_get_table(ACPI_SIG_PPTT, 0, &table_hdr);
+	if (ACPI_FAILURE(status))
+		return;
+
+	for_each_possible_cpu(cpu) {
+		acpi_id = get_acpi_id_for_cpu(cpu);
+		cpu_node = acpi_find_processor_node(table_hdr, acpi_id);
+
+		while (cpu_node) {
+			if (cpu_node == parent_node) {
+				cpumask_set_cpu(cpu, cpus);
+				break;
+			}
+			cpu_node = fetch_pptt_node(table_hdr, cpu_node->parent);
+		}
+	}
+
+	acpi_put_table(table_hdr);
+
+	return;
+}
+
 /**
  * acpi_pptt_for_each_container() - Iterate over all processor containers
  *
@@ -306,7 +338,7 @@ static struct acpi_pptt_processor *acpi_find_processor_node(struct acpi_table_he
  * Return: 0 for a complete walk, or the first non-zero value from the callback
  *         that stopped the walk.
  */
-static int __maybe_unused
+static int
 acpi_pptt_for_each_container(acpi_pptt_cpu_callback_t callback, void *arg)
 {
 	struct acpi_pptt_processor *cpu_node;
@@ -350,6 +382,41 @@ acpi_pptt_for_each_container(acpi_pptt_cpu_callback_t callback, void *arg)
 	acpi_put_table(table_hdr);
 
 	return ret;
+}
+
+struct __cpus_from_container_arg {
+	u32 acpi_cpu_id;
+	cpumask_t *cpus;
+};
+
+static int __cpus_from_container(struct acpi_pptt_processor *container, void *arg)
+{
+	struct __cpus_from_container_arg *params = arg;
+
+	if (container->acpi_processor_id == params->acpi_cpu_id)
+		acpi_pptt_get_child_cpus(container, params->cpus);
+
+	return 0;
+}
+
+/**
+ * acpi_pptt_get_cpus_from_container() - Populate a cpumask with all CPUs in a
+ * 					 processor containers
+ *
+ * Find the specified Processor Container, and fill cpus with all the cpus
+ * below it.
+ *
+ * Return: 0 for a complete walk, or an error if the mask is incomplete.
+ */
+int acpi_pptt_get_cpus_from_container(u32 acpi_cpu_id, cpumask_t *cpus)
+{
+	struct __cpus_from_container_arg params;
+
+	params.acpi_cpu_id = acpi_cpu_id;
+	params.cpus = cpus;
+
+	cpumask_clear(cpus);
+	return acpi_pptt_for_each_container(&__cpus_from_container, &params);
 }
 
 static u8 acpi_cache_type(enum cache_type type)
