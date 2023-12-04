@@ -11,6 +11,9 @@
 # (this increases performance and avoids hard-to-debug behaviour)
 MAKEFLAGS += -rR
 
+# Allow to run debian/rules directly without root
+export DEB_RULES_REQUIRES_ROOT := no
+
 .NOTPARALLEL:
 
 DEBIAN=$(shell awk -F= '($$1 == "DEBIAN") { print $$2 }' <debian/debian.env)
