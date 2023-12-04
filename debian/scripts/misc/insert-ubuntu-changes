@@ -1,83 +1,64 @@
-#!/usr/bin/perl
+#!/usr/bin/env python3
 
-if ($#ARGV != 2 && $#ARGV != 3) {
-	die "Usage: $0 <changelog> <stop at> <start at> [<source changelog>]\n";
-}
-if ($#ARGV == 2) {
-	push(@ARGV, "debian.master/changelog")
-}
-my ($changelog, $end, $start, $source_changelog) = @ARGV;
+import re
+import os
+import sys
 
-$end =~ s/^\D+//;
-$start =~ s/^\D+//;
+def version_cmp(a, b):
+    a = re.split(r"[\.-]+", a)
+    b = re.split(r"[\.-]+", b)
+    i = 0
+    while True:
+        if len(a) <= i:
+            if len(b) <= i:
+                return 0
+            return -1
+        if len(b) <= i:
+            return 1
+        if int(a[i]) < int(b[i]):
+            return -1
+        if int(a[i]) > int(b[i]):
+            return 1
+        i += 1
 
-sub version_cmp($$) {
-	my @a = split(/[\.-]+/, $_[0]);
-	my @b = split(/[\.-]+/, $_[1]);
-	for (my $i = 1;; $i++) {
-		if (!defined $a[$i]) {
-			if (!defined $b[$i]) {
-				return 0;
-			}
-			return -1;
-		}
-		if (!defined $b[$i]) {
-			return 1;
-		}
-		if ($a[$i] < $b[$i]) {
-			return -1;
-		}
-		if ($a[$i] > $b[$i]) {
-			return 1;
-		}
-	}
-}
+if len(sys.argv) == 4:
+    sys.argv.append("debian.master/changelog")
 
-my @changes = ();
-my $output = 0;
-open(CHG, "<$source_changelog") ||
-	open(CHG, "<debian/changelog") ||
-	die "$0: debian/changelog: open failed - $!\n";
-while (<CHG>) {
-	if (/^\S+\s+\((.*)\)/) {
-		if (version_cmp($1, $end) <= 0) {
-			last;
-		}
-		if ($1 eq $start) {
-			$output = 1;
-		}
-		if ($output) {
-			push(@changes, "\n  [ Ubuntu: $1 ]\n\n");
-			next;
-		}
-	}
-	next if ($output == 0);
+if len(sys.argv) == 5:
+    changelog, end, start, source_changelog = sys.argv[1:]
+else:
+    print("Usage: insert-ubuntu-changes <changelog> <stop at> <start at> [<source changelog>]")
+    sys.exit(1)
 
-	next if (/^\s*$/);
-	next if (/^\s--/);
-	next if (/^\s\s[^\*\s]/);
+changes = []
+output = False
+with open(source_changelog) as fh:
+    for line in fh:
+        m = re.match(r"^\S+\s+\((.*)\)", line)
+        if m:
+            if version_cmp(m.group(1), end) <= 0:
+                break
+            if m.group(1) == start:
+                output = True
+            if output:
+                changes.append("\n")
+                changes.append("  [ Ubuntu: {} ]\n".format(m.group(1)))
+                changes.append("\n")
+                continue
 
-	push(@changes, $_);
-}
-close(CHG);
+        if output and re.match(r"^(  * |    |      )\S", line):
+            changes.append(line)
 
-open(CHANGELOG, "< $changelog") or die "Cannot open changelog";
-open(NEW, "> $changelog.new") or die "Cannot open new changelog";
+printed = 3
+with open(changelog + ".new", "w") as fh_new:
+    with open(changelog) as fh:
+        for line in fh:
+            if line.startswith("  CHANGELOG: "):
+                printed -= 1
+                fh_new.write(line)
+                if printed == 0:
+                    fh_new.write("".join(changes))
+                continue
+            fh_new.write(line)
 
-$printed = 3;
-while (<CHANGELOG>) {
-	if (/^  CHANGELOG: /) {
-		$printed--;
-		print NEW;
-		if ($printed == 0) {
-			print NEW @changes;
-		}
-		next;
-	}
-	print NEW;
-}
-
-close(NEW);
-close(CHANGELOG);
-
-rename("$changelog.new", "$changelog");
+os.rename(changelog + ".new", changelog)
