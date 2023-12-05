@@ -731,7 +731,6 @@ sha1_s390
 sha256_s390
 sha3_256_s390
 sha3_512_s390
-shiftfs
 siox-bus-gpio
 siox-core
 sit
