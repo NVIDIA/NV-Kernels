@@ -2549,6 +2549,7 @@ static int arm_cmn_probe(struct platform_device *pdev)
 	struct arm_cmn *cmn;
 	const char *name;
 	static atomic_t id;
+	struct resource *cfg;
 	int err, rootnode, this_id;
 
 	cmn = devm_kzalloc(&pdev->dev, sizeof(*cmn), GFP_KERNEL);
@@ -2564,7 +2565,16 @@ static int arm_cmn_probe(struct platform_device *pdev)
 		rootnode = arm_cmn600_acpi_probe(pdev, cmn);
 	} else {
 		rootnode = 0;
-		cmn->base = devm_platform_ioremap_resource(pdev, 0);
+
+		/*
+		 * Avoid requesting resources as the PMUs registers are
+		 * scattered through CMN, and may appear either side of
+		 * registers for other 'devices'. (e.g. the MPAM MSC controls).
+		 */
+		cfg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+		if (!cfg)
+			return -EINVAL;
+		cmn->base = devm_ioremap(&pdev->dev, cfg->start, resource_size(cfg));
 		if (IS_ERR(cmn->base))
 			return PTR_ERR(cmn->base);
 		if (cmn->part == PART_CMN600)
