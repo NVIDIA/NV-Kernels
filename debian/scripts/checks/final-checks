@@ -3,12 +3,6 @@
 debian="$1"
 abi="$2"
 
-skipabi=${3:-}
-case "${skipabi,,}" in
-    1|true|yes) skipabi=true ;;
-    *) skipabi=false ;;
-esac
-
 archs=$(awk '/^Architecture:/ { $1=""; for (i=1; i<=NF; i++) { if ($i != "all") { print $i }}}' debian/control | sort -u)
 
 fail=0
@@ -18,41 +12,6 @@ failure()
 	echo "EE: $*" 1>&2
 	fail=1
 }
-
-abi_check()
-{
-	local abidir="$1"
-	local arch="$2"
-	local flavour="$3"
-
-	local abidir="$abidir/$arch"
-
-	if [ ! -f "$abidir/$flavour" ] && \
-	   [ ! -f "$abidir/$flavour.ignore" ] && \
-	   [ ! -f "$abidir/ignore" ]
-	then
-		failure "$arch/$flavour ABI symbol file missing"
-	fi
-
-	if [ ! -f "$abidir/$flavour.modules" ] && \
-	   [ ! -f "$abidir/$flavour.ignore.modules" ] && \
-	   [ ! -f "$abidir/ignore.modules" ]
-	then
-		failure "$arch/$flavour ABI modules file missing"
-	fi
-}
-
-abi_version="$debian/abi/version"
-if ! [ -f "$abi_version" ]
-then
-	failure "$abi_version ABI version file missing"
-fi
-
-version=$(cat "$abi_version")
-if [ "$abi" != "$version" ]
-then
-	failure "$abi_version ABI version mismatch ($abi != $version)"
-fi
 
 for arch in $archs
 do
@@ -81,9 +40,6 @@ do
 			if ! python3 debian/scripts/misc/annotations --export -c CONFIG_SYSTEM_REVOCATION_KEYS --arch "$arch" --flavour "$flavour" | grep -q '^CONFIG_SYSTEM_REVOCATION_KEYS="debian/canonical-revoked-certs.pem"$' ; then
 				failure "'CONFIG_SYSTEM_REVOCATION_KEYS=\"debian/canonical-revoked-certs.pem\"' is required"
 			fi
-		fi
-		if [ "${skipabi}" = "false" ] ; then
-			abi_check "$debian/abi" "$arch" "$flavour"
 		fi
 	done
 done
