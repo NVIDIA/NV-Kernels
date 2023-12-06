@@ -3011,8 +3011,11 @@ retry:
 		r = hva_to_pfn_remapped(vma, kfp, &pfn);
 		if (r == -EAGAIN)
 			goto retry;
-		if (r < 0)
+		if (r < 0) {
 			pfn = KVM_PFN_ERR_FAULT;
+			if (r == -EHWPOISON)
+				pfn = KVM_PFN_ERR_HWPOISON;
+		}
 	} else {
 		if ((kfp->flags & FOLL_NOWAIT) &&
 		    vma_is_valid(vma, kfp->flags & FOLL_WRITE))
