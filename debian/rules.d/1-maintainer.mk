@@ -43,7 +43,6 @@ printenv:
 	@echo "prev_revision             = $(prev_revision)"
 	@echo "abinum                    = $(abinum)"
 	@echo "upstream_tag              = $(upstream_tag)"
-	@echo "variants                  = $(variants)"
 	@echo "flavours                  = $(flavours)"
 	@echo "bin_pkg_name              = $(bin_pkg_name)"
 	@echo "hdr_pkg_name              = $(hdrs_pkg_name)"
