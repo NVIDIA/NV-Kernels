@@ -27,6 +27,11 @@ upstream_tag := "v$(upstream_version).$(upstream_patchlevel)"
 # Get the kernels own extra version to be added to the release signature.
 raw_kernelversion=$(shell make kernelversion)
 
+packages_enabled := $(shell dh_listpackages 2>/dev/null)
+define if_package
+$(if $(filter $(1),$(packages_enabled)),$(2))
+endef
+
 #
 # do_full_build -- are we doing a full buildd style build, i.e., are we
 #                  building in a PPA
@@ -113,12 +118,6 @@ do_source_package=true
 do_source_package_content=true
 ifeq ($(do_full_build),false)
 do_source_package_content=false
-endif
-
-ifeq ($(DEBIAN),debian.master)
-do_libc_dev_package=true
-else
-do_libc_dev_package=false
 endif
 
 # common headers normally is built as an indep package, but may be arch

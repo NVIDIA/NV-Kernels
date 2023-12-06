@@ -172,7 +172,7 @@ include $(DROOT)/rules.d/3-binary-indep.mk
 include $(DROOT)/rules.d/4-checks.mk
 
 control_files := $(DEBIAN)/control.stub.in
-ifeq ($(do_libc_dev_package),true)
+ifeq ($(DEBIAN),debian.master)
 	control_files += $(DEBIAN)/control.d/linux-libc-dev.stub
 endif
 
