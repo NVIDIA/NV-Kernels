@@ -485,20 +485,10 @@ static void ghes_kick_task_work(struct callback_head *head)
 
 static bool ghes_do_memory_failure(u64 physical_addr, int flags)
 {
-	unsigned long pfn;
-
 	if (!IS_ENABLED(CONFIG_ACPI_APEI_MEMORY_FAILURE))
 		return false;
 
-	pfn = PHYS_PFN(physical_addr);
-	if (!pfn_valid(pfn) && !arch_is_platform_page(physical_addr)) {
-		pr_warn_ratelimited(FW_WARN GHES_PFX
-		"Invalid address in generic error data: %#llx\n",
-		physical_addr);
-		return false;
-	}
-
-	memory_failure_queue(pfn, flags);
+	memory_failure_queue(PHYS_PFN(physical_addr), flags);
 	return true;
 }
 
