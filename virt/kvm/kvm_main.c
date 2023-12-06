@@ -3016,6 +3016,12 @@ retry:
 		r = hva_to_pfn_remapped(vma, addr, write_fault, writable, &pfn);
 		if (r == -EAGAIN)
 			goto retry;
+
+		if (r == -EHWPOISON) {
+			pfn = KVM_PFN_ERR_HWPOISON;
+			goto exit;
+		}
+
 		if (r < 0)
 			pfn = KVM_PFN_ERR_FAULT;
 	} else {
