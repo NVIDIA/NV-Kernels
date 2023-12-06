@@ -1654,7 +1654,7 @@ retry:
 	}
 
 	if (ret & VM_FAULT_ERROR) {
-		int err = vm_fault_to_errno(ret, 0);
+		int err = vm_fault_to_errno(ret, FOLL_HWPOISON);
 
 		if (err)
 			return err;
