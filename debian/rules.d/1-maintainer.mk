@@ -70,7 +70,6 @@ printenv:
 	@echo "do_source_package         = $(do_source_package)"
 	@echo "do_source_package_content = $(do_source_package_content)"
 	@echo "do_extras_package         = $(do_extras_package)"
-	@echo "do_libc_dev_package       = $(do_libc_dev_package)"
 	@echo "do_flavour_image_package  = $(do_flavour_image_package)"
 	@echo "do_flavour_header_package = $(do_flavour_header_package)"
 	@echo "do_common_headers_indep   = $(do_common_headers_indep)"

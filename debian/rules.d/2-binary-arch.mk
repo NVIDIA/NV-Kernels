@@ -520,9 +520,7 @@ install-arch-headers:
 	@echo Debug: $@
 	dh_testdir
 	dh_testroot
-ifeq ($(do_libc_dev_package),true)
-	dh_prep -plinux-libc-dev
-endif
+	$(call if_package, linux-libc-dev, dh_prep -plinux-libc-dev)
 	rm -rf $(headers_tmp) $(headers_dir)
 	$(kmake) O=$(headers_tmp) INSTALL_HDR_PATH=$(headers_dir)/usr $(conc_level) headers_install
 	mkdir $(headers_dir)/usr/include/$(DEB_HOST_MULTIARCH)
@@ -556,9 +554,7 @@ binary-arch-headers: install-arch-headers
 	@echo Debug: $@
 	dh_testdir
 	dh_testroot
-ifeq ($(do_libc_dev_package),true)
-	$(call dh_all,linux-libc-dev)
-endif
+	$(call if_package, linux-libc-dev, $(call dh_all,linux-libc-dev))
 
 -include $(builddir)/skipped-dkms.mk
 binary-%: pkgimg = $(bin_pkg_name)-$*
@@ -766,7 +762,7 @@ build-arch: $(build-arch-deps-true)
 	@echo Debug: $@
 
 binary-arch-deps-$(do_flavour_image_package) += binary-debs
-binary-arch-deps-$(do_libc_dev_package) += binary-arch-headers
+binary-arch-deps-true += binary-arch-headers
 ifneq ($(do_common_headers_indep),true)
 binary-arch-deps-$(do_flavour_header_package) += binary-headers
 endif
