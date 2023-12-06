@@ -38,6 +38,7 @@
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/memory-failure.h>
 #include <linux/page-flags.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/task.h>
@@ -60,6 +61,7 @@
 #include <linux/pagewalk.h>
 #include <linux/shmem_fs.h>
 #include <linux/sysctl.h>
+#include <linux/pfn_t.h>
 #include "swap.h"
 #include "internal.h"
 #include "ras/ras_event.h"
@@ -143,6 +145,10 @@ static struct ctl_table memory_failure_table[] = {
 	},
 	{ }
 };
+
+static struct rb_root_cached pfn_space_itree = RB_ROOT_CACHED;
+
+static DEFINE_MUTEX(pfn_space_lock);
 
 /*
  * Return values:
@@ -434,15 +440,16 @@ static unsigned long dev_pagemap_mapping_shift(struct vm_area_struct *vma,
  * Schedule a process for later kill.
  * Uses GFP_ATOMIC allocations to avoid potential recursions in the VM.
  *
- * Note: @fsdax_pgoff is used only when @p is a fsdax page and a
- * filesystem with a memory failure handler has claimed the
- * memory_failure event. In all other cases, page->index and
- * page->mapping are sufficient for mapping the page back to its
- * corresponding user virtual address.
+ * Notice: @pgoff is used when:
+ * a. @p is a fsdax page and a filesystem with a memory failure handler
+ * has claimed the memory_failure event.
+ * b. pgoff is not backed by struct page.
+ * In all other cases, page->index and page->mapping are sufficient
+ * for mapping the page back to its corresponding user virtual address.
  */
 static void __add_to_kill(struct task_struct *tsk, struct page *p,
 			  struct vm_area_struct *vma, struct list_head *to_kill,
-			  unsigned long ksm_addr, pgoff_t fsdax_pgoff)
+			  unsigned long ksm_addr, pgoff_t pgoff)
 {
 	struct to_kill *tk;
 
@@ -452,13 +459,20 @@ static void __add_to_kill(struct task_struct *tsk, struct page *p,
 		return;
 	}
 
-	tk->addr = ksm_addr ? ksm_addr : page_address_in_vma(p, vma);
-	if (is_zone_device_page(p)) {
-		if (fsdax_pgoff != FSDAX_INVALID_PGOFF)
-			tk->addr = vma_pgoff_address(fsdax_pgoff, 1, vma);
-		tk->size_shift = dev_pagemap_mapping_shift(vma, tk->addr);
-	} else
-		tk->size_shift = page_shift(compound_head(p));
+	/* Check for pgoff not backed by struct page */
+	if (!(pfn_valid(pgoff)) && (vma->vm_flags | PFN_MAP)) {
+		tk->addr = vma_pgoff_address(pgoff, 1, vma);
+		tk->size_shift = PAGE_SHIFT;
+	} else {
+		tk->addr = ksm_addr ? ksm_addr : page_address_in_vma(p, vma);
+		if (is_zone_device_page(p)) {
+			if (pgoff != FSDAX_INVALID_PGOFF)
+				tk->addr = vma_pgoff_address(pgoff, 1, vma);
+			tk->size_shift = dev_pagemap_mapping_shift(vma, tk->addr);
+		} else {
+			tk->size_shift = page_shift(compound_head(p));
+		}
+	}
 
 	/*
 	 * Send SIGKILL if "tk->addr == -EFAULT". Also, as
@@ -471,8 +485,8 @@ static void __add_to_kill(struct task_struct *tsk, struct page *p,
 	 * has a mapping for the page.
 	 */
 	if (tk->addr == -EFAULT) {
-		pr_info("Unable to find user space address %lx in %s\n",
-			page_to_pfn(p), tsk->comm);
+		pr_info("Unable to find address %lx in %s\n",
+			pfn_valid(pgoff) ? page_to_pfn(p) : pgoff, tsk->comm);
 	} else if (tk->size_shift == 0) {
 		kfree(tk);
 		return;
@@ -677,8 +691,7 @@ static void collect_procs_file(struct folio *folio, struct page *page,
 	i_mmap_unlock_read(mapping);
 }
 
-#ifdef CONFIG_FS_DAX
-static void add_to_kill_fsdax(struct task_struct *tsk, struct page *p,
+static void add_to_kill_pgoff(struct task_struct *tsk, struct page *p,
 			      struct vm_area_struct *vma,
 			      struct list_head *to_kill, pgoff_t pgoff)
 {
@@ -686,11 +699,12 @@ static void add_to_kill_fsdax(struct task_struct *tsk, struct page *p,
 }
 
 /*
- * Collect processes when the error hit a fsdax page.
+ * Collect processes when the error hit a fsdax page or a PFN not backed by
+ * struct page.
  */
-static void collect_procs_fsdax(struct page *page,
-		struct address_space *mapping, pgoff_t pgoff,
-		struct list_head *to_kill, bool pre_remove)
+static void collect_procs_pgoff(struct page *page,
+				struct address_space *mapping, pgoff_t pgoff,
+				struct list_head *to_kill, bool pre_remove)
 {
 	struct vm_area_struct *vma;
 	struct task_struct *tsk;
@@ -711,13 +725,12 @@ static void collect_procs_fsdax(struct page *page,
 			continue;
 		vma_interval_tree_foreach(vma, &mapping->i_mmap, pgoff, pgoff) {
 			if (vma->vm_mm == t->mm)
-				add_to_kill_fsdax(t, page, vma, to_kill, pgoff);
+				add_to_kill_pgoff(t, page, vma, to_kill, pgoff);
 		}
 	}
 	rcu_read_unlock();
 	i_mmap_unlock_read(mapping);
 }
-#endif /* CONFIG_FS_DAX */
 
 /*
  * Collect the processes who have the corrupted page mapped to kill.
@@ -911,6 +924,7 @@ static const char * const action_page_types[] = {
 	[MF_MSG_BUDDY]			= "free buddy page",
 	[MF_MSG_DAX]			= "dax page",
 	[MF_MSG_UNSPLIT_THP]		= "unsplit thp",
+	[MF_MSG_PFN_MAP]		= "non struct page pfn",
 	[MF_MSG_UNKNOWN]		= "unknown page",
 };
 
@@ -1341,7 +1355,8 @@ static int action_result(unsigned long pfn, enum mf_action_page_type type,
 
 	num_poisoned_pages_inc(pfn);
 
-	update_per_node_mf_stats(pfn, result);
+	if (type != MF_MSG_PFN_MAP)
+		update_per_node_mf_stats(pfn, result);
 
 	pr_err("%#lx: recovery action for %s: %s\n",
 		pfn, action_page_types[type], action_name[result]);
@@ -1834,7 +1849,7 @@ int mf_dax_kill_procs(struct address_space *mapping, pgoff_t index,
 		 * The pre_remove case is revoking access, the memory is still
 		 * good and could theoretically be put back into service.
 		 */
-		collect_procs_fsdax(page, mapping, index, &to_kill, pre_remove);
+		collect_procs_pgoff(page, mapping, index, &to_kill, pre_remove);
 		unmap_and_kill(&to_kill, page_to_pfn(page), mapping,
 				index, mf_flags);
 unlock:
@@ -2173,6 +2188,83 @@ out:
 	return rc;
 }
 
+int register_pfn_address_space(struct pfn_address_space *pfn_space)
+{
+	if (!pfn_space)
+		return -EINVAL;
+
+	if (!request_mem_region(pfn_space->node.start << PAGE_SHIFT,
+	    (pfn_space->node.last - pfn_space->node.start + 1) << PAGE_SHIFT, ""))
+		return -EBUSY;
+
+	mutex_lock(&pfn_space_lock);
+	interval_tree_insert(&pfn_space->node, &pfn_space_itree);
+	mutex_unlock(&pfn_space_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(register_pfn_address_space);
+
+void unregister_pfn_address_space(struct pfn_address_space *pfn_space)
+{
+	if (!pfn_space)
+		return;
+
+	mutex_lock(&pfn_space_lock);
+	interval_tree_remove(&pfn_space->node, &pfn_space_itree);
+	mutex_unlock(&pfn_space_lock);
+	release_mem_region(pfn_space->node.start << PAGE_SHIFT,
+			   (pfn_space->node.last - pfn_space->node.start + 1) << PAGE_SHIFT);
+}
+EXPORT_SYMBOL_GPL(unregister_pfn_address_space);
+
+static int memory_failure_pfn(unsigned long pfn, int flags)
+{
+	struct interval_tree_node *node;
+	int res = MF_FAILED;
+	LIST_HEAD(tokill);
+
+	mutex_lock(&pfn_space_lock);
+	/*
+	 * Modules registers with MM the address space mapping to the device memory they
+	 * manage. Iterate to identify exactly which address space has mapped to this
+	 * failing PFN.
+	 */
+	for (node = interval_tree_iter_first(&pfn_space_itree, pfn, pfn); node;
+	     node = interval_tree_iter_next(node, pfn, pfn)) {
+		struct pfn_address_space *pfn_space =
+			container_of(node, struct pfn_address_space, node);
+		/*
+		 * Modules managing the device memory need to be conveyed about the
+		 * memory failure so that the poisoned PFN can be tracked.
+		 */
+		if (pfn_space->ops)
+			pfn_space->ops->failure(pfn_space, pfn);
+
+		collect_procs_pgoff(NULL, pfn_space->mapping, pfn, &tokill, false);
+
+		unmap_mapping_range(pfn_space->mapping, pfn << PAGE_SHIFT,
+				    PAGE_SIZE, 0);
+
+		res = MF_RECOVERED;
+	}
+	mutex_unlock(&pfn_space_lock);
+
+	if (res == MF_FAILED)
+		return action_result(pfn, MF_MSG_PFN_MAP, res);
+
+	/*
+	 * Unlike System-RAM there is no possibility to swap in a different
+	 * physical page at a given virtual address, so all userspace
+	 * consumption of direct PFN memory necessitates SIGBUS (i.e.
+	 * MF_MUST_KILL)
+	 */
+	flags |= MF_ACTION_REQUIRED | MF_MUST_KILL;
+	kill_procs(&tokill, true, false, pfn, flags);
+
+	return action_result(pfn, MF_MSG_PFN_MAP, MF_RECOVERED);
+}
+
 /**
  * memory_failure - Handle memory failure of a page.
  * @pfn: Page Number of the corrupted page
@@ -2211,6 +2303,11 @@ int memory_failure(unsigned long pfn, int flags)
 
 	if (!(flags & MF_SW_SIMULATED))
 		hw_memory_failure = true;
+
+	if (!pfn_valid(pfn) && !arch_is_platform_page(PFN_PHYS(pfn))) {
+		res = memory_failure_pfn(pfn, flags);
+		goto unlock_mutex;
+	}
 
 	p = pfn_to_online_page(pfn);
 	if (!p) {
