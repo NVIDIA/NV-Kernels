@@ -121,9 +121,7 @@ ifeq ($(do_full_build),false)
 do_source_package_content=false
 endif
 
-# linux-libc-dev may not be needed, default to building it only for the
-# primary variant
-ifneq ($(filter --,$(variants)),)
+ifeq ($(DEBIAN),debian.master)
 do_libc_dev_package=true
 else
 do_libc_dev_package=false

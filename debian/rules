@@ -173,9 +173,7 @@ include $(DROOT)/rules.d/4-checks.mk
 
 control_files := $(DEBIAN)/control.stub.in
 ifeq ($(do_libc_dev_package),true)
-ifneq (,$(wildcard $(DEBIAN)/control.d/linux-libc-dev.stub))
 	control_files += $(DEBIAN)/control.d/linux-libc-dev.stub
-endif
 endif
 
 # Calculate Ubuntu Compatible Signing levels
