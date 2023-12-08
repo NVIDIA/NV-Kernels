@@ -5469,7 +5469,7 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
 	struct lruvec *lruvec;
 	struct lru_gen_folio *lrugen;
 	struct mem_cgroup *memcg;
-	struct hlist_nulls_node *pos;
+	const struct hlist_nulls_node *pos;
 
 	gen = get_memcg_gen(READ_ONCE(pgdat->memcg_lru.seq));
 	bin = first_bin = get_random_u32_below(MEMCG_NR_BINS);
