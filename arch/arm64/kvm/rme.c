@@ -319,6 +319,44 @@ u64 kvm_realm_reset_id_aa64dfr0_el1(struct kvm_vcpu *vcpu, u64 val)
 	return val;
 }
 
+static int realm_init_sve_param(struct kvm *kvm, struct realm_params *params)
+{
+	int ret = 0;
+	unsigned long i;
+	struct kvm_vcpu *vcpu;
+	int max_vl, realm_max_vl = -1;
+
+	/*
+	 * Get the preferred SVE configuration, set by userspace with the
+	 * KVM_ARM_VCPU_SVE feature and KVM_REG_ARM64_SVE_VLS pseudo-register.
+	 */
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		mutex_lock(&vcpu->mutex);
+		if (vcpu_has_sve(vcpu)) {
+			if (!kvm_arm_vcpu_sve_finalized(vcpu))
+				ret = -EINVAL;
+			max_vl = vcpu->arch.sve_max_vl;
+		} else {
+			max_vl = 0;
+		}
+		mutex_unlock(&vcpu->mutex);
+		if (ret)
+			return ret;
+
+		/* We need all vCPUs to have the same SVE config */
+		if (realm_max_vl >= 0 && realm_max_vl != max_vl)
+			return -EINVAL;
+
+		realm_max_vl = max_vl;
+	}
+
+	if (realm_max_vl > 0) {
+		params->sve_vl = sve_vq_from_vl(realm_max_vl) - 1;
+		params->flags |= RMI_REALM_PARAM_FLAG_SVE;
+	}
+	return 0;
+}
+
 static int realm_create_rd(struct kvm *kvm)
 {
 	struct realm *realm = &kvm->arch.realm;
@@ -365,6 +403,10 @@ static int realm_create_rd(struct kvm *kvm)
 		params->pmu_num_ctrs = kvm->arch.pmcr_n;
 		params->flags |= RMI_REALM_PARAM_FLAG_PMU;
 	}
+
+	r = realm_init_sve_param(kvm, params);
+	if (r)
+		goto out_undelegate_tables;
 
 	params_phys = virt_to_phys(params);
 
