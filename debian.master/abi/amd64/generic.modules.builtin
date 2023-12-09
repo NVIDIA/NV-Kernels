@@ -55,6 +55,7 @@ crypto_acompress
 crypto_algapi
 crypto_hash
 crypto_null
+crypto_skcipher
 cryptomgr
 ctr
 cts
@@ -87,6 +88,7 @@ extcon-core
 fan
 fat
 fb
+fb_io_fops
 fb_sys_fops
 fbdev
 fddi
@@ -164,6 +166,7 @@ mpi
 mq-deadline
 n_null
 nd_e820
+netkit
 nls_base
 nls_cp437
 ohci-hcd
@@ -184,6 +187,7 @@ processor
 pstore
 ptp
 public_key
+pwm-crc
 pwm-lpss
 pwm-lpss-pci
 pwm-lpss-platform
@@ -214,7 +218,6 @@ sha256_generic
 sha3_generic
 sha512_generic
 sig
-skcipher
 slhc
 speedstep-centrino
 squashfs
@@ -224,6 +227,7 @@ sysfillrect
 sysimgblt
 t10-pi
 tcp_cubic
+tcp_sigpool
 thermal
 tpm
 tpm_crb
@@ -238,7 +242,6 @@ tun
 ucs2_string
 uhci-hcd
 uinput
-unix
 usb-common
 usbcore
 utf8data

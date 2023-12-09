@@ -64,6 +64,7 @@ authenc
 authencesn
 ba431-rng
 bcache
+bcachefs
 bcm-phy-lib
 bcm-phy-ptp
 bcm54140
@@ -612,10 +613,11 @@ ntfs
 ntfs3
 null_blk
 nvme
-nvme-common
+nvme-auth
 nvme-core
 nvme-fabrics
 nvme-fc
+nvme-keyring
 nvme-loop
 nvme-rdma
 nvme-tcp

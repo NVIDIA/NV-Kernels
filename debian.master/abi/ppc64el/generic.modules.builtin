@@ -49,6 +49,7 @@ crypto_acompress
 crypto_algapi
 crypto_hash
 crypto_null
+crypto_skcipher
 cryptomgr
 ctr
 cts
@@ -75,6 +76,7 @@ ext4
 extcon-core
 fat
 fb
+fb_io_fops
 fb_sys_fops
 fddi
 firmware_class
@@ -143,6 +145,7 @@ mousedev
 mpi
 mq-deadline
 n_null
+netkit
 nls_base
 nls_cp437
 nvram
@@ -198,7 +201,6 @@ sha256_generic
 sha3_generic
 sha512_generic
 sig
-skcipher
 slhc
 spi-fsl-lib
 spi-fsl-spi
@@ -209,6 +211,7 @@ sysfillrect
 sysimgblt
 t10-pi
 tcp_cubic
+tcp_sigpool
 tpm
 tpm_i2c_atmel
 tpm_i2c_infineon
@@ -224,12 +227,10 @@ ttyprintk
 tun
 uhci-hcd
 uinput
-unix
 usb-common
 usbcore
 utf8data
 vfat
-vgacon
 virtio
 virtio_balloon
 virtio_blk

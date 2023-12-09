@@ -34,7 +34,6 @@ backlight
 battery
 bcm84881
 binfmt_script
-brcmstb_gisb
 bsg
 button
 cbc
@@ -183,6 +182,7 @@ crypto_acompress
 crypto_algapi
 crypto_hash
 crypto_null
+crypto_skcipher
 cryptomgr
 ctr
 cts
@@ -214,6 +214,7 @@ extcon-core
 fan
 fat
 fb
+fb_io_fops
 fb_sys_fops
 fddi
 fec
@@ -330,6 +331,7 @@ mtk-eint
 mtk-regulator-coupler
 mxc-clk
 n_null
+netkit
 nls_base
 nls_cp437
 npcm_wdt
@@ -398,6 +400,8 @@ pwc-rzv2m
 qcom-ipcc
 qcom-pdc
 qcom-scm
+qcom_qseecom
+qcom_qseecom_uefisecapp
 qcom_rpmh
 rapidio
 rational
@@ -442,7 +446,6 @@ sha256_generic
 sha3_generic
 sha512_generic
 sig
-skcipher
 slhc
 smc91x
 soc-imx8m
@@ -470,6 +473,7 @@ sysfillrect
 sysimgblt
 t10-pi
 tcp_cubic
+tcp_sigpool
 tegra-tcu
 tegra20-apb-dma
 tegra20-cpufreq
@@ -492,7 +496,6 @@ tun
 ucs2_string
 uhci-hcd
 uinput
-unix
 usb-common
 usbcore
 utf8data

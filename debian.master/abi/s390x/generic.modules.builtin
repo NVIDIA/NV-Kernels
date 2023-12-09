@@ -29,6 +29,7 @@ crypto_acompress
 crypto_algapi
 crypto_hash
 crypto_null
+crypto_skcipher
 cryptomgr
 ctr
 cts
@@ -48,6 +49,7 @@ exportfs
 ext4
 fat
 fb
+fb_io_fops
 fb_sys_fops
 firmware_class
 fixed_phy
@@ -60,6 +62,7 @@ ghash-generic
 glob
 hmac
 input-core
+iova
 ipv6
 iucv
 jbd2
@@ -86,6 +89,7 @@ mpi
 mq-deadline
 multipath
 n_null
+netkit
 nls_base
 nls_cp437
 oid_registry
@@ -109,7 +113,6 @@ sha256_generic
 sha3_generic
 sha512_generic
 sig
-skcipher
 smsgiucv
 squashfs
 sr_mod
@@ -118,10 +121,10 @@ sysfillrect
 sysimgblt
 t10-pi
 tcp_cubic
+tcp_sigpool
 tpm
 trusted
 tun
-unix
 utf8data
 vfat
 virtio

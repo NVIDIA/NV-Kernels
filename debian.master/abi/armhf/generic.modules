@@ -395,7 +395,6 @@ aquantia
 ar0521
 ar1021_i2c
 ar5523
-ar7part
 ar9331
 arasan-nand-controller
 arc-rawmode
@@ -574,6 +573,7 @@ baycom_par
 baycom_ser_fdx
 baycom_ser_hdx
 bcache
+bcachefs
 bcm-keypad
 bcm-phy-lib
 bcm-phy-ptp
@@ -743,6 +743,7 @@ caif_serial
 caif_socket
 caif_usb
 caif_virtio
+camcc-sm8550
 camellia_generic
 can
 can-bcm
@@ -828,6 +829,7 @@ chv3-i2s
 ci_hdrc
 ci_hdrc_imx
 ci_hdrc_msm
+ci_hdrc_npcm
 ci_hdrc_pci
 ci_hdrc_tegra
 ci_hdrc_usb2
@@ -887,6 +889,7 @@ clk-si570
 clk-smd-rpm
 clk-sp7021
 clk-spmi-pmic-div
+clk-twl
 clk-twl6040
 clk-versaclock3
 clk-versaclock5
@@ -1227,6 +1230,7 @@ drm_display_helper
 drm_dma_helper
 drm_dp_aux_bus
 drm_exec
+drm_gpuvm
 drm_kms_helper
 drm_mipi_dbi
 drm_shmem_helper
@@ -1355,13 +1359,13 @@ dwc3-meson-g12a
 dwc3-of-simple
 dwc3-omap
 dwc3-qcom
+dwc3-rtk
 dwmac-altr-socfpga
 dwmac-dwc-qos-eth
 dwmac-generic
 dwmac-imx
 dwmac-intel-plat
 dwmac-ipq806x
-dwmac-loongson
 dwmac-mediatek
 dwmac-meson
 dwmac-meson8b
@@ -1408,7 +1412,6 @@ echo
 ecrdsa_generic
 edt-ft5x06
 ee1004
-eeprom
 eeprom_93cx6
 eeprom_93xx46
 eeti_ts
@@ -1496,6 +1499,7 @@ extcon-palmas
 extcon-ptn5150
 extcon-qcom-spmi-misc
 extcon-rt8973a
+extcon-rtk-type-c
 extcon-sm5502
 extcon-usb-gpio
 extcon-usbc-cros-ec
@@ -1664,6 +1668,7 @@ gb-audio-codec
 gb-audio-gb
 gb-audio-manager
 gb-audio-module
+gb-beagleplay
 gb-bootrom
 gb-es2
 gb-firmware
@@ -1710,6 +1715,7 @@ gcc-sdx55
 gcc-sdx65
 gcc-sdx75
 gcc-sm7150
+gcc-sm8550
 gdmtty
 gdmulte
 ge2d
@@ -2276,6 +2282,7 @@ ics932s401
 icss_iep
 idma64
 idmouse
+idpf
 idt77252
 idt_89hpesx
 idt_gen2
@@ -2382,6 +2389,7 @@ imx8qxp-ldb
 imx8qxp-pixel-combiner
 imx8qxp-pixel-link
 imx8qxp-pxl2dpi
+imx93-mipi-dsi
 imx93-pd
 imx93-src
 imx93_adc
@@ -2563,7 +2571,6 @@ ir-nec-decoder
 ir-rc5-decoder
 ir-rc6-decoder
 ir-rcmm-decoder
-ir-rx51
 ir-sanyo-decoder
 ir-sharp-decoder
 ir-sony-decoder
@@ -2756,6 +2763,7 @@ leds-gpio
 leds-group-multicolor
 leds-is31fl319x
 leds-is31fl32xx
+leds-ktd202x
 leds-ktd2692
 leds-lm3530
 leds-lm3532
@@ -2814,6 +2822,7 @@ ledtrig-audio
 ledtrig-backlight
 ledtrig-camera
 ledtrig-default-on
+ledtrig-gpio
 ledtrig-heartbeat
 ledtrig-netdev
 ledtrig-oneshot
@@ -2947,6 +2956,7 @@ lrw
 lt3651-charger
 lt7182s
 ltc1660
+ltc2309
 ltc2471
 ltc2485
 ltc2496
@@ -2962,6 +2972,7 @@ ltc2947-spi
 ltc2978
 ltc2983
 ltc2990
+ltc2991
 ltc2992
 ltc3589
 ltc3676
@@ -3114,6 +3125,7 @@ max6650
 max6697
 max6875
 max7359_keypad
+max77503-regulator
 max77541
 max77541-adc
 max77541-regulator
@@ -3191,6 +3203,7 @@ mcp251xfd
 mcp3021
 mcp320x
 mcp3422
+mcp3564
 mcp3911
 mcp4018
 mcp41010
@@ -3205,6 +3218,7 @@ mcs7830
 mcs_touchkey
 mct_u232
 mctp-i2c
+mctp-i3c
 mctp-serial
 md-cluster
 md4
@@ -3271,6 +3285,7 @@ metro-usb
 metronomefb
 mf6x4
 mgag200
+mgb4
 mhi
 mhi_ep
 mhi_net
@@ -3301,6 +3316,7 @@ mlx4_en
 mlx4_ib
 mlx5-vfio-pci
 mlx5_core
+mlx5_dpll
 mlx5_ib
 mlx5_vdpa
 mlx90614
@@ -3316,6 +3332,7 @@ mlxsw_i2c
 mlxsw_minimal
 mlxsw_pci
 mlxsw_spectrum
+mm8013
 mma7455_core
 mma7455_i2c
 mma7455_spi
@@ -3468,6 +3485,9 @@ mt7921-common
 mt7921e
 mt7921s
 mt7921u
+mt7925-common
+mt7925e
+mt7925u
 mt792x-lib
 mt792x-usb
 mt7986-wm8960
@@ -3481,6 +3501,7 @@ mt8192-mt6359-rt1015-rt5682
 mt8195-mt6359
 mt9m001
 mt9m111
+mt9m114
 mt9p031
 mt9t112
 mt9v011
@@ -3787,6 +3808,7 @@ nouveau
 novatek-nvt-ts
 nozomi
 npcm-rng
+npcm-video
 npcm750-pwm-fan
 npcm_adc
 npcm_edac
@@ -3815,10 +3837,11 @@ nvec_power
 nvec_ps2
 nvidiafb
 nvme
-nvme-common
+nvme-auth
 nvme-core
 nvme-fabrics
 nvme-fc
+nvme-keyring
 nvme-loop
 nvme-rdma
 nvme-tcp
@@ -3982,10 +4005,12 @@ panel-himax-hx8394
 panel-ilitek-ili9322
 panel-ilitek-ili9341
 panel-ilitek-ili9881c
+panel-ilitek-ili9882t
 panel-innolux-ej030na
 panel-innolux-p079zca
 panel-jadard-jd9365da-h3
 panel-jdi-fhd-r63452
+panel-jdi-lpm102a188a
 panel-jdi-lt070me05000
 panel-khadas-ts050
 panel-kingdisplay-kd097d04
@@ -4014,6 +4039,7 @@ panel-panasonic-vvx10f034n00
 panel-raspberrypi-touchscreen
 panel-raydium-rm67191
 panel-raydium-rm68200
+panel-raydium-rm692e5
 panel-ronbo-rb070d30
 panel-samsung-atna33xc20
 panel-samsung-db7430
@@ -4135,6 +4161,7 @@ pci-stub
 pci200syn
 pcie-mediatek-gen3
 pcie-qcom-ep
+pcie-rcar-gen4
 pcie-rockchip-host
 pcips2
 pcl711
@@ -4257,8 +4284,6 @@ phy-rockchip-pcie
 phy-rockchip-snps-pcie3
 phy-rockchip-typec
 phy-rockchip-usb
-phy-rtk-usb2
-phy-rtk-usb3
 phy-sunplus-usb2
 phy-tahvo
 phy-tegra-usb
@@ -4297,7 +4322,12 @@ pinctrl-msm8909
 pinctrl-msm8916
 pinctrl-msm8960
 pinctrl-msm8x74
+pinctrl-npcm8xx
 pinctrl-rk805
+pinctrl-rtd
+pinctrl-rtd1315e
+pinctrl-rtd1319d
+pinctrl-rtd1619b
 pinctrl-sdx55
 pinctrl-sdx65
 pinctrl-spmi-gpio
@@ -4334,6 +4364,8 @@ pm2fb
 pm3fb
 pm6764tr
 pm80xx
+pm8916_bms_vm
+pm8916_lbc
 pm8916_wdt
 pm8941-pwrkey
 pm8xxx-vibrator
@@ -4359,6 +4391,7 @@ polynomial
 polyval-generic
 port100
 powermate
+powerz
 powr1220
 ppa
 ppdev
@@ -4388,6 +4421,7 @@ psnap
 pstore_blk
 pstore_zone
 psxpad-spi
+ptn36502
 ptp-qoriq
 ptp_clockmatrix
 ptp_dfl_tod
@@ -4413,6 +4447,7 @@ pwm-berlin
 pwm-clk
 pwm-cros-ec
 pwm-dwc
+pwm-dwc-core
 pwm-fan
 pwm-fsl-ftm
 pwm-hibvt
@@ -4544,7 +4579,6 @@ qla2xxx
 qla3xxx
 qla4xxx
 qlcnic
-qlge
 qm1d1b0004
 qm1d1c0042
 qmi_helpers
@@ -4566,6 +4600,7 @@ qnoc-sdm670
 qnoc-sdm845
 qnoc-sdx55
 qnoc-sdx65
+qnoc-sdx75
 qnoc-sm6350
 qnoc-sm8150
 qnoc-sm8250
@@ -4597,7 +4632,6 @@ r8152
 r8153_ecm
 r8169
 r8192e_pci
-r8192u_usb
 r820t
 r852
 r8712u
@@ -4897,6 +4931,7 @@ rocker
 rohm-bd71828
 rohm-bd718x7
 rohm-bd9576
+rohm-bm1390
 rohm-bu27008
 rohm-bu27034
 rohm-regulator
@@ -5066,6 +5101,7 @@ rtc-s5m
 rtc-sd3078
 rtc-sh
 rtc-snvs
+rtc-ssd202d
 rtc-stk17ta8
 rtc-sunplus
 rtc-tegra
@@ -5273,6 +5309,7 @@ scmi-cpufreq
 scmi-hwmon
 scmi-regulator
 scmi_iio
+scmi_perf_domain
 scmi_pm_domain
 scmi_power_control
 scpi-cpufreq
@@ -5295,6 +5332,7 @@ sdhci-cadence
 sdhci-dove
 sdhci-milbeaut
 sdhci-msm
+sdhci-npcm
 sdhci-of-arasan
 sdhci-of-aspeed
 sdhci-of-at91
@@ -5591,9 +5629,11 @@ snd-soc-audio-graph-card2
 snd-soc-audio-graph-card2-custom-sample
 snd-soc-audio-iio-aux
 snd-soc-aw8738
+snd-soc-aw87390
 snd-soc-aw88261
 snd-soc-aw88395
 snd-soc-aw88395-lib
+snd-soc-aw88399
 snd-soc-bd28623
 snd-soc-bt-sco
 snd-soc-chv3-codec
@@ -5814,6 +5854,7 @@ snd-soc-rt715
 snd-soc-rt715-sdca
 snd-soc-rt722-sdca
 snd-soc-rt9120
+snd-soc-rtq9128
 snd-soc-sc7180
 snd-soc-sc7280
 snd-soc-sc8280xp
@@ -5981,7 +6022,6 @@ socfpga-a10
 socinfo
 softdog
 softing
-solo6x10
 solos-pci
 sony-btf-mpx
 soundwire-bus
@@ -6080,6 +6120,7 @@ spi-ti-qspi
 spi-tle62x0
 spi-wpcm-fiu
 spi-xcomm
+spi-xilinx
 spi-zynqmp-gqspi
 spi_ks8995
 spidev
