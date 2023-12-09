@@ -33,7 +33,6 @@ bch
 bcm84881
 binfmt_elf_fdpic
 binfmt_script
-brcmstb_gisb
 bsg
 cbc
 cdrom
@@ -110,6 +109,7 @@ crypto_acompress
 crypto_algapi
 crypto_hash
 crypto_null
+crypto_skcipher
 cryptomgr
 ctr
 cts
@@ -143,6 +143,7 @@ extcon-core
 exynos_thermal
 fat
 fb
+fb_io_fops
 fb_sys_fops
 fddi
 fec
@@ -246,6 +247,7 @@ mxc-clk
 n_null
 nand
 nandcore
+netkit
 nls_base
 nls_cp437
 npcm_wdt
@@ -298,6 +300,8 @@ public_key
 qcom-ipcc
 qcom-pdc
 qcom-scm
+qcom_qseecom
+qcom_qseecom_uefisecapp
 qcom_rpmh
 ramoops
 rapidio
@@ -351,7 +355,6 @@ sha256_generic
 sha3_generic
 sha512_generic
 sig
-skcipher
 slhc
 sm501
 smc91x
@@ -379,6 +382,7 @@ sysfillrect
 sysimgblt
 t10-pi
 tcp_cubic
+tcp_sigpool
 tegra-tcu
 tegra124-emc
 tegra20-apb-dma
@@ -409,7 +413,6 @@ ucs2_string
 udc-core
 uhci-hcd
 uinput
-unix
 usb-common
 usbcore
 utf8data
