@@ -294,6 +294,9 @@ CONFIG_INTEL_ATOMISP2_PM                        note<'LP: #2017444'>
 CONFIG_INTEL_IOMMU_DEFAULT_ON                   policy<{'amd64': 'n'}>
 CONFIG_INTEL_IOMMU_DEFAULT_ON                   note<'the IOMMU can trigger boot failures'>
 
+CONFIG_INTEL_TDX_HOST                           policy<{'amd64': 'y'}>
+CONFIG_INTEL_TDX_HOST                           note<'LP: #2046040'>
+
 CONFIG_IOMMU_DEBUGFS                            policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_IOMMU_DEBUGFS                            note<'LP: #1861057'>
 
@@ -6541,7 +6544,6 @@ CONFIG_INTEL_STRATIX10_SERVICE                  policy<{'arm64': 'm'}>
 CONFIG_INTEL_TCC                                policy<{'amd64': 'y'}>
 CONFIG_INTEL_TCC_COOLING                        policy<{'amd64': 'm'}>
 CONFIG_INTEL_TDX_GUEST                          policy<{'amd64': 'y'}>
-CONFIG_INTEL_TDX_HOST                           policy<{'amd64': 'n'}>
 CONFIG_INTEL_TELEMETRY                          policy<{'amd64': 'm'}>
 CONFIG_INTEL_TH                                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_INTEL_TH_ACPI                            policy<{'amd64': 'm', 'arm64': 'm', 'riscv64': 'm'}>
