@@ -243,6 +243,12 @@ static void __init lsm_set_blob_sizes(struct lsm_blob_sizes *needed)
 		else
 			needed->lbs_secmark = false;
 	}
+	if (needed->lbs_netlabel) {
+		if (!blob_sizes.lbs_netlabel)
+			blob_sizes.lbs_netlabel = true;
+		else
+			needed->lbs_netlabel = false;
+	}
 }
 
 /* Prepare LSM for initialization. */
