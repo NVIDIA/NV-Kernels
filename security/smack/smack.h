@@ -367,6 +367,11 @@ static inline struct smack_known **smack_key(const struct key *key)
 }
 #endif /* CONFIG_KEYS */
 
+static inline bool smack_netlabel(void)
+{
+	return smack_blob_sizes.lbs_netlabel;
+}
+
 /*
  * Is the directory transmuting?
  */
