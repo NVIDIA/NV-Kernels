@@ -330,6 +330,9 @@ CONFIG_KVM                                      note<'LP: #1532886'>
 CONFIG_LATENCYTOP                               policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_LATENCYTOP                               note<'LP: #1655986'>
 
+CONFIG_LEGACY_TIOCSTI                           policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
+CONFIG_LEGACY_TIOCSTI                           note<'LP:#2046192'>
+
 CONFIG_LOAD_PPC_KEYS                            policy<{'ppc64el': 'y'}>
 CONFIG_LOAD_PPC_KEYS                            note<'LP: #1866909'>
 
@@ -7302,7 +7305,6 @@ CONFIG_LED_TRIGGER_PHY                          policy<{'amd64': 'y', 'arm64': '
 CONFIG_LEGACY_DIRECT_IO                         policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_LEGACY_PTYS                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_LEGACY_PTY_COUNT                         policy<{'amd64': '0', 'arm64': '0', 'armhf': '0', 'ppc64el': '0', 'riscv64': '0', 's390x': '0'}>
-CONFIG_LEGACY_TIOCSTI                           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_LEGACY_VSYSCALL_NONE                     policy<{'amd64': 'n'}>
 CONFIG_LEGACY_VSYSCALL_XONLY                    policy<{'amd64': 'y'}>
 CONFIG_LENOVO_YMC                               policy<{'amd64': 'm'}>
