@@ -1,2 +1,0 @@
-mstflint     4.26.0-1         modulename=mstflint_access debpath=pool/universe/m/%package%/mstflint-dkms_%version%_all.deb         arch=amd64 arch=arm64 rprovides=mstflint-modules rprovides=mstflint-dkms
-nvidia-fs    2.17.4-0         modulename=nvidia-fs       debpath=pool/universe/n/%package%/nvidia-fs-dkms_%version%_amd64.deb      arch=amd64 arch=arm64 rprovides=nvidia-fs-modules rprovides=nvidia-fs-dkms type=standalone
