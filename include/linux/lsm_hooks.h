@@ -84,6 +84,7 @@ struct lsm_blob_sizes {
 	int	lbs_xattr_count; /* number of xattr slots in new_xattrs array */
 	int	lbs_mnt_opts;
 	bool	lbs_secmark;	/* expressed desire for secmark use */
+	bool	lbs_netlabel;	/* expressed desire for netlabel use */
 };
 
 /**

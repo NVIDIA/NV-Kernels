@@ -134,4 +134,9 @@ static inline int selinux_netlbl_socket_connect_locked(struct sock *sk,
 }
 #endif /* CONFIG_NETLABEL */
 
+static inline bool selinux_netlbl_enabled(void)
+{
+	return selinux_blob_sizes.lbs_netlabel && netlbl_enabled();
+}
+
 #endif
