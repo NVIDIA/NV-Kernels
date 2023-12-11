@@ -326,7 +326,7 @@ bool __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
 		 * frequency (by keeping the initial capacity_freq_ref value).
 		 */
 		cpu_clk = of_clk_get(cpu_node, 0);
-		if (!IS_ERR_OR_NULL(cpu_clk)) {
+		if (!PTR_ERR_OR_ZERO(cpu_clk)) {
 			per_cpu(capacity_freq_ref, cpu) =
 				clk_get_rate(cpu_clk) / HZ_PER_KHZ;
 			clk_put(cpu_clk);
@@ -344,16 +344,11 @@ bool __init topology_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
 	return !ret;
 }
 
-void __weak freq_inv_set_max_ratio(int cpu, u64 max_rate)
-{
-}
-
 #ifdef CONFIG_ACPI_CPPC_LIB
 #include <acpi/cppc_acpi.h>
 
 void topology_init_cpu_capacity_cppc(void)
 {
-	u64 capacity, capacity_scale = 0;
 	struct cppc_perf_caps perf_caps;
 	int cpu;
 
@@ -370,10 +365,6 @@ void topology_init_cpu_capacity_cppc(void)
 		    (perf_caps.highest_perf >= perf_caps.nominal_perf) &&
 		    (perf_caps.highest_perf >= perf_caps.lowest_perf)) {
 			raw_capacity[cpu] = perf_caps.highest_perf;
-			capacity_scale = max_t(u64, capacity_scale, raw_capacity[cpu]);
-
-			per_cpu(capacity_freq_ref, cpu) = cppc_perf_to_khz(&perf_caps, raw_capacity[cpu]);
-
 			pr_debug("cpu_capacity: CPU%d cpu_capacity=%u (raw).\n",
 				 cpu, raw_capacity[cpu]);
 			continue;
@@ -384,18 +375,7 @@ void topology_init_cpu_capacity_cppc(void)
 		goto exit;
 	}
 
-	for_each_possible_cpu(cpu) {
-		freq_inv_set_max_ratio(cpu,
-				       per_cpu(capacity_freq_ref, cpu) * HZ_PER_KHZ);
-
-		capacity = raw_capacity[cpu];
-		capacity = div64_u64(capacity << SCHED_CAPACITY_SHIFT,
-				     capacity_scale);
-		topology_set_cpu_scale(cpu, capacity);
-		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
-			cpu, topology_get_cpu_scale(cpu));
-	}
-
+	topology_normalize_cpu_scale();
 	schedule_work(&update_topology_flags_work);
 	pr_debug("cpu_capacity: cpu_capacity initialization done\n");
 
@@ -417,6 +397,9 @@ init_cpu_capacity_callback(struct notifier_block *nb,
 	struct cpufreq_policy *policy = data;
 	int cpu;
 
+	if (!raw_capacity)
+		return 0;
+
 	if (val != CPUFREQ_CREATE_POLICY)
 		return 0;
 
@@ -426,18 +409,13 @@ init_cpu_capacity_callback(struct notifier_block *nb,
 
 	cpumask_andnot(cpus_to_visit, cpus_to_visit, policy->related_cpus);
 
-	for_each_cpu(cpu, policy->related_cpus) {
+	for_each_cpu(cpu, policy->related_cpus)
 		per_cpu(capacity_freq_ref, cpu) = policy->cpuinfo.max_freq;
-		freq_inv_set_max_ratio(cpu,
-				       per_cpu(capacity_freq_ref, cpu) * HZ_PER_KHZ);
-	}
 
 	if (cpumask_empty(cpus_to_visit)) {
-		if (raw_capacity) {
-			topology_normalize_cpu_scale();
-			schedule_work(&update_topology_flags_work);
-			free_raw_capacity();
-		}
+		topology_normalize_cpu_scale();
+		schedule_work(&update_topology_flags_work);
+		free_raw_capacity();
 		pr_debug("cpu_capacity: parsing done\n");
 		schedule_work(&parsing_done_work);
 	}
@@ -457,7 +435,7 @@ static int __init register_cpufreq_notifier(void)
 	 * On ACPI-based systems skip registering cpufreq notifier as cpufreq
 	 * information is not needed for cpu capacity initialization.
 	 */
-	if (!acpi_disabled)
+	if (!acpi_disabled || !raw_capacity)
 		return -EINVAL;
 
 	if (!alloc_cpumask_var(&cpus_to_visit, GFP_KERNEL))
