@@ -233,6 +233,12 @@ static void __init lsm_set_blob_sizes(struct lsm_blob_sizes *needed)
 	lsm_set_blob_size(&needed->lbs_task, &blob_sizes.lbs_task);
 	lsm_set_blob_size(&needed->lbs_xattr_count,
 			  &blob_sizes.lbs_xattr_count);
+	if (needed->lbs_secmark) {
+		if (!blob_sizes.lbs_secmark)
+			blob_sizes.lbs_secmark = true;
+		else
+			needed->lbs_secmark = false;
+	}
 }
 
 /* Prepare LSM for initialization. */

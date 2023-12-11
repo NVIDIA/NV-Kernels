@@ -51,6 +51,11 @@ struct aa_sk_ctx {
 	struct aa_label *peer;
 };
 
+static inline bool aa_secmark(void)
+{
+	return apparmor_blob_sizes.lbs_secmark;
+}
+
 static inline struct aa_sk_ctx *aa_sock(const struct sock *sk)
 {
 	return sk->sk_security + apparmor_blob_sizes.lbs_sock;
