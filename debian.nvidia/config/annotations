@@ -39,24 +39,10 @@ CONFIG_TCG_TIS_SPI                              note<'ensures the TPM is availab
 
 # ---- Annotations without notes ----
 
-CONFIG_ARCH_SUPPORTS_SHADOW_CALL_STACK          policy<{'arm64': '-'}>
-CONFIG_AS_VERSION                               policy<{'amd64': '23800', 'arm64': '23800'}>
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
-CONFIG_CC_HAS_AUTO_VAR_INIT_PATTERN             policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO                policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO_BARE           policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_CC_HAVE_SHADOW_CALL_STACK                policy<{'arm64': '-'}>
-CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'arm64': '"aarch64-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"'}>
 CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
-CONFIG_DEBUG_INFO_COMPRESSED_ZSTD               policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_GCC_VERSION                              policy<{'amd64': '110400', 'arm64': '110400'}>
 CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
-CONFIG_INIT_STACK_ALL_PATTERN                   policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_INIT_STACK_ALL_ZERO                      policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_INIT_STACK_NONE                          policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_KCOV                                     policy<{'amd64': 'n', 'arm64': '-'}>
-CONFIG_LD_VERSION                               policy<{'amd64': '23800', 'arm64': '23800'}>
 CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
 CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
@@ -66,5 +52,4 @@ CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': '-'}>
 CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-'}>
 CONFIG_SAMPLES_RUST                             policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
-CONFIG_SHADOW_CALL_STACK                        policy<{'arm64': '-'}>
 CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': '-'}>
