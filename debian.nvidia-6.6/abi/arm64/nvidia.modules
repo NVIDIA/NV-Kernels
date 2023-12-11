@@ -573,7 +573,6 @@ baycom_par
 baycom_ser_fdx
 baycom_ser_hdx
 bcache
-bch
 bcm-keypad
 bcm-phy-lib
 bcm-phy-ptp
@@ -839,7 +838,6 @@ chcr
 chipone-icn6211
 chipone_icn8318
 chipone_icn8505
-chipreg
 chnl_net
 chromeos_acpi
 chromeos_privacy_screen
@@ -1003,7 +1001,6 @@ comedi_parport
 comedi_pci
 comedi_test
 comedi_usb
-comm
 contec_pci_dio
 cordic
 core
@@ -1589,7 +1586,6 @@ f81232
 f81534
 f81601
 f81604
-failover
 fakelb
 fan53555
 fan53880
@@ -3191,7 +3187,6 @@ mali-dp
 mantis
 mantis_core
 map_absent
-map_funcs
 map_ram
 map_rom
 marvell
@@ -3639,7 +3634,6 @@ mt9t112
 mt9v011
 mt9v032
 mt9v111
-mtd
 mtd_blkdevs
 mtd_dataflash
 mtdblock
@@ -3726,7 +3720,6 @@ n5pf
 n_gsm
 n_hdlc
 nand
-nandcore
 nandsim
 national
 natsemi
@@ -3752,7 +3745,6 @@ neofb
 net1080
 net2272
 net2280
-net_failover
 netconsole
 netdevsim
 netfs
@@ -3990,6 +3982,7 @@ nvmem-reboot-mode
 nvmem-rmem
 nvmem-rockchip-otp
 nvmem-sc27xx-efuse
+nvmem_meson_efuse
 nvmem_meson_mx_efuse
 nvmem_mtk-efuse
 nvmem_qcom-spmi-sdam
@@ -6342,7 +6335,6 @@ spi-synquacer
 spi-tegra114
 spi-tegra20-sflash
 spi-tegra20-slink
-spi-tegra210-quad
 spi-thunderx
 spi-tle62x0
 spi-wpcm-fiu
@@ -6352,7 +6344,6 @@ spi-zynqmp-gqspi
 spi_ks8995
 spidev
 spinand
-spl
 spmi
 spmi-mtk-pmif
 spmi-pmic-arb
@@ -6816,7 +6807,6 @@ tpm_st33zp24_i2c
 tpm_st33zp24_spi
 tpm_tis_i2c
 tpm_tis_i2c_cr50
-tpm_tis_spi
 tpm_tis_synquacer
 tpm_vtpm_proxy
 tps23861
@@ -7160,7 +7150,6 @@ virtio_crypto
 virtio_dma_buf
 virtio_input
 virtio_mem
-virtio_net
 virtio_pmem
 virtio_rpmsg_bus
 virtio_snd
@@ -7185,11 +7174,13 @@ vme_tsi148
 vme_user
 vmgenid
 vmk80xx
+vmw_pvrdma
 vmw_vmci
 vmw_vsock_virtio_transport
 vmw_vsock_virtio_transport_common
 vmw_vsock_vmci_transport
 vmwgfx
+vmxnet3
 vp27smpx
 vp_vdpa
 vport-geneve
@@ -7478,7 +7469,6 @@ zd1301
 zd1301_demod
 zet6223
 zforce_ts
-zfs
 zhenhua
 ziirave_wdt
 zinitix
