@@ -156,11 +156,7 @@ unsigned long get_capacity_ref_freq(struct cpufreq_policy *policy)
 	if (arch_scale_freq_invariant())
 		return policy->cpuinfo.max_freq;
 
-	/*
-	 * Apply a 25% margin so that we select a higher frequency than
-	 * the current one before the CPU is fully busy:
-	 */
-	return policy->cur + (policy->cur >> 2);
+	return policy->cur;
 }
 
 /**
