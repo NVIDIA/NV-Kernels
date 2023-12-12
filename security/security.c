@@ -4191,17 +4191,16 @@ EXPORT_SYMBOL(security_ismaclabel);
 /**
  * security_secid_to_secctx() - Convert a secid to a secctx
  * @secid: secid
- * @secdata: secctx
- * @seclen: secctx length
+ * @cp: the LSM context
  *
- * Convert secid to security context.  If @secdata is NULL the length of the
- * result will be returned in @seclen, but no @secdata will be returned.  This
+ * Convert secid to security context.  If @cp is NULL the length of the
+ * result will be returned, but no data will be returned.  This
  * does mean that the length could change between calls to check the length and
- * the next call which actually allocates and returns the @secdata.
+ * the next call which actually allocates and returns the data.
  *
- * Return: Return 0 on success, error on failure.
+ * Return: Return length of data on success, error on failure.
  */
-int security_secid_to_secctx(u32 secid, char **secdata, u32 *seclen)
+int security_secid_to_secctx(u32 secid, struct lsmcontext *cp)
 {
 	struct security_hook_list *hp;
 	int rc;
@@ -4211,7 +4210,7 @@ int security_secid_to_secctx(u32 secid, char **secdata, u32 *seclen)
 	 * LSM hook is not "stackable").
 	 */
 	hlist_for_each_entry(hp, &security_hook_heads.secid_to_secctx, list) {
-		rc = hp->hook.secid_to_secctx(secid, secdata, seclen);
+		rc = hp->hook.secid_to_secctx(secid, cp);
 		if (rc != LSM_RET_DEFAULT(secid_to_secctx))
 			return rc;
 	}
@@ -4240,7 +4239,7 @@ int security_lsmblob_to_secctx(struct lsmblob *blob, char **secdata,
 	struct security_hook_list *hp;
 	int rc;
 
-	hlist_for_each_entry(hp, &security_hook_heads.secid_to_secctx, list) {
+	hlist_for_each_entry(hp, &security_hook_heads.lsmblob_to_secctx, list) {
 		rc = hp->hook.lsmblob_to_secctx(blob, secdata, seclen);
 		if (rc != LSM_RET_DEFAULT(secid_to_secctx))
 			return rc;
