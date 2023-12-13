@@ -1221,8 +1221,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 	struct audit_buffer	*ab;
 	u16			msg_type = nlh->nlmsg_type;
 	struct audit_sig_info   *sig_data;
-	char			*ctx = NULL;
-	u32			len;
+	struct lsmcontext	lsmctx;
 
 	err = audit_netlink_ok(skb, msg_type);
 	if (err)
@@ -1471,30 +1470,34 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 		kfree(new);
 		break;
 	}
-	case AUDIT_SIGNAL_INFO:
-		len = 0;
+	case AUDIT_SIGNAL_INFO: {
+		size_t sig_data_size;
+
 		if (lsmblob_is_set(&audit_sig_lsm)) {
-			err = security_lsmblob_to_secctx(&audit_sig_lsm, &ctx,
-							 &len);
+			err = security_lsmblob_to_secctx(&audit_sig_lsm,
+							 &lsmctx.context,
+							 &lsmctx.len);
 			if (err)
 				return err;
 		}
-		sig_data = kmalloc(struct_size(sig_data, ctx, len), GFP_KERNEL);
+		sig_data_size = struct_size(sig_data, ctx, lsmctx.len);
+		sig_data = kmalloc(sig_data_size, GFP_KERNEL);
 		if (!sig_data) {
 			if (lsmblob_is_set(&audit_sig_lsm))
-				security_release_secctx(ctx, len);
+				security_release_secctx(&lsmctx);
 			return -ENOMEM;
 		}
 		sig_data->uid = from_kuid(&init_user_ns, audit_sig_uid);
 		sig_data->pid = audit_sig_pid;
 		if (lsmblob_is_set(&audit_sig_lsm)) {
-			memcpy(sig_data->ctx, ctx, len);
-			security_release_secctx(ctx, len);
+			memcpy(sig_data->ctx, lsmctx.context, lsmctx.len);
+			security_release_secctx(&lsmctx);
 		}
 		audit_send_reply(skb, seq, AUDIT_SIGNAL_INFO, 0, 0,
-				 sig_data, struct_size(sig_data, ctx, len));
+				 sig_data, sig_data_size);
 		kfree(sig_data);
 		break;
+	}
 	case AUDIT_TTY_GET: {
 		struct audit_tty_status s;
 		unsigned int t;
@@ -2181,24 +2184,23 @@ void audit_log_key(struct audit_buffer *ab, char *key)
 
 int audit_log_task_context(struct audit_buffer *ab)
 {
+	struct lsmcontext ctx;
 	struct lsmblob blob;
-	char *ctx = NULL;
-	unsigned len;
 	int error;
 
 	security_current_getlsmblob_subj(&blob);
 	if (!lsmblob_is_set(&blob))
 		return 0;
 
-	error = security_lsmblob_to_secctx(&blob, &ctx, &len);
+	error = security_lsmblob_to_secctx(&blob, &ctx.context, &ctx.len);
 	if (error) {
 		if (error != -EINVAL)
 			goto error_path;
 		return 0;
 	}
 
-	audit_log_format(ab, " subj=%s", ctx);
-	security_release_secctx(ctx, len);
+	audit_log_format(ab, " subj=%s", ctx.context);
+	security_release_secctx(&ctx);
 	return 0;
 
 error_path:
