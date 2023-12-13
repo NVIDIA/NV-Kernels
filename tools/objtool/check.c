@@ -4500,7 +4500,9 @@ static int validate_sls(struct objtool_file *file)
 		}
 	}
 
-	return warnings;
+	/* SLS is an optional security safety feature, make it fatal
+	 * to ensure no new code is introduced that fails SLS */
+	return -warnings;
 }
 
 static bool ignore_noreturn_call(struct instruction *insn)
