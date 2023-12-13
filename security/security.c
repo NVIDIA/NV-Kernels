@@ -4336,24 +4336,24 @@ EXPORT_SYMBOL(security_inode_setsecctx);
 /**
  * security_inode_getsecctx() - Get the security label of an inode
  * @inode: inode
- * @ctx: secctx
- * @ctxlen: length of secctx
+ * @cp: security context
  *
- * On success, returns 0 and fills out @ctx and @ctxlen with the security
- * context for the given @inode.
+ * On success, returns 0 and fills out @cp with the security context
+ * for the given @inode.
  *
  * Return: Returns 0 on success, error on failure.
  */
-int security_inode_getsecctx(struct inode *inode, void **ctx, u32 *ctxlen)
+int security_inode_getsecctx(struct inode *inode, struct lsmcontext *cp)
 {
 	struct security_hook_list *hp;
 	int rc;
 
+	memset(cp, 0, sizeof(*cp));
 	/*
 	 * Only one module will provide a security context.
 	 */
 	hlist_for_each_entry(hp, &security_hook_heads.inode_getsecctx, list) {
-		rc = hp->hook.inode_getsecctx(inode, ctx, ctxlen);
+		rc = hp->hook.inode_getsecctx(inode, cp);
 		if (rc != LSM_RET_DEFAULT(inode_getsecctx))
 			return rc;
 	}
