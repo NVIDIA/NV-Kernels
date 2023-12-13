@@ -55,6 +55,7 @@ enum {
 	IOMMUFD_CMD_VIOMMU_ALLOC,
 	IOMMUFD_CMD_VIOMMU_SET_VDEV_ID,
 	IOMMUFD_CMD_VIOMMU_UNSET_VDEV_ID,
+	IOMMUFD_CMD_VIOMMU_INVALIDATE,
 };
 
 /**
@@ -977,4 +978,40 @@ struct iommu_viommu_unset_vdev_id {
 	__aligned_u64 vdev_id;
 };
 #define IOMMU_VIOMMU_UNSET_VDEV_ID _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VIOMMU_UNSET_VDEV_ID)
+
+/**
+ * enum iommu_viommu_invalidate_data_type - VIOMMU Cache Invalidate Data Type
+ * @IOMMU_VIOMMU_INVALIDATE_DATA_ARM_SMMUV3: Invalidation data for ARM SMMUv3
+ */
+enum iommu_viommu_invalidate_data_type {
+	IOMMU_VIOMMU_INVALIDATE_DATA_ARM_SMMUV3,
+};
+
+/**
+ * struct iommu_viommu_invalidate - ioctl(IOMMU_VIOMMU_INVALIDATE)
+ * @size: sizeof(struct iommu_viommu_invalidate)
+ * @viommu_id: viommu ID for cache invalidation
+ * @data_uptr: User pointer to an array of driver-specific viommu cache
+ *             invalidation data
+ * @data_type: One of enum iommu_viommu_invalidate_data_type, defining the data
+ *             type of all the entries in the invalidation request array.
+ * @entry_len: Length (in bytes) of a request entry in the request array
+ * @entry_num: Input the number of cache invalidation requests in the array.
+ *             Output the number of requests successfully handled by kernel.
+ * @__reserved: Must be 0
+ *
+ * Invalidate an iommu HW cache used by a viommu in the user space.
+ * Each ioctl can support one or more cache invalidation requests in the array
+ * that has a total size of @req_len * @req_num.
+ */
+struct iommu_viommu_invalidate {
+	__u32 size;
+	__u32 viommu_id;
+	__aligned_u64 data_uptr;
+	__u32 data_type;
+	__u32 entry_len;
+	__u32 entry_num;
+	__u32 __reserved;
+};
+#define IOMMU_VIOMMU_INVALIDATE _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VIOMMU_INVALIDATE)
 #endif

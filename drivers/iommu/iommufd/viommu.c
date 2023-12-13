@@ -194,3 +194,48 @@ out_put_idev:
 	iommufd_put_object(ucmd->ictx, &idev->obj);
 	return rc;
 }
+
+int iommufd_viommu_invalidate(struct iommufd_ucmd *ucmd)
+{
+	struct iommu_viommu_invalidate *cmd = ucmd->cmd;
+	struct iommu_user_data_array data_array = {
+		.type = cmd->data_type,
+		.uptr = u64_to_user_ptr(cmd->data_uptr),
+		.entry_len = cmd->entry_len,
+		.entry_num = cmd->entry_num,
+	};
+	struct iommufd_viommu *viommu;
+	u32 done_num = 0;
+	int rc;
+
+	if (cmd->__reserved) {
+		rc = -EOPNOTSUPP;
+		goto out;
+	}
+
+	if (cmd->entry_num && (!cmd->data_uptr || !cmd->entry_len)) {
+		rc = -EINVAL;
+		goto out;
+	}
+
+	viommu = iommufd_get_viommu(ucmd, cmd->viommu_id);
+	if (IS_ERR(viommu))
+		return PTR_ERR(viommu);
+
+	if (!viommu->ops || !viommu->ops->cache_invalidate) {
+		rc = -EOPNOTSUPP;
+		goto out_put_viommu;
+	}
+
+	rc = viommu->ops->cache_invalidate(viommu, &data_array);
+
+	done_num = data_array.entry_num;
+
+out_put_viommu:
+	iommufd_put_object(ucmd->ictx, &viommu->obj);
+out:
+	cmd->entry_num = done_num;
+	if (iommufd_ucmd_respond(ucmd, sizeof(*cmd)))
+		return -EFAULT;
+	return rc;
+}

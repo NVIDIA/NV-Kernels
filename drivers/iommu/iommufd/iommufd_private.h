@@ -551,6 +551,7 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd);
 void iommufd_viommu_destroy(struct iommufd_object *obj);
 int iommufd_viommu_set_vdev_id(struct iommufd_ucmd *ucmd);
 int iommufd_viommu_unset_vdev_id(struct iommufd_ucmd *ucmd);
+int iommufd_viommu_invalidate(struct iommufd_ucmd *ucmd);
 
 #ifdef CONFIG_IOMMUFD_TEST
 int iommufd_test(struct iommufd_ucmd *ucmd);
