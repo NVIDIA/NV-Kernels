@@ -4667,7 +4667,7 @@ static int cifs_readpage_worker(struct file *file, struct page *page,
 
 	/* we do not want atime to be less than mtime, it broke some apps */
 	file_inode(file)->i_atime = current_time(file_inode(file));
-	if (timespec64_compare(&(file_inode(file)->i_atime), &(file_inode(file)->i_mtime)))
+	if (timespec64_compare(&(file_inode(file)->i_atime), &(file_inode(file)->i_mtime)) < 0)
 		file_inode(file)->i_atime = file_inode(file)->i_mtime;
 	else
 		file_inode(file)->i_atime = current_time(file_inode(file));
