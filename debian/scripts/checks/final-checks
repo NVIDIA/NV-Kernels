@@ -40,13 +40,6 @@ abi_check()
 	then
 		failure "$arch/$flavour ABI modules file missing"
 	fi
-
-	if [ ! -f "$abidir/$flavour.retpoline" ] && \
-	   [ ! -f "$abidir/$flavour.ignore.retpoline" ] && \
-	   [ ! -f "$abidir/ignore.retpoline" ]
-	then
-		failure "$arch/$flavour ABI retpoline file missing"
-	fi
 }
 
 abi_version="$debian/abi/version"
