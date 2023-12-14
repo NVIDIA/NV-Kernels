@@ -18,13 +18,7 @@ module-signature-check-%: $(stampdir)/stamp-install-%
 		"$(DROOT)/$(mods_extra_pkg_name)-$*" \
 		$(do_skip_checks)
 
-# Check the reptoline jmp/call functions against the last release.
-retpoline-check-%: $(stampdir)/stamp-install-%
-	@echo Debug: $@
-	$(DROOT)/scripts/checks/retpoline-check "$*" \
-		"$(prev_abidir)" "$(abidir)" $(do_skip_checks)
-
-checks-%: module-check-% module-signature-check-% abi-check-% retpoline-check-%
+checks-%: module-check-% module-signature-check-% abi-check-%
 	@echo Debug: $@
 
 # Check the config against the known options list.

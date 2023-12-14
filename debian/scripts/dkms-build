@@ -144,7 +144,7 @@ shift 2
 # Copy the objects.
 echo "II: copying objects to '$to'"
 mkdir -p "$to"
-(cd "$from" && find -name \*.o -o -name \*.o.ur-\* -o -name \*.mod | cpio -Lpd "$to")
+(cd "$from" && find -name \*.o -o -name \*.mod | cpio -Lpd "$to")
 
 # Call the original post_install script if there is one.
 [ "$script" = '' ] && exit 0

@@ -281,8 +281,6 @@ endif
 	grep '^HOSTCC	.*$(gcc)$$' $(hdrdir)/Makefile
 	grep '^CC	.*$(gcc)$$' $(hdrdir)/Makefile
 	rm -rf $(hdrdir)/include2 $(hdrdir)/source
-	# We do not need the retpoline information.
-	find $(hdrdir) -name \*.o.ur-\* -exec rm -f {} \;
 	# Copy over the compilation version.
 	cp "$(builddir)/build-$*/include/generated/compile.h" \
 		"$(hdrdir)/include/generated/compile.h"
@@ -301,8 +299,6 @@ ifeq ($(build_arch),s390)
 endif
 	# Copy over scripts/module.lds for building external modules
 	cp $(builddir)/build-$*/scripts/module.lds $(hdrdir)/scripts
-	# Copy over the new retpoline extractor.
-	cp scripts/ubuntu-retpoline-extract-one $(hdrdir)/scripts
 	# Script to symlink everything up
 	$(SHELL) $(DROOT)/scripts/link-headers "$(hdrdir)" "$(indeppkg)" "$*"
 	# The build symlink
@@ -461,15 +457,6 @@ endif
 			print "" \
 		}' | sort -u >$(abidir)/$*.compiler
 
-	# Build the final ABI retpoline information.
-	if grep -q CONFIG_RETPOLINE=y $(builddir)/build-$*/.config; then \
-		echo "# retpoline v1.0" >$(abidir)/$*.retpoline; \
-		$(SHELL) $(DROOT)/scripts/retpoline-extract $(builddir)/build-$* $(CURDIR) | \
-			sort >>$(abidir)/$*.retpoline; \
-	else \
-		echo "# RETPOLINE NOT ENABLED" >$(abidir)/$*.retpoline; \
-	fi
-
 	# Build the buildinfo package content.
 	install -d $(pkgdir_bldinfo)/usr/lib/linux/$(abi_release)-$*
 	install -m644 $(builddir)/build-$*/.config \
@@ -480,8 +467,6 @@ endif
 		$(pkgdir_bldinfo)/usr/lib/linux/$(abi_release)-$*/modules
 	install -m644 $(abidir)/$*.fwinfo \
 		$(pkgdir_bldinfo)/usr/lib/linux/$(abi_release)-$*/fwinfo
-	install -m644 $(abidir)/$*.retpoline \
-		$(pkgdir_bldinfo)/usr/lib/linux/$(abi_release)-$*/retpoline
 	install -m644 $(abidir)/$*.compiler \
 		$(pkgdir_bldinfo)/usr/lib/linux/$(abi_release)-$*/compiler
 	if [ -f $(abidir)/$*.modules.builtin ] ; then \

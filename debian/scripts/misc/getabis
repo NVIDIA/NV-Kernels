@@ -126,11 +126,6 @@ getall_set()
 			else
 				echo "    NO ABI FILE"
 			fi
-			if [ -f tmp/boot/retpoline-* ]; then
-				mv tmp/boot/retpoline-* $abidir/$arch/$sub.retpoline
-			else
-				echo "    NO RETPOLINE FILE"
-			fi
 			(cd tmp; find lib/modules/$verabi-$sub/kernel -name '*.ko') | \
 				sed -e 's/.*\/\([^\/]*\)\.ko/\1/' | sort > \
 				$abidir/$arch/$sub.modules
@@ -157,7 +152,7 @@ getall_set()
 			echo "  buildinfo..."
 			base="tmp/usr/lib/linux/${verabi}-${sub}"
 			mv "$base/abi" "$abidir/$arch/$sub"
-			for comp in 'modules' 'retpoline' 'compiler'
+			for comp in 'modules' 'compiler'
 			do
 				mv "$base/$comp" "$abidir/$arch/$sub.$comp"
 			done
