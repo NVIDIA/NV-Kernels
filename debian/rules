@@ -118,10 +118,6 @@ $(foreach _m,$(all_built-in_dkms_modules), \
 # Either tools package needs the common source preparation
 do_any_tools=$(sort $(filter-out false,$(do_linux_tools) $(do_cloud_tools)))
 
-# NVIDIA DKMS package gross series split into desktop and server.
-nvidia_desktop_series=$(shell sed -n -e 's/^nvidia-graphics-drivers-\([0-9][0-9]*\) .*/\1/p' debian/dkms-versions)
-nvidia_server_series=$(shell sed -n -e 's/^nvidia-graphics-drivers-\([0-9][0-9]*-server\) .*/\1/p' debian/dkms-versions)
-
 # Debian Build System targets
 .PHONY: binary
 binary: binary-indep binary-arch
