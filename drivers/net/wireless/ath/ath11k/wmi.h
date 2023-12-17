@@ -6304,8 +6304,8 @@ enum wmi_wmm_params_type {
 	WMI_WMM_PARAM_TYPE_11AX_MU_EDCA = 1,
 };
 
-const void **ath11k_wmi_tlv_parse_alloc(struct ath11k_base *ab, const void *ptr,
-					size_t len, gfp_t gfp);
+const void **ath11k_wmi_tlv_parse_alloc(struct ath11k_base *ab,
+					struct sk_buff *skb, gfp_t gfp);
 int ath11k_wmi_cmd_send(struct ath11k_pdev_wmi *wmi, struct sk_buff *skb,
 			u32 cmd_id);
 struct sk_buff *ath11k_wmi_alloc_skb(struct ath11k_wmi_base *wmi_sc, u32 len);
