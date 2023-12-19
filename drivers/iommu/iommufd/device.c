@@ -136,6 +136,18 @@ void iommufd_device_destroy(struct iommufd_object *obj)
 	struct iommufd_device *idev =
 		container_of(obj, struct iommufd_device, obj);
 
+	/* Unlocked since there should be no race in a destroy() */
+	if (idev->vdev_id) {
+		struct iommufd_vdev_id *vdev_id = idev->vdev_id;
+		struct iommufd_viommu *viommu = vdev_id->viommu;
+		struct iommufd_vdev_id *old;
+
+		old = xa_cmpxchg(&viommu->vdev_ids, vdev_id->id, vdev_id, NULL,
+				 GFP_KERNEL);
+		WARN_ON(old != vdev_id);
+		kfree(vdev_id);
+		idev->vdev_id = NULL;
+	}
 	iommu_device_release_dma_owner(idev->dev);
 	iommufd_put_group(idev->igroup);
 	if (!iommufd_selftest_is_mock_dev(idev->dev))
