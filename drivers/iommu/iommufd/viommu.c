@@ -8,6 +8,15 @@ void iommufd_viommu_destroy(struct iommufd_object *obj)
 {
 	struct iommufd_viommu *viommu =
 		container_of(obj, struct iommufd_viommu, obj);
+	struct iommufd_vdev_id *vdev_id;
+	unsigned long index;
+
+	xa_for_each(&viommu->vdev_ids, index, vdev_id) {
+		/* Unlocked since there should be no race in a destroy() */
+		vdev_id->idev->vdev_id = NULL;
+		kfree(vdev_id);
+	}
+	xa_destroy(&viommu->vdev_ids);
 
 	refcount_dec(&viommu->hwpt->common.obj.users);
 }
@@ -53,6 +62,9 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd)
 	viommu->ictx = ucmd->ictx;
 	viommu->hwpt = hwpt_paging;
 
+	xa_init(&viommu->vdev_ids);
+	init_rwsem(&viommu->vdev_ids_rwsem);
+
 	refcount_inc(&viommu->hwpt->common.obj.users);
 
 	cmd->out_viommu_id = viommu->obj.id;
@@ -68,5 +80,114 @@ out_put_hwpt:
 	iommufd_put_object(ucmd->ictx, &hwpt_paging->common.obj);
 out_put_idev:
 	iommufd_put_object(ucmd->ictx, &idev->obj);
+	return rc;
+}
+
+int iommufd_viommu_set_vdev_id(struct iommufd_ucmd *ucmd)
+{
+	struct iommu_viommu_set_vdev_id *cmd = ucmd->cmd;
+	struct iommufd_vdev_id *vdev_id, *curr;
+	struct iommufd_viommu *viommu;
+	struct iommufd_device *idev;
+	int rc = 0;
+
+	if (cmd->vdev_id > ULONG_MAX)
+		return -EINVAL;
+
+	viommu = iommufd_get_viommu(ucmd, cmd->viommu_id);
+	if (IS_ERR(viommu))
+		return PTR_ERR(viommu);
+
+	idev = iommufd_get_device(ucmd, cmd->dev_id);
+	if (IS_ERR(idev)) {
+		rc = PTR_ERR(idev);
+		goto out_put_viommu;
+	}
+
+	down_write(&viommu->vdev_ids_rwsem);
+	mutex_lock(&idev->igroup->lock);
+	if (idev->vdev_id) {
+		rc = -EEXIST;
+		goto out_unlock_igroup;
+	}
+
+	vdev_id = kzalloc(sizeof(*vdev_id), GFP_KERNEL);
+	if (!vdev_id) {
+		rc = -ENOMEM;
+		goto out_unlock_igroup;
+	}
+
+	vdev_id->idev = idev;
+	vdev_id->viommu = viommu;
+	vdev_id->id = cmd->vdev_id;
+
+	curr = xa_cmpxchg(&viommu->vdev_ids, cmd->vdev_id, NULL, vdev_id,
+			  GFP_KERNEL);
+	if (curr) {
+		rc = xa_err(curr) ? : -EBUSY;
+		goto out_free;
+	}
+
+	idev->vdev_id = vdev_id;
+	goto out_unlock_igroup;
+
+out_free:
+	kfree(vdev_id);
+out_unlock_igroup:
+	mutex_unlock(&idev->igroup->lock);
+	up_write(&viommu->vdev_ids_rwsem);
+	iommufd_put_object(ucmd->ictx, &idev->obj);
+out_put_viommu:
+	iommufd_put_object(ucmd->ictx, &viommu->obj);
+	return rc;
+}
+
+int iommufd_viommu_unset_vdev_id(struct iommufd_ucmd *ucmd)
+{
+	struct iommu_viommu_unset_vdev_id *cmd = ucmd->cmd;
+	struct iommufd_viommu *viommu;
+	struct iommufd_vdev_id *old;
+	struct iommufd_device *idev;
+	int rc = 0;
+
+	if (cmd->vdev_id > ULONG_MAX)
+		return -EINVAL;
+
+	viommu = iommufd_get_viommu(ucmd, cmd->viommu_id);
+	if (IS_ERR(viommu))
+		return PTR_ERR(viommu);
+
+	idev = iommufd_get_device(ucmd, cmd->dev_id);
+	if (IS_ERR(idev)) {
+		rc = PTR_ERR(idev);
+		goto out_put_viommu;
+	}
+
+	down_write(&viommu->vdev_ids_rwsem);
+	mutex_lock(&idev->igroup->lock);
+	if (!idev->vdev_id) {
+		rc = -ENOENT;
+		goto out_unlock_igroup;
+	}
+	if (idev->vdev_id->id != cmd->vdev_id) {
+		rc = -EINVAL;
+		goto out_unlock_igroup;
+	}
+
+	old = xa_cmpxchg(&viommu->vdev_ids, idev->vdev_id->id,
+			 idev->vdev_id, NULL, GFP_KERNEL);
+	if (xa_is_err(old)) {
+		rc = xa_err(old);
+		goto out_unlock_igroup;
+	}
+	kfree(old);
+	idev->vdev_id = NULL;
+
+out_unlock_igroup:
+	mutex_unlock(&idev->igroup->lock);
+	up_write(&viommu->vdev_ids_rwsem);
+	iommufd_put_object(ucmd->ictx, &idev->obj);
+out_put_viommu:
+	iommufd_put_object(ucmd->ictx, &viommu->obj);
 	return rc;
 }
