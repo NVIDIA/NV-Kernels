@@ -10,7 +10,14 @@ void iommufd_viommu_destroy(struct iommufd_object *obj)
 {
 	struct iommufd_viommu *viommu =
 		container_of(obj, struct iommufd_viommu, obj);
+	struct iommufd_vdev_id *vdev_id;
+	unsigned long index;
 
+	xa_for_each(&viommu->vdev_ids, index, vdev_id) {
+		list_del(&vdev_id->idev_item);
+		kfree(vdev_id);
+	}
+	xa_destroy(&viommu->vdev_ids);
 	refcount_dec(&viommu->hwpt->common.obj.users);
 }
 
@@ -69,6 +76,117 @@ out_abort:
 	iommufd_object_abort_and_destroy(ucmd->ictx, &viommu->obj);
 out_put_hwpt:
 	iommufd_put_object(ucmd->ictx, &hwpt_paging->common.obj);
+out_put_idev:
+	iommufd_put_object(ucmd->ictx, &idev->obj);
+	return rc;
+}
+
+int iommufd_viommu_set_vdev_id(struct iommufd_ucmd *ucmd)
+{
+	struct iommu_viommu_set_vdev_id *cmd = ucmd->cmd;
+	struct iommufd_hwpt_nested *hwpt_nested;
+	struct iommufd_vdev_id *vdev_id, *curr;
+	struct iommufd_hw_pagetable *hwpt;
+	struct iommufd_viommu *viommu;
+	struct iommufd_device *idev;
+	int rc = 0;
+
+	if (cmd->vdev_id > ULONG_MAX)
+		return -EINVAL;
+
+	idev = iommufd_get_device(ucmd, cmd->dev_id);
+	if (IS_ERR(idev))
+		return PTR_ERR(idev);
+	hwpt = idev->igroup->hwpt;
+
+	if (hwpt == NULL || hwpt->obj.type != IOMMUFD_OBJ_HWPT_NESTED) {
+		rc = -EINVAL;
+		goto out_put_idev;
+	}
+	hwpt_nested = container_of(hwpt, struct iommufd_hwpt_nested, common);
+
+	viommu = iommufd_get_viommu(ucmd, cmd->viommu_id);
+	if (IS_ERR(viommu)) {
+		rc = PTR_ERR(viommu);
+		goto out_put_idev;
+	}
+
+	if (hwpt_nested->viommu != viommu) {
+		rc = -EINVAL;
+		goto out_put_viommu;
+	}
+
+	vdev_id = kzalloc(sizeof(*vdev_id), GFP_KERNEL);
+	if (IS_ERR(vdev_id)) {
+		rc = PTR_ERR(vdev_id);
+		goto out_put_viommu;
+	}
+
+	vdev_id->viommu = viommu;
+	vdev_id->dev = idev->dev;
+	vdev_id->vdev_id = cmd->vdev_id;
+
+	curr = xa_cmpxchg(&viommu->vdev_ids, cmd->vdev_id,
+			  NULL, vdev_id, GFP_KERNEL);
+	if (curr) {
+		rc = xa_err(curr) ? : -EBUSY;
+		goto out_free_vdev_id;
+	}
+
+	list_add_tail(&vdev_id->idev_item, &idev->vdev_id_list);
+	goto out_put_viommu;
+
+out_free_vdev_id:
+	kfree(vdev_id);
+out_put_viommu:
+	iommufd_put_object(ucmd->ictx, &viommu->obj);
+out_put_idev:
+	iommufd_put_object(ucmd->ictx, &idev->obj);
+	return rc;
+}
+
+static struct device *
+iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id)
+{
+	struct iommufd_vdev_id *vdev_id;
+
+	xa_lock(&viommu->vdev_ids);
+	vdev_id = xa_load(&viommu->vdev_ids, (unsigned long)id);
+	xa_unlock(&viommu->vdev_ids);
+	if (!vdev_id || vdev_id->vdev_id != id)
+		return NULL;
+	return vdev_id->dev;
+}
+
+int iommufd_viommu_unset_vdev_id(struct iommufd_ucmd *ucmd)
+{
+	struct iommu_viommu_unset_vdev_id *cmd = ucmd->cmd;
+	struct iommufd_vdev_id *vdev_id;
+	struct iommufd_viommu *viommu;
+	struct iommufd_device *idev;
+	int rc = 0;
+
+	idev = iommufd_get_device(ucmd, cmd->dev_id);
+	if (IS_ERR(idev))
+		return PTR_ERR(idev);
+
+	viommu = iommufd_get_viommu(ucmd, cmd->viommu_id);
+	if (IS_ERR(viommu)) {
+		rc = PTR_ERR(viommu);
+		goto out_put_idev;
+	}
+
+	if (idev->dev != iommufd_viommu_find_device(viommu, cmd->vdev_id)) {
+		rc = -EINVAL;
+		goto out_put_viommu;
+	}
+
+	vdev_id = xa_erase(&viommu->vdev_ids, cmd->vdev_id);
+	list_del(&vdev_id->idev_item);
+	kfree(vdev_id);
+
+out_put_viommu:
+	iommufd_put_object(ucmd->ictx, &viommu->obj);
 out_put_idev:
 	iommufd_put_object(ucmd->ictx, &idev->obj);
 	return rc;

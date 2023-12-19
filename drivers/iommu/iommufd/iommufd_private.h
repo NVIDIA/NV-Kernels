@@ -397,6 +397,7 @@ struct iommufd_device {
 	struct iommufd_ctx *ictx;
 	struct iommufd_group *igroup;
 	struct list_head group_item;
+	struct list_head vdev_id_list;
 	/* always the physical device */
 	struct device *dev;
 	bool enforce_cache_coherency;
@@ -523,12 +524,31 @@ struct iommufd_viommu {
 	struct iommufd_ctx *ictx;
 	struct iommu_device *iommu_dev;
 	struct iommufd_hwpt_paging *hwpt;
+	struct xarray vdev_ids;
 
 	unsigned int type;
 };
 
+struct iommufd_vdev_id {
+	struct iommufd_viommu *viommu;
+	struct device *dev;
+	u64 vdev_id;
+
+	struct list_head idev_item;
+};
+
+static inline struct iommufd_viommu *
+iommufd_get_viommu(struct iommufd_ucmd *ucmd, u32 id)
+{
+	return container_of(iommufd_get_object(ucmd->ictx, id,
+					       IOMMUFD_OBJ_VIOMMU),
+			    struct iommufd_viommu, obj);
+}
+
 int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd);
 void iommufd_viommu_destroy(struct iommufd_object *obj);
+int iommufd_viommu_set_vdev_id(struct iommufd_ucmd *ucmd);
+int iommufd_viommu_unset_vdev_id(struct iommufd_ucmd *ucmd);
 
 #ifdef CONFIG_IOMMUFD_TEST
 int iommufd_test(struct iommufd_ucmd *ucmd);

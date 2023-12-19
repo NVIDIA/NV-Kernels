@@ -53,6 +53,8 @@ enum {
 	IOMMUFD_CMD_FAULT_QUEUE_ALLOC,
 	IOMMUFD_CMD_EVENT_QUEUE_ALLOC = IOMMUFD_CMD_FAULT_QUEUE_ALLOC,
 	IOMMUFD_CMD_VIOMMU_ALLOC,
+	IOMMUFD_CMD_VIOMMU_SET_VDEV_ID,
+	IOMMUFD_CMD_VIOMMU_UNSET_VDEV_ID,
 };
 
 /**
@@ -937,4 +939,42 @@ struct iommu_viommu_alloc {
 	__u32 out_viommu_id;
 };
 #define IOMMU_VIOMMU_ALLOC _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VIOMMU_ALLOC)
+
+/**
+ * struct iommu_viommu_set_vdev_id - ioctl(IOMMU_VIOMMU_SET_VDEV_ID)
+ * @size: sizeof(struct iommu_viommu_set_vdev_id)
+ * @viommu_id: viommu ID to associate with the device to store its virtual ID
+ * @dev_id: device ID to set its virtual ID
+ * @__reserved: Must be 0
+ * @vdev_id: Virtual device ID
+ *
+ * Set a viommu-specific virtual ID of a device
+ */
+struct iommu_viommu_set_vdev_id {
+	__u32 size;
+	__u32 viommu_id;
+	__u32 dev_id;
+	__u32 __reserved;
+	__aligned_u64 vdev_id;
+};
+#define IOMMU_VIOMMU_SET_VDEV_ID _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VIOMMU_SET_VDEV_ID)
+
+/**
+ * struct iommu_viommu_unset_vdev_id - ioctl(IOMMU_VIOMMU_UNSET_VDEV_ID)
+ * @size: sizeof(struct iommu_viommu_unset_vdev_id)
+ * @viommu_id: viommu ID associated with the device to delete its virtual ID
+ * @dev_id: device ID to unset its virtual ID
+ * @__reserved: Must be 0
+ * @vdev_id: Virtual device ID (for verification)
+ *
+ * Unset a viommu-specific virtual ID of a device
+ */
+struct iommu_viommu_unset_vdev_id {
+	__u32 size;
+	__u32 viommu_id;
+	__u32 dev_id;
+	__u32 __reserved;
+	__aligned_u64 vdev_id;
+};
+#define IOMMU_VIOMMU_UNSET_VDEV_ID _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VIOMMU_UNSET_VDEV_ID)
 #endif
