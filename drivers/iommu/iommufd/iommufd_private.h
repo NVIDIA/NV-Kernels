@@ -397,6 +397,7 @@ struct iommufd_device {
 	struct iommufd_object obj;
 	struct iommufd_ctx *ictx;
 	struct iommufd_group *igroup;
+	struct iommufd_vdev_id *vdev_id;
 	struct list_head group_item;
 	/* always the physical device */
 	struct device *dev;
@@ -514,11 +515,31 @@ struct iommufd_viommu {
 	struct iommufd_ctx *ictx;
 	struct iommufd_hwpt_paging *hwpt;
 
+	/* The locking order is vdev_ids_rwsem -> igroup::lock */
+	struct rw_semaphore vdev_ids_rwsem;
+	struct xarray vdev_ids;
+
 	unsigned int type;
 };
 
+struct iommufd_vdev_id {
+	struct iommufd_viommu *viommu;
+	struct iommufd_device *idev;
+	u64 id;
+};
+
+static inline struct iommufd_viommu *
+iommufd_get_viommu(struct iommufd_ucmd *ucmd, u32 id)
+{
+	return container_of(iommufd_get_object(ucmd->ictx, id,
+					       IOMMUFD_OBJ_VIOMMU),
+			    struct iommufd_viommu, obj);
+}
+
 int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd);
 void iommufd_viommu_destroy(struct iommufd_object *obj);
+int iommufd_viommu_set_vdev_id(struct iommufd_ucmd *ucmd);
+int iommufd_viommu_unset_vdev_id(struct iommufd_ucmd *ucmd);
 
 #ifdef CONFIG_IOMMUFD_TEST
 int iommufd_test(struct iommufd_ucmd *ucmd);
