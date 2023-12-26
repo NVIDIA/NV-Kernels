@@ -71,6 +71,7 @@ enum btrtl_chip_id {
 	CHIP_ID_8852C = 25,
 	CHIP_ID_8851B = 36,
 	CHIP_ID_8922A = 44,
+	CHIP_ID_8852BT = 47,
 };
 
 struct id_table {
@@ -318,6 +319,15 @@ static const struct id_table ic_id_table[] = {
 	  .fw_name  = "rtl_bt/rtl8922au_fw",
 	  .cfg_name = "rtl_bt/rtl8922au_config",
 	  .hw_info  = "rtl8922au" },
+
+	/* 8852BT/8852BE-VT */
+	{ IC_INFO(RTL_ROM_LMP_8852A, 0x87, 0xc, HCI_USB),
+	  .config_needed = false,
+	  .has_rom_version = true,
+	  .has_msft_ext = true,
+	  .fw_name  = "rtl_bt/rtl8852btu_fw",
+	  .cfg_name = "rtl_bt/rtl8852btu_config",
+	  .hw_info  = "rtl8852btu" },
 	};
 
 static const struct id_table *btrtl_match_ic(u16 lmp_subver, u16 hci_rev,
@@ -650,6 +660,7 @@ static int rtlbt_parse_firmware(struct hci_dev *hdev,
 		{ RTL_ROM_LMP_8852A, 25 },	/* 8852C */
 		{ RTL_ROM_LMP_8851B, 36 },	/* 8851B */
 		{ RTL_ROM_LMP_8922A, 44 },	/* 8922A */
+		{ RTL_ROM_LMP_8852A, 47 },	/* 8852BT */
 	};
 
 	if (btrtl_dev->fw_len <= 8)
@@ -1295,6 +1306,7 @@ void btrtl_set_quirks(struct hci_dev *hdev, struct btrtl_device_info *btrtl_dev)
 	case CHIP_ID_8852C:
 	case CHIP_ID_8851B:
 	case CHIP_ID_8922A:
+	case CHIP_ID_8852BT:
 		set_bit(HCI_QUIRK_WIDEBAND_SPEECH_SUPPORTED, &hdev->quirks);
 
 		/* RTL8852C needs to transmit mSBC data continuously without
@@ -1525,6 +1537,8 @@ MODULE_FIRMWARE("rtl_bt/rtl8852bs_fw.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8852bs_config.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8852bu_fw.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8852bu_config.bin");
+MODULE_FIRMWARE("rtl_bt/rtl8852btu_fw.bin");
+MODULE_FIRMWARE("rtl_bt/rtl8852btu_config.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8852cu_fw.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8852cu_fw_v2.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8852cu_config.bin");
