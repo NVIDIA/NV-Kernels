@@ -457,6 +457,16 @@ config RTC_DRV_PCF85063
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-pcf85063.
 
+config RTC_DRV_PCF85263
+	tristate "NXP PCF85263"
+	depends on UBUNTU_ODM_DRIVERS
+	select REGMAP_I2C
+	help
+	  If you say yes here you get support for the PCF85263 RTC chip.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called rtc-pcf85263.
+
 config RTC_DRV_PCF85363
 	tristate "NXP PCF85363"
 	select REGMAP_I2C

@@ -13524,6 +13524,12 @@ S:	Maintained
 F:	Documentation/devicetree/bindings/display/imx/nxp,imx8mq-dcss.yaml
 F:	drivers/gpu/drm/imx/dcss/
 
+NXP PCF85263 RTC DRIVER
+M:	Filippo Copetti <filippo.copetti@eurotech.com>
+S:	Maintained
+F:	drivers/rtc/rtc-pcf85263.c
+F:	drivers/rtc/rtc-pcf85263.h
+
 NXP PF8100/PF8121A/PF8200 PMIC REGULATOR DEVICE DRIVER
 M:	Jagan Teki <jagan@amarulasolutions.com>
 S:	Maintained
