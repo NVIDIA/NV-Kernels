@@ -1030,6 +1030,12 @@ config GPIO_MAX732X_IRQ
 	  Say yes here to enable the max732x to be used as an interrupt
 	  controller. It requires the driver to be built in the kernel.
 
+config GPIO_M058SSAN
+	tristate "M085 8-DI 8-DO I2C expander"
+	depends on UBUNTU_ODM_DRIVERS
+	help
+	  Say yes here to enable the M058SSAN gpio driver.
+
 config GPIO_PCA953X
 	tristate "PCA95[357]x, PCA9698, TCA64xx, and MAX7310 I/O ports"
 	select REGMAP_I2C

@@ -13429,6 +13429,11 @@ F:	drivers/nubus/
 F:	include/linux/nubus.h
 F:	include/uapi/linux/nubus.h
 
+NUVOTON M058SSAN GPIO DRIVER
+M:	Filippo Copetti <filippo.copetti@eurotech.com>
+S:	Maintained
+F:	drivers/gpio/gpio-m058ssan.c
+
 NVIDIA (rivafb and nvidiafb) FRAMEBUFFER DRIVER
 M:	Antonino Daplas <adaplas@gmail.com>
 L:	linux-fbdev@vger.kernel.org
