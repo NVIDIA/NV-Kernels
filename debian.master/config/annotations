@@ -2321,6 +2321,7 @@ CONFIG_CAN_EMS_USB                              policy<{'amd64': 'm', 'arm64': '
 CONFIG_CAN_ESD_USB2                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_CAN_ETAS_ES58X                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_CAN_F81601                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_CAN_F81604                               policy<{'amd64': 'm', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n'}>
 CONFIG_CAN_FLEXCAN                              policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_CAN_GRCAN                                policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_CAN_GS_USB                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
