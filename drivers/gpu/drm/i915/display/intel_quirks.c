@@ -59,6 +59,12 @@ static void quirk_no_pps_backlight_power_hook(struct drm_i915_private *i915)
 	drm_info(&i915->drm, "Applying no pps backlight power quirk\n");
 }
 
+static void quirk_force_disable_fastboot_hook(struct drm_i915_private *i915)
+{
+	i915->quirks |= QUIRK_FORCE_DISABLE_FASTBOOT;
+	drm_info(&i915->drm, "Applying force disable fastboot quirk\n");
+}
+
 struct intel_quirk {
 	int device;
 	int subsystem_vendor;
@@ -81,6 +87,12 @@ static int intel_dmi_reverse_brightness(const struct dmi_system_id *id)
 static int intel_dmi_no_pps_backlight(const struct dmi_system_id *id)
 {
 	DRM_INFO("No pps backlight support on %s\n", id->ident);
+	return 1;
+}
+
+static int intel_dmi_force_disable_fastboot(const struct dmi_system_id *id)
+{
+	DRM_INFO("Force disable fastboot on %s\n", id->ident);
 	return 1;
 }
 
@@ -129,6 +141,19 @@ static const struct intel_dmi_quirk intel_dmi_quirks[] = {
 			{ }
 		},
 		.hook = quirk_no_pps_backlight_power_hook,
+	},
+	{
+		.dmi_id_list = &(const struct dmi_system_id[]) {
+			{
+				.callback = intel_dmi_force_disable_fastboot,
+				.ident = "B&R Industrial Automation APC2200",
+				.matches = {DMI_EXACT_MATCH(DMI_BOARD_VENDOR, "B&R Industrial Automation"),
+					    DMI_EXACT_MATCH(DMI_BOARD_NAME, "APC2200"),
+				},
+			},
+			{ }
+		},
+		.hook = quirk_force_disable_fastboot_hook,
 	},
 };
 
