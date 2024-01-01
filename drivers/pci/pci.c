@@ -837,6 +837,9 @@ int pci_wait_for_pending(struct pci_dev *dev, int pos, u16 mask)
 			return 1;
 	}
 
+	if (dev->bus->self)
+		pcie_aspm_pm_state_change(dev->bus->self);
+
 	return 0;
 }
 
@@ -1156,6 +1159,9 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
 	 */
 	if (need_restore)
 		pci_restore_bars(dev);
+
+	if (dev->bus->self)
+		pcie_aspm_pm_state_change(dev->bus->self);
 
 	return 0;
 }
