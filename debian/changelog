@@ -1,3 +1,9 @@
+linux-meta-unstable (6.7.0-4.4) noble; urgency=medium
+
+  * Master version: 6.7.0-4.4
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 02 Jan 2024 17:52:44 +0100
+
 linux-meta-unstable (6.7.0-3.3) noble; urgency=medium
 
   * Master version: 6.7.0-3.3
