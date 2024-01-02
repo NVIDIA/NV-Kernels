@@ -3706,7 +3706,6 @@ CONFIG_DEBUG_BOOT_PARAMS                        policy<{'amd64': 'n'}>
 CONFIG_DEBUG_BUGVERBOSE                         policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_DEBUG_CGROUP_REF                         policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_DEBUG_CLOSURES                           policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
-CONFIG_DEBUG_CREDENTIALS                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_DEBUG_DEVRES                             policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_DEBUG_DRIVER                             policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_DEBUG_EFI                                policy<{'arm64': 'n'}>
@@ -12063,7 +12062,7 @@ CONFIG_SMT_NUM_THREADS_DYNAMIC                  policy<{'ppc64el': 'y'}>
 CONFIG_SM_CAMCC_6350                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_CAMCC_8250                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_CAMCC_8450                            policy<{'arm64': 'm', 'armhf': '-'}>
-CONFIG_SM_CAMCC_8550                            policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_SM_CAMCC_8550                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_DISPCC_6115                           policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_DISPCC_6125                           policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_DISPCC_6350                           policy<{'arm64': 'm', 'armhf': '-'}>
@@ -12082,7 +12081,7 @@ CONFIG_SM_GCC_8150                              policy<{'arm64': 'm', 'armhf': '
 CONFIG_SM_GCC_8250                              policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_GCC_8350                              policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_GCC_8450                              policy<{'arm64': 'm', 'armhf': '-'}>
-CONFIG_SM_GCC_8550                              policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_SM_GCC_8550                              policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_GPUCC_6115                            policy<{'arm64': 'm'}>
 CONFIG_SM_GPUCC_6125                            policy<{'arm64': 'm'}>
 CONFIG_SM_GPUCC_6350                            policy<{'arm64': 'm', 'armhf': '-'}>
