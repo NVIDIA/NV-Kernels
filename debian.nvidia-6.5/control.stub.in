@@ -37,7 +37,7 @@ Build-Depends:
  libnuma-dev [amd64 arm64] <!stage1>,
  dkms <!stage1>,
  curl <!stage1>,
- zstd <!stage1>,
+ zstd [amd64] <!stage1>,
  pahole [amd64 arm64] | dwarves (>= 1.21) [amd64 arm64] <!stage1>,
  clang-15 [amd64],
  libclang1-15 [amd64],
