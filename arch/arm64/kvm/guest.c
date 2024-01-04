@@ -620,6 +620,9 @@ static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
 	if (!kvm_arm_vcpu_sve_finalized(vcpu))
 		return 1; /* KVM_REG_ARM64_SVE_VLS */
 
+	if (kvm_is_realm(vcpu->kvm))
+		return 1; /* KVM_REG_ARM64_SVE_VLS */
+
 	return slices * (SVE_NUM_PREGS + SVE_NUM_ZREGS + 1 /* FFR */)
 		+ 1; /* KVM_REG_ARM64_SVE_VLS */
 }
@@ -645,6 +648,9 @@ static int copy_sve_reg_indices(const struct kvm_vcpu *vcpu,
 	++num_regs;
 
 	if (!kvm_arm_vcpu_sve_finalized(vcpu))
+		return num_regs;
+
+	if (kvm_is_realm(vcpu->kvm))
 		return num_regs;
 
 	for (i = 0; i < slices; i++) {
