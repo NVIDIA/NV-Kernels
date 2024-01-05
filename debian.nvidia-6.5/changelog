@@ -1,4 +1,4 @@
-linux-nvidia-6.5 (6.5.0-1008.8) jammy; urgency=medium
+linux-nvidia-6.5 (6.5.0-1008.8+1) jammy; urgency=medium
 
   * jammy/linux-nvidia-6.5: 6.5.0-1008.8 -proposed tracker (LP: #2047983)
 
