@@ -43,6 +43,8 @@ Build-Depends:
  libclang1-15 [amd64],
  bindgen-0.56 [amd64],
  libstdc++-dev,
+ nvidia-dkms-kernel [amd64 arm64] <!stage1>,
+ nvidia-kernel-source [amd64 arm64] <!stage1>,
 Build-Depends-Indep:
  xmlto <!stage1>,
  docbook-utils <!stage1>,
