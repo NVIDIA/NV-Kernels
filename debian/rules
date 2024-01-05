@@ -152,6 +152,10 @@ clean: debian/control debian/canonical-certs.pem debian/canonical-revoked-certs.
 	rm -f $(DROOT)/control.stub $(DEBIAN)/control.stub
 	rm -f $(DROOT)/scripts/fix-filenames
 
+	# SUBSTVARS: rprovides for all DKMS packages
+	echo "linux:rprovides=$(foreach dkms,$(all_built-in_dkms_modules),$(foreach provides,$(dkms_$(dkms)_rprovides),$(provides)$(comma)))" >"debian/substvars"
+	echo "$(foreach dkms,$(all_standalone_dkms_modules),$(dkms):rprovides=$(foreach provides,$(dkms_$(dkms)_rprovides),$(provides)$(comma))=NL=)" | sed -e "s/=NL= */\n/g" >>"debian/substvars"
+
 .PHONY: distclean
 distclean: clean
 	rm -rf $(DROOT)/control debian/changelog \
