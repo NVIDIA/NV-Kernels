@@ -519,7 +519,7 @@ define dh_all
 	dh_shlibdeps -p$(1) $(shlibdeps_opts)
 	dh_installdeb -p$(1)
 	dh_installdebconf -p$(1)
-	$(lockme) dh_gencontrol -p$(1) -- -Vlinux:rprovides='$(rprovides)' $(2)
+	$(lockme) dh_gencontrol -p$(1) -- -Tdebian/substvars $(2)
 	dh_md5sums -p$(1)
 	dh_builddeb -p$(1)
 endef
@@ -553,7 +553,6 @@ binary-%: pkgcloud = $(cloud_flavour_pkg_name)-$*
 $(foreach _m,$(all_dkms_modules), \
   $(eval binary-%: enable_$(_m) = $$(filter true,$$(call custom_override,do_$(_m),$$*))) \
 )
-binary-%: rprovides = $(foreach _m,$(all_built-in_dkms_modules),$(if $(enable_$(_m)),$(foreach _r,$(dkms_$(_m)_rprovides),$(_r)$(comma) )))
 binary-%: target_flavour = $*
 binary-%: checks-%
 	@echo Debug: $@
