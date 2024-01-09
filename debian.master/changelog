@@ -1,3 +1,9 @@
+linux (6.7.0-0.0) noble; urgency=medium
+
+  * Empty entry
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 09 Jan 2024 09:27:23 +0100
+
 linux-unstable (6.7.0-5.5) noble; urgency=medium
 
   * noble/linux-unstable: 6.7.0-5.5 -proposed tracker (LP: #2048118)
