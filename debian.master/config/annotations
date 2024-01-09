@@ -168,6 +168,9 @@ CONFIG_DEVTMPFS_MOUNT                           note<'upstart requirement'>
 CONFIG_DMA_CMA                                  policy<{'arm64': 'y', 'armhf': 'y', 'riscv64': 'y', 's390x': 'n'}>
 CONFIG_DMA_CMA                                  note<'LP: #1803206'>
 
+CONFIG_DM_VERITY_VERIFY_ROOTHASH_SIG_SECONDARY_KEYRING policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_DM_VERITY_VERIFY_ROOTHASH_SIG_SECONDARY_KEYRING note<'LP: #2019040'>
+
 CONFIG_DRM_AMDGPU_CIK                           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_DRM_AMDGPU_CIK                           note<'for zesty'>
 
@@ -753,6 +756,9 @@ CONFIG_VIRTIO_MMIO                              note<'LP: #1557689'>
 CONFIG_VIRTIO_NET                               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_VIRTIO_NET                               note<'KVM paravirt support -- cloud-init currently racy with this as a module (LP: #2036968)'>
 
+CONFIG_WWAN                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'm', 's390x': 'n'}>
+CONFIG_WWAN                                     note<'LP: #2033406'>
+
 CONFIG_X509_CERTIFICATE_PARSER                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_X509_CERTIFICATE_PARSER                  note<'module signing'>
 
@@ -797,9 +803,6 @@ CONFIG_ZLIB_DFLTCC                              note<'LP: #1830208'>
 
 CONFIG_ZONE_DMA                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 's390x': 'y'}>
 CONFIG_ZONE_DMA                                 note<'LP: #1628523'>
-
-CONFIG_WWAN                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'm', 's390x': 'n'}>
-CONFIG_WWAN                                     note<'LP: #2033406'>
 
 
 # ---- Annotations without notes ----
@@ -3936,8 +3939,6 @@ CONFIG_DM_UNSTRIPED                             policy<{'amd64': 'm', 'arm64': '
 CONFIG_DM_VERITY                                policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_DM_VERITY_FEC                            policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_DM_VERITY_VERIFY_ROOTHASH_SIG            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
-CONFIG_DM_VERITY_VERIFY_ROOTHASH_SIG_SECONDARY_KEYRING policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
-CONFIG_DM_VERITY_VERIFY_ROOTHASH_SIG_SECONDARY_KEYRING note<LP: #2019040>
 CONFIG_DM_WRITECACHE                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_DM_ZERO                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_DM_ZONED                                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
