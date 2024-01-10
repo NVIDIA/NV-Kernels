@@ -27,7 +27,6 @@
 #include <asm/nospec-branch.h>
 #include <asm/bootparam.h>
 #include <asm/pgtable_32.h>
-#include <asm/nospec-branch.h>
 
 /* Physical address */
 #define pa(X) ((X) - __PAGE_OFFSET)
