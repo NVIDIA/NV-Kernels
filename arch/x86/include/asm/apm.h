@@ -35,7 +35,6 @@ static inline void apm_bios_call_asm(u32 func, u32 ebx_in, u32 ecx_in,
 	__asm__ __volatile__(APM_DO_ZERO_SEGS
 		"pushl %%edi\n\t"
 		"pushl %%ebp\n\t"
-		ANNOTATE_RETPOLINE_SAFE /* FRBS */
 		"lcall *%%cs:apm_bios_entry\n\t"
 		"setc %%al\n\t"
 		"popl %%ebp\n\t"
@@ -60,7 +59,6 @@ static inline bool apm_bios_call_simple_asm(u32 func, u32 ebx_in,
 	__asm__ __volatile__(APM_DO_ZERO_SEGS
 		"pushl %%edi\n\t"
 		"pushl %%ebp\n\t"
-		ANNOTATE_RETPOLINE_SAFE /* FRBS */
 		"lcall *%%cs:apm_bios_entry\n\t"
 		"setc %%bl\n\t"
 		"popl %%ebp\n\t"
