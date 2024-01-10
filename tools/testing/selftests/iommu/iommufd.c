@@ -554,6 +554,41 @@ TEST_F(iommufd_ioas, alloc_hwpt_nested)
 	}
 }
 
+TEST_F(iommufd_ioas, viommu_default)
+{
+	uint32_t dev_id = self->device_id;
+	uint32_t viommu_id = 0;
+	uint32_t hwpt_id = 0;
+
+	if (dev_id) {
+		/* Negative test -- invalid hwpt */
+		test_err_viommu_alloc(ENOENT, dev_id, hwpt_id,
+				      IOMMU_VIOMMU_TYPE_DEFAULT, &viommu_id);
+
+		/* Negative test -- not a nested parent hwpt */
+		test_cmd_hwpt_alloc(dev_id, self->ioas_id, 0, &hwpt_id);
+		test_err_viommu_alloc(EINVAL, dev_id, hwpt_id,
+				      IOMMU_VIOMMU_TYPE_DEFAULT, &viommu_id);
+		test_ioctl_destroy(hwpt_id);
+
+		/* Allocate a nested parent HWP */
+		test_cmd_hwpt_alloc(dev_id, self->ioas_id,
+				    IOMMU_HWPT_ALLOC_NEST_PARENT,
+				    &hwpt_id);
+		/* Negative test -- unsupported viommu type */
+		test_err_viommu_alloc(EOPNOTSUPP, dev_id, hwpt_id,
+				      0xdead, &viommu_id);
+		/* Allocate a default type of viommu */
+		test_cmd_viommu_alloc(dev_id, hwpt_id,
+				      IOMMU_VIOMMU_TYPE_DEFAULT, &viommu_id);
+		test_ioctl_destroy(viommu_id);
+		test_ioctl_destroy(hwpt_id);
+	} else {
+		test_err_viommu_alloc(ENOENT, dev_id, hwpt_id,
+				      IOMMU_VIOMMU_TYPE_DEFAULT, &viommu_id);
+	}
+}
+
 TEST_F(iommufd_ioas, hwpt_attach)
 {
 	/* Create a device attached directly to a hwpt */
