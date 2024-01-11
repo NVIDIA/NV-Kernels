@@ -3561,6 +3561,7 @@ msm
 msp3400
 mspro_block
 mss-sc7180
+mstflint_access
 mt2060
 mt2063
 mt20xx
@@ -3665,6 +3666,7 @@ mtk-svs
 mtk-uart-apdma
 mtk-vpu
 mtk_dp
+mtk_iommu
 mtk_nand
 mtk_rpmsg
 mtk_scp
@@ -6342,6 +6344,7 @@ spi-zynqmp-gqspi
 spi_ks8995
 spidev
 spinand
+spl
 spmi
 spmi-mtk-pmif
 spmi-pmic-arb
@@ -7290,6 +7293,7 @@ wm97xx-ts
 wp512
 wpcm450-soc
 wusb3801
+wwan
 wwan_hwsim
 x25
 x9250
@@ -7465,6 +7469,7 @@ zd1301
 zd1301_demod
 zet6223
 zforce_ts
+zfs
 zhenhua
 ziirave_wdt
 zinitix
