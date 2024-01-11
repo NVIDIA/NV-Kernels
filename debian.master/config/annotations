@@ -534,6 +534,9 @@ CONFIG_RTC_DRV_TWL4030                          note<'boot essential on OMAP3/OM
 CONFIG_RT_GROUP_SCHED                           policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_RT_GROUP_SCHED                           note<'LP: #1875665'>
 
+CONFIG_S390_UV_UAPI                             policy<{'s390x': 'y'}>
+CONFIG_S390_UV_UAPI                             note<'LP: #2048919'>
+
 CONFIG_SAMPLE_TRACE_PRINTK                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_SAMPLE_TRACE_PRINTK                      note<'Required for ftrace selftests'>
 
@@ -11281,7 +11284,6 @@ CONFIG_S390_PRNG                                policy<{'s390x': 'm'}>
 CONFIG_S390_TAPE                                policy<{'s390x': 'm'}>
 CONFIG_S390_TAPE_34XX                           policy<{'s390x': 'm'}>
 CONFIG_S390_TAPE_3590                           policy<{'s390x': 'm'}>
-CONFIG_S390_UV_UAPI                             policy<{'s390x': 'n'}>
 CONFIG_S390_VMUR                                policy<{'s390x': 'm'}>
 CONFIG_S3C2410_WATCHDOG                         policy<{'armhf': 'n'}>
 CONFIG_S5P_DEV_MFC                              policy<{'armhf': 'y'}>
