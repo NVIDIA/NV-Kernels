@@ -524,7 +524,6 @@ virtio_ring
 virtio_scsi
 vivaldi-fmap
 watchdog
-wwan
 wwnr
 x509_key_parser
 xen-blkfront
