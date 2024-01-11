@@ -531,6 +531,9 @@ CONFIG_RUST                                     note<'required to enable Rust su
 CONFIG_RUST_IS_AVAILABLE                        policy<{'amd64': 'y', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
 CONFIG_RUST_IS_AVAILABLE                        note<'required to enable Rust support, LP: #1993183'>
 
+CONFIG_S390_UV_UAPI                             policy<{'s390x': 'y'}>
+CONFIG_S390_UV_UAPI                             note<'LP: #2048919'>
+
 CONFIG_SAMPLE_TRACE_PRINTK                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_SAMPLE_TRACE_PRINTK                      note<'Required for ftrace selftests'>
 
@@ -11133,7 +11136,6 @@ CONFIG_S390_PRNG                                policy<{'s390x': 'm'}>
 CONFIG_S390_TAPE                                policy<{'s390x': 'm'}>
 CONFIG_S390_TAPE_34XX                           policy<{'s390x': 'm'}>
 CONFIG_S390_TAPE_3590                           policy<{'s390x': 'm'}>
-CONFIG_S390_UV_UAPI                             policy<{'s390x': 'n'}>
 CONFIG_S390_VMUR                                policy<{'s390x': 'm'}>
 CONFIG_S3C2410_WATCHDOG                         policy<{'armhf': 'n'}>
 CONFIG_S5P_DEV_MFC                              policy<{'armhf': 'y'}>
