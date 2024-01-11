@@ -1161,6 +1161,7 @@ firmware:       liquidio/lio_210sv_nic.bin
 firmware:       liquidio/lio_23xx_nic.bin
 firmware:       liquidio/lio_410nv_nic.bin
 firmware:       me2600_firmware.bin
+firmware:       me4000_firmware.bin
 firmware:       mediatek/BT_RAM_CODE_MT7961_1_2_hdr.bin
 firmware:       mediatek/WIFI_MT7922_patch_mcu_1_1_hdr.bin
 firmware:       mediatek/WIFI_MT7961_patch_mcu_1_2_hdr.bin
