@@ -193,7 +193,7 @@ static void arm_smmu_free_shared_cd(struct arm_smmu_ctx_desc *cd)
  * invalidation feature handles too many per-page TLBI commands, which will
  * otherwise result in a soft lockup.
  */
-#define CMDQ_MAX_TLBI_OPS		(1 << (PAGE_SHIFT - 3))
+#define CMDQ_MAX_TLBI_OPS      (1 << (PAGE_SHIFT - 3))
 
 static void arm_smmu_mm_invalidate_range(struct mmu_notifier *mn,
 					 struct mm_struct *mm,
@@ -225,6 +225,17 @@ static void arm_smmu_mm_invalidate_range(struct mmu_notifier *mn,
 						    smmu_domain);
 	}
 
+	if (!(smmu_domain->smmu->features & ARM_SMMU_FEAT_RANGE_INV)) {
+		if (size >= CMDQ_MAX_TLBI_OPS * PAGE_SIZE)
+			size = 0;
+	} else {
+		if (size == ULONG_MAX)
+			size = 0;
+	}
+
+	if (!(smmu_domain->smmu->features & ARM_SMMU_FEAT_BTM))
+		arm_smmu_tlb_inv_range_asid(start, size, smmu_mn->cd->asid,
+					    PAGE_SIZE, false, smmu_domain);
 	arm_smmu_atc_inv_domain(smmu_domain, mm->pasid, start, size);
 }
 
