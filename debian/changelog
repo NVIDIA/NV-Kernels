@@ -1,3 +1,9 @@
+linux-meta (6.7.0-2.2) noble; urgency=medium
+
+  * Master version: 6.7.0-2.2
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 12 Jan 2024 09:23:58 +0100
+
 linux-meta (6.7.0-1.1) noble; urgency=medium
 
   * Master version: 6.7.0-1.1
