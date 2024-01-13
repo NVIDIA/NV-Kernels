@@ -104,15 +104,13 @@ cat_file()
 	(cd "$kv_repo" && git cat-file "$@") || exit 1
 }
 
-# Determine if this is merge format (main branch exists).
-present=$(cat_file -t "$remote_name/main" 2>/dev/null)
+present=$(cat_file -t "$remote_name/$remote_branch:devel/" 2>/dev/null)
 if [ "$present" ]; then
-	git_base="$remote_name/$remote_branch:$sru_cycle/"
-	git_base_devel="$remote_name/$remote_branch:tip/"
+	git_base_devel="$remote_name/$remote_branch:devel/"
 else
-	git_base="$remote_name/$sru_cycle:"
-	git_base_devel="$remote_name/master:"
+	git_base_devel="$remote_name/$remote_branch:tip/"
 fi
+git_base="$remote_name/$remote_branch:$sru_cycle/"
 git_human="$remote_name/$sru_cycle"
 
 # Determine if we have this cycle.
@@ -155,6 +153,7 @@ esac
 #  mainline			- backwards compatibility
 for versions_path_tail in \
 	"$our_series:$our_source:$our_type" \
+	"$our_series:$our_mainline:$our_type" \
 	"$our_series:$our_type" \
 	"$our_mainline:$our_type" \
 	"$our_series" \
