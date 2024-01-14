@@ -290,7 +290,6 @@ virtio_pci_modern_dev
 virtio_ring
 watch_queue
 watchdog
-wwan
 x509_key_parser
 xen-acpi-processor
 xen-blkfront
