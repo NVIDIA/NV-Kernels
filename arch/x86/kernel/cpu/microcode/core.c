@@ -212,6 +212,11 @@ static int __init save_microcode_in_initrd(void)
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 	int ret = -EINVAL;
 
+	if (dis_ucode_ldr) {
+		ret = 0;
+		goto out;
+	}
+
 	switch (c->x86_vendor) {
 	case X86_VENDOR_INTEL:
 		if (c->x86 >= 6)
@@ -225,6 +230,7 @@ static int __init save_microcode_in_initrd(void)
 		break;
 	}
 
+out:
 	initrd_gone = true;
 
 	return ret;
