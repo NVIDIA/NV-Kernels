@@ -1,3 +1,12 @@
+linux-meta-unstable (6.7.0-7.7) noble; urgency=medium
+
+  * Master version: 6.7.0-7.7
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 15 Jan 2024 08:47:37 +0100
+
 linux-meta-unstable (6.7.0-6.6) noble; urgency=medium
 
   *  Empty entry
