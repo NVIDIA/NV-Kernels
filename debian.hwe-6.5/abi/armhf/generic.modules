@@ -3766,7 +3766,6 @@ nvmet
 nvmet-fc
 nvmet-rdma
 nvmet-tcp
-nvsw-sn2201
 nwl-dsi
 nxp-bbnsm-pwrkey
 nxp-c45-tja11xx
