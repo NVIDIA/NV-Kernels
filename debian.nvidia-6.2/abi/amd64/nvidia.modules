@@ -6102,6 +6102,7 @@ wmi
 wmi-bmof
 wp512
 wusb3801
+wwan
 wwan_hwsim
 x25
 x38_edac

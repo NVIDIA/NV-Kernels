@@ -512,7 +512,6 @@ virtio_scsi
 vivaldi-fmap
 watch_queue
 watchdog
-wwan
 wwnr
 x509_key_parser
 xen-blkfront
