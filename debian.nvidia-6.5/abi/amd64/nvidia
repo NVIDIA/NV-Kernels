@@ -4085,6 +4085,10 @@ EXPORT_SYMBOL	 drivers/ntb/ntb 0xdf2953df	ntb_default_peer_port_number
 EXPORT_SYMBOL	 drivers/ntb/ntb 0xf98a4a16	ntb_unregister_client
 EXPORT_SYMBOL	 drivers/nvdimm/nd_btt 0x3635eef0	nvdimm_namespace_attach_btt
 EXPORT_SYMBOL	 drivers/nvdimm/nd_btt 0x71b4e6a0	nvdimm_namespace_detach_btt
+EXPORT_SYMBOL	 drivers/nvme/host/nvme 0x3b856180	nvme_v1_register_nvfs_dma_ops
+EXPORT_SYMBOL	 drivers/nvme/host/nvme 0xb671ef7b	nvme_v1_unregister_nvfs_dma_ops
+EXPORT_SYMBOL	 drivers/nvme/host/nvme-rdma 0x83ef76ec	nvme_rdma_v1_unregister_nvfs_dma_ops
+EXPORT_SYMBOL	 drivers/nvme/host/nvme-rdma 0xfeec8dc9	nvme_rdma_v1_register_nvfs_dma_ops
 EXPORT_SYMBOL	 drivers/parport/parport 0x07177ecb	parport_unregister_driver
 EXPORT_SYMBOL	 drivers/parport/parport 0x17bd73dd	parport_register_port
 EXPORT_SYMBOL	 drivers/parport/parport 0x1f466fc7	parport_ieee1284_epp_read_data
@@ -5720,6 +5724,8 @@ EXPORT_SYMBOL	 net/sunrpc/auth_gss/auth_rpcgss 0xd941b5f5	gss_mech_get
 EXPORT_SYMBOL	 net/sunrpc/sunrpc 0xab966b37	xdr_restrict_buflen
 EXPORT_SYMBOL	 net/sunrpc/sunrpc 0xbfede7d3	xdr_truncate_encode
 EXPORT_SYMBOL	 net/sunrpc/sunrpc 0xcec852f5	svc_pool_stats_open
+EXPORT_SYMBOL	 net/sunrpc/xprtrdma/rpcrdma 0x3aab8e77	rpcrdma_unregister_nvfs_dma_ops
+EXPORT_SYMBOL	 net/sunrpc/xprtrdma/rpcrdma 0xc59950b9	rpcrdma_register_nvfs_dma_ops
 EXPORT_SYMBOL	 net/tipc/tipc 0x3c4821c1	tipc_dump_done
 EXPORT_SYMBOL	 net/tipc/tipc 0x91409794	tipc_dump_start
 EXPORT_SYMBOL	 net/tipc/tipc 0xda33c64b	tipc_sk_fill_sock_diag
