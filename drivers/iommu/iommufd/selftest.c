@@ -139,6 +139,7 @@ struct mock_dev {
 	struct device dev;
 	unsigned long flags;
 	int id;
+	u32 cache[MOCK_DEV_CACHE_NUM];
 };
 
 struct selftest_obj {
@@ -540,6 +541,61 @@ static int mock_dev_disable_feat(struct device *dev, enum iommu_dev_features fea
 	return 0;
 }
 
+static int mock_viommu_cache_invalidate(struct iommufd_viommu *viommu,
+					struct iommu_user_data_array *array)
+{
+	struct iommu_viommu_invalidate_selftest inv;
+	u32 processed = 0;
+	int i = 0, j;
+	int rc = 0;
+
+	if (array->type != IOMMU_VIOMMU_INVALIDATE_DATA_SELFTEST) {
+		rc = -EINVAL;
+		goto out;
+	}
+
+	for ( ; i < array->entry_num; i++) {
+		struct mock_dev *mdev;
+		struct device *dev;
+
+		rc = iommu_copy_struct_from_user_array(&inv, array,
+			IOMMU_VIOMMU_INVALIDATE_DATA_SELFTEST, i, cache_id);
+		if (rc)
+			break;
+
+		if (inv.flags & ~IOMMU_TEST_INVALIDATE_FLAG_ALL) {
+			rc = -EOPNOTSUPP;
+			break;
+		}
+
+		if (inv.cache_id > MOCK_DEV_CACHE_ID_MAX) {
+			rc = -EINVAL;
+			break;
+		}
+
+		dev = iommufd_viommu_find_device(viommu, inv.vdev_id);
+		if (!dev) {
+			rc = -EINVAL;
+			break;
+		}
+		mdev = container_of(dev, struct mock_dev, dev);
+
+		if (inv.flags & IOMMU_TEST_INVALIDATE_FLAG_ALL) {
+			/* Invalidate all cache entries and ignore cache_id */
+			for (j = 0; j < MOCK_DEV_CACHE_NUM; j++)
+				mdev->cache[j] = 0;
+		} else {
+			mdev->cache[inv.cache_id] = 0;
+		}
+
+		processed++;
+	}
+
+out:
+	array->entry_num = processed;
+	return rc;
+}
+
 static const struct iommu_ops mock_ops = {
 	/*
 	 * IOMMU_DOMAIN_BLOCKED cannot be returned from def_domain_type()
@@ -566,6 +622,9 @@ static const struct iommu_ops mock_ops = {
 			.map_pages = mock_domain_map_pages,
 			.unmap_pages = mock_domain_unmap_pages,
 			.iova_to_phys = mock_domain_iova_to_phys,
+			.default_viommu_ops = &(struct iommufd_viommu_ops){
+				.cache_invalidate = mock_viommu_cache_invalidate,
+			},
 		},
 };
 
@@ -693,7 +752,7 @@ static struct mock_dev *mock_dev_create(unsigned long dev_flags)
 	struct iommu_fwspec *fwspec;
 	struct dev_iommu *param;
 	struct mock_dev *mdev;
-	int rc;
+	int rc, i;
 
 	if (dev_flags &
 	    ~(MOCK_FLAGS_DEVICE_NO_DIRTY | MOCK_FLAGS_DEVICE_HUGE_IOVA))
@@ -725,6 +784,8 @@ static struct mock_dev *mock_dev_create(unsigned long dev_flags)
 	mdev->dev.release = mock_dev_release;
 	mdev->dev.bus = &iommufd_mock_bus_type.bus;
 	mdev->dev.iommu = param;
+	for (i = 0; i < MOCK_DEV_CACHE_NUM; i++)
+		mdev->cache[i] = IOMMU_TEST_DEV_CACHE_DEFAULT;
 
 	rc = ida_alloc(&mock_dev_ida, GFP_KERNEL);
 	if (rc < 0)
