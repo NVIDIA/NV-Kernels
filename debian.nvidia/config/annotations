@@ -26,6 +26,7 @@ CONFIG_DRM_NOUVEAU_BACKLIGHT                    policy<{'amd64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-'}>
 CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
 CONFIG_GPIO_LJCA                                policy<{'amd64': '-'}>
+CONFIG_GPIO_M058SSAN                            policy<{'amd64': '-'}>
 CONFIG_HZ                                       policy<{'amd64': '250', 'amd64-nvidia-lowlatency': '1000'}>
 CONFIG_HZ_1000                                  policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y'}>
 CONFIG_HZ_250                                   policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n'}>
@@ -55,6 +56,7 @@ CONFIG_PREEMPT_DYNAMIC                          policy<{'amd64-nvidia-lowlatency
 CONFIG_PREEMPT_RCU                              policy<{'amd64-nvidia-lowlatency': 'y'}>
 CONFIG_PREEMPT_TRACER                           policy<{'amd64-nvidia-lowlatency': 'n'}>
 CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': 'y', 'amd64-nvidia-lowlatency': 'n'}>
+CONFIG_RTC_DRV_PCF85263                         policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SND_HDA_INTEL_HDMI_SILENT_STREAM         policy<{'amd64': 'n'}>
 CONFIG_SPI_LJCA                                 policy<{'amd64': '-'}>
