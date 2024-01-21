@@ -2554,6 +2554,7 @@ static struct aa_sfs_entry aa_sfs_entry_domain[] = {
 	AA_SFS_FILE_BOOLEAN("post_nnp_subset",	1),
 	AA_SFS_FILE_BOOLEAN("computed_longest_left",	1),
 	AA_SFS_DIR("attach_conditions",		aa_sfs_entry_attach),
+	AA_SFS_FILE_BOOLEAN("interruptible",		1),
 	AA_SFS_FILE_BOOLEAN("disconnected.path",            1),
 	AA_SFS_FILE_STRING("version", "1.2"),
 	{ }
@@ -2573,11 +2574,10 @@ static struct aa_sfs_entry aa_sfs_entry_versions[] = {
 	{ }
 };
 
-static struct aa_sfs_entry aa_sfs_entry_profile[] = {
-	AA_SFS_FILE_BOOLEAN("interruptible",		1),
-	{ }
-};
-
+/* permstable v1: skipped
+              v2: accept1 index, no accept2
+              v3: accept1 index, accept2 flags
+*/
 #define PERMS32STR "allow deny subtree cond kill complain prompt audit quiet hide xindex tag label"
 static struct aa_sfs_entry aa_sfs_entry_policy[] = {
 	AA_SFS_DIR("versions",			aa_sfs_entry_versions),
