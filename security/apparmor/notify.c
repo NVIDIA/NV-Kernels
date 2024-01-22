@@ -971,10 +971,10 @@ static long build_v3_unotif(struct aa_knotif *knotif, void __user *buf,
 	pos = buf + sizeof(unotif);
 	if (!build_append_str(buf, pos, max_size, profile->base.hname,
 			      unotif.op.label, size))
-		return size;
+		return -EMSGSIZE;
 	if (!build_append_str(buf, pos, max_size, knotif->ad->name,
 			      unotif.file.name, size))
-		return size;
+		return -EMSGSIZE;
 
 	/* set size after appending strings */
 	unotif.common.len = size;
