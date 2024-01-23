@@ -743,7 +743,6 @@ caif_serial
 caif_socket
 caif_usb
 caif_virtio
-camcc-sm8550
 camellia_generic
 can
 can-bcm
@@ -1514,7 +1513,6 @@ f81232
 f81534
 f81601
 f81604
-failover
 fakelb
 fan53555
 fan53880
@@ -1715,7 +1713,6 @@ gcc-sdx55
 gcc-sdx65
 gcc-sdx75
 gcc-sm7150
-gcc-sm8550
 gdmtty
 gdmulte
 ge2d
@@ -3615,7 +3612,6 @@ neofb
 net1080
 net2272
 net2280
-net_failover
 netconsole
 netdevsim
 netfs
@@ -5371,7 +5367,6 @@ sha1-arm-ce
 sha1-arm-neon
 sha2-arm-ce
 sha256-arm
-sha512-arm
 shark2
 shmob-drm
 sht15
@@ -6813,7 +6808,6 @@ virtio_bt
 virtio_crypto
 virtio_dma_buf
 virtio_input
-virtio_net
 virtio_pmem
 virtio_rpmsg_bus
 virtio_snd

@@ -1638,7 +1638,6 @@ f81232
 f81534
 f81601
 f81604
-failover
 fakelb
 fan53555
 fan53880
@@ -3770,6 +3769,7 @@ mtk-svs
 mtk-uart-apdma
 mtk-vpu
 mtk_dp
+mtk_iommu
 mtk_nand
 mtk_rpmsg
 mtk_scp
@@ -3852,7 +3852,6 @@ neofb
 net1080
 net2272
 net2280
-net_failover
 netconsole
 netdevsim
 netfs
@@ -5180,7 +5179,6 @@ reset-a10sr
 reset-hi3660
 reset-meson-audio-arb
 reset-qcom-pdc
-reset-rzg2l-usbphy-ctrl
 reset-scmi
 reset-ti-sci
 reset-ti-syscon
@@ -5710,8 +5708,6 @@ sha1-ce
 sha2-ce
 sha256-arm64
 sha3-ce
-sha512-arm64
-sha512-ce
 shark2
 shmob-drm
 sht15
@@ -6531,6 +6527,7 @@ spi-zynqmp-gqspi
 spi_ks8995
 spidev
 spinand
+spl
 spmi
 spmi-mtk-pmif
 spmi-pmic-arb
@@ -7340,7 +7337,6 @@ virtio_crypto
 virtio_dma_buf
 virtio_input
 virtio_mem
-virtio_net
 virtio_pmem
 virtio_rpmsg_bus
 virtio_snd
@@ -7485,6 +7481,7 @@ wm97xx-ts
 wp512
 wpcm450-soc
 wusb3801
+wwan
 wwan_hwsim
 x25
 x9250
@@ -7660,6 +7657,7 @@ zd1301
 zd1301_demod
 zet6223
 zforce_ts
+zfs
 zhenhua
 ziirave_wdt
 zinitix

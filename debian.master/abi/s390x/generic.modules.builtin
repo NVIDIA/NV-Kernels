@@ -47,6 +47,7 @@ encrypted-keys
 evdev
 exportfs
 ext4
+failover
 fat
 fb
 fb_io_fops
@@ -89,6 +90,7 @@ mpi
 mq-deadline
 multipath
 n_null
+net_failover
 netkit
 nls_base
 nls_cp437
@@ -112,6 +114,8 @@ sha1_generic
 sha256_generic
 sha3_generic
 sha512_generic
+sha512_s390
+sha_common
 sig
 smsgiucv
 squashfs
@@ -126,11 +130,13 @@ tpm
 trusted
 tun
 utf8data
+uvdevice
 vfat
 virtio
 virtio_balloon
 virtio_blk
 virtio_console
+virtio_net
 virtio_pci
 virtio_pci_legacy_dev
 virtio_pci_modern_dev

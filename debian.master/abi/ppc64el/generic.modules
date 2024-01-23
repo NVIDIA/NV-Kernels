@@ -1329,7 +1329,6 @@ f81232
 f81534
 f81601
 f81604
-failover
 fakelb
 fan53555
 fan53880
@@ -3168,7 +3167,6 @@ neofb
 net1080
 net2272
 net2280
-net_failover
 netconsole
 netdevsim
 netfs
@@ -5157,6 +5155,7 @@ spi-zynqmp-gqspi
 spi_ks8995
 spidev
 spinand
+spl
 spmi
 sprd_serial
 sps30
@@ -5788,7 +5787,6 @@ virtio_bt
 virtio_crypto
 virtio_dma_buf
 virtio_input
-virtio_net
 virtio_pmem
 virtio_rpmsg_bus
 virtio_snd
@@ -6065,6 +6063,7 @@ zd1301
 zd1301_demod
 zet6223
 zforce_ts
+zfs
 zhenhua
 ziirave_wdt
 zinitix

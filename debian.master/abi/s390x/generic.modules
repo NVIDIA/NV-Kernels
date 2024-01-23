@@ -235,7 +235,6 @@ esp6
 esp6_offload
 essiv
 et1011c
-failover
 faulty
 fcoe
 fcrypt
@@ -466,7 +465,6 @@ mscc
 msdos
 national
 nbd
-net_failover
 netconsole
 netdevsim
 netfs
@@ -746,8 +744,6 @@ sha1_s390
 sha256_s390
 sha3_256_s390
 sha3_512_s390
-sha512_s390
-sha_common
 siox-bus-gpio
 siox-core
 sit
@@ -762,6 +758,7 @@ smc_diag
 smsc
 smsgiucv_app
 softdog
+spl
 st
 st_drv
 ste10Xp
@@ -855,7 +852,6 @@ virtio-rng
 virtio_crypto
 virtio_dma_buf
 virtio_input
-virtio_net
 virtiofs
 vitesse
 vmac
@@ -963,6 +959,7 @@ z3fold
 zcrypt
 zcrypt_cex4
 zfcp
+zfs
 zonefs
 zram
 zstd
