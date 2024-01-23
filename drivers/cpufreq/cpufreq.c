@@ -2903,7 +2903,7 @@ static char cpufreq_driver_name[CPUFREQ_NAME_LEN];
 
 static int __init cpufreq_driver_setup(char *str)
 {
-	strlcpy(cpufreq_driver_name, str, CPUFREQ_NAME_LEN);
+	strscpy(cpufreq_driver_name, str, CPUFREQ_NAME_LEN);
 	return 1;
 }
 
