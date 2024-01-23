@@ -949,18 +949,6 @@ static int traceprobe_parse_probe_arg_body(const char *argv, ssize_t *size,
 		trace_probe_log_err(ctx->offset + (t ? (t - arg) : 0), BAD_TYPE);
 		goto out;
 	}
-	parg->offset = *size;
-	*size += parg->type->size * (parg->count ?: 1);
-
-	ret = -ENOMEM;
-	if (parg->count) {
-		len = strlen(parg->type->fmttype) + 6;
-		parg->fmt = kmalloc(len, GFP_KERNEL);
-		if (!parg->fmt)
-			goto out;
-		snprintf(parg->fmt, len, "%s[%d]", parg->type->fmttype,
-			 parg->count);
-	}
 
 	code = tmp = kcalloc(FETCH_INSN_MAX, sizeof(*code), GFP_KERNEL);
 	if (!code)
@@ -978,6 +966,19 @@ static int traceprobe_parse_probe_arg_body(const char *argv, ssize_t *size,
 			parg->type = parse_btf_arg_type(code->param, ctx);
 		else if (code->op == FETCH_OP_RETVAL)
 			parg->type = parse_btf_retval_type(ctx);
+	}
+	parg->offset = *size;
+	*size += parg->type->size * (parg->count ?: 1);
+
+	if (parg->count) {
+		len = strlen(parg->type->fmttype) + 6;
+		parg->fmt = kmalloc(len, GFP_KERNEL);
+		if (!parg->fmt) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		snprintf(parg->fmt, len, "%s[%d]", parg->type->fmttype,
+			 parg->count);
 	}
 
 	ret = -EINVAL;
