@@ -211,6 +211,7 @@ evdev
 exportfs
 ext4
 extcon-core
+failover
 fan
 fat
 fb
@@ -332,6 +333,7 @@ mtk-eint
 mtk-regulator-coupler
 mxc-clk
 n_null
+net_failover
 netkit
 nls_base
 nls_cp437
@@ -415,6 +417,7 @@ reset-berlin
 reset-imx7
 reset-meson
 reset-qcom-aoss
+reset-rzg2l-usbphy-ctrl
 rfkill
 rng
 rng-core
@@ -445,6 +448,8 @@ sh-sci
 sha1_generic
 sha256_generic
 sha3_generic
+sha512-arm64
+sha512-ce
 sha512_generic
 sig
 slhc
@@ -511,6 +516,7 @@ virtio_balloon
 virtio_blk
 virtio_console
 virtio_mmio
+virtio_net
 virtio_pci
 virtio_pci_legacy_dev
 virtio_pci_modern_dev
@@ -518,7 +524,6 @@ virtio_ring
 virtio_scsi
 vivaldi-fmap
 watchdog
-wwan
 wwnr
 x509_key_parser
 xen-blkfront

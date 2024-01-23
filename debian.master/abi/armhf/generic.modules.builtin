@@ -141,6 +141,7 @@ exportfs
 ext4
 extcon-core
 exynos_thermal
+failover
 fat
 fb
 fb_io_fops
@@ -247,6 +248,7 @@ mxc-clk
 n_null
 nand
 nandcore
+net_failover
 netkit
 nls_base
 nls_cp437
@@ -353,6 +355,7 @@ sh-sci
 sha1_generic
 sha256_generic
 sha3_generic
+sha512-arm
 sha512_generic
 sig
 slhc
@@ -425,6 +428,7 @@ virtio_balloon
 virtio_blk
 virtio_console
 virtio_mmio
+virtio_net
 virtio_pci
 virtio_pci_legacy_dev
 virtio_pci_modern_dev
