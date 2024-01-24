@@ -1,3 +1,12 @@
+linux-meta-unstable (6.8.0-1.1) noble; urgency=medium
+
+  * Master version: 6.8.0-1.1
+
+  * Miscellaneous Ubuntu changes
+    - debian/dkms-versions -- update from master
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Wed, 24 Jan 2024 10:49:42 +0100
+
 linux-meta-unstable (6.7.0-7.7) noble; urgency=medium
 
   * Master version: 6.7.0-7.7
