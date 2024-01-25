@@ -2190,9 +2190,9 @@ static bool arm_smmu_inv_range_too_big(struct arm_smmu_device *smmu,
 	return size >= max_ops * granule;
 }
 
-static void arm_smmu_tlb_inv_range_domain(unsigned long iova, size_t size,
-					  size_t granule, bool leaf,
-					  struct arm_smmu_domain *smmu_domain)
+static void arm_smmu_tlb_inv_range_s2(struct arm_smmu_domain *smmu_domain,
+				      unsigned long iova, size_t size,
+				      size_t granule, bool leaf)
 {
 	struct arm_smmu_cmdq_ent cmd = {
 		.tlbi = {
@@ -2200,21 +2200,9 @@ static void arm_smmu_tlb_inv_range_domain(unsigned long iova, size_t size,
 		},
 	};
 
-	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
-		cmd.opcode	= smmu_domain->smmu->features & ARM_SMMU_FEAT_E2H ?
-				  CMDQ_OP_TLBI_EL2_VA : CMDQ_OP_TLBI_NH_VA;
-		cmd.tlbi.asid	= smmu_domain->asid;
-	} else {
-		cmd.opcode	= CMDQ_OP_TLBI_S2_IPA;
-		cmd.tlbi.vmid	= smmu_domain->vmid;
-	}
+	cmd.opcode	= CMDQ_OP_TLBI_S2_IPA;
+	cmd.tlbi.vmid	= smmu_domain->vmid;
 	__arm_smmu_tlb_inv_range(&cmd, iova, size, granule, smmu_domain);
-
-	/*
-	 * Unfortunately, this can't be leaf-only since we may have
-	 * zapped an entire table.
-	 */
-	arm_smmu_atc_inv_domain(smmu_domain, iova, size);
 }
 
 void arm_smmu_tlb_inv_range_s1(struct arm_smmu_domain *smmu_domain,
@@ -2254,7 +2242,15 @@ static void arm_smmu_tlb_inv_page_nosync(struct iommu_iotlb_gather *gather,
 static void arm_smmu_tlb_inv_walk(unsigned long iova, size_t size,
 				  size_t granule, void *cookie)
 {
-	arm_smmu_tlb_inv_range_domain(iova, size, granule, false, cookie);
+	struct arm_smmu_domain *smmu_domain = cookie;
+
+	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1)
+		arm_smmu_tlb_inv_range_s1(smmu_domain, iova, size, granule,
+					  false);
+	else
+		arm_smmu_tlb_inv_range_s2(smmu_domain, iova, size, granule,
+					 false);
+	arm_smmu_atc_inv_domain(smmu_domain, iova, size);
 }
 
 static const struct iommu_flush_ops arm_smmu_flush_ops = {
@@ -3146,13 +3142,24 @@ static void arm_smmu_iotlb_sync(struct iommu_domain *domain,
 				struct iommu_iotlb_gather *gather)
 {
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+	size_t size = gather->end - gather->start + 1;
 
 	if (!gather->pgsize)
 		return;
 
-	arm_smmu_tlb_inv_range_domain(gather->start,
-				      gather->end - gather->start + 1,
-				      gather->pgsize, true, smmu_domain);
+	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1)
+		arm_smmu_tlb_inv_range_s1(smmu_domain, gather->start, size,
+					  gather->pgsize, true);
+
+	else
+		arm_smmu_tlb_inv_range_s2(smmu_domain, gather->start, size,
+					  gather->pgsize, true);
+
+	/*
+	 * Unfortunately, this can't be leaf-only since we may have
+	 * zapped an entire table.
+	 */
+	arm_smmu_atc_inv_domain(smmu_domain, gather->start, size);
 }
 
 static phys_addr_t
