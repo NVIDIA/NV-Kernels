@@ -983,17 +983,6 @@ static void arm_smmu_page_response(struct device *dev, struct iopf_fault *unused
 }
 
 /* Context descriptor manipulation functions */
-void arm_smmu_tlb_inv_all_s1(struct arm_smmu_domain *smmu_domain)
-{
-	struct arm_smmu_device *smmu = smmu_domain->smmu;
-	struct arm_smmu_cmdq_ent cmd = {
-		.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
-			CMDQ_OP_TLBI_EL2_ASID : CMDQ_OP_TLBI_NH_ASID,
-		.tlbi.asid = READ_ONCE(smmu_domain->asid),
-	};
-
-	arm_smmu_cmdq_issue_cmd_with_sync(smmu, &cmd);
-}
 
 /*
  * Based on the value of ent report which bits of the STE the HW will access. It
@@ -2178,6 +2167,29 @@ static void __arm_smmu_tlb_inv_range(struct arm_smmu_cmdq_ent *cmd,
 	arm_smmu_cmdq_batch_submit(smmu, &cmds);
 }
 
+static bool arm_smmu_inv_range_too_big(struct arm_smmu_device *smmu,
+				       size_t size, size_t granule)
+{
+	unsigned int max_ops;
+
+	/* 0 size means invalidate all */
+	if (!size || size == SIZE_MAX)
+		return true;
+
+	if (smmu->features & ARM_SMMU_FEAT_RANGE_INV)
+		return false;
+
+	/*
+	 * Cloned from the MAX_TLBI_OPS in arch/arm64/include/asm/tlbflush.h,
+	 * this is used as a threshold to replace per-page TLBI commands to
+	 * issue in the command queue with an address-space TLBI command, when
+	 * SMMU w/o a range invalidation feature handles too many per-page TLBI
+	 * commands, which will otherwise result in a soft lockup.
+	 */
+	max_ops = 1 << (ilog2(granule) - 3);
+	return size >= max_ops * granule;
+}
+
 static void arm_smmu_tlb_inv_range_domain(unsigned long iova, size_t size,
 					  size_t granule, bool leaf,
 					  struct arm_smmu_domain *smmu_domain)
@@ -2205,20 +2217,28 @@ static void arm_smmu_tlb_inv_range_domain(unsigned long iova, size_t size,
 	arm_smmu_atc_inv_domain(smmu_domain, iova, size);
 }
 
-void arm_smmu_tlb_inv_range_asid(unsigned long iova, size_t size, int asid,
-				 size_t granule, bool leaf,
-				 struct arm_smmu_domain *smmu_domain)
+void arm_smmu_tlb_inv_range_s1(struct arm_smmu_domain *smmu_domain,
+			       unsigned long iova, size_t size,
+			       size_t granule, bool leaf)
 {
 	struct arm_smmu_cmdq_ent cmd = {
 		.opcode	= smmu_domain->smmu->features & ARM_SMMU_FEAT_E2H ?
 			  CMDQ_OP_TLBI_EL2_VA : CMDQ_OP_TLBI_NH_VA,
 		.tlbi = {
-			.asid	= asid,
+			.asid	= READ_ONCE(smmu_domain->asid),
 			.leaf	= leaf,
 		},
 	};
 
-	__arm_smmu_tlb_inv_range(&cmd, iova, size, granule, smmu_domain);
+	if (arm_smmu_inv_range_too_big(smmu_domain->smmu, size, granule)) {
+		cmd.opcode = smmu_domain->smmu->features & ARM_SMMU_FEAT_E2H ?
+				     CMDQ_OP_TLBI_EL2_ASID :
+				     CMDQ_OP_TLBI_NH_ASID,
+		arm_smmu_cmdq_issue_cmd_with_sync(smmu_domain->smmu, &cmd);
+	} else {
+		__arm_smmu_tlb_inv_range(&cmd, iova, size, granule,
+					 smmu_domain);
+	}
 }
 
 static void arm_smmu_tlb_inv_page_nosync(struct iommu_iotlb_gather *gather,

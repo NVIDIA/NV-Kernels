@@ -136,15 +136,6 @@ void arm_smmu_make_sva_cd(struct arm_smmu_cd *target,
 }
 EXPORT_SYMBOL_IF_KUNIT(arm_smmu_make_sva_cd);
 
-/*
- * Cloned from the MAX_TLBI_OPS in arch/arm64/include/asm/tlbflush.h, this
- * is used as a threshold to replace per-page TLBI commands to issue in the
- * command queue with an address-space TLBI command, when SMMU w/o a range
- * invalidation feature handles too many per-page TLBI commands, which will
- * otherwise result in a soft lockup.
- */
-#define CMDQ_MAX_TLBI_OPS		(1 << (PAGE_SHIFT - 3))
-
 static void arm_smmu_mm_arch_invalidate_secondary_tlbs(struct mmu_notifier *mn,
 						struct mm_struct *mm,
 						unsigned long start,
@@ -160,25 +151,12 @@ static void arm_smmu_mm_arch_invalidate_secondary_tlbs(struct mmu_notifier *mn,
 	 * range. So do a simple translation here by calculating size correctly.
 	 */
 	size = end - start;
-	if (!(smmu_domain->smmu->features & ARM_SMMU_FEAT_RANGE_INV)) {
-		if (size >= CMDQ_MAX_TLBI_OPS * PAGE_SIZE)
-			size = 0;
-	} else {
-		if (size == ULONG_MAX)
-			size = 0;
-	}
+	if (size == ULONG_MAX)
+		size = 0;
 
-	if (!smmu_domain->btm_invalidation) {
-		ioasid_t asid = READ_ONCE(smmu_domain->asid);
-
-		if (!size)
-			arm_smmu_tlb_inv_all_s1(smmu_domain);
-		else
-			arm_smmu_tlb_inv_range_asid(start, size, asid,
-						    PAGE_SIZE, false,
-						    smmu_domain);
-	}
-
+	if (!smmu_domain->btm_invalidation)
+		arm_smmu_tlb_inv_range_s1(smmu_domain, start, size, PAGE_SIZE,
+					  false);
 	arm_smmu_atc_inv_domain(smmu_domain, start, size);
 }
 

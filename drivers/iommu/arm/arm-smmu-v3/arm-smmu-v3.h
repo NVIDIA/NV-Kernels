@@ -873,10 +873,13 @@ int arm_smmu_set_pasid(struct arm_smmu_master *master,
 int arm_smmu_domain_alloc_id(struct arm_smmu_device *smmu,
 			     struct arm_smmu_domain *smmu_domain);
 void arm_smmu_domain_free_id(struct arm_smmu_domain *smmu_domain);
-void arm_smmu_tlb_inv_all_s1(struct arm_smmu_domain *smmu_domain);
-void arm_smmu_tlb_inv_range_asid(unsigned long iova, size_t size, int asid,
-				 size_t granule, bool leaf,
-				 struct arm_smmu_domain *smmu_domain);
+void arm_smmu_tlb_inv_range_s1(struct arm_smmu_domain *smmu_domain,
+			       unsigned long iova, size_t size, size_t granule,
+			       bool leaf);
+static inline void arm_smmu_tlb_inv_all_s1(struct arm_smmu_domain *smmu_domain)
+{
+	arm_smmu_tlb_inv_range_s1(smmu_domain, 0, 0, PAGE_SIZE, false);
+}
 int arm_smmu_atc_inv_domain(struct arm_smmu_domain *smmu_domain,
 			    unsigned long iova, size_t size);
 
