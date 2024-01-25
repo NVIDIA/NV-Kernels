@@ -983,12 +983,13 @@ static void arm_smmu_page_response(struct device *dev, struct iopf_fault *unused
 }
 
 /* Context descriptor manipulation functions */
-void arm_smmu_tlb_inv_asid(struct arm_smmu_device *smmu, u16 asid)
+void arm_smmu_tlb_inv_all_s1(struct arm_smmu_domain *smmu_domain)
 {
+	struct arm_smmu_device *smmu = smmu_domain->smmu;
 	struct arm_smmu_cmdq_ent cmd = {
 		.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
 			CMDQ_OP_TLBI_EL2_ASID : CMDQ_OP_TLBI_NH_ASID,
-		.tlbi.asid = asid,
+		.tlbi.asid = READ_ONCE(smmu_domain->asid),
 	};
 
 	arm_smmu_cmdq_issue_cmd_with_sync(smmu, &cmd);
@@ -2098,7 +2099,7 @@ static void arm_smmu_tlb_inv_context(struct arm_smmu_domain *smmu_domain)
 
 	if ((smmu_domain->stage == ARM_SMMU_DOMAIN_S1 ||
 	     smmu_domain->domain.type == IOMMU_DOMAIN_SVA)) {
-		arm_smmu_tlb_inv_asid(smmu, READ_ONCE(smmu_domain->asid));
+		arm_smmu_tlb_inv_all_s1(smmu_domain);
 	} else if (smmu_domain->stage == ARM_SMMU_DOMAIN_S2) {
 		cmd.opcode = CMDQ_OP_TLBI_S12_VMALL;
 		cmd.tlbi.vmid	= smmu_domain->vmid;

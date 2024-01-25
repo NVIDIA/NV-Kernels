@@ -19,7 +19,6 @@ static int arm_smmu_realloc_s1_domain_asid(struct arm_smmu_device *smmu,
 					   struct arm_smmu_domain *smmu_domain)
 {
 	struct arm_smmu_master_domain *master_domain;
-	u32 old_asid = smmu_domain->asid;
 	struct arm_smmu_cd target_cd;
 	unsigned long flags;
 	int ret;
@@ -57,9 +56,6 @@ static int arm_smmu_realloc_s1_domain_asid(struct arm_smmu_device *smmu,
 					&target_cd);
 	}
 	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
-
-	/* Clean the ASID we are about to assign to a new translation */
-	arm_smmu_tlb_inv_asid(smmu, old_asid);
 	return 0;
 }
 
@@ -176,7 +172,7 @@ static void arm_smmu_mm_arch_invalidate_secondary_tlbs(struct mmu_notifier *mn,
 		ioasid_t asid = READ_ONCE(smmu_domain->asid);
 
 		if (!size)
-			arm_smmu_tlb_inv_asid(smmu_domain->smmu, asid);
+			arm_smmu_tlb_inv_all_s1(smmu_domain);
 		else
 			arm_smmu_tlb_inv_range_asid(start, size, asid,
 						    PAGE_SIZE, false,
@@ -217,7 +213,7 @@ static void arm_smmu_mm_release(struct mmu_notifier *mn, struct mm_struct *mm)
 	}
 	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
 
-	arm_smmu_tlb_inv_asid(smmu_domain->smmu, smmu_domain->asid);
+	arm_smmu_tlb_inv_all_s1(smmu_domain);
 	arm_smmu_atc_inv_domain(smmu_domain, 0, 0);
 }
 
@@ -479,6 +475,9 @@ static int arm_smmu_share_asid(struct arm_smmu_device *smmu,
 		ret = arm_smmu_realloc_s1_domain_asid(smmu, old_s1_domain);
 		if (ret)
 			goto out_restore_s1;
+
+		/* Clean the ASID since it was just recovered before using it */
+		arm_smmu_tlb_inv_all_s1(smmu_domain);
 	}
 
 	smmu_domain->btm_invalidation = true;
