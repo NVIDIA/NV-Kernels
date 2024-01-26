@@ -4283,7 +4283,7 @@ int security_inode_getsecctx(struct inode *inode, struct lsmcontext *cp)
 		return hp->hook.inode_getsecctx(inode, (void **)&cp->context,
 						&cp->len);
 	}
-	return -EOPNOTSUPP;
+	return LSM_RET_DEFAULT(inode_getsecctx);
 }
 EXPORT_SYMBOL(security_inode_getsecctx);
 
