@@ -5,7 +5,14 @@
 
 #include <linux/types.h>
 
+struct posix_acl;
+struct inode;
+struct btrfs_trans_handle;
+
 #ifdef CONFIG_BTRFS_FS_POSIX_ACL
+
+struct mnt_idmap;
+struct dentry;
 
 struct posix_acl *btrfs_get_acl(struct inode *inode, int type, bool rcu);
 int btrfs_set_acl(struct mnt_idmap *idmap, struct dentry *dentry,
@@ -14,6 +21,8 @@ int __btrfs_set_acl(struct btrfs_trans_handle *trans, struct inode *inode,
 		    struct posix_acl *acl, int type);
 
 #else
+
+#include <linux/errno.h>
 
 #define btrfs_get_acl NULL
 #define btrfs_set_acl NULL
