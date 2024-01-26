@@ -620,15 +620,19 @@ struct arm_smmu_ctx_desc {
 	u16				asid;
 };
 
-struct arm_smmu_l1_ctx_desc {
-	struct arm_smmu_cdtab_l2	*l2ptr;
-};
-
 struct arm_smmu_ctx_desc_cfg {
-	__le64				*cdtab;
+	union {
+		struct {
+			struct arm_smmu_cd *table;
+			unsigned int num_ents;
+		} linear;
+		struct {
+			struct arm_smmu_cdtab_l1 *l1tab;
+			struct arm_smmu_cdtab_l2 **l2ptrs;
+			unsigned int num_l1_ents;
+		} l2;
+	};
 	dma_addr_t			cdtab_dma;
-	struct arm_smmu_l1_ctx_desc	*l1_desc;
-	unsigned int			num_l1_ents;
 	unsigned int			used_ssids;
 	u8				in_ste;
 	u8				s1fmt;
@@ -640,6 +644,12 @@ struct arm_smmu_ctx_desc_cfg {
 static inline bool arm_smmu_ssids_in_use(struct arm_smmu_ctx_desc_cfg *cd_table)
 {
 	return cd_table->used_ssids;
+}
+
+static inline bool
+arm_smmu_cdtab_allocated(struct arm_smmu_ctx_desc_cfg *cfg)
+{
+	return cfg->linear.table || cfg->l2.l1tab;
 }
 
 struct arm_smmu_s2_cfg {
