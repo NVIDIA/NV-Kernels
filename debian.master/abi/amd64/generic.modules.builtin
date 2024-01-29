@@ -127,8 +127,6 @@ input-core
 intel-agp
 intel-gtt
 intel-uncore
-intel_pmc_core
-intel_pmc_core_pltdrv
 iosf_mbi
 iova
 ipv6
