@@ -106,7 +106,7 @@ static int smb_open(struct inode *inode, struct file *file)
 		goto out;
 	}
 
-	if (atomic_read(&drvdata->csdev->refcnt)) {
+	if (drvdata->csdev->refcnt) {
 		ret = -EBUSY;
 		goto out;
 	}
@@ -284,8 +284,7 @@ static int smb_enable(struct coresight_device *csdev, enum cs_mode mode,
 	if (ret)
 		goto out;
 
-	atomic_inc(&csdev->refcnt);
-
+	csdev->refcnt++;
 	dev_dbg(&csdev->dev, "Ultrasoc SMB enabled\n");
 out:
 	spin_unlock(&drvdata->spinlock);
@@ -305,7 +304,8 @@ static int smb_disable(struct coresight_device *csdev)
 		goto out;
 	}
 
-	if (atomic_dec_return(&csdev->refcnt)) {
+	csdev->refcnt--;
+	if (csdev->refcnt) {
 		ret = -EBUSY;
 		goto out;
 	}
@@ -317,12 +317,7 @@ static int smb_disable(struct coresight_device *csdev)
 
 	/* Dissociate from the target process. */
 	drvdata->pid = -1;
-<<<<<<< HEAD
 	drvdata->mode = CS_MODE_DISABLED;
-=======
-	local_set(&csdev->mode, CS_MODE_DISABLED);
-	dev_dbg(&csdev->dev, "Ultrasoc SMB disabled\n");
->>>>>>> 9cae77cf23e3 (coresight: Move mode to struct coresight_device)
 
 	dev_dbg(&csdev->dev, "Ultrasoc SMB disabled\n");
 out:
@@ -410,7 +405,7 @@ static unsigned long smb_update_buffer(struct coresight_device *csdev,
 	spin_lock(&drvdata->spinlock);
 
 	/* Don't do anything if another tracer is using this sink. */
-	if (atomic_read(&csdev->refcnt) != 1)
+	if (csdev->refcnt != 1)
 		goto out;
 
 	smb_disable_hw(drvdata);
