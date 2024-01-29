@@ -243,6 +243,7 @@ governor_userspace
 gpio-davinci
 gpio-generic
 gpio-mxc
+gpio-npcm-sgpio
 gpio-pl061
 gpio-sifive
 gpio-tegra

@@ -166,6 +166,7 @@ governor_simpleondemand
 governor_userspace
 gpio-generic
 gpio-mxc
+gpio-npcm-sgpio
 gpio-omap
 gpio-pl061
 gpio-sifive

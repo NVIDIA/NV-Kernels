@@ -50,7 +50,6 @@ ext4
 failover
 fat
 fb
-fb_io_fops
 fb_sys_fops
 firmware_class
 fixed_phy
@@ -88,7 +87,6 @@ md5
 mdio_devres
 mpi
 mq-deadline
-multipath
 n_null
 net_failover
 netkit

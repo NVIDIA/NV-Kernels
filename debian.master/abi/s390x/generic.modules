@@ -14,7 +14,6 @@ act_ct
 act_ctinfo
 act_gact
 act_gate
-act_ipt
 act_mirred
 act_mpls
 act_nat
@@ -78,7 +77,6 @@ blowfish_common
 blowfish_generic
 bochs
 bonding
-bpfilter
 br_netfilter
 brd
 bridge
@@ -92,7 +90,6 @@ cast_common
 ccm
 ccwgroup
 ceph
-cfb
 ch
 chacha20poly1305
 chacha_generic
@@ -183,6 +180,7 @@ dp83848
 dp83867
 dp83869
 dp83tc811
+dp83tg720
 drbd
 drm
 drm_kms_helper
@@ -235,14 +233,12 @@ esp6
 esp6_offload
 essiv
 et1011c
-faulty
 fcoe
 fcrypt
 fou
 fou6
 fpga-mgr
 fs3270
-fscache
 fsm
 garp
 geneve
@@ -264,7 +260,6 @@ gtp
 hangcheck-timer
 hfcpci
 hmcdrv
-i2c-algo-bit
 i2c-core
 i2c-dev
 i2c-mux
@@ -401,10 +396,8 @@ libiscsi
 libiscsi_tcp
 libpoly1305
 libsas
-linear
 llc
 lockd
-loongson
 lru_cache
 lrw
 lxt
@@ -434,7 +427,6 @@ marvell10g
 md-cluster
 md4
 mdev
-mdio-i2c
 mdio-mscc-miim
 memory-notifier-error-inject
 mena21_wdt
@@ -607,6 +599,7 @@ nls_ucs2_utils
 nls_utf8
 notifier-error-inject
 nsh
+nsm
 ntfs
 ntfs3
 null_blk
@@ -631,7 +624,6 @@ ocfs2_nodemanager
 ocfs2_stack_o2cb
 ocfs2_stack_user
 ocfs2_stackglue
-ofb
 openvswitch
 orangefs
 overlay
@@ -642,7 +634,6 @@ pcbc
 pci-pf-stub
 pci-stub
 pcrypt
-phylink
 pkcs7_test_key
 pkcs8_key_parser
 pkey
@@ -739,7 +730,6 @@ sctp
 sctp_diag
 serial_base
 serpent_generic
-sfp
 sha1_s390
 sha256_s390
 sha3_256_s390
@@ -758,7 +748,6 @@ smc_diag
 smsc
 smsgiucv_app
 softdog
-spl
 st
 st_drv
 ste10Xp
@@ -879,7 +868,6 @@ xfrm_interface
 xfrm_ipcomp
 xfrm_user
 xfs
-xilinx_emac
 xilinx_gmii2rgmii
 xor
 xsk_diag
@@ -959,7 +947,6 @@ z3fold
 zcrypt
 zcrypt_cex4
 zfcp
-zfs
 zonefs
 zram
 zstd
