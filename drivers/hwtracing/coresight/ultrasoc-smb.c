@@ -216,7 +216,7 @@ static void smb_enable_sysfs(struct coresight_device *csdev)
 {
 	struct smb_drv_data *drvdata = dev_get_drvdata(csdev->dev.parent);
 
-	if (local_read(&csdev->mode) != CS_MODE_DISABLED)
+	if (coresight_get_mode(csdev) != CS_MODE_DISABLED)
 		return;
 
 	smb_enable_hw(drvdata);
@@ -264,8 +264,8 @@ static int smb_enable(struct coresight_device *csdev, enum cs_mode mode,
 	}
 
 	/* Do nothing, the SMB is already enabled as other mode */
-	if (local_read(&csdev->mode) != CS_MODE_DISABLED &&
-	    local_read(&csdev->mode) != mode) {
+	if (coresight_get_mode(csdev) != CS_MODE_DISABLED &&
+	    coresight_get_mode(csdev) != mode) {
 		ret = -EBUSY;
 		goto out;
 	}
@@ -311,7 +311,7 @@ static int smb_disable(struct coresight_device *csdev)
 	}
 
 	/* Complain if we (somehow) got out of sync */
-	WARN_ON_ONCE(local_read(&csdev->mode) == CS_MODE_DISABLED);
+	WARN_ON_ONCE(coresight_get_mode(csdev) == CS_MODE_DISABLED);
 
 	smb_disable_hw(drvdata);
 
