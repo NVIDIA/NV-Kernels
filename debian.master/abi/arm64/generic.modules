@@ -1467,7 +1467,6 @@ dwmac-generic
 dwmac-imx
 dwmac-intel-plat
 dwmac-ipq806x
-dwmac-loongson
 dwmac-mediatek
 dwmac-meson
 dwmac-meson8b
