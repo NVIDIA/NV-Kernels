@@ -486,7 +486,8 @@ static void nlmclnt_locks_init_private(struct file_lock *fl, struct nlm_host *ho
 {
 	fl->fl_u.nfs_fl.state = 0;
 	fl->fl_ops = NULL;
-	fl->fl_u.nfs_fl.owner = nlmclnt_find_lockowner(host, fl->fl_owner);
+	fl->fl_u.nfs_fl.owner = nlmclnt_find_lockowner(host,
+						       fl->c.flc_owner);
 	INIT_LIST_HEAD(&fl->fl_u.nfs_fl.list);
 	if (!fl->fl_u.nfs_fl.owner)
 		return;
