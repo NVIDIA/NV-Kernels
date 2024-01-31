@@ -4862,10 +4862,10 @@ void
 lpfc_nlp_set_state(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 		   int state)
 {
-	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
 	int  old_state = ndlp->nlp_state;
 	bool node_dropped = test_bit(NLP_DROPPED, &ndlp->nlp_flag);
 	char name1[16], name2[16];
+	unsigned long iflags;
 
 	lpfc_printf_vlog(vport, KERN_INFO, LOG_NODE,
 			 "0904 NPort state transition x%06x, %s -> %s\n",
@@ -4892,9 +4892,9 @@ lpfc_nlp_set_state(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	}
 
 	if (list_empty(&ndlp->nlp_listp)) {
-		spin_lock_irq(shost->host_lock);
+		spin_lock_irqsave(&vport->fc_nodes_list_lock, iflags);
 		list_add_tail(&ndlp->nlp_listp, &vport->fc_nodes);
-		spin_unlock_irq(shost->host_lock);
+		spin_unlock_irqrestore(&vport->fc_nodes_list_lock, iflags);
 	} else if (old_state)
 		lpfc_nlp_counters(vport, old_state, -1);
 
@@ -4906,26 +4906,26 @@ lpfc_nlp_set_state(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 void
 lpfc_enqueue_node(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
 {
-	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
+	unsigned long iflags;
 
 	if (list_empty(&ndlp->nlp_listp)) {
-		spin_lock_irq(shost->host_lock);
+		spin_lock_irqsave(&vport->fc_nodes_list_lock, iflags);
 		list_add_tail(&ndlp->nlp_listp, &vport->fc_nodes);
-		spin_unlock_irq(shost->host_lock);
+		spin_unlock_irqrestore(&vport->fc_nodes_list_lock, iflags);
 	}
 }
 
 void
 lpfc_dequeue_node(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
 {
-	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
+	unsigned long iflags;
 
 	lpfc_cancel_retry_delay_tmo(vport, ndlp);
 	if (ndlp->nlp_state && !list_empty(&ndlp->nlp_listp))
 		lpfc_nlp_counters(vport, ndlp->nlp_state, -1);
-	spin_lock_irq(shost->host_lock);
+	spin_lock_irqsave(&vport->fc_nodes_list_lock, iflags);
 	list_del_init(&ndlp->nlp_listp);
-	spin_unlock_irq(shost->host_lock);
+	spin_unlock_irqrestore(&vport->fc_nodes_list_lock, iflags);
 	lpfc_nlp_state_cleanup(vport, ndlp, ndlp->nlp_state,
 				NLP_STE_UNUSED_NODE);
 }
@@ -5393,8 +5393,8 @@ lpfc_unreg_hba_rpis(struct lpfc_hba *phba)
 {
 	struct lpfc_vport **vports;
 	struct lpfc_nodelist *ndlp;
-	struct Scsi_Host *shost;
 	int i;
+	unsigned long iflags;
 
 	vports = lpfc_create_vport_work_array(phba);
 	if (!vports) {
@@ -5403,17 +5403,18 @@ lpfc_unreg_hba_rpis(struct lpfc_hba *phba)
 		return;
 	}
 	for (i = 0; i <= phba->max_vports && vports[i] != NULL; i++) {
-		shost = lpfc_shost_from_vport(vports[i]);
-		spin_lock_irq(shost->host_lock);
+		spin_lock_irqsave(&vports[i]->fc_nodes_list_lock, iflags);
 		list_for_each_entry(ndlp, &vports[i]->fc_nodes, nlp_listp) {
 			if (test_bit(NLP_RPI_REGISTERED, &ndlp->nlp_flag)) {
 				/* The mempool_alloc might sleep */
-				spin_unlock_irq(shost->host_lock);
+				spin_unlock_irqrestore(&vports[i]->fc_nodes_list_lock,
+						       iflags);
 				lpfc_unreg_rpi(vports[i], ndlp);
-				spin_lock_irq(shost->host_lock);
+				spin_lock_irqsave(&vports[i]->fc_nodes_list_lock,
+						  iflags);
 			}
 		}
-		spin_unlock_irq(shost->host_lock);
+		spin_unlock_irqrestore(&vports[i]->fc_nodes_list_lock, iflags);
 	}
 	lpfc_destroy_vport_work_array(phba, vports);
 }
@@ -5656,12 +5657,11 @@ lpfc_findnode_did(struct lpfc_vport *vport, uint32_t did)
 struct lpfc_nodelist *
 lpfc_findnode_mapped(struct lpfc_vport *vport)
 {
-	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
 	struct lpfc_nodelist *ndlp;
 	uint32_t data1;
 	unsigned long iflags;
 
-	spin_lock_irqsave(shost->host_lock, iflags);
+	spin_lock_irqsave(&vport->fc_nodes_list_lock, iflags);
 
 	list_for_each_entry(ndlp, &vport->fc_nodes, nlp_listp) {
 		if (ndlp->nlp_state == NLP_STE_UNMAPPED_NODE ||
@@ -5670,7 +5670,8 @@ lpfc_findnode_mapped(struct lpfc_vport *vport)
 				 ((uint32_t)ndlp->nlp_xri << 16) |
 				 ((uint32_t)ndlp->nlp_type << 8) |
 				 ((uint32_t)ndlp->nlp_rpi & 0xff));
-			spin_unlock_irqrestore(shost->host_lock, iflags);
+			spin_unlock_irqrestore(&vport->fc_nodes_list_lock,
+					       iflags);
 			lpfc_printf_vlog(vport, KERN_INFO, LOG_NODE_VERBOSE,
 					 "2025 FIND node DID MAPPED "
 					 "Data: x%px x%x x%lx x%x x%px\n",
@@ -5680,7 +5681,7 @@ lpfc_findnode_mapped(struct lpfc_vport *vport)
 			return ndlp;
 		}
 	}
-	spin_unlock_irqrestore(shost->host_lock, iflags);
+	spin_unlock_irqrestore(&vport->fc_nodes_list_lock, iflags);
 
 	/* FIND node did <did> NOT FOUND */
 	lpfc_printf_vlog(vport, KERN_INFO, LOG_NODE,
@@ -6710,7 +6711,7 @@ lpfc_fcf_inuse(struct lpfc_hba *phba)
 	struct lpfc_vport **vports;
 	int i, ret = 0;
 	struct lpfc_nodelist *ndlp;
-	struct Scsi_Host  *shost;
+	unsigned long iflags;
 
 	vports = lpfc_create_vport_work_array(phba);
 
@@ -6719,8 +6720,6 @@ lpfc_fcf_inuse(struct lpfc_hba *phba)
 		return 1;
 
 	for (i = 0; i <= phba->max_vports && vports[i] != NULL; i++) {
-		shost = lpfc_shost_from_vport(vports[i]);
-		spin_lock_irq(shost->host_lock);
 		/*
 		 * IF the CVL_RCVD bit is not set then we have sent the
 		 * flogi.
@@ -6728,15 +6727,16 @@ lpfc_fcf_inuse(struct lpfc_hba *phba)
 		 * unreg the fcf.
 		 */
 		if (!(vports[i]->fc_flag & FC_VPORT_CVL_RCVD)) {
-			spin_unlock_irq(shost->host_lock);
 			ret =  1;
 			goto out;
 		}
+		spin_lock_irqsave(&vports[i]->fc_nodes_list_lock, iflags);
 		list_for_each_entry(ndlp, &vports[i]->fc_nodes, nlp_listp) {
 			if (ndlp->rport &&
 			  (ndlp->rport->roles & FC_RPORT_ROLE_FCP_TARGET)) {
 				ret = 1;
-				spin_unlock_irq(shost->host_lock);
+				spin_unlock_irqrestore(&vports[i]->fc_nodes_list_lock,
+						       iflags);
 				goto out;
 			} else if (test_bit(NLP_RPI_REGISTERED,
 					    &ndlp->nlp_flag)) {
@@ -6749,7 +6749,7 @@ lpfc_fcf_inuse(struct lpfc_hba *phba)
 						ndlp->nlp_flag);
 			}
 		}
-		spin_unlock_irq(shost->host_lock);
+		spin_unlock_irqrestore(&vports[i]->fc_nodes_list_lock, iflags);
 	}
 out:
 	lpfc_destroy_vport_work_array(phba, vports);
