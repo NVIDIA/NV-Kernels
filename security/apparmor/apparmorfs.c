@@ -492,6 +492,69 @@ static struct aa_loaddata *aa_simple_write_to_buffer(const char __user *userbuf,
 
 	return data;
 }
+static int decompress_zstd(char *src, size_t slen, char *dst, size_t dlen);
+/**
+ * aa_get_data_from_compressed - common routine for getting compressed policy
+ * from user and get both compressed and uncompressed version.
+ * @userbuf: user buffer to copy data from  (NOT NULL)
+ * @buffer_size: size of user buffer
+ * @pos: position write is at in the file (NOT NULL)
+ * @compressed_data Ptr on compressed data. *compressed_data is allocated there
+ *
+ * Returns: kernel buffer containing copy of user buffer data or an
+ *          ERR_PTR on failure.
+ */
+
+static struct aa_loaddata *aa_get_data_from_compressed(const char __user *userbuf,
+						  size_t buffer_size,
+						  loff_t *pos,
+						  char **compressed_data)
+{
+	struct aa_loaddata *data;
+	zstd_frame_header header;
+	int error;
+
+	if (!userbuf || !pos)
+		return ERR_PTR(-EINVAL);
+	if (*pos)
+		return ERR_PTR(-ESPIPE);
+
+	*compressed_data = kvmalloc(buffer_size, GFP_KERNEL);
+	if (!*compressed_data)
+		return ERR_PTR(-ENOMEM);
+	error = copy_from_user(*compressed_data, userbuf, buffer_size);
+	if (error)
+		goto fail;
+
+	error = zstd_get_frame_header(&header, *compressed_data, buffer_size);
+	if (error || header.frameContentSize == ZSTD_CONTENTSIZE_UNKNOWN ||
+	    header.frameContentSize == ZSTD_CONTENTSIZE_ERROR) {
+		error = -EINVAL;
+		goto fail;
+	}
+
+	data = aa_loaddata_alloc(header.frameContentSize);
+	if (IS_ERR(data)) {
+		error = PTR_ERR(data);
+		goto fail;
+	}
+
+	// We then decompress the data
+	error = decompress_zstd(*compressed_data, buffer_size, data->data,
+				header.frameContentSize);
+	if (error)
+		goto fail_decompress;
+
+	data->size = header.frameContentSize;
+	return data;
+
+fail_decompress:
+	aa_put_i_loaddata(data);
+fail:
+	kvfree(*compressed_data);
+	return ERR_PTR(error);
+
+}
 
 static ssize_t policy_update(u32 mask, const char __user *buf, size_t size,
 			     loff_t *pos, struct aa_ns *ns,
@@ -500,6 +563,9 @@ static ssize_t policy_update(u32 mask, const char __user *buf, size_t size,
 	struct aa_loaddata *data;
 	struct aa_label *label;
 	ssize_t error;
+	char *compressed_data = NULL;
+	__le32 magic_le;
+	bool is_compressed;
 
 	label = begin_current_label_crit_section();
 
@@ -510,10 +576,33 @@ static ssize_t policy_update(u32 mask, const char __user *buf, size_t size,
 	if (error)
 		goto end_section;
 
-	data = aa_simple_write_to_buffer(buf, size, size, pos);
-	error = PTR_ERR(data);
+	/* If the policy is userspace compressed we start by decompressing it
+	 * to make the required checks (computing hash, verifying profile, ...)
+	 *
+	 * Getting a userspace-compressed version then decompressing it in the
+	 * kernel actually makes sense since zstd decompression is ~3.5x faster
+	 * than compression. This also allow to increase the compression level.
+	 */
+
+	if (size >= sizeof(__le32) &&
+	    !copy_from_user(&magic_le, buf, sizeof(magic_le)) &&
+	    le32_to_cpu(magic_le) == ZSTD_MAGICNUMBER)
+		is_compressed = true;
+	else
+		is_compressed = false;
+
+	if (is_compressed) {
+
+		data = aa_get_data_from_compressed(buf, size, pos, &compressed_data);
+		error = PTR_ERR(data);
+	} else {
+		data = aa_simple_write_to_buffer(buf, size, size, pos);
+		error = PTR_ERR(data);
+	}
+
 	if (!IS_ERR(data)) {
-		error = aa_replace_profiles(ns, label, mask, data);
+		error = aa_replace_profiles(ns, label, mask, data,
+					    compressed_data, size);
 		/* put pcount, which will put count and free if no
 		 * profiles referencing it.
 		 */
@@ -559,6 +648,7 @@ static const struct file_operations aa_fs_profile_replace = {
 	.write = profile_replace,
 	.llseek = default_llseek,
 };
+
 
 /* .remove file hook fn to remove loaded policy */
 static ssize_t profile_remove(struct file *f, const char __user *buf,
@@ -2851,6 +2941,7 @@ static struct aa_sfs_entry aa_sfs_entry_policy[] = {
 	AA_SFS_DIR("unconfined_restrictions",   aa_sfs_entry_unconfined),
 	AA_SFS_DIR("notify",   aa_sfs_entry_notify),
 	AA_SFS_DIR("notify_versions",   aa_sfs_entry_notify_versions),
+	AA_SFS_FILE_BOOLEAN("compressed_load",	1),
 	{ }
 };
 
