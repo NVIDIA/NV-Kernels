@@ -1,3 +1,9 @@
+linux-meta-unstable (6.8.0-5.5) noble; urgency=medium
+
+  * Master version: 6.8.0-5.5
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Fri, 02 Feb 2024 12:59:31 +0100
+
 linux-meta-unstable (6.8.0-4.4) noble; urgency=medium
 
   * Master version: 6.8.0-4.4
