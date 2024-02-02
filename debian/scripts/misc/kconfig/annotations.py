@@ -110,13 +110,22 @@ class Annotation(Config):
                     m = re.match(r".* policy<(.*?)>", line)
                     if m:
                         match = True
-                        try:
-                            entry["policy"] |= literal_eval(m.group(1))
-                        except TypeError:
-                            entry["policy"] = {
-                                **entry["policy"],
-                                **literal_eval(m.group(1)),
-                            }
+                        # Update the previous entry considering potential overrides:
+                        #  - if the new entry is adding a rule for a new
+                        #    arch/flavour, simply add that
+                        #  - if the new entry is overriding a previous
+                        #    arch-flavour item, then overwrite that item
+                        #  - if the new entry is overriding a whole arch, then
+                        #    remove all the previous flavour rules of that arch
+                        new_entry = literal_eval(m.group(1))
+                        for key in new_entry:
+                            if key in self.arch:
+                                for flavour_key in list(entry["policy"].keys()):
+                                    if flavour_key.startswith(key):
+                                        del entry["policy"][flavour_key]
+                                entry["policy"][key] = new_entry[key]
+                            else:
+                                entry["policy"][key] = new_entry[key]
 
                     m = re.match(r".* note<(.*?)>", line)
                     if m:
