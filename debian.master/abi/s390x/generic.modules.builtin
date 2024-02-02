@@ -127,6 +127,7 @@ trusted
 tun
 unix
 utf8data
+uvdevice
 vfat
 virtio
 virtio_balloon
