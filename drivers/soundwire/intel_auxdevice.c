@@ -626,8 +626,6 @@ static int __maybe_unused intel_resume(struct device *dev)
 		return 0;
 	}
 
-	link_flags = md_flags >> (bus->link_id * 8);
-
 	if (pm_runtime_suspended(dev)) {
 		dev_dbg(dev, "pm_runtime status was suspended, forcing active\n");
 
