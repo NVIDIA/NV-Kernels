@@ -4191,7 +4191,6 @@ CONFIG_DWMAC_IMX8                               policy<{'arm64': 'm', 'armhf-gen
 CONFIG_DWMAC_INTEL                              policy<{'amd64': 'm'}>
 CONFIG_DWMAC_INTEL_PLAT                         policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_DWMAC_IPQ806X                            policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_DWMAC_LOONGSON                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_DWMAC_MEDIATEK                           policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DWMAC_MESON                              policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_DWMAC_QCOM_ETHQOS                        policy<{'arm64': 'm', 'armhf': 'm'}>

@@ -1149,7 +1149,6 @@ dwc3-of-simple
 dwmac-dwc-qos-eth
 dwmac-generic
 dwmac-intel-plat
-dwmac-loongson
 dyna_pci10xx
 dynapro
 e100

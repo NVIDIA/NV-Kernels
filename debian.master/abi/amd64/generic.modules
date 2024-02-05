@@ -1233,7 +1233,6 @@ dwc3-haps
 dwc3-pci
 dwmac-generic
 dwmac-intel
-dwmac-loongson
 dyna_pci10xx
 dynapro
 e100
