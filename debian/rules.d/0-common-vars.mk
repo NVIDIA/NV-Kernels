@@ -232,7 +232,7 @@ all_dkms_modules =
 subst_paired = $(subst $(firstword $(subst =, ,$(1))),$(lastword $(subst =, ,$(1))),$(2))
 recursive_call = $(if $(2),$(call recursive_call,$(1),$(wordlist 2,$(words $(2)),$(2)),$(call $(1),$(firstword $(2)),$(3))),$(3))
 
-$(foreach _line,$(shell gawk '{ OFS = "!"; $$1 = $$1; print }' $(DROOT)/dkms-versions), \
+$(foreach _line,$(shell gawk '{ OFS = "!"; $$1 = $$1; print }' $(DEBIAN)/dkms-versions), \
   $(eval _params = $(subst !, ,$(_line))) \
   $(eval _deb_pkgname = $(firstword $(_params))) \
   $(eval _deb_version = $(word 2,$(_params))) \
