@@ -1,3 +1,17 @@
+linux-meta (6.8.0-6.6) noble; urgency=medium
+
+  * Main version: 6.8.0-6.6
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] remove update-version script
+    - [Packaging] update variants
+
+  * Miscellaneous Ubuntu changes
+    - [packaging] rename to linux-meta
+    - debian/dkms-versions -- update from main
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Wed, 07 Feb 2024 15:11:17 +0100
+
 linux-meta (6.8.0-5.5) noble; urgency=medium
 
   * Master version: 6.8.0-5.5
