@@ -4,6 +4,8 @@ linux (6.8.0-6.6) UNRELEASED; urgency=medium
   CHANGELOG: Use the printchanges target to see the curent changes.
   CHANGELOG: Use the insertchanges target to create the final log.
 
+  * Rebase on v6.8-rc3
+ 
  -- Paolo Pisati <paolo.pisati@canonical.com>  Wed, 07 Feb 2024 13:34:51 +0100
 
 linux (6.8.0-5.5) noble; urgency=medium
