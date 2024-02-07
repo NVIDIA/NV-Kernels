@@ -1,6 +1,6 @@
-linux (5.15.0-96.106) jammy; urgency=medium
+linux (5.15.0-100.110) jammy; urgency=medium
 
-  * jammy/linux: 5.15.0-96.106 -proposed tracker (LP: #2052089)
+  * jammy/linux: 5.15.0-100.110 -proposed tracker (LP: #2052616)
 
   * i915 regression introduced with 5.5 kernel (LP: #2044131)
     - drm/i915: Skip some timing checks on BXT/GLK DSI transcoders
