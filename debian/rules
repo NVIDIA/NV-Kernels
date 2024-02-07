@@ -55,6 +55,13 @@ ifeq ($(src_pkg_name),linux)
 	do_tools_host = true
 endif
 
+# The linux-source package may only be built for the linux source package
+# We need to explicitly turn this off here to override any (incorrect)
+# statement in any of the above included makefile snippets
+ifneq ($(src_pkg_name),linux)
+	do_source_package = false
+endif
+
 # Default settings for DKMS modules.
 $(foreach _m,$(all_dkms_modules), \
   $(eval do_$(_m) ?= $(if $(filter $(_m),$(filter-out $(dkms_exclude),$(dkms_include) $(subst any,$(_m),$(subst $(arch),$(_m),$(dkms_$(_m)_archs))))),true,false)) \
