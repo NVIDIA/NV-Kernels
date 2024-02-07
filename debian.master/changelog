@@ -1,6 +1,6 @@
-linux (6.5.0-20.20) mantic; urgency=medium
+linux (6.5.0-25.25) mantic; urgency=medium
 
-  * mantic/linux: 6.5.0-20.20 -proposed tracker (LP: #2052040)
+  * mantic/linux: 6.5.0-25.25 -proposed tracker (LP: #2052615)
 
   * Packaging resync (LP: #1786013)
     - debian/dkms-versions -- update from kernel-versions (main/2024.02.05)
