@@ -289,7 +289,7 @@ CONFIG_INTEGRITY_PLATFORM_KEYRING               policy<{'amd64': 'y', 'arm64': '
 CONFIG_INTEGRITY_PLATFORM_KEYRING               note<'Required for lockdown'>
 
 CONFIG_INTEL_IOMMU_DEFAULT_ON                   policy<{'amd64': 'n'}>
-CONFIG_INTEL_IOMMU_DEFAULT_ON                   note<'the IOMMU can trigger boot failures'>
+CONFIG_INTEL_IOMMU_DEFAULT_ON                   note<'LP: #1971699'>
 
 CONFIG_IOMMU_DEBUGFS                            policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 's390x': 'n'}>
 CONFIG_IOMMU_DEBUGFS                            note<'Should not be enabled in production, LP #1861057'>
