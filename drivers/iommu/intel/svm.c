@@ -745,9 +745,8 @@ prq_advance:
 	return IRQ_RETVAL(handled);
 }
 
-int intel_svm_page_response(struct device *dev,
-			    struct iopf_fault *evt,
-			    struct iommu_page_response *msg)
+void intel_svm_page_response(struct device *dev, struct iopf_fault *evt,
+			     struct iommu_page_response *msg)
 {
 	struct iommu_fault_page_request *prm;
 	struct intel_iommu *iommu;
@@ -773,16 +772,6 @@ int intel_svm_page_response(struct device *dev,
 	pasid_present = prm->flags & IOMMU_FAULT_PAGE_REQUEST_PASID_VALID;
 	private_present = prm->flags & IOMMU_FAULT_PAGE_REQUEST_PRIV_DATA;
 	last_page = prm->flags & IOMMU_FAULT_PAGE_REQUEST_LAST_PAGE;
-
-	if (!pasid_present) {
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (prm->pasid == 0 || prm->pasid >= PASID_MAX) {
-		ret = -EINVAL;
-		goto out;
-	}
 
 	/*
 	 * Per VT-d spec. v3.0 ch7.7, system software must respond
@@ -812,8 +801,6 @@ int intel_svm_page_response(struct device *dev,
 
 		qi_submit_sync(iommu, &desc, 1, 0);
 	}
-out:
-	return ret;
 }
 
 static int intel_svm_set_dev_pasid(struct iommu_domain *domain,
