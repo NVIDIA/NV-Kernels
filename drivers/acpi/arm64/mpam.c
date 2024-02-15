@@ -94,25 +94,110 @@ static void acpi_mpam_parse_irqs(struct platform_device *pdev,
 	}
 }
 
-static int acpi_mpam_parse_resource(struct mpam_msc *msc,
+#define UUID_MPAM_INTERCONNECT_TABLE		"fe2bd645-033b-49e6-9479-2e0b8b21d1cd"
+
+struct acpi_mpam_interconnect_descriptor_table {
+	u8	type_uuid[16];
+	u32	num_descriptors;
+};
+
+struct acpi_mpam_interconnect_descriptor {
+	u32	source_id;
+	u32	destination_id;
+	u8	link_type;
+	u8	reserved[3];
+};
+
+static int acpi_mpam_parse_resource(struct acpi_mpam_msc_node *tbl_msc,
+				    struct mpam_msc *msc,
 				    struct acpi_mpam_resource_node *res)
 {
+	struct acpi_mpam_interconnect_descriptor_table *tbl_int_tbl;
+	struct acpi_mpam_interconnect_descriptor *tbl_int;
+	guid_t int_tbl_uuid, spec_uuid;
 	u32 cache_id;
+	off_t offset;
 	int level;
 
+	/*
+	 * Class IDs are somewhat arbitrary, but need to be co-ordinated.
+	 * 0-N are caches,
+	 * 64, 65: Interconnect, but ideally these would appear between the
+	 *     classes the controls are adjacent to.
+	 * 128: SMMU,
+	 * 192-192+level: Memory Side Caches, nothing checks that N is a
+	 *                small number.
+	 * 255: Memory Controllers
+	 *
+	 * ACPI devices would need a class id allocated based on the _HID.
+	 *
+	 * Classes that the mpam driver can't currently plumb into resctrl
+	 * are registered as UNKNOWN.
+	 */
 	switch (res->locator_type) {
 	case ACPI_MPAM_LOCATION_TYPE_PROCESSOR_CACHE:
 		cache_id = res->locator.cache_locator.cache_reference;
 		level = find_acpi_cache_level_from_id(cache_id);
-		if (level < 0) {
+		if (level < 0 || level >= 64) {
 			pr_err_once("Bad level for cache with id %u\n", cache_id);
-			return level;
+			return -EINVAL;
 		}
 		return mpam_ris_create(msc, res->ris_index, MPAM_CLASS_CACHE,
 				       level, cache_id);
 	case ACPI_MPAM_LOCATION_TYPE_MEMORY:
 		return mpam_ris_create(msc, res->ris_index, MPAM_CLASS_MEMORY,
 				       255, res->locator.memory_locator.proximity_domain);
+	case ACPI_MPAM_LOCATION_TYPE_SMMU:
+		return mpam_ris_create(msc, res->ris_index, MPAM_CLASS_UNKNOWN,
+				       128, res->locator.smmu_locator.smmu_interface);
+	case ACPI_MPAM_LOCATION_TYPE_MEMORY_CACHE:
+		cache_id = res->locator.mem_cache_locator.reference;
+		level = res->locator.mem_cache_locator.level;
+		if (192 + level >= 255) {
+			pr_err_once("Bad level for memory side cache with reference %u\n",
+				    cache_id);
+			return -EINVAL;
+		}
+
+		return mpam_ris_create(msc, res->ris_index, MPAM_CLASS_CACHE,
+				       192 + level, cache_id);
+
+	case ACPI_MPAM_LOCATION_TYPE_INTERCONNECT:
+		/* Find the descriptor table, and check it lands in the parent msc */
+		offset = res->locator.interconnect_ifc_locator.inter_connect_desc_tbl_off;
+		if (offset >= tbl_msc->length) {
+			pr_err_once("Bad offset for interconnect descriptor on msc %u\n",
+				    tbl_msc->identifier);
+			return -EINVAL;
+		}
+		tbl_int_tbl = ACPI_ADD_PTR(struct acpi_mpam_interconnect_descriptor_table,
+					   tbl_msc, offset);
+		guid_parse(UUID_MPAM_INTERCONNECT_TABLE, &spec_uuid);
+		import_guid(&int_tbl_uuid, tbl_int_tbl->type_uuid);
+		if (guid_equal(&spec_uuid, &int_tbl_uuid)) {
+			pr_err_once("Bad UUID for interconnect descriptor on msc %u\n",
+				    tbl_msc->identifier);
+			return -EINVAL;
+		}
+
+		offset += sizeof(*tbl_int_tbl);
+		offset += tbl_int_tbl->num_descriptors * sizeof(*tbl_int);
+		if (offset >= tbl_msc->length) {
+			pr_err_once("Bad num_descriptors for interconnect descriptor on msc %u\n",
+				    tbl_msc->identifier);
+			return -EINVAL;
+		}
+
+		tbl_int = ACPI_ADD_PTR(struct acpi_mpam_interconnect_descriptor,
+				       tbl_int_tbl, sizeof(*tbl_int_tbl));
+		cache_id = tbl_int->source_id;
+
+		/* Unknown link type? */
+		if (tbl_int->link_type != 0 && tbl_int->link_type == 1)
+			return 0;
+
+		return mpam_ris_create(msc, res->ris_index, MPAM_CLASS_UNKNOWN,
+				       64 + tbl_int->link_type, cache_id);
 	default:
 		/* These get discovered later and treated as unknown */
 		return 0;
@@ -127,7 +212,7 @@ int acpi_mpam_parse_resources(struct mpam_msc *msc,
 
 	resources = (struct acpi_mpam_resource_node *)(tbl_msc + 1);
 	for (i = 0; i < tbl_msc->num_resource_nodes; i++) {
-		err = acpi_mpam_parse_resource(msc, &resources[i]);
+		err = acpi_mpam_parse_resource(tbl_msc, msc, &resources[i]);
 		if (err)
 			return err;
 	}
