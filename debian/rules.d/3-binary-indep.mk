@@ -112,7 +112,7 @@ ifeq ($(do_tools_common),true)
 
 	install -m755 debian/tools/generic $(toolsbin)/usbip
 	install -m755 debian/tools/generic $(toolsbin)/usbipd
-	install -m644 $(CURDIR)/tools/usb/usbip/doc/*.8 $(toolsman)/man1/
+	install -m644 $(CURDIR)/tools/usb/usbip/doc/*.8 $(toolsman)/man8/
 
 	install -m755 debian/tools/generic $(toolsbin)/cpupower
 	install -m644 $(CURDIR)/tools/power/cpupower/man/*.1 $(toolsman)/man1/
