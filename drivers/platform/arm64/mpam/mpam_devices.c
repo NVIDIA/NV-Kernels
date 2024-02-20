@@ -767,6 +767,13 @@ static void mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 			mpam_set_feature(mpam_feat_mbw_part, props);
 
 		props->bwa_wd = FIELD_GET(MPAMF_MBW_IDR_BWA_WD, mbw_features);
+
+		/*
+		 * The BWA_WD field can represent 0-63, but the control fields it
+		 * describes have a maximum of 16 bits.
+		 */
+		props->bwa_wd = min(props->bwa_wd, 16);
+
 		if (props->bwa_wd && FIELD_GET(MPAMF_MBW_IDR_HAS_MAX, mbw_features))
 			mpam_set_feature(mpam_feat_mbw_max, props);
 
@@ -1404,8 +1411,12 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 					      rprops->mbw_pbm_bits);
 	}
 
-	if (mpam_has_feature(mpam_feat_mbw_min, rprops))
-		mpam_write_partsel_reg(msc, MBW_MIN, 0);
+	if (mpam_has_feature(mpam_feat_mbw_min, rprops)) {
+		if (mpam_has_feature(mpam_feat_mbw_min, cfg))
+			mpam_write_partsel_reg(msc, MBW_MIN, cfg->mbw_min);
+		else
+			mpam_write_partsel_reg(msc, MBW_MIN, 0);
+	}
 
 	if (mpam_has_feature(mpam_feat_mbw_max, rprops)) {
 		if (mpam_has_feature(mpam_feat_mbw_max, cfg))
@@ -2657,6 +2668,43 @@ static int __write_config(void *arg)
 	return 0;
 }
 
+static void mpam_extend_config(struct mpam_class *class, struct mpam_config *cfg)
+{
+	struct mpam_props *cprops = &class->props;
+	u16 min, min_hw_granule, delta;
+	u16 max_hw_value;
+
+	/*
+	 * MAX and MIN should be set together. If only one is provided,
+	 * generate a configuration for the other. If only one control
+	 * type is supported, the other value will be ignored.
+	 *
+	 * Resctrl can only configure the MAX.
+	 */
+	if (mpam_has_feature(mpam_feat_mbw_max, cfg) &&
+	    !mpam_has_feature(mpam_feat_mbw_min, cfg)){
+		/*
+		 * Calculate the values the 'min' control can hold.
+		 * e.g. on a platform with bwa_wd = 8, min_hw_granule is 0x00ff beacuse
+		 * those bits are RES0. Configurations of this value are effectively
+		 * zero. But configurations need to saturate at min_hw_granule on
+		 * systems with mismatched bwa_wd, where the 'less than 0' values are
+		 * implemented on some MSC, but not others.
+		 */
+		max_hw_value = ((1<<cprops->bwa_wd) - 1)<<(16-cprops->bwa_wd);
+		min_hw_granule = ~max_hw_value;
+
+		delta = ((5 * MPAMCFG_MBW_MAX_MAX) / 100) - 1;
+		if (cfg->mbw_max > delta)
+			min = cfg->mbw_max - delta;
+		else
+			min = 0;
+
+		cfg->mbw_min = max(min, min_hw_granule);
+		mpam_set_feature(mpam_feat_mbw_min, cfg);
+	}
+}
+
 /* TODO: split into write_config/sync_config */
 /* TODO: add config_dirty bitmap to drive sync_config */
 int mpam_apply_config(struct mpam_component *comp, u16 partid,
@@ -2669,6 +2717,8 @@ int mpam_apply_config(struct mpam_component *comp, u16 partid,
 	int idx;
 
 	lockdep_assert_cpus_held();
+
+	mpam_extend_config(comp->class, cfg);
 
 	if (!memcmp(&comp->cfg[partid], cfg, sizeof(*cfg)))
 		return 0;
