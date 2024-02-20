@@ -1,0 +1,36 @@
+#
+# Generated using kteam-tools script:
+# generate-transitions --input mantic/linux-meta-laptop/debian/control --output noble/linux-meta/debian/control.d/transitionals-laptop-23.10 laptop-23.10$ generic
+#
+Package: linux-image-laptop-23.10
+Architecture: arm64
+Section: oldlibs
+Multi-Arch: no
+Depends: linux-image-generic
+Description: Laptop Linux kernel image (transitional package)
+ Transitional package for upgrades. This package can be safely removed.
+
+Package: linux-headers-laptop-23.10
+Architecture: arm64
+Section: oldlibs
+Multi-Arch: no
+Depends: linux-headers-generic
+Description: Laptop Linux kernel headers (transitional package)
+ Transitional package for upgrades. This package can be safely removed.
+
+Package: linux-tools-laptop-23.10
+Architecture: arm64
+Section: oldlibs
+Multi-Arch: no
+Depends: linux-tools-generic
+Description: Laptop Linux kernel tools (transitional package)
+ Transitional package for upgrades. This package can be safely removed.
+
+Package: linux-laptop-23.10
+Architecture: arm64
+Section: oldlibs
+Multi-Arch: no
+Depends: linux-generic
+Description: Complete Laptop Linux kernel and headers (transitional package)
+ Transitional package for upgrades. This package can be safely removed.
+
