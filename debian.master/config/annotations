@@ -321,8 +321,11 @@ CONFIG_INTEL_ATOMISP                            note<'LP: #2017444'>
 CONFIG_INTEL_ATOMISP2_PM                        policy<{'amd64': 'm'}>
 CONFIG_INTEL_ATOMISP2_PM                        note<'LP: #2017444'>
 
-CONFIG_INTEL_IOMMU_DEFAULT_ON                   policy<{'amd64': 'n'}>
-CONFIG_INTEL_IOMMU_DEFAULT_ON                   note<'LP: #1971699'>
+CONFIG_INTEL_IOMMU_DEFAULT_ON                   policy<{'amd64': 'y'}>
+CONFIG_INTEL_IOMMU_DEFAULT_ON                   note<'LP: #1951440'>
+
+CONFIG_INTEL_IOMMU_SCALABLE_MODE_DEFAULT_ON     policy<{'amd64': 'y'}>
+CONFIG_INTEL_IOMMU_SCALABLE_MODE_DEFAULT_ON     note<'LP: #1951440'>
 
 CONFIG_IOMMU_DEBUGFS                            policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_IOMMU_DEBUGFS                            note<'LP: #1861057'>
@@ -6564,7 +6567,6 @@ CONFIG_INTEL_IOATDMA                            policy<{'amd64': 'm'}>
 CONFIG_INTEL_IOMMU                              policy<{'amd64': 'y'}>
 CONFIG_INTEL_IOMMU_FLOPPY_WA                    policy<{'amd64': 'y'}>
 CONFIG_INTEL_IOMMU_PERF_EVENTS                  policy<{'amd64': 'y'}>
-CONFIG_INTEL_IOMMU_SCALABLE_MODE_DEFAULT_ON     policy<{'amd64': 'n'}>
 CONFIG_INTEL_IOMMU_SVM                          policy<{'amd64': 'y'}>
 CONFIG_INTEL_IPS                                policy<{'amd64': 'm'}>
 CONFIG_INTEL_ISHTP_ECLITE                       policy<{'amd64': 'm'}>
