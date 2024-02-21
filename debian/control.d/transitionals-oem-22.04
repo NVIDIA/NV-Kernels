@@ -30,20 +30,6 @@ Depends: linux-generic-hwe-22.04
 Description: Complete OEM Linux kernel and headers (dummy transitional package)
  Transitional package for upgrades. This package can be safely removed.
 
-Package: linux-modules-ipu6-oem-22.04
-Architecture: amd64
-Section: oldlibs
-Depends: linux-modules-ipu6-generic-hwe-22.04
-Description: Extra drivers for ipu6 for the oem flavour (dummy transitional package)
- Transitional package for upgrades. This package can be safely removed.
-
-Package: linux-modules-ivsc-oem-22.04
-Architecture: amd64
-Section: oldlibs
-Depends: linux-modules-ivsc-generic-hwe-22.04
-Description: Extra drivers for ivsc for the oem flavour (dummy transitional package)
- Transitional package for upgrades. This package can be safely removed.
-
 Package: linux-modules-iwlwifi-oem-22.04
 Architecture: amd64
 Section: oldlibs
