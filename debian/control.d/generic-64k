@@ -11,7 +11,7 @@ Architecture: arm64
 Section: kernel
 Provides: ${dkms:wireguard-linux-compat-modules}
 Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-generic-64k, linux-firmware
-Recommends: thermald [amd64]
+Recommends: thermald [amd64], linux-tools-${kernel-abi-version}-generic-64k
 Description: Generic 64K Linux kernel image
  This package will always depend on the latest generic-64k kernel image
  available.
