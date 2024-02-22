@@ -1,3 +1,12 @@
+linux-meta (6.8.0-12.12) noble; urgency=medium
+
+  * Main version: 6.8.0-12.12
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] Recommends linux-tools-6.6.0-14-generic from linux-image-generic
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Thu, 22 Feb 2024 14:36:24 +0100
+
 linux-meta (6.8.0-11.11+1) noble; urgency=medium
 
 
