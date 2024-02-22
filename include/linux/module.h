@@ -38,7 +38,7 @@ struct modversion_info {
 	/* Offset of the next modversion entry in relation to this one. */
 	u32 next;
 	u32 crc;
-	char name[0];
+	char name[]; /* Flexible array member */
 } __packed;
 
 struct module;
