@@ -233,6 +233,7 @@ fs/configfs/*
 fs/dlm/dlm.ko
 fs/ecryptfs/*
 fs/efivarfs/*
+fs/erofs/*
 fs/exofs/libore.ko
 fs/ext4/*
 fs/fat/*
