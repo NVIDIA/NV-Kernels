@@ -1418,6 +1418,15 @@ static bool kvm_vma_mte_allowed(struct vm_area_struct *vma)
 	return vma->vm_flags & VM_MTE_ALLOWED;
 }
 
+/*
+ * Determine the memory region cacheability from VMA's pgprot. This
+ * is used to set the stage 2 PTEs.
+ */
+static unsigned long mapping_type(pgprot_t page_prot)
+{
+	return FIELD_GET(PTE_ATTRINDX_MASK, pgprot_val(page_prot));
+}
+
 static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 			  struct kvm_s2_trans *nested,
 			  struct kvm_memory_slot *memslot, unsigned long hva,
@@ -1555,6 +1564,22 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 
 	vfio_allow_any_uc = vma->vm_flags & VM_ALLOW_ANY_UNCACHED;
 
+	/*
+	 * Figure out the memory type based on the user va mapping properties
+	 * Only MT_DEVICE_nGnRE and MT_DEVICE_nGnRnE will be set using
+	 * pgprot_device() and pgprot_noncached() respectively.
+	 */
+	if ((mapping_type(vma->vm_page_prot) == MT_DEVICE_nGnRE) ||
+	    (mapping_type(vma->vm_page_prot) == MT_DEVICE_nGnRnE) ||
+	    (mapping_type(vma->vm_page_prot) == MT_NORMAL_NC)) {
+		if (vfio_allow_any_uc)
+			prot |= KVM_PGTABLE_PROT_NORMAL_NC;
+		else
+			prot |= KVM_PGTABLE_PROT_DEVICE;
+	} else if (cpus_have_final_cap(ARM64_HAS_CACHE_DIC)) {
+		prot |= KVM_PGTABLE_PROT_X;
+	}
+
 	/* Don't use the VMA after the unlock -- it may have vanished */
 	vma = NULL;
 
@@ -1661,14 +1686,18 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	if (exec_fault)
 		prot |= KVM_PGTABLE_PROT_X;
 
-	if (device) {
-		if (vfio_allow_any_uc)
-			prot |= KVM_PGTABLE_PROT_NORMAL_NC;
-		else
-			prot |= KVM_PGTABLE_PROT_DEVICE;
-	} else if (cpus_have_final_cap(ARM64_HAS_CACHE_DIC) &&
-		   (!nested || kvm_s2_trans_executable(nested))) {
-		prot |= KVM_PGTABLE_PROT_X;
+	/*
+	 *  When FWB is unsupported KVM needs to do cache flushes
+	 *  (via dcache_clean_inval_poc()) of the underlying memory. This is
+	 *  only possible if the memory is already mapped into the kernel map
+	 *  at the usual spot.
+	 *
+	 *  Validate that there is a struct page for the PFN which maps
+	 *  to the KVA that the flushing code expects.
+	 */
+	if (!stage2_has_fwb(pgt) && !(pfn_valid(pfn))) {
+		ret = -EINVAL;
+		goto out_unlock;
 	}
 
 	/*
