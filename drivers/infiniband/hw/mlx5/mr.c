@@ -44,6 +44,8 @@
 #include "mlx5_ib.h"
 #include "umr.h"
 
+static void mlx5_invalidate_umem(struct ib_umem *umem, void *priv);
+
 enum {
 	MAX_PENDING_REG_MR = 8,
 };
@@ -1393,17 +1395,20 @@ static struct ib_mr *create_real_mr(struct ib_pd *pd, struct ib_umem *umem,
 	int err;
 
 	xlt_with_umr = mlx5r_umr_can_load_pas(dev, umem->length);
-	if (xlt_with_umr) {
+	if (xlt_with_umr && !umem->is_peer) {
 		mr = alloc_cacheable_mr(pd, umem, iova, access_flags);
 	} else {
 		unsigned int page_size = mlx5_umem_find_best_pgsz(
 			umem, mkc, log_page_size, 0, iova);
 
 		mutex_lock(&dev->slow_path_mutex);
-		mr = reg_create(pd, umem, iova, access_flags, page_size, true);
+		mr = reg_create(pd, umem, iova, access_flags, page_size,
+				!xlt_with_umr);
 		mutex_unlock(&dev->slow_path_mutex);
 	}
 	if (IS_ERR(mr)) {
+		if (umem->is_peer)
+			ib_umem_stop_invalidation_notifier(umem);
 		ib_umem_release(umem);
 		return ERR_CAST(mr);
 	}
@@ -1424,6 +1429,11 @@ static struct ib_mr *create_real_mr(struct ib_pd *pd, struct ib_umem *umem,
 			return ERR_PTR(err);
 		}
 	}
+
+	if (umem->is_peer)
+		ib_umem_activate_invalidation_notifier(
+			umem, mlx5_invalidate_umem, mr);
+
 	return &mr->ibmr;
 }
 
@@ -1501,7 +1511,8 @@ struct ib_mr *mlx5_ib_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 	if (access_flags & IB_ACCESS_ON_DEMAND)
 		return create_user_odp_mr(pd, start, length, iova, access_flags,
 					  udata);
-	umem = ib_umem_get(&dev->ib_dev, start, length, access_flags);
+	umem = ib_umem_get_peer(&dev->ib_dev, start, length, access_flags,
+				IB_PEER_MEM_INVAL_SUPP);
 	if (IS_ERR(umem))
 		return ERR_CAST(umem);
 	return create_real_mr(pd, umem, iova, access_flags);
@@ -1661,6 +1672,10 @@ static int umr_rereg_pas(struct mlx5_ib_mr *mr, struct ib_pd *pd,
 		return err;
 	}
 
+	if (new_umem->is_peer)
+		ib_umem_activate_invalidation_notifier(
+			new_umem, mlx5_invalidate_umem, mr);
+
 	atomic_sub(ib_umem_num_pages(old_umem), &dev->mdev->priv.reg_pages);
 	ib_umem_release(old_umem);
 	atomic_add(ib_umem_num_pages(new_umem), &dev->mdev->priv.reg_pages);
@@ -1704,8 +1719,13 @@ struct ib_mr *mlx5_ib_rereg_user_mr(struct ib_mr *ib_mr, int flags, u64 start,
 				return ERR_PTR(err);
 			return NULL;
 		}
-		/* DM or ODP MR's don't have a normal umem so we can't re-use it */
-		if (!mr->umem || is_odp_mr(mr) || is_dmabuf_mr(mr))
+		/*
+		 * DM or ODP MR's don't have a normal umem so we can't re-use
+		 * it. Peer umems cannot have their MR's changed once created
+		 * due to races with invalidation.
+		 */
+		if (!mr->umem || is_odp_mr(mr) || is_dmabuf_mr(mr) ||
+		    mr->umem->is_peer)
 			goto recreate;
 
 		/*
@@ -1724,10 +1744,11 @@ struct ib_mr *mlx5_ib_rereg_user_mr(struct ib_mr *ib_mr, int flags, u64 start,
 	}
 
 	/*
-	 * DM doesn't have a PAS list so we can't re-use it, odp/dmabuf does
-	 * but the logic around releasing the umem is different
+	 * DM doesn't have a PAS list so we can't re-use it, odp/dmabuf does but
+	 * the logic around releasing the umem is different, peer memory
+	 * invalidation semantics are incompatible.
 	 */
-	if (!mr->umem || is_odp_mr(mr) || is_dmabuf_mr(mr))
+	if (!mr->umem || is_odp_mr(mr) || is_dmabuf_mr(mr) || mr->umem->is_peer)
 		goto recreate;
 
 	if (!(new_access_flags & IB_ACCESS_ON_DEMAND) &&
@@ -1735,8 +1756,9 @@ struct ib_mr *mlx5_ib_rereg_user_mr(struct ib_mr *ib_mr, int flags, u64 start,
 		struct ib_umem *new_umem;
 		unsigned long page_size;
 
-		new_umem = ib_umem_get(&dev->ib_dev, start, length,
-				       new_access_flags);
+		new_umem = ib_umem_get_peer(&dev->ib_dev, start, length,
+					    new_access_flags,
+					    IB_PEER_MEM_INVAL_SUPP);
 		if (IS_ERR(new_umem))
 			return ERR_CAST(new_umem);
 
@@ -1903,6 +1925,13 @@ int mlx5_ib_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata)
 		if (mlx5r_umr_revoke_mr(mr) ||
 		    cache_ent_find_and_store(dev, mr))
 			mr->mmkey.cache_ent = NULL;
+
+	if (mr->umem && mr->umem->is_peer) {
+		rc = mlx5r_umr_revoke_mr(mr);
+		if (rc)
+			return rc;
+		ib_umem_stop_invalidation_notifier(mr->umem);
+	}
 
 	if (!mr->mmkey.cache_ent) {
 		rc = destroy_mkey(to_mdev(mr->ibmr.device), mr);
@@ -2621,4 +2650,16 @@ int mlx5_ib_map_mr_sg(struct ib_mr *ibmr, struct scatterlist *sg, int sg_nents,
 				      DMA_TO_DEVICE);
 
 	return n;
+}
+
+static void mlx5_invalidate_umem(struct ib_umem *umem, void *priv)
+{
+	struct mlx5_ib_mr *mr = priv;
+
+	/*
+	 * DMA is turned off for the mkey, but the mkey remains otherwise
+	 * untouched until the normal flow of dereg_mr happens. Any access to
+	 * this mkey will generate CQEs.
+	 */
+	mlx5r_umr_revoke_mr(mr);
 }
