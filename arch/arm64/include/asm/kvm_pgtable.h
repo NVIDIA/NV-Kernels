@@ -461,6 +461,14 @@ u64 kvm_pgtable_hyp_unmap(struct kvm_pgtable *pgt, u64 addr, u64 size);
 u64 kvm_get_vtcr(u64 mmfr0, u64 mmfr1, u32 phys_shift);
 
 /**
+ * stage2_has_fwb() - Determine whether FWB is supported
+ * @pgt:    Page-table structure initialised by kvm_pgtable_stage2_init*()
+ *
+ * Return: True if FWB is supported.
+ */
+bool stage2_has_fwb(struct kvm_pgtable *pgt);
+
+/**
  * kvm_pgtable_stage2_pgd_size() - Helper to compute size of a stage-2 PGD
  * @vtcr:	Content of the VTCR register.
  *
