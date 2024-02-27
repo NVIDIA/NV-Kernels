@@ -4173,6 +4173,7 @@ CONFIG_DRM_MXS                                  policy<{'arm64': 'y', 'armhf': '
 CONFIG_DRM_MXSFB                                policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': '-', 'riscv64': '-'}>
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
 CONFIG_DRM_NOUVEAU_BACKLIGHT                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
+CONFIG_DRM_NOUVEAU_GSP_DEFAULT                  policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n'}>
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': 'n', 'arm64': 'n', 'ppc64el': 'n'}>
 CONFIG_DRM_NWL_MIPI_DSI                         policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_DRM_NXP_PTN3460                          policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
@@ -5246,6 +5247,7 @@ CONFIG_GAMEPORT_FM801                           policy<{'amd64': 'm', 'arm64': '
 CONFIG_GARP                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_GART_IOMMU                               policy<{'amd64': 'y'}>
 CONFIG_GCC11_NO_ARRAY_BOUNDS                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_GCC_ASM_GOTO_OUTPUT_WORKAROUND           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_GCC_NO_STRINGOP_OVERFLOW                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_GCC_SUPPORTS_DYNAMIC_FTRACE              policy<{'riscv64': 'y'}>
 CONFIG_GCC_SUPPORTS_DYNAMIC_FTRACE_WITH_ARGS    policy<{'arm64': 'y'}>
@@ -5718,6 +5720,7 @@ CONFIG_HD44780                                  policy<{'amd64': 'm', 'arm64': '
 CONFIG_HD44780_COMMON                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_HDC100X                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_HDC2010                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
+CONFIG_HDC3020                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_HDLC                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_HDLC_CISCO                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_HDLC_FR                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
@@ -5979,7 +5982,6 @@ CONFIG_HVC_IRQ                                  policy<{'amd64': 'y', 'arm64': '
 CONFIG_HVC_IUCV                                 policy<{'s390x': 'y'}>
 CONFIG_HVC_OLD_HVSI                             policy<{'ppc64el': 'y'}>
 CONFIG_HVC_OPAL                                 policy<{'ppc64el': 'y'}>
-CONFIG_HVC_RISCV_SBI                            policy<{'riscv64': 'y'}>
 CONFIG_HVC_RTAS                                 policy<{'ppc64el': 'y'}>
 CONFIG_HVC_XEN                                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': '-'}>
 CONFIG_HVC_XEN_FRONTEND                         policy<{'amd64': 'y', 'arm64': 'y', 'armhf': '-'}>
