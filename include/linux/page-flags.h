@@ -236,7 +236,7 @@ static inline const struct page *page_fixed_fake_head(const struct page *page)
 }
 #endif
 
-static __always_inline int page_is_fake_head(struct page *page)
+static __always_inline int page_is_fake_head(const struct page *page)
 {
 	return page_fixed_fake_head(page) != page;
 }
@@ -280,12 +280,12 @@ static __always_inline unsigned long _compound_head(const struct page *page)
  */
 #define folio_page(folio, n)	nth_page(&(folio)->page, n)
 
-static __always_inline int PageTail(struct page *page)
+static __always_inline int PageTail(const struct page *page)
 {
 	return READ_ONCE(page->compound_head) & 1 || page_is_fake_head(page);
 }
 
-static __always_inline int PageCompound(struct page *page)
+static __always_inline int PageCompound(const struct page *page)
 {
 	return test_bit(PG_head, &page->flags) ||
 	       READ_ONCE(page->compound_head) & 1;
@@ -304,6 +304,16 @@ static inline void page_init_poison(struct page *page, size_t size)
 {
 }
 #endif
+
+static const unsigned long *const_folio_flags(const struct folio *folio,
+		unsigned n)
+{
+	const struct page *page = &folio->page;
+
+	VM_BUG_ON_PGFLAGS(PageTail(page), page);
+	VM_BUG_ON_PGFLAGS(n > 0 && !test_bit(PG_head, &page->flags), page);
+	return &page[n].flags;
+}
 
 static unsigned long *folio_flags(struct folio *folio, unsigned n)
 {
@@ -370,9 +380,9 @@ static unsigned long *folio_flags(struct folio *folio, unsigned n)
  * Macros to create function definitions for page flags
  */
 #define TESTPAGEFLAG(uname, lname, policy)				\
-static __always_inline bool folio_test_##lname(struct folio *folio)	\
-{ return test_bit(PG_##lname, folio_flags(folio, FOLIO_##policy)); }	\
-static __always_inline int Page##uname(struct page *page)		\
+static __always_inline bool folio_test_##lname(const struct folio *folio) \
+{ return test_bit(PG_##lname, const_folio_flags(folio, FOLIO_##policy)); } \
+static __always_inline int Page##uname(const struct page *page)		\
 { return test_bit(PG_##lname, &policy(page, 0)->flags); }
 
 #define SETPAGEFLAG(uname, lname, policy)				\
@@ -812,7 +822,7 @@ static __always_inline bool folio_test_head(struct folio *folio)
 	return test_bit(PG_head, folio_flags(folio, FOLIO_PF_ANY));
 }
 
-static __always_inline int PageHead(struct page *page)
+static __always_inline int PageHead(const struct page *page)
 {
 	PF_POISONED_CHECK(page);
 	return test_bit(PG_head, &page->flags) && !page_is_fake_head(page);
