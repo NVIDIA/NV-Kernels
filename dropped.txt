@@ -9,3 +9,6 @@ Retpoline annotations reverted after enforcing objtool warnings as fatal (LP: #2
  - UBUNTU: SAUCE: apm -- annotate indirect calls within firmware_restrict_branch_speculation_{start,end}
  - UBUNTU: SAUCE: early/late -- annotate indirect calls in early/late initialisation code
  - UBUNTU: SAUCE: vga_set_mode -- avoid jump tables
+
+linux-nvidia:
+ - NVIDIA: SAUCE: iommu/arm-smmu-v3: Allow default substream bypass with a pasid support
