@@ -4269,7 +4269,6 @@ sdhci-of-at91
 sdhci-of-dwcmshc
 sdhci-of-esdhc
 sdhci-of-hlwd
-sdhci-omap
 sdhci-pci
 sdhci-pltfm
 sdhci-xenon-driver
