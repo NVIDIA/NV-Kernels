@@ -4852,7 +4852,6 @@ sdhci-pci
 sdhci-pxav3
 sdhci-s3c
 sdhci-xenon-driver
-sdhci_am654
 sdhci_f_sdh30
 sdio_uart
 sensorhub
