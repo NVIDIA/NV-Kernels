@@ -90,6 +90,9 @@ CONFIG_CMA_SIZE_MBYTES                          note<'LP: #1823753'>
 CONFIG_COMPAT_BRK                               policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_COMPAT_BRK                               note<'disables brk ASLR'>
 
+CONFIG_CONSOLE_LOGLEVEL_QUIET                   policy<{'amd64': '3', 'arm64': '3', 'armhf': '3', 'ppc64el': '3', 'riscv64': '3', 's390x': '3'}>
+CONFIG_CONSOLE_LOGLEVEL_QUIET                   note<'LP: #2049390'>
+
 CONFIG_CP15_BARRIER_EMULATION                   policy<{'arm64': 'y', 'arm64-generic-64k': '-'}>
 CONFIG_CP15_BARRIER_EMULATION                   note<'LP: #1545542'>
 
@@ -3224,7 +3227,6 @@ CONFIG_COMPILE_TEST                             policy<{'amd64': 'n', 'arm64': '
 CONFIG_CONFIGFS_FS                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CONNECTOR                                policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CONSOLE_LOGLEVEL_DEFAULT                 policy<{'amd64': '7', 'arm64': '7', 'armhf': '7', 'ppc64el': '7', 'riscv64': '7', 's390x': '7'}>
-CONFIG_CONSOLE_LOGLEVEL_QUIET                   policy<{'amd64': '4', 'arm64': '4', 'armhf': '4', 'ppc64el': '4', 'riscv64': '4', 's390x': '4'}>
 CONFIG_CONSOLE_POLL                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_CONSOLE_TRANSLATIONS                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CONSTRUCTORS                             policy<{'amd64': 'y'}>
