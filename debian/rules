@@ -101,12 +101,6 @@ ifneq ($(do_tools),true)
 	do_tools_host=
 endif
 
-$(foreach _m,$(all_built-in_dkms_modules), \
-  $(if $(filter true,$(do_$(_m))),, \
-    $(eval do_$(_m)_disable := $$(shell for m in $$$$(cat $(DROOT)/$(_m)-modules.ignore); do grep -qxF $$$$m $(prev_abidir)/../modules.ignore 2>/dev/null || echo $$$$m >> $(prev_abidir)/../modules.ignore; done)) \
-  ) \
-)
-
 ifeq ($(do_dkms_wireguard),false)
 	do_wireguard_disable:=$(shell for m in $$(cat $(DROOT)/wireguard-modules.ignore); do grep -qxF $$m $(prev_abidir)/../modules.ignore 2>/dev/null || echo $$m >> $(prev_abidir)/../modules.ignore; done)
 endif
@@ -129,7 +123,7 @@ clean: debian/control debian/canonical-certs.pem debian/canonical-revoked-certs.
 	dh_clean
 
 	# normal build junk
-	rm -rf $(DEBIAN)/abi/$(release)-$(revision)
+	rm -rf $(DEBIAN)/abi
 	rm -rf $(builddir)
 	rm -f $(stampdir)/stamp-*
 	rm -rf $(DEBIAN)/linux-*
