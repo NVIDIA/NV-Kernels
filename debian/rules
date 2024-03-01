@@ -137,8 +137,7 @@ clean: debian/control debian/canonical-certs.pem debian/canonical-revoked-certs.
 
 	# normal build junk
 	rm -rf $(DEBIAN)/abi
-	rm -rf $(builddir)
-	rm -f $(stampdir)/stamp-*
+	rm -rf $(builddir) $(stampdir)
 	rm -rf debian/linux-*/
 
 	cp $(DEBIAN)/changelog debian/changelog

@@ -9,7 +9,8 @@ debian/scripts/fix-filenames: debian/scripts/fix-filenames.c
 
 $(stampdir)/stamp-prepare-%: config-prepare-check-%
 	@echo Debug: $@
-	@touch $@
+	$(stamp)
+
 $(stampdir)/stamp-prepare-tree-%: target_flavour = $*
 $(stampdir)/stamp-prepare-tree-%: debian/scripts/fix-filenames
 	@echo Debug: $@
@@ -23,7 +24,7 @@ $(stampdir)/stamp-prepare-tree-%: debian/scripts/fix-filenames
 	find $(builddir)/build-$* -name "*.ko" | xargs rm -f
 	$(kmake) O=$(builddir)/build-$* $(conc_level) rustavailable || true
 	$(kmake) O=$(builddir)/build-$* $(conc_level) olddefconfig
-	touch $@
+	$(stamp)
 
 # Used by developers as a shortcut to prepare a tree for compilation.
 prepare-%: $(stampdir)/stamp-prepare-%
@@ -45,8 +46,7 @@ ifeq ($(do_dbgsym_package),true)
 		$(kmake) O=$(builddir)/build-$* $(conc_level) scripts_gdb ; \
 	fi
 endif
-
-	@touch $@
+	$(stamp)
 
 define build_dkms_sign =
 	$(shell set -x; if grep -q CONFIG_MODULE_SIG=y $(1)/.config; then
@@ -495,7 +495,7 @@ ifneq ($(do_full_build),false)
 	# Clean out this flavours build directory.
 	rm -rf $(builddir)/build-$*
 endif
-	@touch $@
+	$(stamp)
 
 headers_tmp := $(CURDIR)/debian/tmp-headers
 headers_dir := $(CURDIR)/debian/linux-libc-dev
@@ -629,7 +629,7 @@ ifeq ($(do_any_tools),true)
 	install -d $(builddirpa)
 	rsync -a --exclude debian --exclude debian.master --exclude $(DEBIAN) --exclude .git -a ./ $(builddirpa)/
 endif
-	touch $@
+	$(stamp)
 
 $(stampdir)/stamp-build-perarch: $(stampdir)/stamp-prepare-perarch install-arch-headers build-arch
 	@echo Debug: $@
@@ -677,7 +677,7 @@ ifeq ($(do_tools_hyperv),true)
 	cd $(builddirpa)/tools/hv && make CFLAGS="-I$(headers_dir)/usr/include -I$(headers_dir)/usr/include/$(DEB_HOST_MULTIARCH)" CROSS_COMPILE=$(CROSS_COMPILE) hv_kvp_daemon hv_vss_daemon hv_fcopy_daemon
 endif
 endif
-	@touch $@
+	$(stamp)
 
 .PHONY: install-perarch
 install-perarch: toolspkgdir = $(CURDIR)/debian/$(tools_pkg_name)

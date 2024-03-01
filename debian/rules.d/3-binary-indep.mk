@@ -29,7 +29,7 @@ ifeq ($(do_flavour_header_package),true)
 	# Do not ship .o and .cmd artifacts in headers
 	find $(indep_hdrdir) -name \*.o -or -name \*.cmd -exec rm -f {} \;
 endif
-	@touch $@
+	$(stamp)
 
 srcpkg = linux-source-$(release)
 srcdir = $(CURDIR)/debian/$(srcpkg)/usr/src/$(srcpkg)
@@ -145,7 +145,7 @@ endif
 $(stampdir)/stamp-prepare-indep:
 	@echo Debug: $@
 	dh_prep -i
-	@touch $@
+	$(stamp)
 
 .PHONY: install-indep
 install-indep: $(stampdir)/stamp-install-headers install-source install-tools

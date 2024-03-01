@@ -32,6 +32,8 @@ define if_package
 $(if $(filter $(1),$(packages_enabled)),$(2))
 endef
 
+stamp = [ -d $(dir $@) ] || mkdir $(dir $@); touch $@
+
 #
 # do_full_build -- are we doing a full buildd style build, i.e., are we
 #                  building in a PPA
