@@ -124,10 +124,6 @@ endif
 # common headers normally is built as an indep package, but may be arch
 do_common_headers_indep=true
 
-# Add an option to enable special drivers which should only be build when
-# explicitly enabled.
-do_odm_drivers=false
-
 # build tools
 ifneq ($(wildcard $(CURDIR)/tools),)
 	ifeq ($(do_tools),)
