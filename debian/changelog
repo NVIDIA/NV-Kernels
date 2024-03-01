@@ -1,3 +1,12 @@
+linux-meta (6.8.0-14.14) noble; urgency=medium
+
+  * Main version: 6.8.0-14.14
+
+  * Miscellaneous Ubuntu changes
+    - debian/dkms-versions -- update from main
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Fri, 01 Mar 2024 11:47:54 +0100
+
 linux-meta (6.8.0-13.13) noble; urgency=medium
 
   * Main version: 6.8.0-13.13
