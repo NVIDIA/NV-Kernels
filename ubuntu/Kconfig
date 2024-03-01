@@ -2,7 +2,7 @@ menu "Ubuntu Supplied Third-Party Device Drivers"
 
 
 config UBUNTU_ODM_DRIVERS
-	def_bool $(success,$(srctree)/debian/scripts/misc/arch-has-odm-enabled.sh $(DEB_ARCH))
+	bool "Ubuntu ODM supplied drivers"
 	help
 	  Turn on support for Ubuntu ODM supplied drivers
 
