@@ -46,16 +46,6 @@ ifeq ($(do_source_package_content),true)
 	(cd $(srcdir); tar cf - $(srcpkg)) | bzip2 -9c > \
 		$(srcdir)/$(srcpkg).tar.bz2
 	rm -rf $(balldir)
-	find './debian' './$(DEBIAN)' \
-		-path './debian/linux-*' -prune -o \
-		-path './debian/$(src_pkg_name)-*' -prune -o \
-		-path './debian/build' -prune -o \
-		-path './debian/files' -prune -o \
-		-path './debian/stamps' -prune -o \
-		-path './debian/tmp' -prune -o \
-		-path './$(DEBIAN)/__abi.current' -prune -o \
-		-print | \
-		cpio -pd --preserve-modification-time $(srcdir)
 	$(LN) $(srcpkg)/$(srcpkg).tar.bz2 $(srcdir)/..
 endif
 endif
