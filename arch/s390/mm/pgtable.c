@@ -817,7 +817,7 @@ again:
 		return key ? -EFAULT : 0;
 	}
 
-	if (pmd_large(*pmdp)) {
+	if (pmd_leaf(*pmdp)) {
 		paddr = pmd_val(*pmdp) & HPAGE_MASK;
 		paddr |= addr & ~HPAGE_MASK;
 		/*
@@ -928,7 +928,7 @@ again:
 		return 0;
 	}
 
-	if (pmd_large(*pmdp)) {
+	if (pmd_leaf(*pmdp)) {
 		paddr = pmd_val(*pmdp) & HPAGE_MASK;
 		paddr |= addr & ~HPAGE_MASK;
 		cc = page_reset_referenced(paddr);
@@ -992,7 +992,7 @@ again:
 		return 0;
 	}
 
-	if (pmd_large(*pmdp)) {
+	if (pmd_leaf(*pmdp)) {
 		paddr = pmd_val(*pmdp) & HPAGE_MASK;
 		paddr |= addr & ~HPAGE_MASK;
 		*key = page_get_storage_key(paddr);
