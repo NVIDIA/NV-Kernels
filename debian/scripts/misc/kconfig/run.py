@@ -75,6 +75,11 @@ def make_parser():
         action="store_true",
         help="Do not process included annotations (stop at the main file)",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Try to parse annotations file in pure JSON format",
+    )
 
     ga = parser.add_argument_group(title="Action").add_mutually_exclusive_group(required=False)
     ga.add_argument(
@@ -156,7 +161,7 @@ def print_result(config, data):
 def do_query(args):
     if args.arch is None and args.flavour is not None:
         arg_fail(_ARGPARSER, "error: --flavour requires --arch")
-    a = Annotation(args.file, do_include=(not args.no_include))
+    a = Annotation(args.file, do_include=(not args.no_include), do_json=args.json)
     res = a.search_config(config=args.config, arch=args.arch, flavour=args.flavour)
     # If no arguments are specified dump the whole annotations structure
     if args.config is None and args.arch is None and args.flavour is None:
