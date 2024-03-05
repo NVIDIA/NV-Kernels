@@ -190,7 +190,7 @@ static int acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 {
 	acpi_status status;
 	unsigned long long tmp;
-	struct acpi_handle_list devices;
+	struct acpi_handle_list devices = { 0 };
 	bool valid = false;
 	int i;
 
@@ -294,7 +294,7 @@ static int acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 		}
 	}
 	if ((flag & ACPI_TRIPS_DEVICES) && tz->trips.passive.valid) {
-		memset(&devices, 0, sizeof(struct acpi_handle_list));
+
 		status = acpi_evaluate_reference(tz->device->handle, "_PSL",
 						 NULL, &devices);
 		if (ACPI_FAILURE(status)) {
@@ -305,12 +305,12 @@ static int acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 			tz->trips.passive.valid = true;
 		}
 
-		if (memcmp(&tz->trips.passive.devices, &devices,
-			   sizeof(struct acpi_handle_list))) {
-			memcpy(&tz->trips.passive.devices, &devices,
-			       sizeof(struct acpi_handle_list));
-			ACPI_THERMAL_TRIPS_EXCEPTION(flag, tz, "device");
+		if (acpi_handle_list_equal(&tz->trips.passive.devices, &devices)) {
+			acpi_handle_list_free(&devices);
+			return 0;
 		}
+		ACPI_THERMAL_TRIPS_EXCEPTION(flag, tz, "device");
+		acpi_handle_list_replace(&tz->trips.passive.devices, &devices);
 	}
 	if ((flag & ACPI_TRIPS_PASSIVE) || (flag & ACPI_TRIPS_DEVICES)) {
 		if (valid != tz->trips.passive.valid)
@@ -959,6 +959,17 @@ static void acpi_thermal_check_fn(struct work_struct *work)
 	mutex_unlock(&tz->thermal_check_lock);
 }
 
+static void acpi_thermal_free_thermal_zone(struct acpi_thermal *tz)
+{
+	int i;
+
+	acpi_handle_list_free(&tz->trips.passive.devices);
+	for (i = 0; i < ACPI_THERMAL_MAX_ACTIVE; i++)
+		acpi_handle_list_free(&tz->trips.active[i].devices);
+
+	kfree(tz);
+}
+
 static int acpi_thermal_add(struct acpi_device *device)
 {
 	struct acpi_thermal *tz;
@@ -996,7 +1007,7 @@ static int acpi_thermal_add(struct acpi_device *device)
 	goto end;
 
 free_memory:
-	kfree(tz);
+	acpi_thermal_free_thermal_zone(tz);
 end:
 	return result;
 }
@@ -1012,7 +1023,7 @@ static void acpi_thermal_remove(struct acpi_device *device)
 	tz = acpi_driver_data(device);
 
 	acpi_thermal_unregister_thermal_zone(tz);
-	kfree(tz);
+	acpi_thermal_free_thermal_zone(tz);
 }
 
 #ifdef CONFIG_PM_SLEEP
