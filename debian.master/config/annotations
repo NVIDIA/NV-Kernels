@@ -7929,7 +7929,7 @@ CONFIG_MMC_REALTEK_PCI                          policy<{'amd64': 'm', 'arm64': '
 CONFIG_MMC_REALTEK_USB                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_MMC_RICOH_MMC                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_MMC_SDHCI_ACPI                           policy<{'amd64': 'm', 'arm64': 'm', 'riscv64': 'm'}>
-CONFIG_MMC_SDHCI_AM654                          policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
+CONFIG_MMC_SDHCI_AM654                          policy<{'arm64': 'm', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-'}>
 CONFIG_MMC_SDHCI_BIG_ENDIAN_32BIT_BYTE_SWAPPER  policy<{'ppc64el': 'y'}>
 CONFIG_MMC_SDHCI_CADENCE                        policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_MMC_SDHCI_DOVE                           policy<{'armhf': 'm'}>
