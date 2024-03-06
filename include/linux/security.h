@@ -1171,7 +1171,7 @@ static inline void security_cred_getsecid(const struct cred *c, u32 *secid)
 static inline void security_cred_getlsmblob(const struct cred *c,
 					    struct lsmblob *blob)
 {
-	*secid = 0;
+	lsmblob_init(blob);
 }
 
 static inline int security_kernel_act_as(struct cred *cred, u32 secid)
