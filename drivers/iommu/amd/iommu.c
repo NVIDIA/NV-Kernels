@@ -1692,8 +1692,15 @@ static int setup_gcr3_table(struct protection_domain *domain, int pasids)
 	if (levels > amd_iommu_max_glx_val)
 		return -EINVAL;
 
-	domain->gcr3_tbl = alloc_pgtable_page(domain->nid, GFP_ATOMIC);
-	if (domain->gcr3_tbl == NULL)
+	if (gcr3_info->gcr3_tbl)
+		return -EBUSY;
+
+	/* Allocate per device domain ID */
+	gcr3_info->domid = domain_id_alloc();
+
+	gcr3_info->gcr3_tbl = alloc_pgtable_page(nid, GFP_ATOMIC);
+	if (gcr3_info->gcr3_tbl == NULL) {
+		domain_id_free(gcr3_info->domid);
 		return -ENOMEM;
 
 	domain->glx      = levels;
