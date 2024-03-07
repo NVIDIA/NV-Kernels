@@ -3533,6 +3533,7 @@ CONFIG_CRYPTO_DEV_QAT_C62X                      policy<{'amd64': 'm', 'arm64': '
 CONFIG_CRYPTO_DEV_QAT_C62XVF                    policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_CRYPTO_DEV_QAT_DH895xCC                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_CRYPTO_DEV_QAT_DH895xCCVF                policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
+CONFIG_CRYPTO_DEV_QAT_ERROR_INJECTION           policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n'}>
 CONFIG_CRYPTO_DEV_QCE                           policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_CRYPTO_DEV_QCE_AEAD                      policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_CRYPTO_DEV_QCE_ENABLE_AEAD               policy<{'arm64': 'n', 'armhf': 'n'}>
