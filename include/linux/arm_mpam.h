@@ -42,11 +42,11 @@ static inline int acpi_mpam_count_msc(void) { return -EINVAL; }
 
 #ifdef CONFIG_ARM64_MPAM_DRIVER
 int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
-		    enum mpam_class_types type, u8 class_id, int component_id);
+		    enum mpam_class_types type, u8 class_id, u32 component_id);
 #else
 static inline int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
 				  enum mpam_class_types type, u8 class_id,
-				  int component_id)
+				  u32 component_id)
 {
 	return -EINVAL;
 }
