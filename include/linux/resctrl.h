@@ -138,7 +138,7 @@ enum resctrl_domain_type {
  */
 struct rdt_domain_hdr {
 	struct list_head		list;
-	int				id;
+	u32				id;
 	enum resctrl_domain_type	type;
 	enum resctrl_res_level		rid;
 	struct cpumask			cpu_mask;
