@@ -383,7 +383,7 @@ mpam_class_find(u8 level_idx, enum mpam_class_types type)
 }
 
 static struct mpam_component *
-mpam_component_alloc(struct mpam_class *class, int id)
+mpam_component_alloc(struct mpam_class *class, u32 id)
 {
 	struct mpam_component *comp;
 
@@ -425,7 +425,7 @@ static void mpam_component_destroy(struct mpam_component *comp)
 }
 
 static struct mpam_component *
-mpam_component_find(struct mpam_class *class, int id)
+mpam_component_find(struct mpam_class *class, u32 id)
 {
 	struct mpam_component *comp;
 
@@ -634,7 +634,7 @@ static int mpam_ris_get_affinity(struct mpam_msc *msc, cpumask_t *affinity,
 
 static int mpam_ris_create_locked(struct mpam_msc *msc, u8 ris_idx,
 				  enum mpam_class_types type, u8 class_id,
-				  int component_id)
+				  u32 component_id)
 {
 	int err;
 	struct mpam_vmsc *vmsc;
@@ -728,7 +728,7 @@ static void mpam_ris_destroy(struct mpam_msc_ris *ris)
 }
 
 int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
-		    enum mpam_class_types type, u8 class_id, int component_id)
+		    enum mpam_class_types type, u8 class_id, u32 component_id)
 {
 	int err;
 
