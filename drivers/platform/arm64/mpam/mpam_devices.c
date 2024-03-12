@@ -705,6 +705,26 @@ static struct mpam_msc_ris *mpam_get_or_create_ris(struct mpam_msc *msc,
 	return found;
 }
 
+static const struct mpam_quirk mpam_quirks[] = {
+	{ NULL }, /* Sentinel */
+};
+
+static void mpam_enable_quirks(struct mpam_msc *msc)
+{
+	const struct mpam_quirk *quirk;
+
+	for (quirk = &mpam_quirks[0]; quirk->iidr_mask; quirk++) {
+		if (quirk->iidr != (msc->iidr & quirk->iidr_mask))
+			continue;
+
+		if (quirk->init)
+			quirk->init(msc, quirk);
+		else
+			mpam_set_quirk(quirk->workaround, msc);
+			pr_info("msc%d enabling workaround for %s\n", msc->id, quirk->desc);
+	}
+}
+
 /*
  * IHI009A.a has this nugget: "If a monitor does not support automatic behaviour
  * of NRDY, software can use this bit for any purpose" - so hardware might not
@@ -923,7 +943,10 @@ static int mpam_msc_hw_probe(struct mpam_msc *msc)
 	}
 
 	idr = mpam_msc_read_idr(msc);
+	msc->iidr = mpam_read_partsel_reg(msc, IIDR);
 	mutex_unlock(&msc->part_sel_lock);
+
+	mpam_enable_quirks(msc);
 
 	msc->ris_max = FIELD_GET(MPAMF_IDR_RIS_MAX, idr);
 
@@ -2117,6 +2140,7 @@ static void __props_mismatch(struct mpam_props *parent,
  * nobble the class feature, as we can't configure all the resources.
  * e.g. The L3 cache is composed of two resources with 13 and 17 portion
  * bitmaps respectively.
+ * Quirks on an MSC will apply to all MSC in that class.
  */
 static void
 __class_props_mismatch(struct mpam_class *class, struct mpam_vmsc *vmsc)
@@ -2132,6 +2156,9 @@ __class_props_mismatch(struct mpam_class *class, struct mpam_vmsc *vmsc)
 
 	/* Clear missing features */
 	cprops->features &= vprops->features;
+
+	/* Merge quirks */
+	class->quirks |= vmsc->msc->quirks;
 
 	__props_mismatch(cprops, vprops);
 }
@@ -2573,6 +2600,8 @@ static void mpam_debugfs_setup(void)
 	list_for_each_entry(msc, &mpam_all_msc, glbl_list) {
 		d = msc->debugfs;
 		debugfs_create_x32("iface", 0400, d, &msc->iface);
+		debugfs_create_x32("mpamf_iidr", 0400, d, &msc->iidr);
+		debugfs_create_x16("quirks", 0400, d, &msc->quirks);
 		list_for_each_entry(ris, &msc->ris, msc_list)
 			mpam_debugfs_setup_ris(ris);
 	}
@@ -2582,6 +2611,7 @@ static void mpam_debugfs_setup(void)
 		d = debugfs_create_dir(name, mpam_debugfs);
 		debugfs_create_x32("features", 0400, d, &class->props.features);
 		debugfs_create_x32("nrdy_usec", 0400, d, &class->nrdy_usec);
+		debugfs_create_x16("quirks", 0400, d, &class->quirks);
 		debugfs_create_x8("level", 0400, d, &class->level);
 		debugfs_create_cpumask("affinity", 0400, d, &class->affinity);
 		class->debugfs = d;
