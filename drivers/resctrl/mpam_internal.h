@@ -96,6 +96,8 @@ struct mpam_msc {
 	u8			pmg_max;
 	unsigned long		ris_idxs;
 	u32			ris_max;
+	u32			iidr;
+	u16			quirks;
 
 	/*
 	 * error_irq_lock is taken when registering/unregistering the error
@@ -215,6 +217,30 @@ struct mpam_props {
 #define mpam_set_feature(_feat, x)	set_bit(_feat, (x)->features)
 #define mpam_clear_feature(_feat, x)	clear_bit(_feat, (x)->features)
 
+/* Workaround bits for msc->quirks */
+enum mpam_device_quirks {
+	MPAM_QUIRK_LAST,
+};
+
+#define mpam_has_quirk(_quirk, x)	((1 << (_quirk) & (x)->quirks))
+#define mpam_set_quirk(_quirk, x)	((x)->quirks |= (1 << (_quirk)))
+
+struct mpam_quirk {
+	void (*init)(struct mpam_msc *msc, const struct mpam_quirk *quirk);
+
+	u32 iidr;
+	u32 iidr_mask;
+
+	enum mpam_device_quirks workaround;
+};
+
+#define IIDR_PROD(x)	((x) << MPAMF_IIDR_PRODUCTID_SHIFT)
+#define IIDR_VAR(x)	((x) << MPAMF_IIDR_VARIANT_SHIFT)
+#define IIDR_REV(x)	((x) << MPAMF_IIDR_REVISON_SHIFT)
+#define IIDR_IMP(x)	((x) << MPAMF_IIDR_IMPLEMENTER_SHIFT)
+
+#define IIDR_MATCH_ONE	(IIDR_PROD(0xfff) | IIDR_VAR(0xf) | IIDR_REV(0xf) | IIDR_IMP(0xfff))
+
 /* The values for MSMON_CFG_MBWU_FLT.RWBW */
 enum mon_filter_options {
 	COUNT_BOTH	= 0,
@@ -267,6 +293,7 @@ struct mpam_class {
 
 	struct mpam_props	props;
 	u32			nrdy_usec;
+	u16			quirks;
 	u8			level;
 	enum mpam_class_types	type;
 
