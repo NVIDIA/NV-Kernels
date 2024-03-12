@@ -86,6 +86,8 @@ struct mpam_msc {
 	u8			pmg_max;
 	unsigned long		ris_idxs[128 / BITS_PER_LONG];
 	u32			ris_max;
+	u32			iidr;
+	u16			quirks;
 
 	/* mpam_msc_ris of this component */
 	struct list_head	ris;
@@ -233,6 +235,30 @@ static inline void mpam_clear_feature(enum mpam_device_features feat,
 	*supported &= ~(1 << feat);
 }
 
+/* Workaround bits for msc->quirks */
+enum mpam_device_quirks {
+	MPAM_QUIRK_LAST,
+};
+
+#define mpam_has_quirk(_quirk, x)	((1 << (_quirk) & (x)->quirks))
+#define mpam_set_quirk(_quirk, x)	((x)->quirks |= (1 << (_quirk)))
+
+struct mpam_quirk {
+	void (*init)(struct mpam_msc *msc, const struct mpam_quirk *quirk);
+
+	u32 iidr;
+	u32 iidr_mask;
+
+	enum mpam_device_quirks workaround;
+};
+
+#define IIDR_PROD(x)	((x) << MPAMF_IIDR_PRODUCTID_SHIFT)
+#define IIDR_VAR(x)	((x) << MPAMF_IIDR_VARIANT_SHIFT)
+#define IIDR_REV(x)	((x) << MPAMF_IIDR_REVISON_SHIFT)
+#define IIDR_IMP(x)	((x) << MPAMF_IIDR_IMPLEMENTER_SHIFT)
+
+#define IIDR_MATCH_ONE	(IIDR_PROD(0xfff) | IIDR_VAR(0xf) | IIDR_REV(0xf) | IIDR_IMP(0xfff))
+
 struct mpam_class {
 	/* mpam_components in this class */
 	struct list_head	components;
@@ -241,6 +267,7 @@ struct mpam_class {
 
 	struct mpam_props	props;
 	u32			nrdy_usec;
+	u16			quirks;
 	u8			level;
 	enum mpam_class_types	type;
 
