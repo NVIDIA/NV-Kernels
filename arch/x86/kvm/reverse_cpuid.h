@@ -45,6 +45,9 @@ enum kvm_only_cpuid_leafs {
 #define X86_FEATURE_AVX_NE_CONVERT      KVM_X86_FEATURE(CPUID_7_1_EDX, 5)
 #define X86_FEATURE_PREFETCHITI         KVM_X86_FEATURE(CPUID_7_1_EDX, 14)
 
+/* Intel-defined sub-features, CPUID level 0x00000007:2 (EDX) */
+#define KVM_X86_FEATURE_BHI_CTRL	KVM_X86_FEATURE(CPUID_7_2_EDX, 4)
+
 /* CPUID level 0x80000007 (EDX). */
 #define KVM_X86_FEATURE_CONSTANT_TSC	KVM_X86_FEATURE(CPUID_8000_0007_EDX, 8)
 
@@ -115,6 +118,8 @@ static __always_inline u32 __feature_translate(int x86_feature)
 		return KVM_X86_FEATURE_CONSTANT_TSC;
 	else if (x86_feature == X86_FEATURE_PERFMON_V2)
 		return KVM_X86_FEATURE_PERFMON_V2;
+	else if (x86_feature == X86_FEATURE_BHI_CTRL)
+		return X86_FEATURE_BHI_CTRL;
 
 	return x86_feature;
 }
