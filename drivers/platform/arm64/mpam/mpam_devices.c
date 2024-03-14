@@ -765,6 +765,12 @@ static const struct mpam_quirk mpam_quirks[] = {
 	.iidr_mask  = IIDR_MATCH_ONE,
 	.workaround = T241_SCRUB_SHADOW_REGS,
 	},
+	{
+	/* NVIDIA t241 erratum T241-MPAM-4 */
+	.iidr       = IIDR_PROD(0x241) | IIDR_VAR(0) | IIDR_REV(0) | IIDR_IMP(0x36b),
+	.iidr_mask  = IIDR_MATCH_ONE,
+	.workaround = T241_FORCE_MBW_MIN_TO_ONE,
+	},
 	{ NULL }, /* Sentinel */
 };
 
@@ -1720,6 +1726,24 @@ static int mpam_save_mbwu_state(void *arg)
 	return 0;
 }
 
+static void mpam_init_empty_cfg(struct mpam_msc_ris *ris, struct mpam_config *cfg)
+{
+	struct mpam_props *rprops = &ris->props;
+	struct mpam_msc *msc = ris->vmsc->msc;
+	u16 max_hw_value, min_hw_granule, res0_bits;
+
+	memset(cfg, 0, sizeof(*cfg));
+
+	if (mpam_has_quirk(T241_FORCE_MBW_MIN_TO_ONE, msc)) {
+		res0_bits = 16 - rprops->bwa_wd;
+		max_hw_value = ((1 << rprops->bwa_wd) - 1) << res0_bits;
+		min_hw_granule = ~max_hw_value;
+
+		cfg->mbw_min = min_hw_granule + 1;
+		mpam_set_feature(mpam_feat_mbw_min, cfg);
+	}
+}
+
 /*
  * Called via smp_call_on_cpu() to prevent migration, while still being
  * pre-emptible.
@@ -1732,6 +1756,8 @@ static int mpam_reset_ris(void *arg)
 
 	if (ris->in_reset_state)
 		return 0;
+
+	mpam_init_empty_cfg(ris, &empty_cfg);
 
 	reprogram_arg.ris = ris;
 	reprogram_arg.cfg = &empty_cfg;
@@ -3033,6 +3059,18 @@ static void mpam_extend_config(struct mpam_class *class, struct mpam_config *cfg
 	u16 max_hw_value, res0_bits;
 
 	/*
+	 * Calculate the values the 'min' control can hold.
+	 * e.g. on a platform with bwa_wd = 8, min_hw_granule is 0x00ff because
+	 * those bits are RES0. Configurations of this value are effectively
+	 * zero. But configurations need to saturate at min_hw_granule on
+	 * systems with mismatched bwa_wd, where the 'less than 0' values are
+	 * implemented on some MSC, but not others.
+	 */
+	res0_bits = 16 - cprops->bwa_wd;
+	max_hw_value = ((1 << cprops->bwa_wd) - 1) << res0_bits;
+	min_hw_granule = ~max_hw_value;
+
+	/*
 	 * MAX and MIN should be set together. If only one is provided,
 	 * generate a configuration for the other. If only one control
 	 * type is supported, the other value will be ignored.
@@ -3041,19 +3079,6 @@ static void mpam_extend_config(struct mpam_class *class, struct mpam_config *cfg
 	 */
 	if (mpam_has_feature(mpam_feat_mbw_max, cfg) &&
 	    !mpam_has_feature(mpam_feat_mbw_min, cfg)) {
-		/*
-		 * Calculate the values the 'min' control can hold.
-		 * e.g. on a platform with bwa_wd = 8, min_hw_granule is 0x00ff
-		 * because those bits are RES0. Configurations of this value
-		 * are effectively zero. But configurations need to saturate
-		 * at min_hw_granule on systems with mismatched bwa_wd, where
-		 * the 'less than 0' values are implemented on some MSC, but
-		 * not others.
-		 */
-		res0_bits = 16 - cprops->bwa_wd;
-		max_hw_value = ((1 << cprops->bwa_wd) - 1) << res0_bits;
-		min_hw_granule = ~max_hw_value;
-
 		delta = ((5 * MPAMCFG_MBW_MAX_MAX) / 100) - 1;
 		if (cfg->mbw_max > delta)
 			min = cfg->mbw_max - delta;
@@ -3061,6 +3086,12 @@ static void mpam_extend_config(struct mpam_class *class, struct mpam_config *cfg
 			min = 0;
 
 		cfg->mbw_min = max(min, min_hw_granule);
+		mpam_set_feature(mpam_feat_mbw_min, cfg);
+	}
+
+	if (mpam_has_quirk(T241_FORCE_MBW_MIN_TO_ONE, class) &&
+	    cfg->mbw_min <= min_hw_granule) {
+		cfg->mbw_min = min_hw_granule + 1;
 		mpam_set_feature(mpam_feat_mbw_min, cfg);
 	}
 }
