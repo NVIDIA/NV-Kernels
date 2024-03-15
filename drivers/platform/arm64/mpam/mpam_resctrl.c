@@ -413,6 +413,27 @@ static enum mon_filter_options resctrl_evt_config_to_mpam(u32 local_evt_cfg)
 	}
 }
 
+static bool __resctrl_arch_mon_can_overflow(enum resctrl_event_id eventid)
+{
+	struct mpam_props *cprops;
+	struct mpam_class *class = mpam_resctrl_counters[eventid];
+
+	if (!class)
+		return false;
+
+	/* No need to worry about a 63 bit counter overflowing */
+	cprops = &class->props;
+	return !mpam_has_feature(mpam_feat_msmon_mbwu_63counter, cprops);
+}
+
+bool resctrl_arch_mon_can_overflow(void)
+{
+	if (__resctrl_arch_mon_can_overflow(QOS_L3_MBM_LOCAL_EVENT_ID))
+		return true;
+
+	return __resctrl_arch_mon_can_overflow(QOS_L3_MBM_TOTAL_EVENT_ID);
+}
+
 int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
 			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
 			   u64 *val, void *arch_mon_ctx)

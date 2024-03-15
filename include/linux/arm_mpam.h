@@ -50,6 +50,7 @@ static inline unsigned int resctrl_arch_round_mon_val(unsigned int val)
 
 bool resctrl_arch_alloc_capable(void);
 bool resctrl_arch_mon_capable(void);
+bool resctrl_arch_mon_can_overflow(void);
 bool resctrl_arch_is_llc_occupancy_enabled(void);
 bool resctrl_arch_is_mbm_local_enabled(void);
 bool resctrl_arch_is_mbm_total_enabled(void);
