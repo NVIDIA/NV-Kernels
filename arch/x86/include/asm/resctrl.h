@@ -200,6 +200,11 @@ static inline void *resctrl_arch_mon_ctx_alloc(struct rdt_resource *r, int evtid
 	return NULL;
 };
 
+static inline bool resctrl_arch_mon_can_overflow(void)
+{
+	return true;
+}
+
 static inline void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid,
 					     void *ctx) { };
 
