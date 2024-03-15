@@ -41,6 +41,7 @@ drivers/cpufreq/tegra194-cpufreq.ko
 drivers/crypto/nx/*
 drivers/crypto/vmx/vmx-crypto.ko
 drivers/dma/tegra210-adma.ko
+drivers/firmware/dmi-sysfs.ko
 drivers/firmware/efi/*
 drivers/firmware/iscsi_ibft.ko
 drivers/gpio/gpio-max77620.ko
@@ -232,6 +233,7 @@ fs/configfs/*
 fs/dlm/dlm.ko
 fs/ecryptfs/*
 fs/efivarfs/*
+fs/erofs/*
 fs/exofs/libore.ko
 fs/ext4/*
 fs/fat/*
