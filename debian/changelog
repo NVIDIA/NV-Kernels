@@ -1,3 +1,12 @@
+linux-meta (6.8.0-20.20) noble; urgency=medium
+
+  * Main version: 6.8.0-20.20
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 18 Mar 2024 11:09:09 +0100
+
 linux-meta (6.8.0-19.19) noble; urgency=medium
 
   * Main version: 6.8.0-19.19
