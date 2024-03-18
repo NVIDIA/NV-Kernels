@@ -1,3 +1,12 @@
+linux-meta (6.8.0-20.20+1) noble; urgency=medium
+
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] Recommends ubuntu-kernel-accessories from linux-
+      generic/generic-64k
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Mon, 18 Mar 2024 15:09:48 +0100
+
 linux-meta (6.8.0-20.20) noble; urgency=medium
 
   * Main version: 6.8.0-20.20
