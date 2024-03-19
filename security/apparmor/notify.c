@@ -603,8 +603,7 @@ static bool response_is_valid_name(struct apparmor_notif_resp_name *reply,
 		return -EINVAL;
 	}
 	/* currently supported flags */
-	if ((reply->perm.base.flags != (URESPONSE_LOOKUP | URESPONSE_PROFILE)) ||
-	    (reply->perm.base.flags != (URESPONSE_TAILGLOB))) {
+	if ((reply->perm.base.flags != (URESPONSE_LOOKUP | URESPONSE_PROFILE))) {
 		AA_DEBUG(DEBUG_UPCALL,
 			 "id %lld: reply bad flags 0x%x expected 0x%x",
 			 knotif->id, reply->perm.base.flags,
