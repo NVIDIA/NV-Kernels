@@ -12,6 +12,9 @@ CONFIG_ACPI_CUSTOM_METHOD                       note<'SECURITY: allows arbitrary
 CONFIG_AGP                                      policy<{'amd64': 'y', 'ppc64el': 'y'}>
 CONFIG_AGP                                      note<'not autoloadable'>
 
+CONFIG_ARCH_MHP_MEMMAP_ON_MEMORY_ENABLE         policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 's390x': 'y'}>
+CONFIG_ARCH_MHP_MEMMAP_ON_MEMORY_ENABLE         note<'LP: #2051835'>
+
 CONFIG_ARCH_MMAP_RND_BITS                       policy<{'amd64': '32', 'arm64': '33', 'arm64-generic-64k': '29', 'armhf': '16', 'ppc64el': '29', 'riscv64': '24'}>
 CONFIG_ARCH_MMAP_RND_BITS                       note<'LP: #1983357'>
 
@@ -395,6 +398,9 @@ CONFIG_MFD_SM501                                note<'boot essential on OMAP4'>
 
 CONFIG_MFD_TPS65217                             policy<{'arm64': 'm', 'armhf': 'y', 'ppc64el': 'n', 'riscv64': 'n'}>
 CONFIG_MFD_TPS65217                             note<'boot essential on AM335x'>
+
+CONFIG_MHP_MEMMAP_ON_MEMORY                     policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 's390x': 'y'}>
+CONFIG_MHP_MEMMAP_ON_MEMORY                     note<'LP: #2051835'>
 
 CONFIG_MMC_BLOCK                                policy<{'amd64': 'm', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'm', 'riscv64': 'y', 's390x': '-'}>
 CONFIG_MMC_BLOCK                                note<'boot essential on armhf/arm64'>
@@ -1378,7 +1384,6 @@ CONFIG_ARCH_MDM9615                             policy<{'armhf': 'y'}>
 CONFIG_ARCH_MEDIATEK                            policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_ARCH_MEMORY_PROBE                        policy<{'amd64': 'y', 'ppc64el': 'y'}>
 CONFIG_ARCH_MESON                               policy<{'arm64': 'y', 'armhf': 'y'}>
-CONFIG_ARCH_MHP_MEMMAP_ON_MEMORY_ENABLE         policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y'}>
 CONFIG_ARCH_MICROCHIP_POLARFIRE                 policy<{'riscv64': 'y'}>
 CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC                 policy<{'amd64': 'y'}>
 CONFIG_ARCH_MIGHT_HAVE_PC_PARPORT               policy<{'amd64': 'y', 'armhf': 'y', 'ppc64el': 'y'}>
@@ -7988,7 +7993,6 @@ CONFIG_MHI_BUS_PCI_GENERIC                      policy<{'amd64': 'm', 'arm64': '
 CONFIG_MHI_NET                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_MHI_WWAN_CTRL                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_MHI_WWAN_MBIM                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
-CONFIG_MHP_MEMMAP_ON_MEMORY                     policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y'}>
 CONFIG_MICREL_KS8995MA                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_MICREL_PHY                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_MICROCHIP_PHY                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
