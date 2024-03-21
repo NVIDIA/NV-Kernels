@@ -40,6 +40,15 @@ CONFIG_TCG_TIS_SPI                              note<'ensures the TPM is availab
 # ---- Annotations without notes ----
 
 CONFIG_ARCH_SUPPORTS_SHADOW_CALL_STACK          policy<{'arm64': '-'}>
+CONFIG_ARM64_ERRATUM_1902691                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2038923                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2064142                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2119858                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2139208                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2224489                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2253138                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE policy<{'arm64': 'y'}>
+CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
 CONFIG_AS_VERSION                               policy<{'amd64': '23800', 'arm64': '23800'}>
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
@@ -49,7 +58,24 @@ CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO_BARE           policy<{'amd64': '-', 'arm64': '
 CONFIG_CC_HAVE_SHADOW_CALL_STACK                policy<{'arm64': '-'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'arm64': '"aarch64-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"'}>
 CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
+CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CATU                           policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CPU_DEBUG                      policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CPU_DEBUG_DEFAULT_ON           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_CTI                            policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CTI_INTEGRATION_REGS           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_DUMMY                          policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_LINKS_AND_SINKS                policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_LINK_AND_SINK_TMC              policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_SINK_ETBV10                    policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_SINK_TPIU                      policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_SOURCE_ETM4X                   policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_STM                            policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_TPDA                           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_TPDM                           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_TRBE                           policy<{'arm64': 'm'}>
 CONFIG_DEBUG_INFO_COMPRESSED_ZSTD               policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_ETM4X_IMPDEF_FEATURE                     policy<{'arm64': 'n'}>
 CONFIG_GCC_VERSION                              policy<{'amd64': '110400', 'arm64': '110400'}>
 CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
 CONFIG_INIT_STACK_ALL_PATTERN                   policy<{'amd64': '-', 'arm64': '-'}>
@@ -60,41 +86,14 @@ CONFIG_LD_VERSION                               policy<{'amd64': '23800', 'arm64
 CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
 CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-'}>
 CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'amd64': '-'}>
 CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': '-'}>
 CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-'}>
 CONFIG_SAMPLES_RUST                             policy<{'amd64': '-'}>
+CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SHADOW_CALL_STACK                        policy<{'arm64': '-'}>
 CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': '-'}>
-
-CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_SOURCE_ETM4X                   policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_TRBE                           policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_LINKS_AND_SINKS                policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_LINK_AND_SINK_TMC              policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_CATU                           policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_SINK_TPIU                      policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_SINK_ETBV10                    policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_STM                            policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_CPU_DEBUG                      policy<{'arm64': 'm'}>
-CONFIG_CORESIGHT_CTI                            policy<{'arm64': 'm'}>
-CONFIG_ARM64_ERRATUM_1902691                    policy<{'arm64': 'y'}>
-CONFIG_ARM64_ERRATUM_2038923                    policy<{'arm64': 'y'}>
-CONFIG_ARM64_ERRATUM_2064142                    policy<{'arm64': 'y'}>
-CONFIG_ARM64_ERRATUM_2119858                    policy<{'arm64': 'y'}>
-CONFIG_ARM64_ERRATUM_2139208                    policy<{'arm64': 'y'}>
-CONFIG_ARM64_ERRATUM_2224489                    policy<{'arm64': 'y'}>
-CONFIG_ARM64_ERRATUM_2253138                    policy<{'arm64': 'y'}>
-CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE policy<{'arm64': 'y'}>
-CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
-CONFIG_CORESIGHT_CPU_DEBUG_DEFAULT_ON           policy<{'arm64': 'n'}>
-CONFIG_CORESIGHT_CTI_INTEGRATION_REGS           policy<{'arm64': 'n'}>
-CONFIG_CORESIGHT_DUMMY                          policy<{'arm64': 'n'}>
-CONFIG_CORESIGHT_TPDA                           policy<{'arm64': 'n'}>
-CONFIG_CORESIGHT_TPDM                           policy<{'arm64': 'n'}>
-CONFIG_ETM4X_IMPDEF_FEATURE                     policy<{'arm64': 'n'}>
-CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
-CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
