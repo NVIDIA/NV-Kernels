@@ -19,6 +19,7 @@
 
 #include <linux/acpi.h>
 #include <linux/cacheinfo.h>
+#include <linux/sort.h>
 #include <acpi/processor.h>
 
 typedef int (*acpi_pptt_cpu_callback_t)(struct acpi_pptt_processor *, void *);
@@ -468,6 +469,130 @@ static struct acpi_pptt_cache *acpi_find_cache_node(struct acpi_table_header *ta
 	return found;
 }
 
+
+struct repainted_cache_id {
+	u32	orig;
+	u32	new;
+};
+
+static u32 num_repainted_cache_ids;
+static struct repainted_cache_id *repainted_cache_ids;
+
+static int repaint_cmp(const void *_a, const void *_b)
+{
+	const struct repainted_cache_id *a = _a, *b = _b;
+	return a->orig - b->orig;
+}
+
+static void repaint_swp(void *_a, void *_b, int size)
+{
+	struct repainted_cache_id *a = _a, *b = _b;
+	struct repainted_cache_id tmp;
+
+	tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
+
+static void repaint_cache_ids(void)
+{
+	struct acpi_pptt_cache_v1* cache_node_v1;
+	struct acpi_table_header *table_hdr;
+	struct acpi_pptt_cache *cache_node;
+	struct acpi_subtable_header *entry;
+	u32 cache_sz, cache_id_iter = 0;
+	unsigned long table_end;
+	acpi_status status;
+	int i;
+
+	status = acpi_get_table(ACPI_SIG_PPTT, 0, &table_hdr);
+	if (ACPI_FAILURE(status))
+		return;
+
+	table_end = (unsigned long)table_hdr + table_hdr->length;
+	entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
+			     sizeof(struct acpi_table_pptt));
+	cache_sz = sizeof(struct acpi_pptt_cache);
+	while ((unsigned long)entry + cache_sz < table_end) {
+		cache_node = (struct acpi_pptt_cache *)entry;
+		if (entry->type == ACPI_PPTT_TYPE_CACHE &&
+		    cache_node->flags & ACPI_PPTT_CACHE_ID_VALID)
+		{
+			cache_node_v1 = ACPI_ADD_PTR(struct acpi_pptt_cache_v1,
+						     cache_node,
+						     sizeof(struct acpi_pptt_cache));
+			repainted_cache_ids[cache_id_iter++].orig = cache_node_v1->cache_id;
+		}
+
+		entry = ACPI_ADD_PTR(struct acpi_subtable_header, entry,
+				     entry->length);
+	}
+
+	/*
+	 * Sort the list so that if the PPTT describes the same cache-ids, but
+	 * in a different order, we don't change what is presented to user-space.
+	 */
+	sort(repainted_cache_ids, num_repainted_cache_ids,
+	     sizeof(*repainted_cache_ids),
+	     repaint_cmp, repaint_swp);
+
+	for (i = 0; i < num_repainted_cache_ids; i++)
+		repainted_cache_ids[i].new = i;
+
+	acpi_put_table(table_hdr);
+
+	return;
+}
+
+static int count_cache_ids(void)
+{
+	struct acpi_table_header *table_hdr;
+	struct acpi_pptt_cache *cache_node;
+	struct acpi_subtable_header *entry;
+	unsigned long table_end;
+	acpi_status status;
+	u32 cache_sz;
+	int ret = 0;
+
+	status = acpi_get_table(ACPI_SIG_PPTT, 0, &table_hdr);
+	if (ACPI_FAILURE(status))
+		return 0;
+
+	if (table_hdr->revision < 3)
+		return 0;
+
+	table_end = (unsigned long)table_hdr + table_hdr->length;
+	entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
+			     sizeof(struct acpi_table_pptt));
+	cache_sz = sizeof(struct acpi_pptt_cache);
+	while ((unsigned long)entry + cache_sz < table_end) {
+		cache_node = (struct acpi_pptt_cache *)entry;
+		if (entry->type == ACPI_PPTT_TYPE_CACHE &&
+		    cache_node->flags & ACPI_PPTT_CACHE_ID_VALID)
+			ret++;
+		entry = ACPI_ADD_PTR(struct acpi_subtable_header, entry,
+				     entry->length);
+	}
+
+	acpi_put_table(table_hdr);
+
+	return ret;
+}
+
+static u32 get_repainted_cache_id(u32 orig)
+{
+	int i;
+
+	for (i = 0; i < num_repainted_cache_ids; i++)
+	{
+		if (repainted_cache_ids[i].orig == orig)
+			return repainted_cache_ids[i].new;
+	}
+
+	WARN_ON_ONCE(1);
+	return 0xbadc0de;
+}
+
 /**
  * update_cache_properties() - Update cacheinfo for the given processor
  * @this_leaf: Kernel cache info structure being updated
@@ -539,7 +664,7 @@ static void update_cache_properties(struct cacheinfo *this_leaf,
 	if (revision >= 3 && (found_cache->flags & ACPI_PPTT_CACHE_ID_VALID)) {
 		found_cache_v1 = ACPI_ADD_PTR(struct acpi_pptt_cache_v1,
 	                                      found_cache, sizeof(struct acpi_pptt_cache));
-		this_leaf->id = found_cache_v1->cache_id;
+		this_leaf->id = get_repainted_cache_id(found_cache_v1->cache_id);
 		this_leaf->attributes |= CACHE_ID;
 	}
 }
@@ -553,6 +678,15 @@ static void cache_setup_acpi_cpu(struct acpi_table_header *table,
 	struct cacheinfo *this_leaf;
 	unsigned int index = 0;
 	struct acpi_pptt_processor *cpu_node = NULL;
+
+	/* Count the number of caches with a cache-id property */
+	num_repainted_cache_ids = count_cache_ids();
+	if (num_repainted_cache_ids > 0)
+		repainted_cache_ids = kcalloc(num_repainted_cache_ids,
+					     sizeof(*repainted_cache_ids),
+					     GFP_KERNEL);
+	if (repainted_cache_ids)
+		repaint_cache_ids();
 
 	while (index < get_cpu_cacheinfo(cpu)->num_leaves) {
 		this_leaf = this_cpu_ci->info_list + index;
