@@ -45,7 +45,11 @@ struct match_addr {
 };
 
 struct stored_match_addr {
-	struct sockaddr addr;
+	union {
+		struct sockaddr addr;
+		struct sockaddr_in addr4;
+		struct sockaddr_in6 addr6;
+	};
 	int addrlen;
 	struct match_addr maddr;
 };
