@@ -259,7 +259,8 @@ $(foreach _line,$(shell gawk '{ OFS = "!"; $$1 = $$1; print }' $(DEBIAN)/dkms-ve
     , \
     $(eval dkms_$(_m)_archs = any) \
   ) \
-  $(eval dkms_$(_m)_rprovides = $(patsubst rprovides=%,%,$(filter rprovides=%,$(_params)))) \
+  $(eval _rprovides_raw = $(filter rprovides=%,$(_params))) \
+  $(eval dkms_$(_m)_rprovides = $(patsubst rprovides=%,%,$(_rprovides_raw))) \
   $(eval dkms_$(_m)_type = $(word 1,$(patsubst type=%,%,$(filter type=%,$(_params))) built-in)) \
   $(eval all_$(dkms_$(_m)_type)_dkms_modules += $(_m)) \
   $(if $(filter standalone,$(dkms_$(_m)_type)), \
