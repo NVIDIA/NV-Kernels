@@ -19,6 +19,7 @@
 
 #include <linux/acpi.h>
 #include <linux/cacheinfo.h>
+#include <linux/sort.h>
 #include <acpi/processor.h>
 
 static struct acpi_subtable_header *fetch_pptt_subtable(struct acpi_table_header *table_hdr,
@@ -484,6 +485,145 @@ static struct acpi_pptt_cache *acpi_find_cache_node(struct acpi_table_header *ta
 	return found;
 }
 
+
+struct repainted_cache_id {
+	u32	orig;
+	u32	new;
+};
+
+static u32 num_repainted_cache_ids;
+static struct repainted_cache_id *repainted_cache_ids;
+
+static int repaint_cmp(const void *_a, const void *_b)
+{
+	const struct repainted_cache_id *a = _a, *b = _b;
+
+	return a->orig - b->orig;
+}
+
+static void repaint_swp(void *_a, void *_b, int size)
+{
+	struct repainted_cache_id *a = _a, *b = _b;
+	struct repainted_cache_id tmp;
+
+	tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
+
+static void repaint_cache_ids(struct acpi_table_header *table)
+{
+	struct acpi_pptt_cache_v1* cache_node_v1;
+	struct acpi_pptt_cache *cache_node;
+	struct acpi_subtable_header *entry;
+	u32 cache_sz, cache_id_iter = 0;
+	unsigned long table_end;
+	int i, new_cache_id;
+
+	table_end = (unsigned long)table + table->length;
+	entry = ACPI_ADD_PTR(struct acpi_subtable_header, table,
+			     sizeof(struct acpi_table_pptt));
+	cache_sz = sizeof(struct acpi_pptt_cache);
+	while ((unsigned long)entry + cache_sz < table_end) {
+		cache_node = (struct acpi_pptt_cache *)entry;
+		if (entry->type == ACPI_PPTT_TYPE_CACHE &&
+		    cache_node->flags & ACPI_PPTT_CACHE_ID_VALID)
+		{
+			cache_node_v1 = ACPI_ADD_PTR(struct acpi_pptt_cache_v1,
+						     cache_node,
+						     sizeof(struct acpi_pptt_cache));
+			repainted_cache_ids[cache_id_iter++].orig = cache_node_v1->cache_id;
+		}
+
+		entry = ACPI_ADD_PTR(struct acpi_subtable_header, entry,
+				     entry->length);
+	}
+
+	/*
+	 * Sort the list so that if the PPTT describes the same cache-ids, but
+	 * in a different order due to a firmware update, we don't change what
+	 * is presented to user-space.
+	 */
+	sort(repainted_cache_ids, num_repainted_cache_ids,
+	     sizeof(*repainted_cache_ids),
+	     repaint_cmp, repaint_swp);
+
+
+	new_cache_id = 0;
+	for (i = 0; i < num_repainted_cache_ids; i++) {
+		/*
+		 * Repaint duplicate cache-ids the same so we don't change
+		 * the values on platforms with cache's numbered 0, 1, 2...
+		 */
+		if (i != 0 && repainted_cache_ids[i - 1].orig == repainted_cache_ids[i].orig) {
+			repainted_cache_ids[i].new = repainted_cache_ids[i - 1].new;
+			pr_warn_once("table contains duplicate cache-ids, e.g: 0x%x\n",
+				     repainted_cache_ids[i].orig);
+			add_taint(TAINT_FIRMWARE_WORKAROUND, LOCKDEP_STILL_OK);
+			continue;
+		}
+
+		repainted_cache_ids[i].new = new_cache_id++;
+	}
+
+	return;
+}
+
+static int count_cache_ids(struct acpi_table_header *table)
+{
+	struct acpi_pptt_cache *cache_node;
+	struct acpi_subtable_header *entry;
+	unsigned long table_end;
+	u32 cache_sz;
+	int ret = 0;
+
+	if (table->revision < 3)
+		return 0;
+
+	table_end = (unsigned long)table + table->length;
+	entry = ACPI_ADD_PTR(struct acpi_subtable_header, table,
+			     sizeof(struct acpi_table_pptt));
+	cache_sz = sizeof(struct acpi_pptt_cache);
+	while ((unsigned long)entry + cache_sz < table_end) {
+		cache_node = (struct acpi_pptt_cache *)entry;
+		if (entry->type == ACPI_PPTT_TYPE_CACHE &&
+		    cache_node->flags & ACPI_PPTT_CACHE_ID_VALID)
+			ret++;
+		entry = ACPI_ADD_PTR(struct acpi_subtable_header, entry,
+				     entry->length);
+	}
+
+	return ret;
+}
+
+u32 pptt_get_repainted_cache_id(u32 orig)
+{
+	int i;
+
+	for (i = 0; i < num_repainted_cache_ids; i++)
+	{
+		if (repainted_cache_ids[i].orig == orig)
+			return repainted_cache_ids[i].new;
+	}
+
+	WARN_ON_ONCE(1);
+	return 0xbadc0de;
+}
+
+static u32 pptt_get_original_repainted_cache_id(u32 repainted_cache_id)
+{
+	int i;
+
+	for (i = 0; i < num_repainted_cache_ids; i++)
+	{
+		if (repainted_cache_ids[i].new == repainted_cache_id)
+			return repainted_cache_ids[i].orig;
+	}
+
+	WARN_ON_ONCE(1);
+	return 0xbadc0de;
+}
+
 /**
  * update_cache_properties() - Update cacheinfo for the given processor
  * @this_leaf: Kernel cache info structure being updated
@@ -555,9 +695,33 @@ static void update_cache_properties(struct cacheinfo *this_leaf,
 	if (revision >= 3 && (found_cache->flags & ACPI_PPTT_CACHE_ID_VALID)) {
 		found_cache_v1 = ACPI_ADD_PTR(struct acpi_pptt_cache_v1,
 	                                      found_cache, sizeof(struct acpi_pptt_cache));
-		this_leaf->id = found_cache_v1->cache_id;
+		this_leaf->id = pptt_get_repainted_cache_id(found_cache_v1->cache_id);
 		this_leaf->attributes |= CACHE_ID;
 	}
+}
+
+static void cache_setup_acpi_repaint_cache_ids(struct acpi_table_header *table)
+{
+	static bool setup_done;
+	static DEFINE_SPINLOCK(setup_done_lock);
+
+	if (table->revision < 3)
+		return;
+
+	spin_lock(&setup_done_lock);
+	if (!setup_done) {
+		/* Count the number of caches with a cache-id property */
+		num_repainted_cache_ids = count_cache_ids(table);
+		if (num_repainted_cache_ids > 0)
+			repainted_cache_ids = kcalloc(num_repainted_cache_ids,
+						      sizeof(*repainted_cache_ids),
+						      GFP_ATOMIC);
+		if (repainted_cache_ids)
+			repaint_cache_ids(table);
+
+		setup_done = true;
+	}
+	spin_unlock(&setup_done_lock);
 }
 
 static void cache_setup_acpi_cpu(struct acpi_table_header *table,
@@ -569,6 +733,8 @@ static void cache_setup_acpi_cpu(struct acpi_table_header *table,
 	struct cacheinfo *this_leaf;
 	unsigned int index = 0;
 	struct acpi_pptt_processor *cpu_node = NULL;
+
+	cache_setup_acpi_repaint_cache_ids(table);
 
 	while (index < get_cpu_cacheinfo(cpu)->num_leaves) {
 		this_leaf = this_cpu_ci->info_list + index;
@@ -959,7 +1125,7 @@ int find_acpi_cpu_topology_hetero_id(unsigned int cpu)
 
 /**
  * find_acpi_cache_level_from_id() - Get the level of the specified cache
- * @cache_id: The id field of the unified cache
+ * @cache_id: The id field of the unified cache from the struct cacheinfo
  *
  * Determine the level relative to any CPU for the unified cache identified by
  * cache_id. This allows the property to be found even if the CPUs are offline.
@@ -994,6 +1160,9 @@ int find_acpi_cache_level_from_id(u32 cache_id)
 		acpi_put_table(table);
 		return -ENOENT;
 	}
+
+	/* cache-id may have been repainted, reverse it */
+	cache_id = pptt_get_original_repainted_cache_id(cache_id);
 
 	/*
 	 * If we found the cache first, we'd still need to walk from each CPU
@@ -1034,8 +1203,8 @@ int find_acpi_cache_level_from_id(u32 cache_id)
 /**
  * acpi_pptt_get_cpumask_from_cache_id() - Get the cpus associated with the
  * 					   specified cache
- * @cache_id: The id field of the unified cache
- * @cpus: Where to buidl the cpumask
+ * @cache_id: The id field of the unified cache from the struct cacheinfo
+ * @cpus: Where to build the cpumask
  *
  * Determine which CPUs are below this cache in the PPTT. This allows the property
  * to be found even if the CPUs are offline.
@@ -1067,6 +1236,9 @@ int acpi_pptt_get_cpumask_from_cache_id(u32 cache_id, cpumask_t *cpus)
 		acpi_put_table(table);
 		return -ENOENT;
 	}
+
+	/* cache-id may have been repainted, reverse it */
+	cache_id = pptt_get_original_repainted_cache_id(cache_id);
 
 	/*
 	 * If we found the cache first, we'd still need to walk from each cpu.
