@@ -1506,6 +1506,7 @@ int acpi_pptt_for_each_container(acpi_pptt_cpu_callback_t callback, void *arg);
 void acpi_pptt_get_child_cpus(struct acpi_pptt_processor *parent_node, cpumask_t *cpus);
 int acpi_pptt_get_cpus_from_container(u32 acpi_cpu_id, cpumask_t *cpus);
 int acpi_pptt_get_cpumask_from_cache_id(u32 cache_id, cpumask_t *cpus);
+u32 pptt_get_repainted_cache_id(u32 orig);
 #else
 static inline int acpi_pptt_cpu_is_thread(unsigned int cpu)
 {
@@ -1558,6 +1559,10 @@ static inline int acpi_pptt_get_cpumask_from_cache_id(u32 cache_id,
 						      cpumask_t *cpus)
 {
 	return -EINVAL;
+}
+static inline u32 pptt_get_repainted_cache_id(u32 orig)
+{
+	return orig;
 }
 #endif
 

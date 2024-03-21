@@ -105,6 +105,7 @@ static int acpi_mpam_parse_resource(struct mpam_msc *msc,
 	switch (res->locator_type) {
 	case ACPI_MPAM_LOCATION_TYPE_PROCESSOR_CACHE:
 		cache_id = res->locator.cache_locator.cache_reference;
+		cache_id = pptt_get_repainted_cache_id(cache_id);
 		level = find_acpi_cache_level_from_id(cache_id);
 		if (level < 0) {
 			pr_err_once("Bad level for cache with id %u\n", cache_id);
