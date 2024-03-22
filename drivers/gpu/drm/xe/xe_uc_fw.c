@@ -761,7 +761,7 @@ int xe_uc_fw_init(struct xe_uc_fw *uc_fw)
 		return 0;
 
 	err = uc_fw_copy(uc_fw, fw->data, fw->size,
-			 XE_BO_CREATE_SYSTEM_BIT | XE_BO_CREATE_GGTT_BIT);
+			 XE_BO_FLAG_SYSTEM | XE_BO_FLAG_GGTT);
 
 	uc_fw_release(fw);
 

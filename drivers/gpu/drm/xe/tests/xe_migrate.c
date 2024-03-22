@@ -112,7 +112,7 @@ static void test_copy(struct xe_migrate *m, struct xe_bo *bo,
 						   bo->size,
 						   ttm_bo_type_kernel,
 						   region |
-						   XE_BO_NEEDS_CPU_ACCESS);
+						   XE_BO_FLAG_NEEDS_CPU_ACCESS);
 	if (IS_ERR(remote)) {
 		KUNIT_FAIL(test, "Failed to allocate remote bo for %s: %pe\n",
 			   str, remote);
@@ -190,7 +190,7 @@ out_unlock:
 static void test_copy_sysmem(struct xe_migrate *m, struct xe_bo *bo,
 			     struct kunit *test)
 {
-	test_copy(m, bo, test, XE_BO_CREATE_SYSTEM_BIT);
+	test_copy(m, bo, test, XE_BO_FLAG_SYSTEM);
 }
 
 static void test_copy_vram(struct xe_migrate *m, struct xe_bo *bo,
@@ -202,9 +202,9 @@ static void test_copy_vram(struct xe_migrate *m, struct xe_bo *bo,
 		return;
 
 	if (bo->ttm.resource->mem_type == XE_PL_VRAM0)
-		region = XE_BO_CREATE_VRAM1_BIT;
+		region = XE_BO_FLAG_VRAM1;
 	else
-		region = XE_BO_CREATE_VRAM0_BIT;
+		region = XE_BO_FLAG_VRAM0;
 	test_copy(m, bo, test, region);
 }
 
@@ -280,8 +280,8 @@ static void xe_migrate_sanity_test(struct xe_migrate *m, struct kunit *test)
 
 	big = xe_bo_create_pin_map(xe, tile, m->q->vm, SZ_4M,
 				   ttm_bo_type_kernel,
-				   XE_BO_CREATE_VRAM_IF_DGFX(tile) |
-				   XE_BO_CREATE_PINNED_BIT);
+				   XE_BO_FLAG_VRAM_IF_DGFX(tile) |
+				   XE_BO_FLAG_PINNED);
 	if (IS_ERR(big)) {
 		KUNIT_FAIL(test, "Failed to allocate bo: %li\n", PTR_ERR(big));
 		goto vunmap;
@@ -289,8 +289,8 @@ static void xe_migrate_sanity_test(struct xe_migrate *m, struct kunit *test)
 
 	pt = xe_bo_create_pin_map(xe, tile, m->q->vm, XE_PAGE_SIZE,
 				  ttm_bo_type_kernel,
-				  XE_BO_CREATE_VRAM_IF_DGFX(tile) |
-				  XE_BO_CREATE_PINNED_BIT);
+				  XE_BO_FLAG_VRAM_IF_DGFX(tile) |
+				  XE_BO_FLAG_PINNED);
 	if (IS_ERR(pt)) {
 		KUNIT_FAIL(test, "Failed to allocate fake pt: %li\n",
 			   PTR_ERR(pt));
@@ -300,8 +300,8 @@ static void xe_migrate_sanity_test(struct xe_migrate *m, struct kunit *test)
 	tiny = xe_bo_create_pin_map(xe, tile, m->q->vm,
 				    2 * SZ_4K,
 				    ttm_bo_type_kernel,
-				    XE_BO_CREATE_VRAM_IF_DGFX(tile) |
-				    XE_BO_CREATE_PINNED_BIT);
+				    XE_BO_FLAG_VRAM_IF_DGFX(tile) |
+				    XE_BO_FLAG_PINNED);
 	if (IS_ERR(tiny)) {
 		KUNIT_FAIL(test, "Failed to allocate tiny fake pt: %li\n",
 			   PTR_ERR(tiny));

@@ -941,8 +941,8 @@ int xe_guc_pc_init(struct xe_guc_pc *pc)
 	mutex_init(&pc->freq_lock);
 
 	bo = xe_managed_bo_create_pin_map(xe, tile, size,
-					  XE_BO_CREATE_VRAM_IF_DGFX(tile) |
-					  XE_BO_CREATE_GGTT_BIT);
+					  XE_BO_FLAG_VRAM_IF_DGFX(tile) |
+					  XE_BO_FLAG_GGTT);
 	if (IS_ERR(bo))
 		return PTR_ERR(bo);
 

@@ -219,11 +219,11 @@ int xe_ggtt_init(struct xe_ggtt *ggtt)
 	 * scratch entires, rather keep the scratch page in system memory on
 	 * platforms where 64K pages are needed for VRAM.
 	 */
-	flags = XE_BO_CREATE_PINNED_BIT;
+	flags = XE_BO_FLAG_PINNED;
 	if (ggtt->flags & XE_GGTT_FLAGS_64K)
-		flags |= XE_BO_CREATE_SYSTEM_BIT;
+		flags |= XE_BO_FLAG_SYSTEM;
 	else
-		flags |= XE_BO_CREATE_VRAM_IF_DGFX(ggtt->tile);
+		flags |= XE_BO_FLAG_VRAM_IF_DGFX(ggtt->tile);
 
 	ggtt->scratch = xe_managed_bo_create_pin_map(xe, ggtt->tile, XE_PAGE_SIZE, flags);
 	if (IS_ERR(ggtt->scratch)) {
