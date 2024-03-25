@@ -7275,7 +7275,7 @@ CONFIG_MFD_T7L66XB                              policy<{'armhf': 'y'}>
 CONFIG_MFD_TC3589X                              policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y'}>
 CONFIG_MFD_TC6387XB                             policy<{'armhf': 'y'}>
 CONFIG_MFD_TC6393XB                             policy<{'armhf': 'y'}>
-CONFIG_MFD_TI_AM335X_TSCADC                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
+CONFIG_MFD_TI_AM335X_TSCADC                     policy<{'amd64': '-', 'arm64': 'm', 'armhf': 'm', 'ppc64el': '-', 's390x': '-'}>
 CONFIG_MFD_TI_LMU                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
 CONFIG_MFD_TI_LP873X                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
 CONFIG_MFD_TI_LP87565                           policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
@@ -12468,7 +12468,7 @@ CONFIG_TI_ADS131E08                             policy<{'amd64': 'm', 'arm64': '
 CONFIG_TI_ADS7950                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_TI_ADS8344                               policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_TI_ADS8688                               policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
-CONFIG_TI_AM335X_ADC                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_TI_AM335X_ADC                            policy<{'amd64': '-', 'arm64': 'm', 'armhf': 'm', 'ppc64el': '-'}>
 CONFIG_TI_AM65_CPSW_TAS                         policy<{'arm64': 'y'}>
 CONFIG_TI_CPPI41                                policy<{'armhf': 'm'}>
 CONFIG_TI_CPSW                                  policy<{'armhf': 'y'}>
@@ -12607,7 +12607,7 @@ CONFIG_TOUCHSCREEN_SUN4I                        policy<{'arm64': 'n'}>
 CONFIG_TOUCHSCREEN_SUR40                        policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_TOUCHSCREEN_SURFACE3_SPI                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_TOUCHSCREEN_SX8654                       policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
-CONFIG_TOUCHSCREEN_TI_AM335X_TSC                policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_TOUCHSCREEN_TI_AM335X_TSC                policy<{'amd64': '-', 'arm64': 'm', 'armhf': 'm', 'ppc64el': '-'}>
 CONFIG_TOUCHSCREEN_TOUCHIT213                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_TOUCHSCREEN_TOUCHRIGHT                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_TOUCHSCREEN_TOUCHWIN                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
