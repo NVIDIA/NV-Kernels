@@ -36,6 +36,8 @@ Build-Depends:
  libtool <!stage1>,
  uuid-dev <!stage1>,
  libnuma-dev [amd64 arm64] <!stage1>,
+ libtraceevent-dev <!stage1>,
+ libtracefs-dev <!stage1>,
  dkms <!stage1>,
  curl <!stage1>,
  zstd <!stage1>,
