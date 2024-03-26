@@ -352,6 +352,9 @@ endif
 ifeq ($(do_tools_cpupower),true)
 	$(LN) ../../$(src_pkg_name)-tools-$(abi_release)/cpupower $(toolspkgdir)/usr/lib/linux-tools/$(abi_release)-$*
 endif
+ifeq ($(do_tools_rtla),true)
+	$(LN) ../../$(src_pkg_name)-tools-$(abi_release)/rtla $(toolspkgdir)/usr/lib/linux-tools/$(abi_release)-$*
+endif
 ifeq ($(do_tools_perf),true)
 	$(LN) ../../$(src_pkg_name)-tools-$(abi_release)/perf $(toolspkgdir)/usr/lib/linux-tools/$(abi_release)-$*
 ifeq ($(do_tools_perf_jvmti),true)
@@ -641,6 +644,9 @@ endif
 ifeq ($(do_tools_acpidbg),true)
 	cd $(builddirpa)/tools/power/acpi && make clean && make CFLAGS="-g -O2 -static -I$(builddirpa)/include" CROSS_COMPILE=$(CROSS_COMPILE) acpidbg
 endif
+ifeq ($(do_tools_rtla),true)
+	cd $(builddirpa)/tools/tracing/rtla && make clean && make CFLAGS='-g -O -Wall -I/usr/include/tracefs -I/usr/include/traceevent -DVERSION="\"6.8.1\""' static
+endif
 ifeq ($(do_tools_cpupower),true)
 	make -C $(builddirpa)/tools/power/cpupower \
 		CROSS_COMPILE=$(CROSS_COMPILE) \
@@ -696,6 +702,10 @@ endif
 ifeq ($(do_tools_cpupower),true)
 	install -m755 $(builddirpa)/tools/power/cpupower/cpupower \
 		$(toolspkgdir)/usr/lib/$(src_pkg_name)-tools-$(abi_release)
+endif
+ifeq ($(do_tools_rtla),true)
+	install -m755 $(builddirpa)/tools/tracing/rtla/rtla-static \
+		$(toolspkgdir)/usr/lib/$(src_pkg_name)-tools-$(abi_release)/rtla
 endif
 ifeq ($(do_tools_perf),true)
 	install -m755 $(builddirpa)/tools/perf/perf $(toolspkgdir)/usr/lib/$(src_pkg_name)-tools-$(abi_release)
