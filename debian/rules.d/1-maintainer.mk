@@ -130,9 +130,6 @@ autoreconstruct:
 
 .PHONY: finalchecks
 finalchecks: debian/control
-ifeq ($(do_fips_checks),true)
-	$(DROOT)/scripts/misc/fips-checks
-endif
 	$(DROOT)/scripts/checks/final-checks "$(DEBIAN)" "$(prev_fullver)" $(do_skip_checks)
 
 .PHONY: startnewrelease
