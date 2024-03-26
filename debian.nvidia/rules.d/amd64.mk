@@ -14,5 +14,6 @@ do_tools_perf   = true
 do_tools_perf_jvmti = true
 do_tools_perf_python = true
 do_tools_bpftool = true
+do_tools_rtla = true
 do_extras_package = true
 do_lib_rust	= false
