@@ -6,6 +6,9 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_ARM64_CONTPTE                            policy<{'arm64': 'y'}>
+CONFIG_ARM64_CONTPTE                            note<'LP: #2059316'>
+
 CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            policy<{'arm64': 'n'}>
 CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'{required for nvidia workloads}'>
 
