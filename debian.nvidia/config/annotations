@@ -9,6 +9,9 @@ include "../../debian.master/config/annotations"
 CONFIG_AAEON_IWMI_WDT                           policy<{'amd64': '-'}>
 CONFIG_AAEON_IWMI_WDT                           note<'{Disable all Ubuntu ODM drivers}'>
 
+CONFIG_ARM64_CONTPTE                            policy<{'arm64': 'y'}>
+CONFIG_ARM64_CONTPTE                            note<'LP: #2059316'>
+
 CONFIG_ARM64_ERRATUM_1902691                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_1902691                    note<'{Required for Grace enablement}'>
 
