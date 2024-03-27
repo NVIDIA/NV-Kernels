@@ -24,6 +24,9 @@ CONFIG_ARCH_MMAP_RND_COMPAT_BITS                note<'LP: #1983357'>
 CONFIG_ARCH_ROCKCHIP                            policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_ARCH_ROCKCHIP                            note<'LP: #1825222'>
 
+CONFIG_ARM64_CONTPTE                            policy<{'arm64': 'y'}>
+CONFIG_ARM64_CONTPTE                            note<'LP: #2059316'>
+
 CONFIG_ARM64_ERRATUM_843419                     policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_843419                     note<'LP: #1647793'>
 
