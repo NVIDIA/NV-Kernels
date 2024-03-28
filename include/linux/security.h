@@ -144,11 +144,6 @@ enum lockdown_reason {
 	LOCKDOWN_CONFIDENTIALITY_MAX,
 };
 
-/* stacking scaffolding */
-struct lsmblob_scaffold {
-	u32 secid;
-};
-
 /*
  * A "security context" is the text representation of
  * the information used by LSMs.
@@ -169,7 +164,6 @@ struct lsmblob {
 	struct lsmblob_smack smack;
 	struct lsmblob_apparmor apparmor;
 	struct lsmblob_bpf bpf;
-	struct lsmblob_scaffold scaffold;
 };
 
 extern const char *const lockdown_reasons[LOCKDOWN_CONFIDENTIALITY_MAX+1];

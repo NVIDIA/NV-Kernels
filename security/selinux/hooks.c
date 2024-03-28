@@ -3532,8 +3532,6 @@ static void selinux_inode_getlsmblob(struct inode *inode, struct lsmblob *blob)
 	struct inode_security_struct *isec = inode_security_novalidate(inode);
 
 	blob->selinux.secid = isec->sid;
-	/* stacking scaffolding */
-	blob->scaffold.secid = isec->sid;
 }
 
 static int selinux_inode_copy_up(struct dentry *src, struct cred **new)
@@ -4064,8 +4062,6 @@ static void selinux_cred_getsecid(const struct cred *c, u32 *secid)
 static void selinux_cred_getlsmblob(const struct cred *c, struct lsmblob *blob)
 {
 	blob->selinux.secid = cred_sid(c);
-	/* stacking scaffolding */
-	blob->scaffold.secid = blob->selinux.secid;
 }
 
 /*
@@ -4206,16 +4202,12 @@ static int selinux_task_getsid(struct task_struct *p)
 static void selinux_current_getlsmblob_subj(struct lsmblob *blob)
 {
 	blob->selinux.secid = current_sid();
-	/* stacking scaffolding */
-	blob->scaffold.secid = blob->selinux.secid;
 }
 
 static void selinux_task_getlsmblob_obj(struct task_struct *p,
 					struct lsmblob *blob)
 {
 	blob->selinux.secid = task_sid_obj(p);
-	/* stacking scaffolding */
-	blob->scaffold.secid = blob->selinux.secid;
 }
 
 static int selinux_task_setnice(struct task_struct *p, int nice)
@@ -6373,8 +6365,6 @@ static void selinux_ipc_getlsmblob(struct kern_ipc_perm *ipcp,
 {
 	struct ipc_security_struct *isec = selinux_ipc(ipcp);
 	blob->selinux.secid = isec->sid;
-	/* stacking scaffolding */
-	blob->scaffold.secid = isec->sid;
 }
 
 static void selinux_d_instantiate(struct dentry *dentry, struct inode *inode)
@@ -6675,10 +6665,6 @@ static int selinux_lsmblob_to_secctx(struct lsmblob *blob,
 	u32 secid = blob->selinux.secid;
 	u32 seclen;
 	u32 ret;
-
-	/* stacking scaffolding */
-	if (!secid)
-		secid = blob->scaffold.secid;
 
 	if (cp) {
 		cp->id = LSM_ID_SELINUX;
