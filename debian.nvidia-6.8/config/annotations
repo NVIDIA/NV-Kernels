@@ -1,0 +1,57 @@
+# Menu: HEADER
+# FORMAT: 4
+# ARCH: amd64 arm64
+# FLAVOUR: amd64-nvidia arm64-nvidia arm64-nvidia-64k
+# FLAVOUR_DEP: {'amd64-nvidia': 'amd64-generic', 'arm64-nvidia': 'arm64-generic', 'arm64-nvidia-64k': 'arm64-generic-64k'}
+
+include "../../debian.master/config/annotations"
+
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            policy<{'arm64': 'n'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'{required for nvidia workloads}'>
+
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'n', 'arm64': 'y'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'{required for nvidia workloads}'>
+
+CONFIG_MTD                                      policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_MTD                                      note<'boot essential on arm'>
+
+CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
+CONFIG_NR_CPUS                                  note<'LP: #1864198'>
+
+CONFIG_PREEMPT_NONE                             policy<{'amd64': 'n', 'arm64': 'y'}>
+CONFIG_PREEMPT_NONE                             note<'required for nvidia workloads'>
+
+CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': 'y', 'arm64': 'n'}>
+CONFIG_PREEMPT_VOLUNTARY                        note<'required for nvidia workloads'>
+
+CONFIG_RUST                                     policy<{'amd64': 'n', 'arm64': '-'}>
+CONFIG_RUST                                     note<'Rust is disabled in derivatives'>
+
+CONFIG_RUST_IS_AVAILABLE                        policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_RUST_IS_AVAILABLE                        note<'Rust is disabled in derivatives'>
+
+CONFIG_SPI_TEGRA210_QUAD                        policy<{'arm64': 'y'}>
+CONFIG_SPI_TEGRA210_QUAD                        note<'ensures the TPM is available before the IMA driver initializes'>
+
+CONFIG_TCG_TIS_SPI                              policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_TCG_TIS_SPI                              note<'ensures the TPM is available before the IMA driver initializes'>
+
+
+# ---- Annotations without notes ----
+
+CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-'}>
+CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
+CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
+CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
+CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
+CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
+CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-'}>
+CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'amd64': '-'}>
+CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': '-'}>
+CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-'}>
+CONFIG_RUST_PHYLIB_ABSTRACTIONS                 policy<{'amd64': '-'}>
+CONFIG_SAMPLES_RUST                             policy<{'amd64': '-'}>
+CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
+CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': 'n', 'arm64': 'n'}>
