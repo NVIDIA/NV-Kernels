@@ -193,6 +193,7 @@ struct lsmblob {
 
 extern const char *const lockdown_reasons[LOCKDOWN_CONFIDENTIALITY_MAX+1];
 extern u32 lsm_active_cnt;
+extern u32 lsm_blob_cnt;
 extern const struct lsm_id *lsm_idlist[];
 
 /* These functions are in security/commoncap.c */
