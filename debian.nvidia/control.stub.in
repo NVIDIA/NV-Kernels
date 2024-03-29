@@ -47,6 +47,8 @@ Build-Depends:
  rustfmt [amd64 arm64 armhf ppc64el riscv64 s390x],
  bindgen-0.65 [amd64 arm64 armhf ppc64el riscv64 s390x],
  libstdc++-dev,
+ nvidia-dkms-kernel [amd64 arm64] <!stage1>,
+ nvidia-kernel-source [amd64 arm64] <!stage1>,
 Build-Depends-Indep:
  xmlto <!stage1>,
  docbook-utils <!stage1>,
