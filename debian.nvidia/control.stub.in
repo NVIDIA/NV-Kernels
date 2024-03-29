@@ -53,6 +53,8 @@ Build-Depends:
  uuid-dev <!stage1>,
  zstd <!stage1>,
  bpftool:native [amd64 arm64] <!stage1 cross>,
+ nvidia-dkms-kernel [amd64 arm64] <!stage1>,
+ nvidia-kernel-source [amd64 arm64] <!stage1>,
 Build-Depends-Indep:
  asciidoc <!stage1>,
  bzip2 <!stage1>,
