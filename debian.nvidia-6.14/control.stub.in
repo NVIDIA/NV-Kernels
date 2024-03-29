@@ -51,6 +51,8 @@ Build-Depends:
  rustfmt-1.80 [amd64 arm64],
  uuid-dev <!stage1>,
  zstd <!stage1>,
+ nvidia-dkms-kernel [amd64 arm64] <!stage1>,
+ nvidia-kernel-source [amd64 arm64] <!stage1>,
 Build-Depends-Indep:
  asciidoc <!stage1>,
  bzip2 <!stage1>,
