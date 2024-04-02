@@ -8107,7 +8107,6 @@ CONFIG_NET_SB1000                               policy<{'amd64': 'm', 'arm64': '
 CONFIG_NET_SCHED                                policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_NET_SCH_ATM                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_NET_SCH_CAKE                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
-CONFIG_NET_SCH_CBQ                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
 CONFIG_NET_SCH_CBS                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
 CONFIG_NET_SCH_CHOKE                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
 CONFIG_NET_SCH_CODEL                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
