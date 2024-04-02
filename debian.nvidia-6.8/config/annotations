@@ -28,7 +28,7 @@ CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '
 CONFIG_RUST                                     note<'TODO: update note'>
 
 CONFIG_RUST_IS_AVAILABLE                        policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_RUST_IS_AVAILABLE                        note<TODO: update note>
+CONFIG_RUST_IS_AVAILABLE                        note<'TODO: update note'>
 
 CONFIG_SPI_TEGRA210_QUAD                        policy<{'arm64': 'y'}>
 CONFIG_SPI_TEGRA210_QUAD                        note<'ensures the TPM is available before the IMA driver initializes'>
