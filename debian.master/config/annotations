@@ -2181,11 +2181,11 @@ CONFIG_BINARY_PRINTF                            policy<{'amd64': 'y', 'arm64': '
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '"bindgen 0.65.1"'}>
 CONFIG_BINFMT_ELF                               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_BINFMT_ELF_FDPIC                         policy<{'armhf': 'y'}>
-CONFIG_BINFMT_FLAT                              policy<{'armhf': 'y', 'riscv64': 'y'}>
+CONFIG_BINFMT_FLAT                              policy<{'armhf': 'y', 'riscv64': 'n'}>
 CONFIG_BINFMT_FLAT_ARGVP_ENVP_ON_STACK          policy<{'armhf': 'y'}>
-CONFIG_BINFMT_FLAT_OLD                          policy<{'armhf': 'y', 'riscv64': 'y'}>
+CONFIG_BINFMT_FLAT_OLD                          policy<{'armhf': 'y'}>
 CONFIG_BINFMT_MISC                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
-CONFIG_BINFMT_ZFLAT                             policy<{'armhf': 'y', 'riscv64': 'y'}>
+CONFIG_BINFMT_ZFLAT                             policy<{'armhf': 'y'}>
 CONFIG_BITREVERSE                               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_BLKDEV_UBLK_LEGACY_OPCODES               policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n'}>
 CONFIG_BLK_CGROUP                               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
