@@ -2836,8 +2836,7 @@ CONFIG_CLK_SH73A0                               policy<{'armhf': 'y'}>
 CONFIG_CLK_SIFIVE                               policy<{'riscv64': 'y'}>
 CONFIG_CLK_SIFIVE_PRCI                          policy<{'riscv64': 'y'}>
 CONFIG_CLK_SP810                                policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': '-'}>
-CONFIG_CLK_STARFIVE_JH7100                      policy<{'riscv64': 'y'}>
-CONFIG_CLK_STARFIVE_JH7100_AUDIO                policy<{'riscv64': 'm'}>
+CONFIG_CLK_STARFIVE_JH7100                      policy<{'riscv64': 'n'}>
 CONFIG_CLK_STARFIVE_JH7110_AON                  policy<{'riscv64': 'm'}>
 CONFIG_CLK_STARFIVE_JH7110_ISP                  policy<{'riscv64': 'm'}>
 CONFIG_CLK_STARFIVE_JH7110_PLL                  policy<{'riscv64': 'y'}>
@@ -10100,7 +10099,7 @@ CONFIG_PINCTRL_SM8650_LPASS_LPI                 policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SPPCTL                           policy<{'armhf': 'y'}>
 CONFIG_PINCTRL_SPRD                             policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_SPRD_SC9860                      policy<{'arm64': 'y'}>
-CONFIG_PINCTRL_STARFIVE_JH7100                  policy<{'riscv64': 'm'}>
+CONFIG_PINCTRL_STARFIVE_JH7100                  policy<{'riscv64': 'n'}>
 CONFIG_PINCTRL_STARFIVE_JH7110                  policy<{'riscv64': 'y'}>
 CONFIG_PINCTRL_STARFIVE_JH7110_AON              policy<{'riscv64': 'm'}>
 CONFIG_PINCTRL_STARFIVE_JH7110_SYS              policy<{'riscv64': 'y'}>
@@ -10970,7 +10969,7 @@ CONFIG_RESET_RZG2L_USBPHY_CTRL                  policy<{'arm64': 'y', 'riscv64':
 CONFIG_RESET_SCMI                               policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_RESET_SIMPLE                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_RESET_SOCFPGA                            policy<{'armhf': 'y'}>
-CONFIG_RESET_STARFIVE_JH7100                    policy<{'riscv64': 'y'}>
+CONFIG_RESET_STARFIVE_JH7100                    policy<{'riscv64': 'n'}>
 CONFIG_RESET_STARFIVE_JH7110                    policy<{'riscv64': 'y'}>
 CONFIG_RESET_STARFIVE_JH71X0                    policy<{'riscv64': 'y'}>
 CONFIG_RESET_SUNPLUS                            policy<{'armhf': 'y'}>
