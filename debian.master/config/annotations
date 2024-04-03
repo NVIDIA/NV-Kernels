@@ -555,8 +555,8 @@ CONFIG_RCU_NOCB_CPU                             note<'LP: #2051342'>
 CONFIG_RCU_NOCB_CPU_DEFAULT_ALL                 policy<{'amd64': 'n', 'arm64': 'n', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-'}>
 CONFIG_RCU_NOCB_CPU_DEFAULT_ALL                 note<'LP: #2051342'>
 
-CONFIG_REGULATOR_FIXED_VOLTAGE                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'y', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
-CONFIG_REGULATOR_FIXED_VOLTAGE                  note<'boot essential on arm'>
+CONFIG_REGULATOR_FIXED_VOLTAGE                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'y', 'ppc64el': 'm', 'riscv64': 'y', 's390x': '-'}>
+CONFIG_REGULATOR_FIXED_VOLTAGE                  note<'boot essential on arm and the Allwinner D1 RISC-V SoC'>
 
 CONFIG_REGULATOR_TPS65217                       policy<{'arm64': 'm', 'armhf': 'y', 'ppc64el': '-', 'riscv64': 'm'}>
 CONFIG_REGULATOR_TPS65217                       note<'boot essential on AM335x'>
