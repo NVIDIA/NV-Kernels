@@ -2397,7 +2397,6 @@ CONFIG_BT_HCIUART_RTL                           policy<{'amd64': 'y', 'arm64': '
 CONFIG_BT_HCIUART_SERDEV                        policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_BT_HCIVHCI                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_BT_HIDP                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
-CONFIG_BT_HS                                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_BT_INTEL                                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_BT_LE                                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_BT_LEDS                                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
@@ -13672,12 +13671,12 @@ CONFIG_TEGRA186_GPC_DMA                         policy<{'arm64': 'm', 'armhf': '
 CONFIG_TEGRA186_TIMER                           policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_TEGRA20_APB_DMA                          policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_TEGRA20_EMC                              policy<{'armhf': 'y'}>
-CONFIG_TEGRA210_ADMA                            policy<{'arm64': 'm'}>
+CONFIG_TEGRA210_ADMA                            policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_TEGRA210_EMC                             policy<{'arm64': 'm'}>
 CONFIG_TEGRA210_EMC_TABLE                       policy<{'arm64': 'y'}>
 CONFIG_TEGRA30_EMC                              policy<{'armhf': 'y'}>
 CONFIG_TEGRA30_TSENSOR                          policy<{'armhf': 'm'}>
-CONFIG_TEGRA_ACONNECT                           policy<{'arm64': 'm'}>
+CONFIG_TEGRA_ACONNECT                           policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_TEGRA_AHB                                policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_TEGRA_BPMP                               policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_TEGRA_BPMP_THERMAL                       policy<{'arm64': 'm', 'armhf': 'm'}>
