@@ -9,16 +9,46 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/err.h>
+#include <linux/refcount.h>
+#include <linux/xarray.h>
 
 struct device;
 struct iommufd_device;
 struct page;
 struct iommufd_ctx;
 struct iommufd_access;
+struct iommufd_hwpt_paging;
 struct file;
 struct iommu_group;
-struct iommufd_viommu;
 struct iommu_user_data_array;
+
+/* Base struct for all objects with a userspace ID handle. */
+struct iommufd_object {
+	refcount_t shortterm_users;
+	refcount_t users;
+	unsigned int type; /* enum iommufd_object_type in iommufd_private.h */
+	unsigned int id;
+};
+
+struct iommufd_viommu {
+	struct iommufd_object obj;
+	struct iommufd_ctx *ictx;
+	struct iommu_device *iommu_dev;
+	struct iommufd_hwpt_paging *hwpt;
+	struct xarray vdev_ids;
+
+	const struct iommufd_viommu_ops *ops;
+
+	unsigned int type;
+};
+
+struct iommufd_vdev_id {
+	struct iommufd_viommu *viommu;
+	struct device *dev;
+	u64 vdev_id;
+
+	struct list_head idev_item;
+};
 
 /**
  * struct iommufd_viommu_ops - viommu specific operations

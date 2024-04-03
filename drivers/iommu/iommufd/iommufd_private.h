@@ -6,9 +6,9 @@
 
 #include <linux/rwsem.h>
 #include <linux/xarray.h>
-#include <linux/refcount.h>
 #include <linux/uaccess.h>
 #include <linux/iommu.h>
+#include <linux/iommufd.h>
 #include <linux/iova_bitmap.h>
 #include <uapi/linux/iommufd.h>
 #include "../iommu-priv.h"
@@ -135,14 +135,6 @@ enum iommufd_object_type {
 	IOMMUFD_OBJ_SELFTEST,
 #endif
 	IOMMUFD_OBJ_MAX,
-};
-
-/* Base struct for all objects with a userspace ID handle. */
-struct iommufd_object {
-	refcount_t shortterm_users;
-	refcount_t users;
-	enum iommufd_object_type type;
-	unsigned int id;
 };
 
 static inline bool iommufd_lock_obj(struct iommufd_object *obj)
@@ -518,26 +510,6 @@ static inline int iommufd_hwpt_replace_device(struct iommufd_device *idev,
 
 	return iommu_group_replace_domain(idev->igroup->group, hwpt->domain);
 }
-
-struct iommufd_viommu {
-	struct iommufd_object obj;
-	struct iommufd_ctx *ictx;
-	struct iommu_device *iommu_dev;
-	struct iommufd_hwpt_paging *hwpt;
-	struct xarray vdev_ids;
-
-	const struct iommufd_viommu_ops *ops;
-
-	unsigned int type;
-};
-
-struct iommufd_vdev_id {
-	struct iommufd_viommu *viommu;
-	struct device *dev;
-	u64 vdev_id;
-
-	struct list_head idev_item;
-};
 
 static inline struct iommufd_viommu *
 iommufd_get_viommu(struct iommufd_ucmd *ucmd, u32 id)
