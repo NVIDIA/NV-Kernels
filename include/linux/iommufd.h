@@ -8,7 +8,9 @@
 
 #include <linux/err.h>
 #include <linux/errno.h>
+#include <linux/refcount.h>
 #include <linux/types.h>
+#include <linux/xarray.h>
 
 struct device;
 struct file;
@@ -17,8 +19,17 @@ struct iommu_user_data_array;
 struct iommufd_access;
 struct iommufd_ctx;
 struct iommufd_device;
+struct iommufd_hwpt_paging;
 struct iommufd_viommu;
 struct page;
+
+/* Base struct for all objects with a userspace ID handle. */
+struct iommufd_object {
+	refcount_t shortterm_users;
+	refcount_t users;
+	unsigned int type; /* enum iommufd_object_type in iommufd_private.h */
+	unsigned int id;
+};
 
 struct iommufd_device *iommufd_device_bind(struct iommufd_ctx *ictx,
 					   struct device *dev, u32 *id);
@@ -55,6 +66,22 @@ int iommufd_access_replace(struct iommufd_access *access, u32 ioas_id);
 void iommufd_access_detach(struct iommufd_access *access);
 
 void iommufd_ctx_get(struct iommufd_ctx *ictx);
+
+struct iommufd_viommu {
+	struct iommufd_object obj;
+	struct iommufd_ctx *ictx;
+	struct iommufd_hwpt_paging *hwpt;
+
+	/* The locking order is vdev_ids_rwsem -> igroup::lock */
+	struct rw_semaphore vdev_ids_rwsem;
+	struct xarray vdev_ids;
+	struct rw_semaphore virqs_rwsem;
+	struct list_head virqs;
+
+	const struct iommufd_viommu_ops *ops;
+
+	unsigned int type;
+};
 
 struct iommufd_vdev_id {
 	struct iommufd_viommu *viommu;

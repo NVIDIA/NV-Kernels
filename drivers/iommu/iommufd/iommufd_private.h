@@ -7,7 +7,6 @@
 #include <linux/iommu.h>
 #include <linux/iommufd.h>
 #include <linux/iova_bitmap.h>
-#include <linux/refcount.h>
 #include <linux/rwsem.h>
 #include <linux/uaccess.h>
 #include <linux/xarray.h>
@@ -139,14 +138,6 @@ enum iommufd_object_type {
 	IOMMUFD_OBJ_SELFTEST,
 #endif
 	IOMMUFD_OBJ_MAX,
-};
-
-/* Base struct for all objects with a userspace ID handle. */
-struct iommufd_object {
-	refcount_t shortterm_users;
-	refcount_t users;
-	enum iommufd_object_type type;
-	unsigned int id;
 };
 
 static inline bool iommufd_lock_obj(struct iommufd_object *obj)
@@ -604,22 +595,6 @@ static inline int iommufd_event_virq_handler(struct iommufd_viommu_irq *virq)
 {
 	return iommufd_event_notify(&virq->event_virq->common, &virq->node);
 }
-
-struct iommufd_viommu {
-	struct iommufd_object obj;
-	struct iommufd_ctx *ictx;
-	struct iommufd_hwpt_paging *hwpt;
-
-	/* The locking order is vdev_ids_rwsem -> igroup::lock */
-	struct rw_semaphore vdev_ids_rwsem;
-	struct xarray vdev_ids;
-	struct rw_semaphore virqs_rwsem;
-	struct list_head virqs;
-
-	const struct iommufd_viommu_ops *ops;
-
-	unsigned int type;
-};
 
 static inline struct iommufd_viommu *
 iommufd_get_viommu(struct iommufd_ucmd *ucmd, u32 id)
