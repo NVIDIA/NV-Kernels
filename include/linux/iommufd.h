@@ -15,6 +15,7 @@
 struct device;
 struct file;
 struct iommu_group;
+struct iommu_user_data;
 struct iommu_user_data_array;
 struct iommufd_access;
 struct iommufd_ctx;
@@ -89,6 +90,12 @@ struct iommufd_vdev_id {
 	u64 id;
 };
 
+struct iommufd_vqueue {
+	struct iommufd_object obj;
+	struct iommufd_ctx *ictx;
+	struct iommufd_viommu *viommu;
+};
+
 /**
  * struct iommufd_viommu_ops - viommu specific operations
  * @free: Free all driver-specific parts of an iommufd_viommu. The memory
@@ -106,6 +113,11 @@ struct iommufd_vdev_id {
  *                    array->entry_num to report the number of handled requests.
  *                    The data structure of the array entry must be defined in
  *                    include/uapi/linux/iommufd.h
+ * @vqueue_alloc: Allocate an iommufd_vqueue as a user space command queue for a
+ *                @viommu instance. Queue specific @user_data must be defined in
+ *                the include/uapi/linux/iommufd.h header.
+ * @vqueue_free: Free all driver-specific parts of an iommufd_vqueue. The memory
+ *               of the iommufd_vqueue will be free-ed by iommufd core
  */
 struct iommufd_viommu_ops {
 	void (*free)(struct iommufd_viommu *viommu);
@@ -114,6 +126,10 @@ struct iommufd_viommu_ops {
 	void (*unset_vdev_id)(struct iommufd_vdev_id *vdev_id);
 	int (*cache_invalidate)(struct iommufd_viommu *viommu,
 				struct iommu_user_data_array *array);
+	struct iommufd_vqueue *(*vqueue_alloc)(
+		struct iommufd_viommu *viommu,
+		const struct iommu_user_data *user_data);
+	void (*vqueue_free)(struct iommufd_vqueue *vqueue);
 };
 
 #if IS_ENABLED(CONFIG_IOMMUFD)
@@ -144,6 +160,8 @@ struct iommufd_viommu *
 __iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
 		       const struct iommufd_viommu_ops *ops);
 struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size);
+struct iommufd_vqueue *
+__iommufd_vqueue_alloc(struct iommufd_viommu *viommu, size_t size);
 #else /* !CONFIG_IOMMUFD */
 static inline struct iommufd_ctx *iommufd_ctx_from_file(struct file *file)
 {
@@ -227,6 +245,12 @@ static inline struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size)
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }
+
+static inline struct iommufd_vqueue *
+__iommufd_vqueue_alloc(struct iommufd_viommu *viommu, size_t size)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
 #endif /* CONFIG_IOMMUFD */
 
 /*
@@ -243,6 +267,12 @@ static inline struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size)
 #define iommufd_vdev_id_alloc(drv_struct, member)                              \
 	container_of(__iommufd_vdev_id_alloc(sizeof(struct drv_struct) +       \
 					     BUILD_BUG_ON_ZERO(offsetof(       \
+						struct drv_struct, member))),  \
+		     struct drv_struct, member)
+#define iommufd_vqueue_alloc(viommu, drv_struct, member)                       \
+	container_of(__iommufd_vqueue_alloc(viommu,                            \
+					    sizeof(struct drv_struct) +        \
+					    BUILD_BUG_ON_ZERO(offsetof(        \
 						struct drv_struct, member))),  \
 		     struct drv_struct, member)
 #endif
