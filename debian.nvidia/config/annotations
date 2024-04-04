@@ -59,3 +59,14 @@ CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
 CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_AAEON_IWMI_WDT                           policy<{'amd64': '-'}>
+
+# --- The NOUVEAU driver is not used with the NVIDIA kernel
+#
+CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n'}>
+CONFIG_DRM_NOUVEAU_BACKLIGHT                    policy<{'amd64': '-'}>
+CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-'}>
+CONFIG_DRM_NOUVEAU_GSP_DEFAULT                  policy<{'amd64': '-'}>
+CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-'}>
+CONFIG_NOUVEAU_DEBUG_DEFAULT                    policy<{'amd64': '-'}>
+CONFIG_NOUVEAU_DEBUG_MMU                        policy<{'amd64': '-'}>
+CONFIG_NOUVEAU_DEBUG_PUSH                       policy<{'amd64': '-'}>
