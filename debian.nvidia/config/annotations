@@ -43,9 +43,6 @@ CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-'}>
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
 CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
-CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
-CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
-CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-'}>
 CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'amd64': '-'}>
@@ -53,5 +50,12 @@ CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': '-'}>
 CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-'}>
 CONFIG_RUST_PHYLIB_ABSTRACTIONS                 policy<{'amd64': '-'}>
 CONFIG_SAMPLES_RUST                             policy<{'amd64': '-'}>
-CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
+
+# --- Disable all of the Ubuntu ODM drivers
+#
 CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
+CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
+CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
+CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
+CONFIG_AAEON_IWMI_WDT                           policy<{'amd64': '-'}>
