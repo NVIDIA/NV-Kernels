@@ -55,6 +55,7 @@ enum {
 	IOMMUFD_CMD_VIOMMU_SET_VDEV_ID = 0x90,
 	IOMMUFD_CMD_VIOMMU_UNSET_VDEV_ID = 0x91,
 	IOMMUFD_CMD_VIRQ_ALLOC = 0x92,
+	IOMMUFD_CMD_VQUEUE_ALLOC = 0x93,
 };
 
 /**
@@ -997,4 +998,36 @@ struct iommu_virq_alloc {
 	__u32 out_virq_fd;
 };
 #define IOMMU_VIRQ_ALLOC _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VIRQ_ALLOC)
+
+/**
+ * enum iommu_vqueue_data_type - VQUEUE Data Type
+ * @IOMMU_VQUEUE_DATA_NONE: No Data
+ */
+enum iommu_vqueue_data_type {
+	IOMMU_VQUEUE_DATA_NONE = 0,
+};
+
+/**
+ * struct iommu_vqueue_alloc - ioctl(IOMMU_VQUEUE_ALLOC)
+ * @size: sizeof(struct iommu_vqueue_alloc)
+ * @flags: Must be 0
+ * @viommu_id: viommu ID to associate the virtual queue with
+ * @out_vqueue_id: The ID of the new virtual queue
+ * @data_type: One of enum iommu_vqueue_data_type
+ * @data_len: Length of the type specific data
+ * @data_uptr: User pointer to the type specific data
+ *
+ * Allocate an virtual queue object for driver-specific HW-accelerated queue
+ */
+
+struct iommu_vqueue_alloc {
+	__u32 size;
+	__u32 flags;
+	__u32 viommu_id;
+	__u32 out_vqueue_id;
+	__u32 data_type;
+	__u32 data_len;
+	__aligned_u64 data_uptr;
+};
+#define IOMMU_VQUEUE_ALLOC _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VQUEUE_ALLOC)
 #endif
