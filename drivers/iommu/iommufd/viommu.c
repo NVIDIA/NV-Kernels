@@ -37,6 +37,21 @@ struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size)
 	return vdev_id;
 }
 
+struct iommufd_vqueue *
+__iommufd_vqueue_alloc(struct iommufd_viommu *viommu, size_t size)
+{
+	struct iommufd_vqueue *vqueue;
+	struct iommufd_object *obj;
+
+	if (WARN_ON(size < sizeof(*vqueue)))
+		return ERR_PTR(-EINVAL);
+	obj = iommufd_object_alloc_elm(viommu->ictx, size, IOMMUFD_OBJ_VQUEUE);
+	if (IS_ERR(obj))
+		return ERR_CAST(obj);
+	vqueue = container_of(obj, struct iommufd_vqueue, obj);
+	return vqueue;
+}
+
 void iommufd_viommu_destroy(struct iommufd_object *obj)
 {
 	struct iommufd_viommu *viommu =
