@@ -788,3 +788,45 @@ static int _test_cmd_viommu_alloc(int fd, __u32 device_id, __u32 hwpt_id,
 	EXPECT_ERRNO(_errno, _test_cmd_viommu_alloc(self->fd, device_id,   \
 						    hwpt_id, type, 0,      \
 						    viommu_id))
+
+static int _test_cmd_viommu_set_vdev_id(int fd, __u32 viommu_id,
+					__u32 idev_id, __u64 vdev_id)
+{
+	struct iommu_viommu_set_vdev_id cmd = {
+		.size = sizeof(cmd),
+		.dev_id = idev_id,
+		.viommu_id = viommu_id,
+		.vdev_id = vdev_id,
+	};
+
+	return ioctl(fd, IOMMU_VIOMMU_SET_VDEV_ID, &cmd);
+}
+
+#define test_cmd_viommu_set_vdev_id(viommu_id, idev_id, vdev_id)       \
+	ASSERT_EQ(0, _test_cmd_viommu_set_vdev_id(self->fd, viommu_id, \
+						  idev_id, vdev_id))
+#define test_err_viommu_set_vdev_id(_errno, viommu_id, idev_id, vdev_id) \
+	EXPECT_ERRNO(_errno,                                             \
+		     _test_cmd_viommu_set_vdev_id(self->fd, viommu_id,   \
+						  idev_id, vdev_id))
+
+static int _test_cmd_viommu_unset_vdev_id(int fd, __u32 viommu_id,
+					  __u32 idev_id, __u64 vdev_id)
+{
+	struct iommu_viommu_unset_vdev_id cmd = {
+		.size = sizeof(cmd),
+		.dev_id = idev_id,
+		.viommu_id = viommu_id,
+		.vdev_id = vdev_id,
+	};
+
+	return ioctl(fd, IOMMU_VIOMMU_UNSET_VDEV_ID, &cmd);
+}
+
+#define test_cmd_viommu_unset_vdev_id(viommu_id, idev_id, vdev_id)       \
+	ASSERT_EQ(0, _test_cmd_viommu_unset_vdev_id(self->fd, viommu_id, \
+						    idev_id, vdev_id))
+#define test_err_viommu_unset_vdev_id(_errno, viommu_id, idev_id, vdev_id) \
+	EXPECT_ERRNO(_errno,                                               \
+		     _test_cmd_viommu_unset_vdev_id(self->fd, viommu_id,   \
+						    idev_id, vdev_id))

@@ -556,9 +556,15 @@ TEST_F(iommufd_ioas, alloc_hwpt_nested)
 
 TEST_F(iommufd_ioas, viommu_default)
 {
+	struct iommu_hwpt_selftest data = {
+		.iotlb = IOMMU_TEST_IOTLB_DEFAULT,
+	};
+	uint32_t nested_hwpt_id = 0, hwpt_id = 0;
 	uint32_t dev_id = self->device_id;
 	uint32_t viommu_id = 0;
-	uint32_t hwpt_id = 0;
+	uint32_t device2;
+	uint32_t stdev2;
+	uint32_t hwpt2;
 
 	if (dev_id) {
 		/* Negative test -- invalid hwpt */
@@ -575,17 +581,42 @@ TEST_F(iommufd_ioas, viommu_default)
 		test_cmd_hwpt_alloc(dev_id, self->ioas_id,
 				    IOMMU_HWPT_ALLOC_NEST_PARENT,
 				    &hwpt_id);
+		test_cmd_mock_domain_replace(self->stdev_id, hwpt_id);
+
 		/* Negative test -- unsupported viommu type */
 		test_err_viommu_alloc(EOPNOTSUPP, dev_id, hwpt_id,
 				      0xdead, &viommu_id);
-		/* Allocate a default type of viommu */
+
+		/* Allocate a default type of viommu and a nested hwpt on top */
 		test_cmd_viommu_alloc(dev_id, hwpt_id,
 				      IOMMU_VIOMMU_TYPE_DEFAULT, &viommu_id);
+		test_cmd_hwpt_alloc_nested(self->device_id, viommu_id, 0,
+					   &nested_hwpt_id,
+					   IOMMU_HWPT_DATA_SELFTEST, &data,
+					   sizeof(data));
+		test_cmd_mock_domain_replace(self->stdev_id, nested_hwpt_id);
+
+		/* Set vdev_id to 0x99, unset it, and set to 0x88 */
+		test_cmd_viommu_set_vdev_id(viommu_id, dev_id, 0x99);
+		test_err_viommu_set_vdev_id(EBUSY, viommu_id, dev_id, 0x99);
+		test_err_viommu_unset_vdev_id(EINVAL, viommu_id, dev_id, 0x88);
+		test_cmd_viommu_unset_vdev_id(viommu_id, dev_id, 0x99);
+		test_cmd_viommu_set_vdev_id(viommu_id, dev_id, 0x88);
+
+		/* Negative test -- a device attached to a different HWPT */
+		test_cmd_mock_domain(self->ioas_id, &stdev2, &hwpt2, &device2);
+		test_err_viommu_set_vdev_id(EINVAL, viommu_id, device2, 0xaa);
+		test_ioctl_destroy(stdev2);
+
+		test_cmd_mock_domain_replace(self->stdev_id, hwpt_id);
+		test_ioctl_destroy(nested_hwpt_id);
+		test_cmd_mock_domain_replace(self->stdev_id, self->ioas_id);
 		test_ioctl_destroy(viommu_id);
 		test_ioctl_destroy(hwpt_id);
 	} else {
 		test_err_viommu_alloc(ENOENT, dev_id, hwpt_id,
 				      IOMMU_VIOMMU_TYPE_DEFAULT, &viommu_id);
+		test_err_viommu_set_vdev_id(ENOENT, viommu_id, dev_id, 0x99);
 	}
 }
 
