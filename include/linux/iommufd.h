@@ -36,6 +36,7 @@ enum iommufd_object_type {
 	IOMMUFD_OBJ_VIOMMU,
 	IOMMUFD_OBJ_VDEVICE,
 	IOMMUFD_OBJ_VEVENTQ,
+	IOMMUFD_OBJ_VCMDQ,
 #ifdef CONFIG_IOMMUFD_TEST
 	IOMMUFD_OBJ_SELFTEST,
 #endif
@@ -109,6 +110,12 @@ struct iommufd_vdevice {
 	u64 id; /* per-vIOMMU virtual ID */
 };
 
+struct iommufd_vcmdq {
+	struct iommufd_object obj;
+	struct iommufd_ctx *ictx;
+	struct iommufd_viommu *viommu;
+};
+
 /**
  * struct iommufd_viommu_ops - vIOMMU specific operations
  * @destroy: Clean up all driver-specific parts of an iommufd_viommu. The memory
@@ -131,6 +138,11 @@ struct iommufd_vdevice {
  * @vdevice_destroy: Clean up all driver-specific parts of an iommufd_vdevice. The
  *                   memory of the vDEVICE will be free-ed by iommufd core after
  *                   calling this op
+ * @vcmdq_alloc: Allocate an iommufd_vcmdq as a user space command queue for a
+ *               @viommu instance. Queue specific @user_data must be defined in
+ *               the include/uapi/linux/iommufd.h header.
+ * @vcmdq_free: Free all driver-specific parts of an iommufd_vcmdq. The memory
+ *              of the iommufd_vcmdq will be free-ed by iommufd core
  */
 struct iommufd_viommu_ops {
 	void (*destroy)(struct iommufd_viommu *viommu);
@@ -142,6 +154,10 @@ struct iommufd_viommu_ops {
 	struct iommufd_vdevice *(*vdevice_alloc)(struct iommufd_viommu *viommu,
 						 struct device *dev, u64 id);
 	void (*vdevice_destroy)(struct iommufd_vdevice *vdev);
+	struct iommufd_vcmdq *(*vcmdq_alloc)(
+		struct iommufd_viommu *viommu,
+		const struct iommu_user_data *user_data);
+	void (*vcmdq_free)(struct iommufd_vcmdq *vcmdq);
 };
 
 #if IS_ENABLED(CONFIG_IOMMUFD)
@@ -276,6 +292,21 @@ static inline int iommufd_viommu_report_event(struct iommufd_viommu *viommu,
 		static_assert(offsetof(drv_struct, member.obj) == 0);          \
 		ret = (drv_struct *)_iommufd_object_alloc(                     \
 			viommu->ictx, sizeof(drv_struct), IOMMUFD_OBJ_VDEVICE);\
+		if (!IS_ERR(ret))                                              \
+			ret->member.viommu = viommu;                           \
+		ret;                                                           \
+	})
+
+#define iommufd_vcmdq_alloc(viommu, drv_struct, member)                        \
+	({                                                                     \
+		drv_struct *ret;                                               \
+									       \
+		static_assert(__same_type(struct iommufd_viommu, *viommu));    \
+		static_assert(__same_type(struct iommufd_vcmdq,                \
+					  ((drv_struct *)NULL)->member));      \
+		static_assert(offsetof(drv_struct, member.obj) == 0);          \
+		ret = (drv_struct *)_iommufd_object_alloc(                     \
+			viommu->ictx, sizeof(drv_struct), IOMMUFD_OBJ_VCMDQ);  \
 		if (!IS_ERR(ret))                                              \
 			ret->member.viommu = viommu;                           \
 		ret;                                                           \
