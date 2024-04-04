@@ -310,3 +310,65 @@ iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu)
 		return NULL;
 	return viommu->hwpt->common.domain;
 }
+
+void iommufd_vqueue_destroy(struct iommufd_object *obj)
+{
+	struct iommufd_vqueue *vqueue =
+		container_of(obj, struct iommufd_vqueue, obj);
+	struct iommufd_viommu *viommu = vqueue->viommu;
+
+	if (viommu->ops->vqueue_free)
+		viommu->ops->vqueue_free(vqueue);
+	refcount_dec(&viommu->obj.users);
+}
+
+int iommufd_vqueue_alloc_ioctl(struct iommufd_ucmd *ucmd)
+{
+	struct iommu_vqueue_alloc *cmd = ucmd->cmd;
+	const struct iommu_user_data user_data = {
+		.type = cmd->data_type,
+		.uptr = u64_to_user_ptr(cmd->data_uptr),
+		.len = cmd->data_len,
+	};
+	struct iommufd_vqueue *vqueue;
+	struct iommufd_viommu *viommu;
+	int rc;
+
+	if (cmd->flags)
+		return -EOPNOTSUPP;
+	if (!cmd->data_len)
+		return -EINVAL;
+
+	viommu = iommufd_get_viommu(ucmd, cmd->viommu_id);
+	if (IS_ERR(viommu))
+		return PTR_ERR(viommu);
+
+	if (!viommu->ops || !viommu->ops->vqueue_alloc) {
+		rc = -EOPNOTSUPP;
+		goto out_put_viommu;
+	}
+
+	vqueue = viommu->ops->vqueue_alloc(
+		viommu, user_data.len ? &user_data : NULL);
+	if (IS_ERR(vqueue)) {
+		rc = PTR_ERR(vqueue);
+		goto out_put_viommu;
+	}
+
+	vqueue->viommu = viommu;
+	vqueue->ictx = ucmd->ictx;
+	cmd->out_vqueue_id = vqueue->obj.id;
+	rc = iommufd_ucmd_respond(ucmd, sizeof(*cmd));
+	if (rc)
+		goto out_free;
+	iommufd_object_finalize(ucmd->ictx, &vqueue->obj);
+	refcount_inc(&viommu->obj.users);
+	goto out_put_viommu;
+
+out_free:
+	if (viommu->ops->vqueue_free)
+		viommu->ops->vqueue_free(vqueue);
+out_put_viommu:
+	iommufd_put_object(ucmd->ictx, &viommu->obj);
+	return rc;
+}
