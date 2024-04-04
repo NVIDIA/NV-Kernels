@@ -12,8 +12,38 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'required for NVIDIA worklo
 CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'n', 'arm64': 'y'}>
 CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'required for NVIDIA workloads'>
 
+CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_DRM_NOUVEAU_BACKLIGHT                    policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOUVEAU_BACKLIGHT                    note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_DRM_NOUVEAU_CH7006                       policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOUVEAU_CH7006                       note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_DRM_NOUVEAU_SIL164                       policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOUVEAU_SIL164                       note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOUVEAU_SVM                          note<'Disable nouveau for NVIDIA kernels'>
+
 CONFIG_MTD                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_MTD                                      note<'Essential for boot on ARM64'>
+
+CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_NOUVEAU_DEBUG                            note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NOUVEAU_DEBUG_DEFAULT                    policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_NOUVEAU_DEBUG_DEFAULT                    note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NOUVEAU_DEBUG_MMU                        policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_NOUVEAU_DEBUG_MMU                        note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NOUVEAU_DEBUG_PUSH                       policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_NOUVEAU_DEBUG_PUSH                       note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NOUVEAU_PLATFORM_DRIVER                  policy<{'arm64': '-'}>
+CONFIG_NOUVEAU_PLATFORM_DRIVER                  note<'Disable nouveau for NVIDIA kernels'>
 
 CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
 CONFIG_NR_CPUS                                  note<'LP: #1864198'>
