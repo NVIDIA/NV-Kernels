@@ -29,9 +29,9 @@ struct iommufd_object_ops {
 static const struct iommufd_object_ops iommufd_object_ops[];
 static struct miscdevice vfio_misc_dev;
 
-struct iommufd_object *_iommufd_object_alloc(struct iommufd_ctx *ictx,
-					     size_t size,
-					     enum iommufd_object_type type)
+struct iommufd_object *iommufd_object_alloc_elm(struct iommufd_ctx *ictx,
+						size_t size,
+						enum iommufd_object_type type)
 {
 	struct iommufd_object *obj;
 	int rc;
