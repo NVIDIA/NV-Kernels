@@ -6,6 +6,32 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_DRM_NOUVEAU_BACKLIGHT                    policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOUVEAU_BACKLIGHT                    note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_DRM_NOUVEAU_GSP_DEFAULT                  policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOUVEAU_GSP_DEFAULT                  note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOUVEAU_SVM                          note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_NOUVEAU_DEBUG                            note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NOUVEAU_DEBUG_DEFAULT                    policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_NOUVEAU_DEBUG_DEFAULT                    note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NOUVEAU_DEBUG_MMU                        policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_NOUVEAU_DEBUG_MMU                        note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NOUVEAU_DEBUG_PUSH                       policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_NOUVEAU_DEBUG_PUSH                       note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NOUVEAU_PLATFORM_DRIVER                  policy<{'arm64': '-'}>
+CONFIG_NOUVEAU_PLATFORM_DRIVER                  note<'Disable nouveau for NVIDIA kernels'>
 
 # ---- Annotations without notes ----
 
