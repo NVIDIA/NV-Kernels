@@ -70,3 +70,31 @@ CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_DEFAULT                    policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_MMU                        policy<{'amd64': '-'}>
 CONFIG_NOUVEAU_DEBUG_PUSH                       policy<{'amd64': '-'}>
+
+# --- Required for Grace enablement
+#
+CONFIG_ARM64_ERRATUM_1902691                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2038923                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2064142                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2119858                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2139208                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2224489                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2253138                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE policy<{'arm64': 'y'}>
+CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
+CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CATU                           policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CPU_DEBUG                      policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CPU_DEBUG_DEFAULT_ON           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_CTI                            policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CTI_INTEGRATION_REGS           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_DUMMY                          policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_LINKS_AND_SINKS                policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_LINK_AND_SINK_TMC              policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_SINK_ETBV10                    policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_SINK_TPIU                      policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_SOURCE_ETM4X                   policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_STM                            policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_TPDA                           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_TPDM                           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_TRBE                           policy<{'arm64': 'm'}>
