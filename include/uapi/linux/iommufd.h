@@ -52,6 +52,7 @@ enum {
 	IOMMUFD_CMD_HWPT_INVALIDATE,
 	IOMMUFD_CMD_FAULT_QUEUE_ALLOC,
 	IOMMUFD_CMD_EVENT_QUEUE_ALLOC = IOMMUFD_CMD_FAULT_QUEUE_ALLOC,
+	IOMMUFD_CMD_VIOMMU_ALLOC,
 };
 
 /**
@@ -906,4 +907,34 @@ struct iommu_event_alloc {
 	__u32 __reserved;
 };
 #define IOMMU_EVENT_QUEUE_ALLOC _IO(IOMMUFD_TYPE, IOMMUFD_CMD_EVENT_QUEUE_ALLOC)
+
+/**
+ * enum iommu_viommu_type - Virtual IOMMU Type
+ * @IOMMU_VIOMMU_TYPE_DEFAULT: Core-maintained VIOMMU type to wrap a nested
+ *                             parent HWPT
+ */
+enum iommu_viommu_type {
+	IOMMU_VIOMMU_TYPE_DEFAULT,
+};
+
+/**
+ * struct iommu_viommu_alloc - ioctl(IOMMU_VIOMMU_ALLOC)
+ * @size: sizeof(struct iommu_viommu_alloc)
+ * @flags: Must be 0
+ * @type: Type of the virtual IOMMU . Must be defined in enum iommu_viommu_type
+ * @dev_id: The device to allocate this virtual IOMMU for
+ * @hwpt_id: ID of a nested parent HWPT to associate to
+ * @out_viommu_id: Output virtual IOMMU ID for the allocated object
+ *
+ * Allocate an virtual IOMMU object that holds a (shared) nested parent HWPT
+ */
+struct iommu_viommu_alloc {
+	__u32 size;
+	__u32 flags;
+	__u32 type;
+	__u32 dev_id;
+	__u32 hwpt_id;
+	__u32 out_viommu_id;
+};
+#define IOMMU_VIOMMU_ALLOC _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VIOMMU_ALLOC)
 #endif
