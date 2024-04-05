@@ -6,6 +6,81 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_ARM64_ERRATUM_1902691                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_1902691                    note<'Required for Grace enablement'>
+
+CONFIG_ARM64_ERRATUM_2038923                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2038923                    note<'Required for Grace enablement'>
+
+CONFIG_ARM64_ERRATUM_2064142                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2064142                    note<'Required for Grace enablement'>
+
+CONFIG_ARM64_ERRATUM_2119858                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2119858                    note<'Required for Grace enablement'>
+
+CONFIG_ARM64_ERRATUM_2139208                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2139208                    note<'Required for Grace enablement'>
+
+CONFIG_ARM64_ERRATUM_2224489                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2224489                    note<'Required for Grace enablement'>
+
+CONFIG_ARM64_ERRATUM_2253138                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_2253138                    note<'Required for Grace enablement'>
+
+CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE policy<{'arm64': 'y'}>
+CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE note<'Required for Grace enablement'>
+
+CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
+CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT                                note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_CATU                           policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CATU                           note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_CPU_DEBUG                      policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CPU_DEBUG                      note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_CPU_DEBUG_DEFAULT_ON           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_CPU_DEBUG_DEFAULT_ON           note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_CTI                            policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_CTI                            note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_CTI_INTEGRATION_REGS           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_CTI_INTEGRATION_REGS           note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_DUMMY                          policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_DUMMY                          note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_LINKS_AND_SINKS                policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_LINKS_AND_SINKS                note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_LINK_AND_SINK_TMC              policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_LINK_AND_SINK_TMC              note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_SINK_ETBV10                    policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_SINK_ETBV10                    note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_SINK_TPIU                      policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_SINK_TPIU                      note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_SOURCE_ETM4X                   policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_SOURCE_ETM4X                   note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_STM                            policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_STM                            note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_TPDA                           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_TPDA                           note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_TPDM                           policy<{'arm64': 'n'}>
+CONFIG_CORESIGHT_TPDM                           note<'Required for Grace enablement'>
+
+CONFIG_CORESIGHT_TRBE                           policy<{'arm64': 'm'}>
+CONFIG_CORESIGHT_TRBE                           note<'Required for Grace enablement'>
+
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
 
@@ -17,6 +92,9 @@ CONFIG_DRM_NOUVEAU_GSP_DEFAULT                  note<'Disable nouveau for NVIDIA
 
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_ETM4X_IMPDEF_FEATURE                     policy<{'arm64': 'n'}>
+CONFIG_ETM4X_IMPDEF_FEATURE                     note<'Required for Grace enablement'>
 
 CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_NOUVEAU_DEBUG                            note<'Disable nouveau for NVIDIA kernels'>
@@ -32,6 +110,16 @@ CONFIG_NOUVEAU_DEBUG_PUSH                       note<'Disable nouveau for NVIDIA
 
 CONFIG_NOUVEAU_PLATFORM_DRIVER                  policy<{'arm64': '-'}>
 CONFIG_NOUVEAU_PLATFORM_DRIVER                  note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
+CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
+
+CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
+CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablement'>
+
+CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
+CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
+
 
 # ---- Annotations without notes ----
 
