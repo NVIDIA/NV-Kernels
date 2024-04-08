@@ -1175,7 +1175,6 @@ CONFIG_AMDTEE                                   policy<{'amd64': 'm'}>
 CONFIG_AMD_HSMP                                 policy<{'amd64': 'm'}>
 CONFIG_AMD_IOMMU                                policy<{'amd64': 'y'}>
 CONFIG_AMD_MEM_ENCRYPT                          policy<{'amd64': 'y'}>
-CONFIG_AMD_MEM_ENCRYPT_ACTIVE_BY_DEFAULT        policy<{'amd64': 'n'}>
 CONFIG_AMD_NB                                   policy<{'amd64': 'y'}>
 CONFIG_AMD_NUMA                                 policy<{'amd64': 'y'}>
 CONFIG_AMD_PHY                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
@@ -7027,7 +7026,6 @@ CONFIG_IWLWIFI_DEBUGFS                          policy<{'amd64': 'y', 'arm64': '
 CONFIG_IWLWIFI_DEVICE_TRACING                   policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_IWLWIFI_LEDS                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_IWLWIFI_OPMODE_MODULAR                   policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
-CONFIG_IWMMXT                                   policy<{'armhf': 'y'}>
 CONFIG_IXGBE                                    policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_IXGBEVF                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_IXGBEVF_IPSEC                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
@@ -8207,6 +8205,7 @@ CONFIG_MODULE_SIG_HASH                          policy<{'amd64': '"sha512"', 'ar
 CONFIG_MODULE_SIG_KEY                           policy<{'amd64': '"certs/signing_key.pem"', 'arm64': '"certs/signing_key.pem"', 'armhf': '"certs/signing_key.pem"', 'ppc64el': '"certs/signing_key.pem"', 'riscv64': '"certs/signing_key.pem"', 's390x': '"certs/signing_key.pem"'}>
 CONFIG_MODULE_SIG_KEY_TYPE_ECDSA                policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_MODULE_SIG_KEY_TYPE_RSA                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_MODULE_SIG_SHA1                          policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_MODULE_SIG_SHA256                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_MODULE_SIG_SHA384                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_MODULE_SIG_SHA3_256                      policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
