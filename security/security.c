@@ -5406,7 +5406,13 @@ void security_key_post_create_or_update(struct key *keyring, struct key *key,
 int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule,
 			     gfp_t gfp)
 {
-	return call_int_hook(audit_rule_init, field, op, rulestr, lsmrule, gfp);
+	struct security_hook_list *hp;
+
+	hlist_for_each_entry(hp, &security_hook_heads.audit_rule_init, list)
+		return hp->hook.audit_rule_init(field, op, rulestr, lsmrule,
+						gfp);
+
+	return LSM_RET_DEFAULT(audit_rule_init);
 }
 
 /**
@@ -5420,7 +5426,12 @@ int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule,
  */
 int security_audit_rule_known(struct audit_krule *krule)
 {
-	return call_int_hook(audit_rule_known, krule);
+	struct security_hook_list *hp;
+
+	hlist_for_each_entry(hp, &security_hook_heads.audit_rule_known, list)
+		return hp->hook.audit_rule_known(krule);
+
+	return LSM_RET_DEFAULT(audit_rule_known);
 }
 
 /**
@@ -5432,7 +5443,13 @@ int security_audit_rule_known(struct audit_krule *krule)
  */
 void security_audit_rule_free(void *lsmrule)
 {
-	call_void_hook(audit_rule_free, lsmrule);
+	struct security_hook_list *hp;
+
+	hlist_for_each_entry(hp, &security_hook_heads.audit_rule_free, list) {
+		hp->hook.audit_rule_free(lsmrule);
+		break;
+	}
+	return;
 }
 
 /**
@@ -5452,6 +5469,12 @@ int security_audit_rule_match(struct lsmblob *blob, u32 field, u32 op,
 			      void *lsmrule)
 {
 	return call_int_hook(audit_rule_match, blob, field, op, lsmrule);
+	struct security_hook_list *hp;
+
+	hlist_for_each_entry(hp, &security_hook_heads.audit_rule_match, list)
+		return hp->hook.audit_rule_match(blob, field, op, lsmrule);
+
+	return LSM_RET_DEFAULT(audit_rule_match);
 }
 #endif /* CONFIG_AUDIT */
 
