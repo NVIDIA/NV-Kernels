@@ -2514,7 +2514,7 @@ config GDS_FORCE_MITIGATION
 choice
 	prompt "Clear branch history"
 	depends on CPU_SUP_INTEL
-	default SPECTRE_BHI_AUTO
+	default SPECTRE_BHI_ON
 	help
 	  Enable BHI mitigations. BHI attacks are a form of Spectre V2 attacks
 	  where the branch history buffer is poisoned to speculatively steer
