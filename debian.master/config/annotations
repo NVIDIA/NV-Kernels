@@ -13223,6 +13223,9 @@ CONFIG_SPEAKUP_SYNTH_LTLK                       policy<{'amd64': 'm', 'arm64': '
 CONFIG_SPEAKUP_SYNTH_SOFT                       policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_SPEAKUP_SYNTH_SPKOUT                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_SPEAKUP_SYNTH_TXPRT                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_SPECTRE_BHI_AUTO                         policy<{'amd64': 'y'}>
+CONFIG_SPECTRE_BHI_OFF                          policy<{'amd64': 'n'}>
+CONFIG_SPECTRE_BHI_ON                           policy<{'amd64': 'n'}>
 CONFIG_SPECULATION_MITIGATIONS                  policy<{'amd64': 'y'}>
 CONFIG_SPI                                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'n'}>
 CONFIG_SPI_ALTERA                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
