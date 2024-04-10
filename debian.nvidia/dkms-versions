@@ -1,3 +1,4 @@
-zfs-linux 2.2.2-0ubuntu4 modulename=zfs debpath=pool/universe/z/%package%/zfs-dkms_%version%_all.deb arch=amd64 arch=arm64 arch=ppc64el arch=s390x rprovides=spl-modules rprovides=spl-dkms rprovides=zfs-modules rprovides=zfs-dkms
+zfs-linux 2.2.2-0ubuntu7 modulename=zfs debpath=pool/universe/z/%package%/zfs-dkms_%version%_all.deb arch=amd64 arch=arm64 arch=ppc64el arch=s390x rprovides=spl-modules rprovides=spl-dkms rprovides=zfs-modules rprovides=zfs-dkms
 backport-iwlwifi-dkms 11510-0ubuntu1 modulename=iwlwifi debpath=pool/universe/b/%package%/backport-iwlwifi-dkms_%version%_all.deb arch=amd64 rprovides=iwlwifi-modules rprovides=backport-iwlwifi-dkms type=standalone
 v4l2loopback 0.12.7-2ubuntu5 modulename=v4l2loopback debpath=pool/universe/v/%package%/v4l2loopback-dkms_%version%_all.deb arch=amd64 rprovides=v4l2loopback-modules rprovides=v4l2loopback-dkms
+nvidia-fs 2.17.5-3 modulename=nvidia-fs debpath=https://launchpad.net/~canonical-kernel-team/+archive/ubuntu/nvidia/+files/nvidia-fs-dkms_%version%_amd64.deb arch=amd64 arch=arm64 rprovides=nvidia-fs-modules~(=2.17.5) rprovides=nvidia-fs-dkms type=standalone
