@@ -2576,8 +2576,8 @@ int unpoison_memory(unsigned long pfn)
 		goto unlock_mutex;
 	}
 
-	if (folio_test_slab(folio) || PageTable(&folio->page) ||
-	    folio_test_reserved(folio) || PageOffline(&folio->page))
+	if (folio_test_slab(folio) || folio_test_pgtable(folio) ||
+	    folio_test_reserved(folio) || folio_test_offline(folio))
 		goto unlock_mutex;
 
 	/*
@@ -2598,7 +2598,7 @@ int unpoison_memory(unsigned long pfn)
 
 	ghp = get_hwpoison_page(p, MF_UNPOISON);
 	if (!ghp) {
-		if (PageHuge(p)) {
+		if (folio_test_hugetlb(folio)) {
 			huge = true;
 			count = folio_free_raw_hwp(folio, false);
 			if (count == 0)
@@ -2614,7 +2614,7 @@ int unpoison_memory(unsigned long pfn)
 					 pfn, &unpoison_rs);
 		}
 	} else {
-		if (PageHuge(p)) {
+		if (folio_test_hugetlb(folio)) {
 			huge = true;
 			count = folio_free_raw_hwp(folio, false);
 			if (count == 0) {
