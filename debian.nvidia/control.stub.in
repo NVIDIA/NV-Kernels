@@ -39,7 +39,6 @@ Build-Depends:
  curl <!stage1>,
  zstd <!stage1>,
  pahole [amd64 arm64] | dwarves (>= 1.21) [amd64 arm64] <!stage1>,
- bindgen-0.56 [amd64],
  clang-17 [amd64 arm64 armhf ppc64el riscv64 s390x],
  libclang1-17 [amd64 arm64 armhf ppc64el riscv64 s390x],
  rustc [amd64 arm64 armhf ppc64el riscv64 s390x],
