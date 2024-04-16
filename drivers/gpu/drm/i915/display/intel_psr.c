@@ -1103,6 +1103,30 @@ static bool _compute_psr2_sdp_prior_scanline_indication(struct intel_dp *intel_d
 	return true;
 }
 
+static bool _lnl_compute_alpm_params(struct intel_dp *intel_dp,
+				     struct intel_crtc_state *crtc_state)
+{
+	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
+	int check_entry_lines;
+
+	if (DISPLAY_VER(i915) < 20)
+		return true;
+
+	/* ALPM Entry Check = 2 + CEILING( 5us /tline ) */
+	check_entry_lines = 2 +
+		intel_usecs_to_scanlines(&crtc_state->hw.adjusted_mode, 5);
+
+	if (check_entry_lines > 15)
+		return false;
+
+	if (i915->display.params.psr_safest_params)
+		check_entry_lines = 15;
+
+	intel_dp->psr.alpm_parameters.check_entry_lines = check_entry_lines;
+
+	return true;
+}
+
 static bool _compute_alpm_params(struct intel_dp *intel_dp,
 				 struct intel_crtc_state *crtc_state)
 {
@@ -1117,6 +1141,8 @@ static bool _compute_alpm_params(struct intel_dp *intel_dp,
 		 * it is not enough -> use 45 us.
 		 */
 		fast_wake_time = 45;
+
+		/* TODO: Check how we can use ALPM_CTL fast wake extended field */
 		max_wake_lines = 12;
 	} else {
 		io_wake_time = 50;
@@ -1131,6 +1157,9 @@ static bool _compute_alpm_params(struct intel_dp *intel_dp,
 
 	if (io_wake_lines > max_wake_lines ||
 	    fast_wake_lines > max_wake_lines)
+		return false;
+
+	if (!_lnl_compute_alpm_params(intel_dp, crtc_state))
 		return false;
 
 	if (i915->display.params.psr_safest_params)
