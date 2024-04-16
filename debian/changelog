@@ -1,3 +1,9 @@
+linux-meta (6.8.0-27.27) noble; urgency=medium
+
+  * Main version: 6.8.0-27.27
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Tue, 16 Apr 2024 11:15:08 +0200
+
 linux-meta (6.8.0-26.26) noble; urgency=medium
 
   * Main version: 6.8.0-26.26
