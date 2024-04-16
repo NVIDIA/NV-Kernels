@@ -103,14 +103,12 @@ static int map_addr(struct sockaddr *addr, int addrlen, u16 raw_port,
 	AA_BUG(!maddr);
 
 	maddr->addrtype = addrtype;
-	if (!addr) {
+	if (!addr || addrlen < offsetofend(struct sockaddr, sa_family)) {
 		maddr->addrp = NULL;
 		maddr->port = 0;
 		maddr->len = 0;
 		return 0;
 	}
-	if (addrlen < offsetofend(struct sockaddr, sa_family))
-		return -EINVAL;
 
 	/*
 	 * its possibly to have sk->sk_family == PF_INET6 and
