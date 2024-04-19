@@ -58,10 +58,27 @@ static const struct ipu_sensor_config ipu_supported_sensors[] = {
 	IPU_SENSOR_CONFIG("INT3537", 1, 437000000),
 	/* Omnivision ov13b10 */
 	IPU_SENSOR_CONFIG("OVTIDB10", 1, 560000000),
+	IPU_SENSOR_CONFIG("OVTI13B1", 1, 560000000),
 	/* GalaxyCore GC0310 */
 	IPU_SENSOR_CONFIG("INT0310", 0),
 	/* Omnivision ov01a10 */
 	IPU_SENSOR_CONFIG("OVTI01A0", 1, 400000000),
+	/* Omnivision ov08x40 */
+	IPU_SENSOR_CONFIG("OVTI08F4", 1, 400000000),
+	/* Himax hm11b1 */
+	IPU_SENSOR_CONFIG("HIMX11B1", 1, 384000000),
+	/* Himax hm2170 */
+	IPU_SENSOR_CONFIG("HIMX2170", 1, 384000000),
+	/* Himax hm2172 */
+	IPU_SENSOR_CONFIG("HIMX2172", 1, 384000000),
+	/* Omnivision ov01a1s */
+	IPU_SENSOR_CONFIG("OVTI01AS", 1, 400000000),
+	/* Omnivision ov02c10 */
+	IPU_SENSOR_CONFIG("OVTI02C1", 1, 400000000),
+	/* Omnivision ov02e10 */
+	IPU_SENSOR_CONFIG("OVTI02E1", 1, 360000000),
+	/* Omnivision ov08a10 */
+	IPU_SENSOR_CONFIG("OVTI08A1", 1, 500000000),
 };
 
 static const struct ipu_property_names prop_names = {
