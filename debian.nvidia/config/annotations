@@ -171,6 +171,7 @@ CONFIG_ULTRASOC_SMB                             note<'{Required for Grace enable
 CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-'}>
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-17ubuntu2) 13.2.0"', 'arm64': '"aarch64-linux-gnu-gcc-13 (Ubuntu 13.2.0-11ubuntu1) 13.2.0"'}>
 CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-'}>
