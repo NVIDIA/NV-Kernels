@@ -1486,11 +1486,27 @@ static const struct tegra_gpio_port tegra264_uphy_ports[] = {
 	TEGRA264_UPHY_GPIO_PORT(E, 1, 1, 4),
 };
 
+static const struct tegra186_pin_range tegra264_uphy_pin_ranges[] = {
+	{ TEGRA264_UPHY_GPIO(B, 0), "pex_l1_clkreq_n_pb0" },
+	{ TEGRA264_UPHY_GPIO(B, 1), "pex_l1_rst_n_pb1" },
+	{ TEGRA264_UPHY_GPIO(B, 2), "pex_l2_clkreq_n_pb2" },
+	{ TEGRA264_UPHY_GPIO(B, 3), "pex_l2_rst_n_pb3" },
+	{ TEGRA264_UPHY_GPIO(B, 4), "pex_l3_clkreq_n_pb4" },
+	{ TEGRA264_UPHY_GPIO(B, 5), "pex_l3_rst_n_pb5" },
+	{ TEGRA264_UPHY_GPIO(D, 0), "pex_l4_clkreq_n_pd0" },
+	{ TEGRA264_UPHY_GPIO(D, 1), "pex_l4_rst_n_pd1" },
+	{ TEGRA264_UPHY_GPIO(D, 2), "pex_l5_clkreq_n_pd2" },
+	{ TEGRA264_UPHY_GPIO(D, 3), "pex_l5_rst_n_pd3" },
+};
+
 static const struct tegra_gpio_soc tegra264_uphy_soc = {
 	.num_ports = ARRAY_SIZE(tegra264_uphy_ports),
 	.ports = tegra264_uphy_ports,
 	.name = "tegra264-gpio-uphy",
 	.instance = 2,
+	.num_pin_ranges = ARRAY_SIZE(tegra264_uphy_pin_ranges),
+	.pinmux = "nvidia,tegra264-pinmux-uphy",
+	.pin_ranges = tegra264_uphy_pin_ranges,
 	.num_irqs_per_bank = 8,
 	.has_vm_support = true,
 };
