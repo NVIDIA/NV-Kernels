@@ -403,18 +403,18 @@ static void rtw89_fw_prog_cnt_dump(struct rtw89_dev *rtwdev)
 static void rtw89_fw_dl_fail_dump(struct rtw89_dev *rtwdev)
 {
 	u32 val32;
-	u16 val16;
 
 	val32 = rtw89_read32(rtwdev, R_AX_WCPU_FW_CTRL);
 	rtw89_err(rtwdev, "[ERR]fwdl 0x1E0 = 0x%x\n", val32);
 
-	val16 = rtw89_read16(rtwdev, R_AX_BOOT_DBG + 2);
-	rtw89_err(rtwdev, "[ERR]fwdl 0x83F2 = 0x%x\n", val16);
+	val32 = rtw89_read32(rtwdev, R_AX_BOOT_DBG);
+	rtw89_err(rtwdev, "[ERR]fwdl 0x83F0 = 0x%x\n", val32);
 
 	rtw89_fw_prog_cnt_dump(rtwdev);
 }
 
-int rtw89_fw_download(struct rtw89_dev *rtwdev, enum rtw89_fw_type type)
+static
+int __rtw89_fw_download(struct rtw89_dev *rtwdev, enum rtw89_fw_type type)
 {
 	struct rtw89_fw_info *fw_info = &rtwdev->fw;
 	struct rtw89_fw_suit *fw_suit = rtw89_fw_suit_get(rtwdev, type);
@@ -464,6 +464,20 @@ int rtw89_fw_download(struct rtw89_dev *rtwdev, enum rtw89_fw_type type)
 
 fwdl_err:
 	rtw89_fw_dl_fail_dump(rtwdev);
+	return ret;
+}
+
+int rtw89_fw_download(struct rtw89_dev *rtwdev, enum rtw89_fw_type type)
+{
+	int retry;
+	int ret;
+
+	for (retry = 0; retry < 5; retry++) {
+		ret = __rtw89_fw_download(rtwdev, type);
+		if (!ret)
+			return 0;
+	}
+
 	return ret;
 }
 
