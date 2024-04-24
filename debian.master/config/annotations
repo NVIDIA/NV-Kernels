@@ -12326,7 +12326,7 @@ CONFIG_TEGRA124_CLK_EMC                         policy<{'armhf-generic': 'y'}>
 CONFIG_TEGRA124_EMC                             policy<{'armhf-generic': 'y'}>
 CONFIG_TEGRA20_APB_DMA                          policy<{'arm64': 'y', 'armhf-generic': 'y'}>
 CONFIG_TEGRA20_EMC                              policy<{'armhf-generic': 'y'}>
-CONFIG_TEGRA210_ADMA                            policy<{'arm64': 'm'}>
+CONFIG_TEGRA210_ADMA                            policy<{'arm64': 'm', 'armhf-generic': 'n'}>
 CONFIG_TEGRA210_EMC                             policy<{'arm64': 'm'}>
 CONFIG_TEGRA210_EMC_TABLE                       policy<{'arm64': 'y'}>
 CONFIG_TEGRA30_EMC                              policy<{'armhf-generic': 'y'}>
