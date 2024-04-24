@@ -12331,7 +12331,7 @@ CONFIG_TEGRA210_EMC                             policy<{'arm64': 'm'}>
 CONFIG_TEGRA210_EMC_TABLE                       policy<{'arm64': 'y'}>
 CONFIG_TEGRA30_EMC                              policy<{'armhf-generic': 'y'}>
 CONFIG_TEGRA30_TSENSOR                          policy<{'armhf-generic': 'm'}>
-CONFIG_TEGRA_ACONNECT                           policy<{'arm64': 'm'}>
+CONFIG_TEGRA_ACONNECT                           policy<{'arm64': 'm', 'armhf-generic': 'n'}>
 CONFIG_TEGRA_AHB                                policy<{'arm64': 'y', 'armhf-generic': 'y'}>
 CONFIG_TEGRA_BPMP                               policy<{'arm64': 'y', 'armhf-generic': 'y'}>
 CONFIG_TEGRA_BPMP_THERMAL                       policy<{'arm64': 'm', 'armhf-generic': 'm'}>
