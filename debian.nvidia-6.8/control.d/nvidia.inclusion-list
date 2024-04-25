@@ -63,6 +63,7 @@ drivers/hid/usbhid/usbhid.ko
 drivers/hv/*
 drivers/hwmon/ibmpowernv.ko
 drivers/hwmon/pwm-fan.ko
+drivers/hwtracing/coresight/*
 drivers/i2c/busses/i2c-tegra-bpmp.ko
 drivers/i2c/busses/i2c-tegra-bpmp.ko
 drivers/i2c/busses/i2c-tegra.ko
