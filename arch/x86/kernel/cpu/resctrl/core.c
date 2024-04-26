@@ -406,8 +406,8 @@ void rdt_ctrl_update(void *arg)
  * found (and NULL returned) then the first domain with id bigger than
  * the input id can be returned to the caller via @pos.
  */
-struct rdt_domain_hdr *rdt_find_domain(struct list_head *h, int id,
-				       struct list_head **pos)
+static struct rdt_domain_hdr *rdt_find_domain(struct list_head *h, int id,
+					      struct list_head **pos)
 {
 	struct rdt_domain_hdr *d;
 	struct list_head *l;
@@ -426,6 +426,12 @@ struct rdt_domain_hdr *rdt_find_domain(struct list_head *h, int id,
 		*pos = l;
 
 	return NULL;
+}
+
+struct rdt_domain_hdr *resctrl_arch_find_domain(struct list_head *domain_list,
+						int id)
+{
+	return rdt_find_domain(domain_list, id, NULL);
 }
 
 static void setup_default_ctrlval(struct rdt_resource *r, u32 *dc)

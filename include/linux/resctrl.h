@@ -314,6 +314,9 @@ static inline u32 resctrl_get_default_ctrl(struct rdt_resource *r)
 /* The number of closid supported by this resource regardless of CDP */
 u32 resctrl_arch_get_num_closid(struct rdt_resource *r);
 u32 resctrl_arch_system_num_rmid_idx(void);
+
+struct rdt_domain_hdr *resctrl_arch_find_domain(struct list_head *domain_list,
+						int id);
 int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid);
 
 /*
