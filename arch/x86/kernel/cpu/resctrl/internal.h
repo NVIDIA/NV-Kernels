@@ -7,9 +7,8 @@
 #include <linux/kernfs.h>
 #include <linux/fs_context.h>
 #include <linux/jump_label.h>
+#include <linux/resctrl.h>
 #include <linux/tick.h>
-
-#include <asm/resctrl.h>
 
 #define L3_QOS_CDP_ENABLE		0x01ULL
 
