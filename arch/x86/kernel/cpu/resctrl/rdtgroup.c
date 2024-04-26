@@ -4100,7 +4100,7 @@ static void rdtgroup_destroy_root(void)
 	}
 }
 
-static void __init rdtgroup_setup_default(void)
+static void rdtgroup_setup_default(void)
 {
 	mutex_lock(&rdtgroup_mutex);
 
@@ -4316,7 +4316,7 @@ out_unlock:
  *
  * Return: 0 on success or -errno
  */
-int __init resctrl_init(void)
+int resctrl_init(void)
 {
 	int ret = 0;
 
@@ -4373,7 +4373,7 @@ cleanup_mountpoint:
 	return ret;
 }
 
-void __exit resctrl_exit(void)
+void resctrl_exit(void)
 {
 	mutex_lock(&rdtgroup_mutex);
 	rdtgroup_destroy_root();
