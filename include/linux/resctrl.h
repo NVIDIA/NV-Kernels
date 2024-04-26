@@ -318,6 +318,8 @@ struct rdt_domain_hdr *resctrl_arch_find_domain(struct list_head *domain_list,
 						int id);
 int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid);
 
+bool resctrl_arch_is_evt_configurable(enum resctrl_event_id evt);
+
 /*
  * Update the ctrl_val and apply this config right now.
  * Must be called on one of the domain's CPUs.
