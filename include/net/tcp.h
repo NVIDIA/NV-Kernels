@@ -34,6 +34,7 @@
 #include <net/request_sock.h>
 #include <net/sock_reuseport.h>
 #include <net/sock.h>
+#include <net/proto_memory.h>
 #include <net/snmp.h>
 #include <net/ip.h>
 #include <net/tcp_states.h>

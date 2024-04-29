@@ -23,6 +23,7 @@
 #include <net/net_ratelimit.h>
 #include <net/busy_poll.h>
 #include <net/pkt_sched.h>
+#include <net/proto_memory.h>
 
 #include "dev.h"
 

@@ -39,6 +39,7 @@
 #include <linux/inet.h>
 #include <linux/slab.h>
 #include <net/sock.h>
+#include <net/proto_memory.h>
 #include <net/inet_ecn.h>
 #include <linux/skbuff.h>
 #include <net/sctp/sctp.h>
