@@ -226,7 +226,7 @@ fs/binfmt_misc.ko
 fs/btrfs/*
 fs/cachefiles/cachefiles.ko
 fs/ceph/*
-fs/cifs/*
+fs/smb/*
 fs/configfs/*
 fs/dlm/dlm.ko
 fs/ecryptfs/*
