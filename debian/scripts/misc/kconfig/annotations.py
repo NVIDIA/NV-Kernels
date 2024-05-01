@@ -65,6 +65,10 @@ class Annotation(Config):
     Parse body of annotations file
     """
 
+    def __init__(self, fname, do_include=True, do_json=False):
+        self.do_json = do_json
+        super().__init__(fname, do_include=True)
+
     def _parse_body(self, data: str, parent=True):
         for line in data.splitlines():
             # Replace tabs with spaces, squeeze multiple into singles and
@@ -227,12 +231,10 @@ class Annotation(Config):
                 self._json_parse(data, is_included=True)
 
     def _parse(self, data: str):
-        # Try to parse the legacy format first, otherwise use the new JSON
-        # format.
-        try:
-            self._legacy_parse(data)
-        except SyntaxError:
+        if self.do_json:
             self._json_parse(data, is_included=False)
+        else:
+            self._legacy_parse(data)
 
     def _remove_entry(self, config: str):
         if self.config[config]:
