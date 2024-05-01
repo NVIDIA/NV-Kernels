@@ -3554,6 +3554,22 @@ static void vxlan_raw_setup(struct net_device *dev)
 	dev->netdev_ops = &vxlan_netdev_raw_ops;
 }
 
+/* Validate Ubuntu FAN payload.
+ *
+ * This is required to bypass the strict length validation enforced for the
+ * attribute types >= IFLA_VXLAN_LOCALBYPASS in vxlan_policy.
+ *
+ * In this way we can continue to use the same allocated ID for
+ * IFLA_VXLAN_FAN_MAP, without breaking the existing user-space and also
+ * future kernel ABIs that may add new attribute types to vxlan_policy.
+ */
+static int fan_map_validate_entry(const struct nlattr *attr,
+				  struct netlink_ext_ack *extack)
+{
+	/* Accept any payload for Ubuntu FAN */
+	return 0;
+}
+
 static const struct nla_policy vxlan_policy[IFLA_VXLAN_MAX + 1] = {
 	[IFLA_VXLAN_UNSPEC]     = { .strict_start_type = IFLA_VXLAN_LOCALBYPASS },
 	[IFLA_VXLAN_ID]		= { .type = NLA_U32 },
@@ -3588,6 +3604,9 @@ static const struct nla_policy vxlan_policy[IFLA_VXLAN_MAX + 1] = {
 	[IFLA_VXLAN_VNIFILTER]	= { .type = NLA_U8 },
 	[IFLA_VXLAN_LOCALBYPASS]	= NLA_POLICY_MAX(NLA_U8, 1),
 	[IFLA_VXLAN_LABEL_POLICY]       = NLA_POLICY_MAX(NLA_U32, VXLAN_LABEL_MAX),
+	[IFLA_VXLAN_FAN_MAP]		= NLA_POLICY_VALIDATE_FN(NLA_BINARY,
+						fan_map_validate_entry,
+						sizeof(struct ifla_fan_map) * 256),
 };
 
 static int vxlan_validate(struct nlattr *tb[], struct nlattr *data[],
