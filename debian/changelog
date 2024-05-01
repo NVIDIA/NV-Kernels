@@ -1,3 +1,21 @@
+linux-meta (6.8.0-32.32) noble; urgency=medium
+
+  * Main version: 6.8.0-32.32
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+    - [Packaging] debian/dkms-versions -- resync from main package
+
+  * linux-virtual: recommends linux-tools and ubuntu-kernel-accessories
+    (LP: #2064266)
+    - [Packaging] Recommends linux-tools-$kernel-abi-version-$flavour and ubuntu-
+      kernel-accessories
+
+  * obsolete out-of-tree ivsc dkms in favor of in-tree one (LP: #2061747)
+    - [Packaging] obsolete out-of-tree ivsc dkms
+
+ -- Roxana Nicolescu <roxana.nicolescu@canonical.com>  Wed, 01 May 2024 16:03:09 +0200
+
 linux-meta (6.8.0-31.31) noble; urgency=medium
 
   * Main version: 6.8.0-31.31
