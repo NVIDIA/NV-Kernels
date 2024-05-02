@@ -46,7 +46,7 @@ struct stream {
 };
 
 struct ksmbd_inode {
-	rwlock_t			m_lock;
+	struct rw_semaphore		m_lock;
 	atomic_t			m_count;
 	atomic_t			op_count;
 	/* opinfo count for streams */
