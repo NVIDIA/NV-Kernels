@@ -3010,7 +3010,8 @@ int security_key_getsecurity(struct key *key, char **_buffer)
 
 #ifdef CONFIG_AUDIT
 
-int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule)
+int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule,
+			     gfp_t gfp)
 {
 	struct security_hook_list *hp;
 	int display = lsm_task_display(current);
@@ -3021,7 +3022,8 @@ int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule)
 		if (display != LSMBLOB_INVALID && display != hp->lsmid->slot)
 			continue;
 		return hp->hook.audit_rule_init(field, op, rulestr,
-						&lsmrule[hp->lsmid->slot]);
+						&lsmrule[hp->lsmid->slot],
+						gfp);
 	}
 	return 0;
 }
