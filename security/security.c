@@ -5545,16 +5545,18 @@ int security_key_getsecurity(struct key *key, char **buffer)
  * @op: rule operator
  * @rulestr: rule context
  * @lsmrule: receive buffer for audit rule struct
+ * @gfp: GFP flag used for kmalloc
  *
  * Allocate and initialize an LSM audit rule structure.
  *
  * Return: Return 0 if @lsmrule has been successfully set, -EINVAL in case of
  *         an invalid rule.
  */
-int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule)
+int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule,
+			     gfp_t gfp)
 {
 	return call_int_hook(audit_rule_init, 0, field, op, rulestr, lsmrule,
-			     LSM_ID_UNDEF);
+			     LSM_ID_UNDEF, gfp);
 }
 
 /**
@@ -5609,10 +5611,10 @@ int security_audit_rule_match(struct lsmblob *blob, u32 field, u32 op, void *lsm
  * the audit subsystem.
  */
 int ima_filter_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule,
-			 int lsmid)
+			 int lsmid, gfp_t gfp)
 {
 	return call_int_hook(audit_rule_init, 0, field, op, rulestr, lsmrule,
-			     lsmid);
+			     lsmid, gfp);
 }
 
 void ima_filter_rule_free(void *lsmrule, int lsmid)
