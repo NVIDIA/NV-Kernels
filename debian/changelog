@@ -1,3 +1,12 @@
+linux-meta (6.8.0-34.34) noble; urgency=medium
+
+  * Main version: 6.8.0-34.34
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] debian/dkms-versions -- resync from main package
+
+ -- Roxana Nicolescu <roxana.nicolescu@canonical.com>  Wed, 08 May 2024 13:15:09 +0200
+
 linux-meta (6.8.0-32.32) noble; urgency=medium
 
   * Main version: 6.8.0-32.32
