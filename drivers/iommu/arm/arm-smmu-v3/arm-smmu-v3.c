@@ -3148,6 +3148,10 @@ static int arm_smmu_attach_dev_identity(struct iommu_domain *domain,
 
 	arm_smmu_make_bypass_ste(master->smmu, &ste);
 	arm_smmu_attach_dev_ste(domain, dev, &ste, STRTAB_STE_1_S1DSS_BYPASS);
+	if (dev_is_pci(master->dev) && master->ssid_bits && !master->ats_enabled) {
+		master->ats_enabled = true;
+		arm_smmu_enable_ats(master);
+	}
 	return 0;
 }
 
