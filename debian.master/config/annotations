@@ -4770,6 +4770,9 @@ CONFIG_FUJITSU_ERRATUM_010001                   policy<{'arm64': 'y'}>
 CONFIG_FUJITSU_ES                               policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_FUJITSU_LAPTOP                           policy<{'amd64': 'm'}>
 CONFIG_FUJITSU_TABLET                           policy<{'amd64': 'm'}>
+CONFIG_FUNCTION_ALIGNMENT                       policy<{'amd64': '16', 'arm64': '0', 'armhf': '0', 'ppc64el': '0', 's390x': '0'}>
+CONFIG_FUNCTION_ALIGNMENT_16B                   policy<{'amd64': 'y'}>
+CONFIG_FUNCTION_ALIGNMENT_4B                    policy<{'amd64': 'y'}>
 CONFIG_FUNCTION_ERROR_INJECTION                 policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_FUNCTION_GRAPH_TRACER                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_FUNCTION_PROFILER                        policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
