@@ -27,6 +27,16 @@
  */
 static struct mpam_resctrl_res mpam_resctrl_controls[RDT_NUM_RESOURCES];
 
+/*
+ * The classes we've picked to map to resctrl events.
+ * Resctrl believes all the worlds a Xeon, and these are all on the L3. This
+ * array lets us find the actual class backing the event counters. e.g.
+ * the only memory bandwidth counters may be on the memory controller, but to
+ * make use of them, we pretend they are on L3.
+ * Class pointer may be NULL.
+ */
+static struct mpam_resctrl_mon mpam_resctrl_counters[QOS_NUM_EVENTS];
+
 static bool exposed_alloc_capable;
 static bool exposed_mon_capable;
 
@@ -44,6 +54,11 @@ bool resctrl_arch_alloc_capable(void)
 bool resctrl_arch_mon_capable(void)
 {
 	return exposed_mon_capable;
+}
+
+bool resctrl_arch_is_llc_occupancy_enabled(void)
+{
+	return mpam_resctrl_counters[QOS_L3_OCCUP_EVENT_ID].class;
 }
 
 bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level rid)
@@ -263,6 +278,28 @@ static bool mba_class_use_mbw_max(struct mpam_props *cprops)
 static bool class_has_usable_mba(struct mpam_props *cprops)
 {
 	return mba_class_use_mbw_part(cprops) || mba_class_use_mbw_max(cprops);
+}
+
+static bool cache_has_usable_csu(struct mpam_class *class)
+{
+	struct mpam_props *cprops;
+
+	if (!class)
+		return false;
+
+	cprops = &class->props;
+
+	if (!mpam_has_feature(mpam_feat_msmon_csu, cprops))
+		return false;
+
+	/*
+	 * CSU counters settle on the value, so we can get away with
+	 * having only one.
+	 */
+	if (!cprops->num_csu_mon)
+		return false;
+
+	return (mpam_partid_max > 1) || (mpam_pmg_max != 0);
 }
 
 /*
@@ -500,6 +537,64 @@ static void mpam_resctrl_pick_mba(void)
 	}
 }
 
+static void counter_update_class(enum resctrl_event_id evt_id,
+				 struct mpam_class *class)
+{
+	struct mpam_class *existing_class = mpam_resctrl_counters[evt_id].class;
+
+	if (existing_class) {
+		if (class->level == 3) {
+			pr_debug("Existing class is L3 - L3 wins\n");
+			return;
+		}
+		else if (existing_class->level < class->level) {
+			pr_debug("Existing class is closer to L3, %u versus %u - closer is better\n",
+				 existing_class->level, class->level);
+			return;
+		}
+	}
+
+	mpam_resctrl_counters[evt_id].class = class;
+	exposed_mon_capable = true;
+}
+
+static void mpam_resctrl_pick_counters(void)
+{
+	struct mpam_class *class;
+	bool has_csu;
+	int idx;
+
+	lockdep_assert_cpus_held();
+
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_rcu(class, &mpam_classes, classes_list) {
+		if (class->level < 3) {
+			pr_debug("class %u is before L3", class->level);
+			continue;
+		}
+
+		if (!cpumask_equal(&class->affinity, cpu_possible_mask)) {
+			pr_debug("class %u does not cover all CPUs", class->level);
+			continue;
+		}
+
+		has_csu = cache_has_usable_csu(class);
+		if (has_csu && topology_matches_l3(class)) {
+			pr_debug("class %u has usable CSU, and matches L3 topology", class->level);
+
+			/* CSU counters only make sense on a cache. */
+			switch (class->type) {
+			case MPAM_CLASS_CACHE:
+				counter_update_class(QOS_L3_OCCUP_EVENT_ID, class);
+				break;
+			default:
+				break;
+			}
+		}
+	}
+	srcu_read_unlock(&mpam_srcu, idx);
+}
+
 static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 				     enum resctrl_res_level type)
 {
@@ -579,6 +674,52 @@ static int mpam_resctrl_pick_domain_id(int cpu, struct mpam_component *comp)
 		 * Otherwise, expose the ID used by the firmware table code.
 		 */
 		return comp->comp_id;
+	}
+}
+
+static void mpam_resctrl_monitor_init(struct mpam_class *class,
+				      enum resctrl_event_id type)
+{
+	struct mpam_resctrl_res *res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
+	struct rdt_resource *l3 = &res->resctrl_res;
+
+	lockdep_assert_cpus_held();
+
+	/* Did we find anything for this monitor type? */
+	if (!mpam_resctrl_counters[type].class)
+		return;
+
+	/* There also needs to be an L3 cache present */
+	if (get_cpu_cacheinfo_id(smp_processor_id(), 3) == -1)
+		return;
+
+	/*
+	 * If there are no MPAM resources on L3, force it into existence.
+	 * topology_matches_l3() already ensures this looks like the L3.
+	 * The domain-ids will be fixed up by mpam_resctrl_domain_hdr_init().
+	 */
+	if (!res->class) {
+		pr_warn_once("Faking L3 MSC to enable counters.\n");
+		res->class = mpam_resctrl_counters[type].class;
+	}
+
+	/* Called multiple times!, once per event type */
+	if (exposed_mon_capable) {
+		l3->mon_capable = true;
+
+		/* Setting name is necessary on monitor only platforms */
+		l3->name = "L3";
+		l3->mon_scope = RESCTRL_L3_CACHE;
+
+		/*
+		 * Unfortunately, num_rmid doesn't mean anything for
+		 * mpam, and its exposed to user-space!
+		 * num-rmid is supposed to mean the number of groups
+		 * that can be created, both control or monitor groups.
+		 * For mpam, each control group has its own pmg/rmid
+		 * space.
+		 */
+		l3->num_rmid = 1;
 	}
 }
 
@@ -911,7 +1052,9 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 int mpam_resctrl_setup(void)
 {
 	int err = 0;
+	enum resctrl_event_id j;
 	enum resctrl_res_level i;
+	struct mpam_class *class;
 	struct mpam_resctrl_res *res;
 
 	cpus_read_lock();
@@ -939,6 +1082,18 @@ int mpam_resctrl_setup(void)
 			break;
 		}
 	}
+
+	/* Find some classes to use for monitors */
+	mpam_resctrl_pick_counters();
+
+	for (j = 0; j < QOS_NUM_EVENTS; j++) {
+		class = mpam_resctrl_counters[j].class;
+		if (!class)
+			continue;	// dummy resource
+
+		mpam_resctrl_monitor_init(class, j);
+	}
+
 	cpus_read_unlock();
 
 	if (!err && !exposed_alloc_capable && !exposed_mon_capable) {
