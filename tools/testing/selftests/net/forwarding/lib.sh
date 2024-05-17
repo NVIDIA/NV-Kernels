@@ -41,12 +41,6 @@ fi
 # Kselftest framework requirement - SKIP code is 4.
 ksft_skip=4
 
-busywait()
-{
-	local timeout_sec=$1; shift
-
-	loopy_wait "sleep 0.1" "$((timeout_sec * 1000))" "$@"
-}
 
 ##############################################################################
 # Sanity checks
@@ -847,29 +841,6 @@ link_stats_tx_packets_get()
 link_stats_rx_errors_get()
 {
 	link_stats_get $1 rx errors
-}
-
-tc_rule_stats_get()
-{
-	local dev=$1; shift
-	local pref=$1; shift
-	local dir=$1; shift
-	local selector=${1:-.packets}; shift
-
-	tc -j -s filter show dev $dev ${dir:-ingress} pref $pref \
-	    | jq ".[1].options.actions[].stats$selector"
-}
-
-tc_rule_handle_stats_get()
-{
-	local id=$1; shift
-	local handle=$1; shift
-	local selector=${1:-.packets}; shift
-	local netns=${1:-""}; shift
-
-	tc $netns -j -s filter show $id \
-	    | jq ".[] | select(.options.handle == $handle) | \
-		  .options.actions[0].stats$selector"
 }
 
 ethtool_stats_get()
