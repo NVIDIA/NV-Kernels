@@ -734,12 +734,17 @@ struct iommu_hwpt_vtd_s1_invalidate {
  * @cmd: 128-bit cache invalidation command that runs in SMMU CMDQ.
  *       Must be little-endian.
  *
- * Supported command list:
+ * Supported command list when passing in a HWPT via @hwpt_id:
  *     CMDQ_OP_TLBI_NSNH_ALL
  *     CMDQ_OP_TLBI_NH_VA
  *     CMDQ_OP_TLBI_NH_VAA
  *     CMDQ_OP_TLBI_NH_ALL
  *     CMDQ_OP_TLBI_NH_ASID
+ *
+ * Additional to the list above, when passing in a VIOMMU via @hwpt_id:
+ *     CMDQ_OP_ATC_INV
+ *     CMDQ_OP_CFGI_CD
+ *     CMDQ_OP_CFGI_CD_ALL
  *
  * -EIO will be returned if the command is not supported.
  */
