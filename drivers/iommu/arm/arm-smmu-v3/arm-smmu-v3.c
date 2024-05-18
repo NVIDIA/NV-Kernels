@@ -3231,15 +3231,32 @@ static void arm_smmu_domain_nested_free(struct iommu_domain *domain)
 	kfree(container_of(domain, struct arm_smmu_nested_domain, domain));
 }
 
+static int arm_smmu_convert_viommu_vdev_id(struct iommufd_viommu *viommu,
+					   u32 vdev_id, u32 *sid)
+{
+	struct arm_smmu_master *master;
+	struct device *dev;
+
+	dev = iommufd_viommu_find_device(viommu, vdev_id);
+	if (!dev)
+		return -EIO;
+	master = dev_iommu_priv_get(dev);
+
+	if (sid)
+		*sid = master->streams[0].id;
+	return 0;
+}
+
 /*
  * Convert, in place, the raw invalidation command into an internal format that
  * can be passed to arm_smmu_cmdq_issue_cmdlist(). Internally commands are
  * stored in CPU endian.
  *
- * Enforce the VMID on the command.
+ * Enforce the VMID or the SID on the command.
  */
 static int
 arm_smmu_convert_user_cmd(struct arm_smmu_domain *s2_parent,
+			  struct iommufd_viommu *viommu,
 			  struct iommu_hwpt_arm_smmuv3_invalidate *cmd)
 {
 	cmd->cmd[0] = le64_to_cpu(cmd->cmd[0]);
@@ -3259,6 +3276,19 @@ arm_smmu_convert_user_cmd(struct arm_smmu_domain *s2_parent,
 		cmd->cmd[0] &= ~CMDQ_TLBI_0_VMID;
 		cmd->cmd[0] |= FIELD_PREP(CMDQ_TLBI_0_VMID, s2_parent->vmid);
 		break;
+	case CMDQ_OP_ATC_INV:
+	case CMDQ_OP_CFGI_CD:
+	case CMDQ_OP_CFGI_CD_ALL:
+		if (viommu) {
+			u32 sid, vsid = FIELD_GET(CMDQ_CFGI_0_SID, cmd->cmd[0]);
+
+			if (arm_smmu_convert_viommu_vdev_id(viommu, vsid, &sid))
+				return -EIO;
+			cmd->cmd[0] &= ~CMDQ_CFGI_0_SID;
+			cmd->cmd[0] |= FIELD_PREP(CMDQ_CFGI_0_SID, sid);
+			break;
+		}
+		fallthrough;
 	default:
 		return -EIO;
 	}
@@ -3266,8 +3296,11 @@ arm_smmu_convert_user_cmd(struct arm_smmu_domain *s2_parent,
 }
 
 static int __arm_smmu_cache_invalidate_user(struct arm_smmu_domain *s2_parent,
+					    struct iommufd_viommu *viommu,
 					    struct iommu_user_data_array *array)
 {
+	unsigned int type = viommu ? IOMMU_VIOMMU_INVALIDATE_DATA_ARM_SMMUV3 :
+				     IOMMU_HWPT_INVALIDATE_DATA_ARM_SMMUV3;
 	struct arm_smmu_device *smmu = s2_parent->smmu;
 	struct iommu_hwpt_arm_smmuv3_invalidate *last_batch;
 	struct iommu_hwpt_arm_smmuv3_invalidate *cmds;
@@ -3284,8 +3317,7 @@ static int __arm_smmu_cache_invalidate_user(struct arm_smmu_domain *s2_parent,
 
 	static_assert(sizeof(*cmds) == 2 * sizeof(u64));
 	ret = iommu_copy_struct_from_full_user_array(
-		cmds, sizeof(*cmds), array,
-		IOMMU_HWPT_INVALIDATE_DATA_ARM_SMMUV3);
+		cmds, sizeof(*cmds), array, type);
 	if (ret)
 		goto out;
 
@@ -3293,7 +3325,7 @@ static int __arm_smmu_cache_invalidate_user(struct arm_smmu_domain *s2_parent,
 
 	last_batch = cmds;
 	while (cur != end) {
-		ret = arm_smmu_convert_user_cmd(s2_parent, cur);
+		ret = arm_smmu_convert_user_cmd(s2_parent, viommu, cur);
 		if (ret)
 			goto out;
 
@@ -3323,7 +3355,7 @@ static int arm_smmu_cache_invalidate_user(struct iommu_domain *domain,
 		container_of(domain, struct arm_smmu_nested_domain, domain);
 
 	return __arm_smmu_cache_invalidate_user(
-			nested_domain->s2_parent, array);
+			nested_domain->s2_parent, NULL, array);
 }
 
 static const struct iommu_domain_ops arm_smmu_nested_ops = {
@@ -3846,6 +3878,15 @@ static int arm_smmu_def_domain_type(struct device *dev)
 	return 0;
 }
 
+static int arm_smmu_viommu_cache_invalidate(struct iommufd_viommu *viommu,
+					    struct iommu_user_data_array *array)
+{
+	struct iommu_domain *domain = iommufd_viommu_to_parent_domain(viommu);
+
+	return __arm_smmu_cache_invalidate_user(
+			to_smmu_domain(domain), viommu, array);
+}
+
 static struct iommu_ops arm_smmu_ops = {
 	.identity_domain	= &arm_smmu_identity_domain,
 	.blocked_domain		= &arm_smmu_blocked_domain,
@@ -3876,6 +3917,9 @@ static struct iommu_ops arm_smmu_ops = {
 		.iotlb_sync		= arm_smmu_iotlb_sync,
 		.iova_to_phys		= arm_smmu_iova_to_phys,
 		.free			= arm_smmu_domain_free_paging,
+		.default_viommu_ops = &(const struct iommufd_viommu_ops) {
+			.cache_invalidate = arm_smmu_viommu_cache_invalidate,
+		}
 	}
 };
 

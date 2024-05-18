@@ -988,6 +988,26 @@ enum iommu_viommu_invalidate_data_type {
 };
 
 /**
+ * struct iommu_viommu_arm_smmuv3_invalidate - ARM SMMUv3 cahce invalidation
+ *         (IOMMU_VIOMMU_INVALIDATE_DATA_ARM_SMMUV3)
+ * @cmd: 128-bit cache invalidation command that runs in SMMU CMDQ.
+ *       Must be little-endian.
+ *
+ * Supported command list:
+ *     CMDQ_OP_TLBI_NSNH_ALL
+ *     CMDQ_OP_TLBI_NH_VA
+ *     CMDQ_OP_TLBI_NH_VAA
+ *     CMDQ_OP_TLBI_NH_ALL
+ *     CMDQ_OP_TLBI_NH_ASID
+ *     CMDQ_OP_ATC_INV
+ *     CMDQ_OP_CFGI_CD
+ *     CMDQ_OP_CFGI_CD_ALL
+ *
+ * -EIO will be returned if the command is not supported.
+ */
+#define iommu_viommu_arm_smmuv3_invalidate iommu_hwpt_arm_smmuv3_invalidate
+
+/**
  * struct iommu_viommu_invalidate - ioctl(IOMMU_VIOMMU_INVALIDATE)
  * @size: sizeof(struct iommu_viommu_invalidate)
  * @viommu_id: viommu ID for cache invalidation
