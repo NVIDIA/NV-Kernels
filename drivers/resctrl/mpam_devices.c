@@ -2084,7 +2084,6 @@ static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 	u32 tmp;
 	char name[20];
 	struct mpam_msc *msc;
-	struct resource *msc_res;
 	struct device *dev = &pdev->dev;
 
 	lockdep_assert_held(&mpam_list_lock);
@@ -2134,6 +2133,7 @@ static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 
 	if (msc->iface == MPAM_IFACE_MMIO) {
 		void __iomem *io;
+		struct resource *msc_res;
 
 		io = devm_platform_get_and_ioremap_resource(pdev, 0,
 							    &msc_res);
