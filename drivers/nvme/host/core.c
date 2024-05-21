@@ -405,7 +405,7 @@ static inline void nvme_end_req_zoned(struct request *req)
 	}
 }
 
-static inline void nvme_end_req(struct request *req)
+void nvme_end_req(struct request *req)
 {
 	blk_status_t status = nvme_error_status(nvme_req(req)->status);
 
