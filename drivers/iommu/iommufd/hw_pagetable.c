@@ -57,6 +57,9 @@ void iommufd_hwpt_nested_destroy(struct iommufd_object *obj)
 		container_of(obj, struct iommufd_hwpt_nested, common.obj);
 
 	__iommufd_hwpt_destroy(&hwpt_nested->common);
+
+	if (hwpt_nested->viommu)
+		refcount_dec(&hwpt_nested->viommu->obj.users);
 	refcount_dec(&hwpt_nested->parent->common.obj.users);
 }
 
@@ -213,6 +216,7 @@ out_abort:
  */
 static struct iommufd_hwpt_nested *
 iommufd_hwpt_nested_alloc(struct iommufd_ctx *ictx,
+			  struct iommufd_viommu *viommu,
 			  struct iommufd_hwpt_paging *parent,
 			  struct iommufd_device *idev, u32 flags,
 			  const struct iommu_user_data *user_data)
@@ -234,13 +238,16 @@ iommufd_hwpt_nested_alloc(struct iommufd_ctx *ictx,
 		return ERR_CAST(hwpt_nested);
 	hwpt = &hwpt_nested->common;
 
+	if (viommu)
+		refcount_inc(&viommu->obj.users);
+	hwpt_nested->viommu = viommu;
 	refcount_inc(&parent->common.obj.users);
 	hwpt_nested->parent = parent;
 
 	hwpt->domain = ops->domain_alloc_user(idev->dev,
 					      flags & ~IOMMU_HWPT_FAULT_ID_VALID,
 					      parent->common.domain,
-					      NULL, user_data);
+					      viommu, user_data);
 	if (IS_ERR(hwpt->domain)) {
 		rc = PTR_ERR(hwpt->domain);
 		hwpt->domain = NULL;
@@ -307,10 +314,23 @@ int iommufd_hwpt_alloc(struct iommufd_ucmd *ucmd)
 		struct iommufd_hwpt_nested *hwpt_nested;
 
 		hwpt_nested = iommufd_hwpt_nested_alloc(
-			ucmd->ictx,
+			ucmd->ictx, NULL,
 			container_of(pt_obj, struct iommufd_hwpt_paging,
 				     common.obj),
 			idev, cmd->flags, &user_data);
+		if (IS_ERR(hwpt_nested)) {
+			rc = PTR_ERR(hwpt_nested);
+			goto out_unlock;
+		}
+		hwpt = &hwpt_nested->common;
+	} else if (pt_obj->type == IOMMUFD_OBJ_VIOMMU) {
+		struct iommufd_hwpt_nested *hwpt_nested;
+		struct iommufd_viommu *viommu;
+
+		viommu = container_of(pt_obj, struct iommufd_viommu, obj);
+		hwpt_nested = iommufd_hwpt_nested_alloc(
+			ucmd->ictx, viommu, viommu->hwpt, idev,
+			cmd->flags, &user_data);
 		if (IS_ERR(hwpt_nested)) {
 			rc = PTR_ERR(hwpt_nested);
 			goto out_unlock;
