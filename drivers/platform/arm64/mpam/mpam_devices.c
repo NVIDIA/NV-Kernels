@@ -2113,7 +2113,6 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 	char name[20];
 	void * __iomem io;
 	struct mpam_msc *msc;
-	struct resource *msc_res;
 	void *plat_data = pdev->dev.platform_data;
 
 	mutex_lock(&mpam_list_lock);
@@ -2155,6 +2154,8 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			msc->iface = MPAM_IFACE_PCC;
 
 		if (msc->iface == MPAM_IFACE_MMIO) {
+			struct resource *msc_res;
+
 			io = devm_platform_get_and_ioremap_resource(pdev, 0,
 								    &msc_res);
 			if (IS_ERR(io)) {
