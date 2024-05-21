@@ -17,6 +17,8 @@
 #include <linux/sizes.h>
 #include <linux/srcu.h>
 
+#include "mpam_fb.h"
+
 DECLARE_STATIC_KEY_FALSE(mpam_enabled);
 
 #ifdef CONFIG_MPAM_KUNIT_TEST
@@ -66,6 +68,8 @@ struct mpam_msc {
 	u32			pcc_subspace_id;
 	struct mbox_client	pcc_cl;
 	struct pcc_mbox_chan	*pcc_chan;
+	struct mpam_fb_channel	mpam_fb_chan;
+	int			mpam_fb_msc_id;	/* in its own name space */
 	u32			nrdy_usec;
 	cpumask_t		accessibility;
 	bool			has_extd_esr;

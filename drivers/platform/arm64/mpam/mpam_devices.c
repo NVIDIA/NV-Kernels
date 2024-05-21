@@ -34,6 +34,7 @@
 #include <asm/mpam.h>
 
 #include "mpam_internal.h"
+#include "mpam_fb.h"
 
 /* Values for the T241 errata workaround */
 #define T241_CHIPS_MAX			4
@@ -128,8 +129,17 @@ static LLIST_HEAD(mpam_garbage);
 
 static u32 __mpam_read_reg(struct mpam_msc *msc, u16 reg)
 {
-	WARN_ON_ONCE(reg + sizeof(u32) > msc->mapped_hwpage_sz);
 	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
+
+	if (msc->iface == MPAM_IFACE_SCMI) {
+		u32 ret;
+
+		mpam_fb_send_read_request(&msc->mpam_fb_chan,
+					  msc->mpam_fb_msc_id, reg, &ret);
+		return ret;
+	}
+
+	WARN_ON_ONCE(reg + sizeof(u32) > msc->mapped_hwpage_sz);
 
 	return readl_relaxed(msc->mapped_hwpage + reg);
 }
@@ -143,10 +153,15 @@ static inline u32 _mpam_read_partsel_reg(struct mpam_msc *msc, u16 reg)
 
 static void __mpam_write_reg(struct mpam_msc *msc, u16 reg, u32 val)
 {
-	WARN_ON_ONCE(reg + sizeof(u32) > msc->mapped_hwpage_sz);
 	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
 
-	writel_relaxed(val, msc->mapped_hwpage + reg);
+	if (msc->iface == MPAM_IFACE_SCMI) {
+		mpam_fb_send_write_request(&msc->mpam_fb_chan,
+					   msc->mpam_fb_msc_id, reg, val);
+	} else {
+		WARN_ON_ONCE(reg + sizeof(u32) > msc->mapped_hwpage_sz);
+		writel_relaxed(val, msc->mapped_hwpage + reg);
+	}
 }
 
 static inline void _mpam_write_partsel_reg(struct mpam_msc *msc, u16 reg, u32 val)
@@ -2095,14 +2110,14 @@ static void mpam_msc_drv_remove(struct platform_device *pdev);
 static int mpam_msc_drv_probe(struct platform_device *pdev)
 {
 	int err;
-	pgprot_t prot;
 	char name[20];
-	void * __iomem io;
 	struct mpam_msc *msc;
 	void *plat_data = pdev->dev.platform_data;
 
 	mutex_lock(&mpam_list_lock);
 	do {
+		struct of_phandle_args of_args;
+
 		msc = devm_kzalloc(&pdev->dev, sizeof(*msc), GFP_KERNEL);
 		if (!msc) {
 			err = -ENOMEM;
@@ -2114,7 +2129,7 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 		mutex_init(&msc->part_sel_lock);
 		mutex_init(&msc->outer_mon_sel_lock);
 		spin_lock_init(&msc->inner_mon_sel_lock);
-		msc->id = mpam_num_msc++;
+		msc->id = mpam_num_msc;
 		msc->pdev = pdev;
 		INIT_LIST_HEAD_RCU(&msc->glbl_list);
 		INIT_LIST_HEAD_RCU(&msc->ris);
@@ -2133,14 +2148,20 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 		if (err)
 			break;
 
-		if (device_property_read_u32(&pdev->dev, "pcc-channel",
-					     &msc->pcc_subspace_id))
-			msc->iface = MPAM_IFACE_MMIO;
-		else
+		if (!device_property_read_u32(&pdev->dev, "pcc-channel",
+					      &msc->pcc_subspace_id)) {
 			msc->iface = MPAM_IFACE_PCC;
+		} else if (!of_parse_phandle_with_fixed_args(pdev->dev.of_node,
+							     "mpam-fb", 1, 0,
+							     &of_args)) {
+			msc->iface = MPAM_IFACE_SCMI;
+		} else {
+			msc->iface = MPAM_IFACE_MMIO;
+		}
 
 		if (msc->iface == MPAM_IFACE_MMIO) {
 			struct resource *msc_res;
+			void * __iomem io;
 
 			io = devm_platform_get_and_ioremap_resource(pdev, 0,
 								    &msc_res);
@@ -2152,6 +2173,9 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			msc->mapped_hwpage_sz = msc_res->end - msc_res->start;
 			msc->mapped_hwpage = io;
 		} else if (msc->iface == MPAM_IFACE_PCC) {
+			void * __iomem io;
+			pgprot_t prot;
+
 			msc->pcc_cl.dev = &pdev->dev;
 			msc->pcc_cl.rx_callback = mpam_pcc_rx_callback;
 			msc->pcc_cl.tx_block = false;
@@ -2180,6 +2204,16 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 
 			msc->mapped_hwpage_sz = msc->pcc_chan->shmem_size;
 			msc->mapped_hwpage = io + sizeof(struct acpi_pcct_shared_memory);
+		} else if (msc->iface == MPAM_IFACE_SCMI) {
+			err = mpam_fb_connect_channel(of_args.np,
+						      &msc->mpam_fb_chan);
+			if (err < 0)
+				break;
+
+			if (of_args.args_count > 0)
+				msc->mpam_fb_msc_id = of_args.args[0];
+			else
+				msc->mpam_fb_msc_id = 0;
 		}
 
 		list_add_rcu(&msc->glbl_list, &mpam_all_msc);
@@ -2192,6 +2226,8 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 	mutex_unlock(&mpam_list_lock);
 
 	if (!err) {
+		mpam_num_msc++;
+
 		/* Create RIS entries described by firmware */
 		if (!acpi_disabled)
 			err = acpi_mpam_parse_resources(msc, plat_data);
