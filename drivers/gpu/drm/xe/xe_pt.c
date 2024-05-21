@@ -731,7 +731,7 @@ static int xe_pt_zap_ptes_entry(struct xe_ptw *parent, pgoff_t offset,
 	pgoff_t end_offset;
 
 	XE_WARN_ON(!*child);
-	XE_WARN_ON(!level && xe_child->is_compact);
+	XE_WARN_ON(!level);
 
 	/*
 	 * Note that we're called from an entry callback, and we're dealing
@@ -1399,7 +1399,7 @@ static int xe_pt_stage_unbind_entry(struct xe_ptw *parent, pgoff_t offset,
 	struct xe_pt *xe_child = container_of(*child, typeof(*xe_child), base);
 
 	XE_WARN_ON(!*child);
-	XE_WARN_ON(!level && xe_child->is_compact);
+	XE_WARN_ON(!level);
 
 	xe_pt_check_kill(addr, next, level - 1, xe_child, action, walk);
 
