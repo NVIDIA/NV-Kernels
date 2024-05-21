@@ -3401,6 +3401,7 @@ arm_smmu_domain_alloc_nesting(struct device *dev, u32 flags,
 static struct iommu_domain *
 arm_smmu_domain_alloc_user(struct device *dev, u32 flags,
 			   struct iommu_domain *parent,
+			   struct iommufd_viommu *viommu,
 			   const struct iommu_user_data *user_data)
 {
 	struct arm_smmu_master *master = dev_iommu_priv_get(dev);
