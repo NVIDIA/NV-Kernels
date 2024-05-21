@@ -878,6 +878,17 @@ struct scmi_notify_ops {
 };
 
 /**
+ * struct scmi_mpam_proto_ops - operations provided by SCMI MPAM Protocol
+ *
+ * @mpam_transfer_buf: transfer an SCMI MPAM message to the agent
+ */
+struct scmi_mpam_proto_ops {
+	int (*mpam_transfer_buf)(const struct scmi_protocol_handle *ph,
+				 u8 msg_id, void *msg_buf, size_t msg_len,
+				 u32 *ret_val);
+};
+
+/**
  * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
  *
  * @dev: pointer to the SCMI device
@@ -926,6 +937,7 @@ enum scmi_std_protocol {
 	SCMI_PROTOCOL_VOLTAGE = 0x17,
 	SCMI_PROTOCOL_POWERCAP = 0x18,
 	SCMI_PROTOCOL_PINCTRL = 0x19,
+	SCMI_PROTOCOL_MPAM = 0x1a,
 };
 
 enum scmi_system_events {
