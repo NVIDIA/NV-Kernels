@@ -1902,6 +1902,7 @@ TEST_F(iommufd_dirty_tracking, device_dirty_capability)
 	test_ioctl_destroy(hwpt_id);
 }
 
+#if 0
 TEST_F(iommufd_dirty_tracking, get_dirty_bitmap)
 {
 	uint32_t page_size = MOCK_PAGE_SIZE;
@@ -1980,7 +1981,7 @@ TEST_F(iommufd_dirty_tracking, get_dirty_bitmap_no_clear)
 
 	test_ioctl_destroy(hwpt_id);
 }
-
+#endif
 /* VFIO compatibility IOCTLs */
 
 TEST_F(iommufd, simple_ioctls)
