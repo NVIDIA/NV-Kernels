@@ -37,3 +37,17 @@ struct device *iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id)
 	return vdev_id->idev->dev;
 }
 EXPORT_SYMBOL_NS_GPL(iommufd_viommu_find_device, IOMMUFD);
+
+/*
+ * Convert a viommu to its encapsulated nest parent domain. Caller must be aware
+ * of the lifecycle of the viommu pointer. Only call this function in a callback
+ * function where viommu is passed in by the iommu/iommufd core.
+ */
+struct iommu_domain *
+iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu)
+{
+	if (!viommu || !viommu->hwpt)
+		return NULL;
+	return viommu->hwpt->common.domain;
+}
+EXPORT_SYMBOL_NS_GPL(iommufd_viommu_to_parent_domain, IOMMUFD);
