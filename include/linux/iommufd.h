@@ -92,6 +92,8 @@ int iommufd_vfio_compat_set_no_iommu(struct iommufd_ctx *ictx);
 void iommufd_viommu_lock_vdev_id(struct iommufd_viommu *viommu);
 void iommufd_viommu_unlock_vdev_id(struct iommufd_viommu *viommu);
 struct device *iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id);
+struct iommu_domain *
+iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu);
 #else /* !CONFIG_IOMMUFD */
 static inline struct iommufd_ctx *iommufd_ctx_from_file(struct file *file)
 {
@@ -142,6 +144,12 @@ void iommufd_viommu_unlock_vdev_id(struct iommufd_viommu *viommu)
 }
 
 struct device *iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id)
+{
+	return NULL;
+}
+
+static inline struct iommu_domain *
+iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu)
 {
 	return NULL;
 }
