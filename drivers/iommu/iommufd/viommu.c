@@ -239,3 +239,11 @@ out:
 		return -EFAULT;
 	return rc;
 }
+
+struct iommu_domain *
+iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu)
+{
+	if (!viommu || !viommu->hwpt)
+		return NULL;
+	return viommu->hwpt->common.domain;
+}
