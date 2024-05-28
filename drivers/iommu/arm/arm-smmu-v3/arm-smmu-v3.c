@@ -3273,6 +3273,7 @@ static int arm_smmu_cache_invalidate_user(struct iommu_domain *domain,
 	struct iommu_hwpt_arm_smmuv3_invalidate *cmds;
 	struct iommu_hwpt_arm_smmuv3_invalidate *cur;
 	struct iommu_hwpt_arm_smmuv3_invalidate *end;
+	struct arm_smmu_cmdq *cmdq;
 	int ret;
 
 	cmds = kcalloc(array->entry_num, sizeof(*cmds), GFP_KERNEL);
@@ -3288,6 +3289,8 @@ static int arm_smmu_cache_invalidate_user(struct iommu_domain *domain,
 	if (ret)
 		goto out;
 
+	cmdq = arm_smmu_get_cmdq(smmu, cmds->cmd[0] & CMDQ_0_OP);
+
 	last_batch = cmds;
 	while (cur != end) {
 		ret = arm_smmu_convert_user_cmd(nested_domain, cur);
@@ -3299,7 +3302,7 @@ static int arm_smmu_cache_invalidate_user(struct iommu_domain *domain,
 		if (cur != end && (cur - last_batch) != CMDQ_BATCH_ENTRIES - 1)
 			continue;
 
-		ret = arm_smmu_cmdq_issue_cmdlist(smmu, last_batch->cmd,
+		ret = arm_smmu_cmdq_issue_cmdlist(smmu, cmdq, last_batch->cmd,
 						  cur - last_batch, true);
 		if (ret) {
 			cur--;
