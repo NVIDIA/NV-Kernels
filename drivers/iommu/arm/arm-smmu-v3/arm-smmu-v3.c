@@ -3239,7 +3239,7 @@ static void arm_smmu_domain_nested_free(struct iommu_domain *domain)
  * Enforce the VMID on the command.
  */
 static int
-arm_smmu_convert_user_cmd(struct arm_smmu_nested_domain *nested_domain,
+arm_smmu_convert_user_cmd(struct arm_smmu_domain *s2_parent,
 			  struct iommu_hwpt_arm_smmuv3_invalidate *cmd)
 {
 	cmd->cmd[0] = le64_to_cpu(cmd->cmd[0]);
@@ -3249,8 +3249,7 @@ arm_smmu_convert_user_cmd(struct arm_smmu_nested_domain *nested_domain,
 	case CMDQ_OP_TLBI_NSNH_ALL:
 		/* Convert to NH_ALL */
 		cmd->cmd[0] = CMDQ_OP_TLBI_NH_ALL |
-			      FIELD_PREP(CMDQ_TLBI_0_VMID,
-					 nested_domain->s2_parent->vmid);
+			      FIELD_PREP(CMDQ_TLBI_0_VMID, s2_parent->vmid);
 		cmd->cmd[1] = 0;
 		break;
 	case CMDQ_OP_TLBI_NH_VA:
@@ -3258,8 +3257,7 @@ arm_smmu_convert_user_cmd(struct arm_smmu_nested_domain *nested_domain,
 	case CMDQ_OP_TLBI_NH_ALL:
 	case CMDQ_OP_TLBI_NH_ASID:
 		cmd->cmd[0] &= ~CMDQ_TLBI_0_VMID;
-		cmd->cmd[0] |= FIELD_PREP(CMDQ_TLBI_0_VMID,
-					  nested_domain->s2_parent->vmid);
+		cmd->cmd[0] |= FIELD_PREP(CMDQ_TLBI_0_VMID, s2_parent->vmid);
 		break;
 	default:
 		return -EIO;
@@ -3267,12 +3265,10 @@ arm_smmu_convert_user_cmd(struct arm_smmu_nested_domain *nested_domain,
 	return 0;
 }
 
-static int arm_smmu_cache_invalidate_user(struct iommu_domain *domain,
-					  struct iommu_user_data_array *array)
+static int __arm_smmu_cache_invalidate_user(struct arm_smmu_domain *s2_parent,
+					    struct iommu_user_data_array *array)
 {
-	struct arm_smmu_nested_domain *nested_domain =
-		container_of(domain, struct arm_smmu_nested_domain, domain);
-	struct arm_smmu_device *smmu = nested_domain->s2_parent->smmu;
+	struct arm_smmu_device *smmu = s2_parent->smmu;
 	struct iommu_hwpt_arm_smmuv3_invalidate *last_batch;
 	struct iommu_hwpt_arm_smmuv3_invalidate *cmds;
 	struct iommu_hwpt_arm_smmuv3_invalidate *cur;
@@ -3297,7 +3293,7 @@ static int arm_smmu_cache_invalidate_user(struct iommu_domain *domain,
 
 	last_batch = cmds;
 	while (cur != end) {
-		ret = arm_smmu_convert_user_cmd(nested_domain, cur);
+		ret = arm_smmu_convert_user_cmd(s2_parent, cur);
 		if (ret)
 			goto out;
 
@@ -3318,6 +3314,16 @@ out:
 	array->entry_num = cur - cmds;
 	kfree(cmds);
 	return ret;
+}
+
+static int arm_smmu_cache_invalidate_user(struct iommu_domain *domain,
+					  struct iommu_user_data_array *array)
+{
+	struct arm_smmu_nested_domain *nested_domain =
+		container_of(domain, struct arm_smmu_nested_domain, domain);
+
+	return __arm_smmu_cache_invalidate_user(
+			nested_domain->s2_parent, array);
 }
 
 static const struct iommu_domain_ops arm_smmu_nested_ops = {
