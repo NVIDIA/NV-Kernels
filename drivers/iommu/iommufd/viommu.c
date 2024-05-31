@@ -148,7 +148,7 @@ out_put_idev:
 	return rc;
 }
 
-static struct device *
+struct device *
 iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id)
 {
 	struct iommufd_vdev_id *vdev_id;
