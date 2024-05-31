@@ -13,9 +13,11 @@
 struct device;
 struct file;
 struct iommu_group;
+struct iommu_user_data_array;
 struct iommufd_access;
 struct iommufd_ctx;
 struct iommufd_device;
+struct iommufd_viommu;
 struct page;
 
 struct iommufd_device *iommufd_device_bind(struct iommufd_ctx *ictx,
@@ -53,6 +55,23 @@ int iommufd_access_replace(struct iommufd_access *access, u32 ioas_id);
 void iommufd_access_detach(struct iommufd_access *access);
 
 void iommufd_ctx_get(struct iommufd_ctx *ictx);
+
+/**
+ * struct iommufd_viommu_ops - viommu specific operations
+ * @cache_invalidate: Flush hardware cache used by a viommu. It can be used for
+ *                    any IOMMU hardware specific cache as long as a viommu has
+ *                    enough information to identify it: for example, a VMID or
+ *                    a vdev_id lookup table.
+ *                    The @array passes in the cache invalidation requests, in
+ *                    form of a driver data structure. A driver must update the
+ *                    array->entry_num to report the number of handled requests.
+ *                    The data structure of the array entry must be defined in
+ *                    include/uapi/linux/iommufd.h
+ */
+struct iommufd_viommu_ops {
+	int (*cache_invalidate)(struct iommufd_viommu *viommu,
+				struct iommu_user_data_array *array);
+};
 
 #if IS_ENABLED(CONFIG_IOMMUFD)
 struct iommufd_ctx *iommufd_ctx_from_file(struct file *file);
