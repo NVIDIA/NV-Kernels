@@ -526,6 +526,8 @@ struct iommufd_viommu {
 	struct iommufd_hwpt_paging *hwpt;
 	struct xarray vdev_ids;
 
+	const struct iommufd_viommu_ops *ops;
+
 	unsigned int type;
 };
 

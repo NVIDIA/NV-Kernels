@@ -27,6 +27,7 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd)
 	struct iommufd_hwpt_paging *hwpt_paging;
 	struct iommufd_viommu *viommu;
 	struct iommufd_device *idev;
+	struct iommu_domain *domain;
 	int rc;
 
 	if (cmd->flags)
@@ -46,6 +47,7 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd)
 		rc = -EINVAL;
 		goto out_put_hwpt;
 	}
+	domain = hwpt_paging->common.domain;
 
 	if (cmd->type != IOMMU_VIOMMU_TYPE_DEFAULT) {
 		rc = -EOPNOTSUPP;
@@ -61,6 +63,7 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd)
 	viommu->type = cmd->type;
 	viommu->ictx = ucmd->ictx;
 	viommu->hwpt = hwpt_paging;
+	viommu->ops = domain->ops->default_viommu_ops;
 	viommu->iommu_dev = idev->dev->iommu->iommu_dev;
 
 	refcount_inc(&viommu->hwpt->common.obj.users);
