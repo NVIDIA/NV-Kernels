@@ -5,6 +5,7 @@
 #define __IOMMUFD_PRIVATE_H
 
 #include <linux/iommu.h>
+#include <linux/iommufd.h>
 #include <linux/iova_bitmap.h>
 #include <linux/refcount.h>
 #include <linux/rwsem.h>
@@ -518,6 +519,8 @@ struct iommufd_viommu {
 	/* The locking order is vdev_ids_rwsem -> igroup::lock */
 	struct rw_semaphore vdev_ids_rwsem;
 	struct xarray vdev_ids;
+
+	const struct iommufd_viommu_ops *ops;
 
 	unsigned int type;
 };
