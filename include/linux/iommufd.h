@@ -52,6 +52,8 @@ struct iommufd_vdev_id {
 
 /**
  * struct iommufd_viommu_ops - viommu specific operations
+ * @free: Free all driver-specific parts of an iommufd_viommu. The memory
+ *        of the entire viommu will be free-ed by iommufd core
  * @cache_invalidate: Flush hardware cache used by a viommu. It can be used for
  *                    any IOMMU hardware specific cache as long as a viommu has
  *                    enough information to identify it: for example, a VMID or
@@ -63,6 +65,7 @@ struct iommufd_vdev_id {
  *                    include/uapi/linux/iommufd.h
  */
 struct iommufd_viommu_ops {
+	void (*free)(struct iommufd_viommu *viommu);
 	int (*cache_invalidate)(struct iommufd_viommu *viommu,
 				struct iommu_user_data_array *array);
 };
@@ -119,6 +122,9 @@ int iommufd_access_rw(struct iommufd_access *access, unsigned long iova,
 int iommufd_vfio_compat_ioas_get_id(struct iommufd_ctx *ictx, u32 *out_ioas_id);
 int iommufd_vfio_compat_ioas_create(struct iommufd_ctx *ictx);
 int iommufd_vfio_compat_set_no_iommu(struct iommufd_ctx *ictx);
+struct iommufd_viommu *
+__iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
+		       const struct iommufd_viommu_ops *ops);
 struct device *
 iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id);
 struct iommu_domain *
@@ -164,6 +170,13 @@ static inline int iommufd_vfio_compat_set_no_iommu(struct iommufd_ctx *ictx)
 	return -EOPNOTSUPP;
 }
 
+static inline struct iommufd_viommu *
+__iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
+		       const struct iommufd_viommu_ops *ops)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
 static inline struct device *
 iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id)
 {
@@ -176,4 +189,16 @@ iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu)
 	return NULL;
 }
 #endif /* CONFIG_IOMMUFD */
+
+/*
+ * Helpers for IOMMU driver to allocate driver structures that will be freed by
+ * the iommufd core. Yet, a driver is responsible for its own struct cleanup.
+ */
+#define iommufd_viommu_alloc(ictx, drv_struct, member, ops)                    \
+	container_of(__iommufd_viommu_alloc(ictx,                              \
+					    sizeof(struct drv_struct) +        \
+					    BUILD_BUG_ON_ZERO(offsetof(        \
+						struct drv_struct, member)),   \
+					    ops),                              \
+		     struct drv_struct, member)
 #endif

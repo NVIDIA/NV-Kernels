@@ -42,6 +42,7 @@ struct notifier_block;
 struct iommu_sva;
 struct iommu_dma_cookie;
 struct iommu_fault_param;
+struct iommufd_ctx;
 struct iommufd_viommu;
 
 #define IOMMU_FAULT_PERM_READ	(1 << 0) /* read */
@@ -683,6 +684,16 @@ struct iommu_ops {
  *                         must be defined in include/uapi/linux/iommufd.h
  * @default_viommu_ops: Driver can choose to use a default core-allocated core-
  *                      managed viommu object by providing a default viommu ops.
+ *                      Otherwise, i.e. for a driver-managed viommu, viommu_ops
+ *                      should be passed in via iommufd_viommu_alloc() helper in
+ *                      its own viommu_alloc op.
+ * @viommu_alloc: Allocate an iommufd_viommu associating to a nested parent
+ *                @domain as a user space IOMMU instance for HW-accelerated
+ *                features from the physical IOMMU behind the @dev. The
+ *                @viommu_type must be defined in include/uapi/linux/iommufd.h
+ *                It is suggested to call iommufd_viommu_alloc() helper for
+ *                a bundled allocation of the core and the driver structures,
+ *                using the given @ictx pointer.
  * @iova_to_phys: translate iova to physical address
  * @enforce_cache_coherency: Prevent any kind of DMA from bypassing IOMMU_CACHE,
  *                           including no-snoop TLPs on PCIe or other platform
@@ -716,6 +727,10 @@ struct iommu_domain_ops {
 				    dma_addr_t iova);
 
 	const struct iommufd_viommu_ops *default_viommu_ops;
+	struct iommufd_viommu *(*viommu_alloc)(struct iommu_domain *domain,
+					       struct device *dev,
+					       struct iommufd_ctx *ictx,
+					       unsigned int viommu_type);
 
 	bool (*enforce_cache_coherency)(struct iommu_domain *domain);
 	int (*set_pgtable_quirks)(struct iommu_domain *domain,

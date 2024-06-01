@@ -6,6 +6,24 @@
 
 #include "iommufd_private.h"
 
+struct iommufd_viommu *
+__iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
+		       const struct iommufd_viommu_ops *ops)
+{
+	struct iommufd_viommu *viommu;
+	struct iommufd_object *obj;
+
+	if (WARN_ON(size < sizeof(*viommu)))
+		return ERR_PTR(-EINVAL);
+	obj = iommufd_object_alloc_elm(ictx, size, IOMMUFD_OBJ_VIOMMU);
+	if (IS_ERR(obj))
+		return ERR_CAST(obj);
+	viommu = container_of(obj, struct iommufd_viommu, obj);
+	if (ops)
+		viommu->ops = ops;
+	return viommu;
+}
+
 void iommufd_viommu_destroy(struct iommufd_object *obj)
 {
 	struct iommufd_viommu *viommu =
@@ -18,6 +36,8 @@ void iommufd_viommu_destroy(struct iommufd_object *obj)
 		kfree(vdev_id);
 	}
 	xa_destroy(&viommu->vdev_ids);
+	if (viommu->ops && viommu->ops->free)
+		viommu->ops->free(viommu);
 	refcount_dec(&viommu->hwpt->common.obj.users);
 }
 
@@ -49,12 +69,19 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd)
 	}
 	domain = hwpt_paging->common.domain;
 
-	if (cmd->type != IOMMU_VIOMMU_TYPE_DEFAULT) {
-		rc = -EOPNOTSUPP;
-		goto out_put_hwpt;
-	}
+	if (cmd->type == IOMMU_VIOMMU_TYPE_DEFAULT) {
+		viommu = __iommufd_viommu_alloc(
+				ucmd->ictx, sizeof(*viommu),
+				domain->ops->default_viommu_ops);
+	} else {
+		if (!domain->ops || !domain->ops->viommu_alloc) {
+			rc = -EOPNOTSUPP;
+			goto out_put_hwpt;
+		}
 
-	viommu = iommufd_object_alloc(ucmd->ictx, viommu, IOMMUFD_OBJ_VIOMMU);
+		viommu = domain->ops->viommu_alloc(domain, idev->dev,
+						   ucmd->ictx, cmd->type);
+	}
 	if (IS_ERR(viommu)) {
 		rc = PTR_ERR(viommu);
 		goto out_put_hwpt;
@@ -63,7 +90,6 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd)
 	viommu->type = cmd->type;
 	viommu->ictx = ucmd->ictx;
 	viommu->hwpt = hwpt_paging;
-	viommu->ops = domain->ops->default_viommu_ops;
 	viommu->iommu_dev = idev->dev->iommu->iommu_dev;
 
 	refcount_inc(&viommu->hwpt->common.obj.users);
