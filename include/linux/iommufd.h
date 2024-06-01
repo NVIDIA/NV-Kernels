@@ -56,8 +56,18 @@ void iommufd_access_detach(struct iommufd_access *access);
 
 void iommufd_ctx_get(struct iommufd_ctx *ictx);
 
+struct iommufd_vdev_id {
+	struct iommufd_viommu *viommu;
+	struct iommufd_device *idev;
+	u64 id;
+};
+
 /**
  * struct iommufd_viommu_ops - viommu specific operations
+ * @set_vdev_id: Set a virtual device id for a device assigned to a viommu.
+ *               Driver allocates an iommufd_vdev_id and return its pointer.
+ * @unset_vdev_id: Unset a virtual device id for a device assigned to a viommu.
+ *                 iommufd core frees the memory pointed by an iommufd_vdev_id.
  * @cache_invalidate: Flush hardware cache used by a viommu. It can be used for
  *                    any IOMMU hardware specific cache as long as a viommu has
  *                    enough information to identify it: for example, a VMID or
@@ -69,6 +79,9 @@ void iommufd_ctx_get(struct iommufd_ctx *ictx);
  *                    include/uapi/linux/iommufd.h
  */
 struct iommufd_viommu_ops {
+	struct iommufd_vdev_id *(*set_vdev_id)(struct iommufd_viommu *viommu,
+					       struct device *dev, u64 id);
+	void (*unset_vdev_id)(struct iommufd_vdev_id *vdev_id);
 	int (*cache_invalidate)(struct iommufd_viommu *viommu,
 				struct iommu_user_data_array *array);
 };

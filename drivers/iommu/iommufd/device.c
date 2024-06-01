@@ -145,6 +145,8 @@ void iommufd_device_destroy(struct iommufd_object *obj)
 		old = xa_cmpxchg(&viommu->vdev_ids, vdev_id->id, vdev_id, NULL,
 				 GFP_KERNEL);
 		WARN_ON(old != vdev_id);
+		if (vdev_id->viommu->ops && vdev_id->viommu->ops->unset_vdev_id)
+			vdev_id->viommu->ops->unset_vdev_id(vdev_id);
 		kfree(vdev_id);
 		idev->vdev_id = NULL;
 	}
