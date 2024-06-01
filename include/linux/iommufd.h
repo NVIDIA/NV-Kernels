@@ -91,6 +91,8 @@ struct iommufd_vdev_id {
 
 /**
  * struct iommufd_viommu_ops - viommu specific operations
+ * @free: Free all driver-specific parts of an iommufd_viommu. The memory
+ *        of the entire viommu will be free-ed by iommufd core
  * @set_vdev_id: Set a virtual device id for a device assigned to a viommu.
  *               Driver allocates an iommufd_vdev_id and return its pointer.
  * @unset_vdev_id: Unset a virtual device id for a device assigned to a viommu.
@@ -106,6 +108,7 @@ struct iommufd_vdev_id {
  *                    include/uapi/linux/iommufd.h
  */
 struct iommufd_viommu_ops {
+	void (*free)(struct iommufd_viommu *viommu);
 	struct iommufd_vdev_id *(*set_vdev_id)(struct iommufd_viommu *viommu,
 					       struct device *dev, u64 id);
 	void (*unset_vdev_id)(struct iommufd_vdev_id *vdev_id);
@@ -137,6 +140,9 @@ struct iommu_domain *
 iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu);
 void iommufd_viommu_report_irq(struct iommufd_viommu *viommu, unsigned int type,
 			       void *irq_ptr, size_t irq_len);
+struct iommufd_viommu *
+__iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
+		       const struct iommufd_viommu_ops *ops);
 #else /* !CONFIG_IOMMUFD */
 static inline struct iommufd_ctx *iommufd_ctx_from_file(struct file *file)
 {
@@ -208,5 +214,24 @@ iommufd_viommu_report_irq(struct iommufd_viommu *viommu, unsigned int type,
 			  void *irq_ptr, size_t irq_len)
 {
 }
+
+static inline struct iommufd_viommu *
+__iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
+		       const struct iommufd_viommu_ops *ops)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
 #endif /* CONFIG_IOMMUFD */
+
+/*
+ * Helpers for IOMMU driver to allocate driver structures that will be freed by
+ * the iommufd core. Yet, a driver is responsible for its own struct cleanup.
+ */
+#define iommufd_viommu_alloc(ictx, drv_struct, member, ops)                    \
+	container_of(__iommufd_viommu_alloc(ictx,                              \
+					    sizeof(struct drv_struct) +        \
+					    BUILD_BUG_ON_ZERO(offsetof(        \
+						struct drv_struct, member)),   \
+					    ops),                              \
+		     struct drv_struct, member)
 #endif
