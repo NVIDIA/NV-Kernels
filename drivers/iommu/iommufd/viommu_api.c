@@ -157,3 +157,16 @@ __iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
 	return viommu;
 }
 EXPORT_SYMBOL_NS_GPL(__iommufd_viommu_alloc, IOMMUFD);
+
+struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size)
+{
+	struct iommufd_vdev_id *vdev_id;
+
+	if (WARN_ON(size < sizeof(*vdev_id)))
+		return ERR_PTR(-EINVAL);
+	vdev_id = kzalloc(size, GFP_KERNEL);
+	if (!vdev_id)
+		return ERR_PTR(-ENOMEM);
+	return vdev_id;
+}
+EXPORT_SYMBOL_NS_GPL(__iommufd_vdev_id_alloc, IOMMUFD);
