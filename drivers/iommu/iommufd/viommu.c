@@ -21,7 +21,20 @@ __iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
 	viommu = container_of(obj, struct iommufd_viommu, obj);
 	if (ops)
 		viommu->ops = ops;
+	xa_init(&viommu->vdev_ids);
 	return viommu;
+}
+
+struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size)
+{
+	struct iommufd_vdev_id *vdev_id;
+
+	if (WARN_ON(size < sizeof(*vdev_id)))
+		return ERR_PTR(-EINVAL);
+	vdev_id = kzalloc(size, GFP_KERNEL);
+	if (!vdev_id)
+		return ERR_PTR(-ENOMEM);
+	return vdev_id;
 }
 
 void iommufd_viommu_destroy(struct iommufd_object *obj)
@@ -32,6 +45,8 @@ void iommufd_viommu_destroy(struct iommufd_object *obj)
 	unsigned long index;
 
 	xa_for_each(&viommu->vdev_ids, index, vdev_id) {
+		if (viommu->ops && viommu->ops->unset_vdev_id)
+			viommu->ops->unset_vdev_id(vdev_id);
 		list_del(&vdev_id->idev_item);
 		kfree(vdev_id);
 	}
@@ -145,7 +160,10 @@ int iommufd_viommu_set_vdev_id(struct iommufd_ucmd *ucmd)
 		goto out_put_viommu;
 	}
 
-	vdev_id = kzalloc(sizeof(*vdev_id), GFP_KERNEL);
+	if (viommu->ops && viommu->ops->set_vdev_id)
+		vdev_id = viommu->ops->set_vdev_id(viommu, idev->dev, cmd->vdev_id);
+	else
+		vdev_id = kzalloc(sizeof(*vdev_id), GFP_KERNEL);
 	if (IS_ERR(vdev_id)) {
 		rc = PTR_ERR(vdev_id);
 		goto out_put_viommu;
@@ -166,6 +184,8 @@ int iommufd_viommu_set_vdev_id(struct iommufd_ucmd *ucmd)
 	goto out_put_viommu;
 
 out_free_vdev_id:
+	if (viommu->ops && viommu->ops->unset_vdev_id)
+		viommu->ops->unset_vdev_id(vdev_id);
 	kfree(vdev_id);
 out_put_viommu:
 	iommufd_put_object(ucmd->ictx, &viommu->obj);
@@ -211,6 +231,8 @@ int iommufd_viommu_unset_vdev_id(struct iommufd_ucmd *ucmd)
 	}
 
 	vdev_id = xa_erase(&viommu->vdev_ids, cmd->vdev_id);
+	if (viommu->ops && viommu->ops->unset_vdev_id)
+		viommu->ops->unset_vdev_id(vdev_id);
 	list_del(&vdev_id->idev_item);
 	kfree(vdev_id);
 

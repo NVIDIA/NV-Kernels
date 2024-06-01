@@ -138,6 +138,8 @@ void iommufd_device_destroy(struct iommufd_object *obj)
 	struct iommufd_vdev_id *vdev_id, *curr;
 
 	list_for_each_entry(vdev_id, &idev->vdev_id_list, idev_item) {
+		if (vdev_id->viommu->ops && vdev_id->viommu->ops->unset_vdev_id)
+			vdev_id->viommu->ops->unset_vdev_id(vdev_id);
 		curr = xa_cmpxchg(&vdev_id->viommu->vdev_ids, vdev_id->vdev_id,
 				  vdev_id, NULL, GFP_KERNEL);
 		WARN_ON(curr != vdev_id);

@@ -54,6 +54,10 @@ struct iommufd_vdev_id {
  * struct iommufd_viommu_ops - viommu specific operations
  * @free: Free all driver-specific parts of an iommufd_viommu. The memory
  *        of the entire viommu will be free-ed by iommufd core
+ * @set_vdev_id: Set a virtual device id for a device assigned to a viommu.
+ *               Driver allocates an iommufd_vdev_id and return its pointer.
+ * @unset_vdev_id: Unset a virtual device id for a device assigned to a viommu.
+ *                 iommufd core frees the memory pointed by an iommufd_vdev_id.
  * @cache_invalidate: Flush hardware cache used by a viommu. It can be used for
  *                    any IOMMU hardware specific cache as long as a viommu has
  *                    enough information to identify it: for example, a VMID or
@@ -66,6 +70,9 @@ struct iommufd_vdev_id {
  */
 struct iommufd_viommu_ops {
 	void (*free)(struct iommufd_viommu *viommu);
+	struct iommufd_vdev_id *(*set_vdev_id)(struct iommufd_viommu *viommu,
+					       struct device *dev, u64 vdev_id);
+	void (*unset_vdev_id)(struct iommufd_vdev_id *vdev_id);
 	int (*cache_invalidate)(struct iommufd_viommu *viommu,
 				struct iommu_user_data_array *array);
 };
@@ -122,9 +129,11 @@ int iommufd_access_rw(struct iommufd_access *access, unsigned long iova,
 int iommufd_vfio_compat_ioas_get_id(struct iommufd_ctx *ictx, u32 *out_ioas_id);
 int iommufd_vfio_compat_ioas_create(struct iommufd_ctx *ictx);
 int iommufd_vfio_compat_set_no_iommu(struct iommufd_ctx *ictx);
+
 struct iommufd_viommu *
 __iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
 		       const struct iommufd_viommu_ops *ops);
+struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size);
 struct device *
 iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id);
 struct iommu_domain *
@@ -177,6 +186,11 @@ __iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
 	return ERR_PTR(-EOPNOTSUPP);
 }
 
+static inline struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
 static inline struct device *
 iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id)
 {
@@ -200,5 +214,10 @@ iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu)
 					    BUILD_BUG_ON_ZERO(offsetof(        \
 						struct drv_struct, member)),   \
 					    ops),                              \
+		     struct drv_struct, member)
+#define iommufd_vdev_id_alloc(drv_struct, member)                              \
+	container_of(__iommufd_vdev_id_alloc(sizeof(struct drv_struct) +       \
+					     BUILD_BUG_ON_ZERO(offsetof(       \
+						struct drv_struct, member))),  \
 		     struct drv_struct, member)
 #endif
