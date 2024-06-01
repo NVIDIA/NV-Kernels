@@ -20,6 +20,8 @@ void iommufd_viommu_destroy(struct iommufd_object *obj)
 	}
 	xa_destroy(&viommu->vdev_ids);
 
+	if (viommu->ops && viommu->ops->free)
+		viommu->ops->free(viommu);
 	refcount_dec(&viommu->hwpt->common.obj.users);
 }
 
@@ -51,12 +53,19 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd)
 	}
 	domain = hwpt_paging->common.domain;
 
-	if (cmd->type != IOMMU_VIOMMU_TYPE_DEFAULT) {
-		rc = -EOPNOTSUPP;
-		goto out_put_hwpt;
-	}
+	if (cmd->type == IOMMU_VIOMMU_TYPE_DEFAULT) {
+		viommu = __iommufd_viommu_alloc(
+				ucmd->ictx, sizeof(*viommu),
+				domain->ops->default_viommu_ops);
+	} else {
+		if (!domain->ops || !domain->ops->viommu_alloc) {
+			rc = -EOPNOTSUPP;
+			goto out_put_hwpt;
+		}
 
-	viommu = iommufd_object_alloc(ucmd->ictx, viommu, IOMMUFD_OBJ_VIOMMU);
+		viommu = domain->ops->viommu_alloc(domain, idev->dev,
+						   ucmd->ictx, cmd->type);
+	}
 	if (IS_ERR(viommu)) {
 		rc = PTR_ERR(viommu);
 		goto out_put_hwpt;
@@ -65,7 +74,6 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd)
 	viommu->type = cmd->type;
 	viommu->ictx = ucmd->ictx;
 	viommu->hwpt = hwpt_paging;
-	viommu->ops = domain->ops->default_viommu_ops;
 
 	xa_init(&viommu->vdev_ids);
 	init_rwsem(&viommu->vdev_ids_rwsem);
