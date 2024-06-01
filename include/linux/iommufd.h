@@ -143,6 +143,7 @@ void iommufd_viommu_report_irq(struct iommufd_viommu *viommu, unsigned int type,
 struct iommufd_viommu *
 __iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
 		       const struct iommufd_viommu_ops *ops);
+struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size);
 #else /* !CONFIG_IOMMUFD */
 static inline struct iommufd_ctx *iommufd_ctx_from_file(struct file *file)
 {
@@ -221,6 +222,11 @@ __iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }
+
+static inline struct iommufd_vdev_id *__iommufd_vdev_id_alloc(size_t size)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
 #endif /* CONFIG_IOMMUFD */
 
 /*
@@ -233,5 +239,10 @@ __iommufd_viommu_alloc(struct iommufd_ctx *ictx, size_t size,
 					    BUILD_BUG_ON_ZERO(offsetof(        \
 						struct drv_struct, member)),   \
 					    ops),                              \
+		     struct drv_struct, member)
+#define iommufd_vdev_id_alloc(drv_struct, member)                              \
+	container_of(__iommufd_vdev_id_alloc(sizeof(struct drv_struct) +       \
+					     BUILD_BUG_ON_ZERO(offsetof(       \
+						struct drv_struct, member))),  \
 		     struct drv_struct, member)
 #endif
