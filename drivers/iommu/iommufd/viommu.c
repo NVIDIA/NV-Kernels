@@ -13,6 +13,8 @@ void iommufd_viommu_destroy(struct iommufd_object *obj)
 
 	xa_for_each(&viommu->vdev_ids, index, vdev_id) {
 		/* Unlocked since there should be no race in a destroy() */
+		if (viommu->ops && viommu->ops->unset_vdev_id)
+			viommu->ops->unset_vdev_id(vdev_id);
 		vdev_id->idev->vdev_id = NULL;
 		kfree(vdev_id);
 	}
@@ -116,10 +118,18 @@ int iommufd_viommu_set_vdev_id(struct iommufd_ucmd *ucmd)
 		goto out_unlock_igroup;
 	}
 
-	vdev_id = kzalloc(sizeof(*vdev_id), GFP_KERNEL);
-	if (!vdev_id) {
-		rc = -ENOMEM;
-		goto out_unlock_igroup;
+	if (viommu->ops && viommu->ops->set_vdev_id) {
+		vdev_id = viommu->ops->set_vdev_id(viommu, idev->dev, cmd->vdev_id);
+		if (IS_ERR(vdev_id)) {
+			rc = PTR_ERR(vdev_id);
+			goto out_unlock_igroup;
+		}
+	} else {
+		vdev_id = kzalloc(sizeof(*vdev_id), GFP_KERNEL);
+		if (!vdev_id) {
+			rc = -ENOMEM;
+			goto out_unlock_igroup;
+		}
 	}
 
 	vdev_id->idev = idev;
@@ -137,6 +147,8 @@ int iommufd_viommu_set_vdev_id(struct iommufd_ucmd *ucmd)
 	goto out_unlock_igroup;
 
 out_free:
+	if (viommu->ops && viommu->ops->unset_vdev_id)
+		viommu->ops->unset_vdev_id(vdev_id);
 	kfree(vdev_id);
 out_unlock_igroup:
 	mutex_unlock(&idev->igroup->lock);
@@ -185,6 +197,9 @@ int iommufd_viommu_unset_vdev_id(struct iommufd_ucmd *ucmd)
 		rc = xa_err(old);
 		goto out_unlock_igroup;
 	}
+
+	if (viommu->ops && viommu->ops->unset_vdev_id)
+		viommu->ops->unset_vdev_id(old);
 	kfree(old);
 	idev->vdev_id = NULL;
 
