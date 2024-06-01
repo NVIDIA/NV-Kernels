@@ -602,12 +602,6 @@ struct iommufd_viommu {
 	unsigned int type;
 };
 
-struct iommufd_vdev_id {
-	struct iommufd_viommu *viommu;
-	struct iommufd_device *idev;
-	u64 id;
-};
-
 static inline struct iommufd_viommu *
 iommufd_get_viommu(struct iommufd_ucmd *ucmd, u32 id)
 {
