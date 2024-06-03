@@ -216,7 +216,6 @@ enum resctrl_schema_fmt {
  * @ctrl_domains:	RCU list of all control domains for this resource
  * @mon_domains:	RCU list of all monitor domains for this resource
  * @name:		Name to use in "schemata" file.
- * @data_width:		Character width of data when displaying
  * @default_ctrl:	Specifies default cache cbm or memory B/W percent.
  * @schema_fmt:	Which format string and parser is used for this schema.
  * @evt_list:		List of monitoring events
@@ -234,7 +233,6 @@ struct rdt_resource {
 	struct list_head	ctrl_domains;
 	struct list_head	mon_domains;
 	char			*name;
-	int			data_width;
 	u32			default_ctrl;
 	enum resctrl_schema_fmt	schema_fmt;
 	struct list_head	evt_list;
@@ -254,6 +252,7 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l);
  * @list:	Member of resctrl_schema_all.
  * @name:	The name to use in the "schemata" file.
  * @fmt_str:	Format string to show domain value
+ * @data_width:	Character width of data when displaying
  * @conf_type:	Whether this schema is specific to code/data.
  * @res:	The resource structure exported by the architecture to describe
  *		the hardware that is configured by this schema.
@@ -265,6 +264,7 @@ struct resctrl_schema {
 	struct list_head		list;
 	char				name[8];
 	const char			*fmt_str;
+	int				data_width;
 	enum resctrl_conf_type		conf_type;
 	struct rdt_resource		*res;
 	u32				num_closid;
