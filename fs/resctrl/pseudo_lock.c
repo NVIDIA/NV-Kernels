@@ -27,7 +27,6 @@
 #include <asm/cpu_device_id.h>
 #include <asm/perf_event.h>
 
-#include "../../events/perf_event.h" /* For X86_CONFIG() */
 #include "internal.h"
 
 /*
