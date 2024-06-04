@@ -1952,8 +1952,7 @@ static void record__read_lost_samples(struct record *rec)
 
 				if (count.lost) {
 					if (!lost) {
-						lost = zalloc(sizeof(*lost) +
-							      session->machines.host.id_hdr_size);
+						lost = zalloc(PERF_SAMPLE_MAX_SIZE);
 						if (!lost) {
 							pr_debug("Memory allocation failed\n");
 							return;
@@ -1969,8 +1968,7 @@ static void record__read_lost_samples(struct record *rec)
 		lost_count = perf_bpf_filter__lost_count(evsel);
 		if (lost_count) {
 			if (!lost) {
-				lost = zalloc(sizeof(*lost) +
-					      session->machines.host.id_hdr_size);
+				lost = zalloc(PERF_SAMPLE_MAX_SIZE);
 				if (!lost) {
 					pr_debug("Memory allocation failed\n");
 					return;
