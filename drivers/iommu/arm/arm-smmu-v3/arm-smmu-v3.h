@@ -207,7 +207,6 @@ struct acpi_iort_node;
  */
 #define STRTAB_SPLIT			8
 
-#define STRTAB_L1_DESC_DWORDS		1
 #define STRTAB_L1_DESC_SPAN		GENMASK_ULL(4, 0)
 #define STRTAB_L1_DESC_L2PTR_MASK	GENMASK_ULL(51, 6)
 
@@ -218,6 +217,13 @@ struct arm_smmu_ste {
 };
 
 #define STRTAB_NUM_L2_STES (1 << STRTAB_SPLIT)
+struct arm_smmu_strtab_l2 {
+	struct arm_smmu_ste stes[STRTAB_NUM_L2_STES];
+};
+
+struct arm_smmu_strtab_l1 {
+	__le64 l2ptr;
+};
 #define STRTAB_MAX_L1_ENTRIES (1 << 17)
 
 static inline unsigned int arm_smmu_strtab_l1_idx(unsigned int sid)
@@ -598,7 +604,7 @@ struct arm_smmu_priq {
 
 /* High-level stream table and context descriptor structures */
 struct arm_smmu_strtab_l1_desc {
-	struct arm_smmu_ste		*l2ptr;
+	struct arm_smmu_strtab_l2	*l2ptr;
 };
 
 struct arm_smmu_ctx_desc {
