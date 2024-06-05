@@ -6,6 +6,9 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_PCI_ENDPOINT_TEST                       policy<{'amd64': '-'}>
+CONFIG_PCI_ENDPOINT_TEST                       note<'{For testing vfio-pci}'>
+
 CONFIG_AAEON_IWMI_WDT                           policy<{'amd64': '-'}>
 CONFIG_AAEON_IWMI_WDT                           note<'{Disable all Ubuntu ODM drivers}'>
 
