@@ -918,13 +918,6 @@ int xe_guc_pc_stop(struct xe_guc_pc *pc)
  */
 void xe_guc_pc_fini(struct xe_guc_pc *pc)
 {
-	struct xe_device *xe = pc_to_xe(pc);
-
-	if (xe->info.skip_guc_pc) {
-		xe_gt_idle_disable_c6(pc_to_gt(pc));
-		return;
-	}
-
 	XE_WARN_ON(xe_guc_pc_gucrc_disable(pc));
 	XE_WARN_ON(xe_guc_pc_stop(pc));
 	mutex_destroy(&pc->freq_lock);
