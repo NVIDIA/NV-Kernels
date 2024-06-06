@@ -10,11 +10,10 @@ ENTRY(_start)
 SECTIONS
 {
 	. = 0;
-	.bstext	: {
-		*(.bstext)
-		. = 495;
-	} =0xffffffff
+	.bstext		: { *(.bstext) }
+	.bsdata		: { *(.bsdata) }
 
+	. = 495;
 	.header		: { *(.header) }
 	.entrytext	: { *(.entrytext) }
 	.inittext	: { *(.inittext) }
