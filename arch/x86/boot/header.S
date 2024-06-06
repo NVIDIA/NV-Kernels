@@ -75,12 +75,14 @@ optional_header:
 	.byte	0x02				# MajorLinkerVersion
 	.byte	0x14				# MinorLinkerVersion
 
-	.long	setup_size + ZO__end - 0x200	# SizeOfCode
+	# Filled in by build.c
+	.long	0				# SizeOfCode
 
 	.long	0				# SizeOfInitializedData
 	.long	0				# SizeOfUninitializedData
 
-	.long	setup_size + ZO_efi_pe_entry	# AddressOfEntryPoint
+	# Filled in by build.c
+	.long	0x0000				# AddressOfEntryPoint
 
 	.long	0x0200				# BaseOfCode
 #ifdef CONFIG_X86_32
@@ -103,7 +105,10 @@ extra_header_fields:
 	.word	0				# MinorSubsystemVersion
 	.long	0				# Win32VersionValue
 
-	.long	setup_size + ZO__end 		# SizeOfImage
+	#
+	# The size of the bzImage is written in tools/build.c
+	#
+	.long	0				# SizeOfImage
 
 	.long	0x200				# SizeOfHeaders
 	.long	0				# CheckSum
@@ -194,15 +199,18 @@ section_table:
 		IMAGE_SCN_MEM_DISCARDABLE	# Characteristics
 #endif
 
+	#
+	# The offset & size fields are filled in by build.c.
+	#
 	.ascii	".text"
 	.byte	0
 	.byte	0
 	.byte	0
-	.long	ZO__end
-	.long	setup_size
-	.long	ZO__edata			# Size of initialized data
+	.long	0
+	.long	0x0				# startup_{32,64}
+	.long	0				# Size of initialized data
 						# on disk
-	.long	setup_size
+	.long	0x0				# startup_{32,64}
 	.long	0				# PointerToRelocations
 	.long	0				# PointerToLineNumbers
 	.word	0				# NumberOfRelocations
