@@ -205,7 +205,6 @@ struct acpi_iort_node;
  * 2lvl: 128k L1 entries,
  *       256 lazy entries per table (each table covers a PCI bus)
  */
-#define STRTAB_L1_SZ_SHIFT		20
 #define STRTAB_SPLIT			8
 
 #define STRTAB_L1_DESC_DWORDS		1
@@ -217,6 +216,19 @@ struct acpi_iort_node;
 struct arm_smmu_ste {
 	__le64 data[STRTAB_STE_DWORDS];
 };
+
+#define STRTAB_NUM_L2_STES (1 << STRTAB_SPLIT)
+#define STRTAB_MAX_L1_ENTRIES (1 << 17)
+
+static inline unsigned int arm_smmu_strtab_l1_idx(unsigned int sid)
+{
+	return sid / STRTAB_NUM_L2_STES;
+}
+
+static inline unsigned int arm_smmu_strtab_l2_idx(unsigned int sid)
+{
+	return sid % STRTAB_NUM_L2_STES;
+}
 
 #define STRTAB_STE_0_V			(1UL << 0)
 #define STRTAB_STE_0_CFG		GENMASK_ULL(3, 1)
