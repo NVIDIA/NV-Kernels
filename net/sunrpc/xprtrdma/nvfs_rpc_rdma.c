@@ -36,7 +36,7 @@ int REGISTER_FUNC(struct nvfs_dma_rw_ops *ops)
 	}
 	return -EOPNOTSUPP;
 }
-EXPORT_SYMBOL(REGISTER_FUNC);
+EXPORT_SYMBOL_GPL(REGISTER_FUNC);
 
 // protected via nvfs_module_mutex
 void UNREGISTER_FUNC(void)
@@ -47,5 +47,5 @@ void UNREGISTER_FUNC(void)
 	} while (nvfs_count_ops());
 	nvfs_ops = NULL;
 }
-EXPORT_SYMBOL(UNREGISTER_FUNC);
+EXPORT_SYMBOL_GPL(UNREGISTER_FUNC);
 #endif
