@@ -4327,9 +4327,9 @@ cleanup_mountpoint:
 
 void __exit resctrl_exit(void)
 {
+	rdtgroup_destroy_root();
 	debugfs_remove_recursive(debugfs_resctrl);
 	unregister_filesystem(&rdt_fs_type);
-	sysfs_remove_mount_point(fs_kobj, "resctrl");
 
 	resctrl_mon_resource_exit();
 }
