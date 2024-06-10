@@ -126,7 +126,7 @@ static notrace void s390_handle_damage(void)
 	smp_emergency_stop();
 	diag_amode31_ops.diag308_reset();
 	ptr = nmi_puts(message, "System stopped due to unrecoverable machine check, code: 0x");
-	u64_to_hex(ptr, S390_lowcore.mcck_interruption_code);
+	u64_to_hex(ptr, get_lowcore()->mcck_interruption_code);
 
 	/*
 	 * Disable low address protection and make machine check new PSW a
@@ -136,17 +136,17 @@ static notrace void s390_handle_damage(void)
 	cr0_new = cr0;
 	cr0_new.lap = 0;
 	local_ctl_load(0, &cr0_new.reg);
-	psw_save = S390_lowcore.mcck_new_psw;
-	psw_bits(S390_lowcore.mcck_new_psw).io = 0;
-	psw_bits(S390_lowcore.mcck_new_psw).ext = 0;
-	psw_bits(S390_lowcore.mcck_new_psw).wait = 1;
+	psw_save = get_lowcore()->mcck_new_psw;
+	psw_bits(get_lowcore()->mcck_new_psw).io = 0;
+	psw_bits(get_lowcore()->mcck_new_psw).ext = 0;
+	psw_bits(get_lowcore()->mcck_new_psw).wait = 1;
 	sclp_emergency_printk(message);
 
 	/*
 	 * Restore machine check new PSW and control register 0 to original
 	 * values. This makes possible system dump analysis easier.
 	 */
-	S390_lowcore.mcck_new_psw = psw_save;
+	get_lowcore()->mcck_new_psw = psw_save;
 	local_ctl_load(0, &cr0.reg);
 	disabled_wait();
 	while (1);
@@ -221,7 +221,7 @@ static int notrace s390_validate_registers(union mci mci)
 
 	if (!mci.gr || !mci.fp)
 		kill_task = 1;
-	fpt_save_area = &S390_lowcore.floating_pt_save_area;
+	fpt_save_area = &get_lowcore()->floating_pt_save_area;
 	if (!mci.fc) {
 		kill_task = 1;
 		asm volatile(
@@ -232,10 +232,10 @@ static int notrace s390_validate_registers(union mci mci)
 		asm volatile(
 			"	lfpc	%0\n"
 			:
-			: "Q" (S390_lowcore.fpt_creg_save_area));
+			: "Q" (get_lowcore()->fpt_creg_save_area));
 	}
 
-	mcesa = __va(S390_lowcore.mcesad & MCESA_ORIGIN_MASK);
+	mcesa = __va(get_lowcore()->mcesad & MCESA_ORIGIN_MASK);
 	if (!cpu_has_vx()) {
 		/* Validate floating point registers */
 		asm volatile(
@@ -271,7 +271,7 @@ static int notrace s390_validate_registers(union mci mci)
 		 */
 		if (!mci.vr && !test_cpu_flag(CIF_MCCK_GUEST))
 			kill_task = 1;
-		cr0.reg = S390_lowcore.cregs_save_area[0];
+		cr0.reg = get_lowcore()->cregs_save_area[0];
 		cr0.afp = cr0.vx = 1;
 		local_ctl_load(0, &cr0.reg);
 		asm volatile(
@@ -281,18 +281,18 @@ static int notrace s390_validate_registers(union mci mci)
 			:
 			: "Q" (*(struct vx_array *)mcesa->vector_save_area)
 			: "1");
-		local_ctl_load(0, &S390_lowcore.cregs_save_area[0]);
+		local_ctl_load(0, &get_lowcore()->cregs_save_area[0]);
 	}
 	/* Validate access registers */
 	asm volatile(
 		"	lam	0,15,0(%0)\n"
 		:
-		: "a" (&S390_lowcore.access_regs_save_area)
+		: "a" (&get_lowcore()->access_regs_save_area)
 		: "memory");
 	if (!mci.ar)
 		kill_task = 1;
 	/* Validate guarded storage registers */
-	cr2.reg = S390_lowcore.cregs_save_area[2];
+	cr2.reg = get_lowcore()->cregs_save_area[2];
 	if (cr2.gse) {
 		if (!mci.gs) {
 			/*
@@ -323,7 +323,7 @@ static int notrace s390_validate_registers(union mci mci)
 	 */
 	set_tod_programmable_field(raw_smp_processor_id());
 	/* Validate clock comparator register */
-	set_clock_comparator(S390_lowcore.clock_comparator);
+	set_clock_comparator(get_lowcore()->clock_comparator);
 
 	if (!mci.ms || !mci.pm || !mci.ia)
 		kill_task = 1;
@@ -349,11 +349,11 @@ static void notrace s390_backup_mcck_info(struct pt_regs *regs)
 
 	sie_page = container_of(sie_block, struct sie_page, sie_block);
 	mcck_backup = &sie_page->mcck_info;
-	mcck_backup->mcic = S390_lowcore.mcck_interruption_code &
+	mcck_backup->mcic = get_lowcore()->mcck_interruption_code &
 				~(MCCK_CODE_CP | MCCK_CODE_EXT_DAMAGE);
-	mcck_backup->ext_damage_code = S390_lowcore.external_damage_code;
+	mcck_backup->ext_damage_code = get_lowcore()->external_damage_code;
 	mcck_backup->failing_storage_address
-			= S390_lowcore.failing_storage_address;
+			= get_lowcore()->failing_storage_address;
 }
 NOKPROBE_SYMBOL(s390_backup_mcck_info);
 
@@ -385,7 +385,7 @@ void notrace s390_do_machine_check(struct pt_regs *regs)
 	if (user_mode(regs))
 		update_timer_mcck();
 	inc_irq_stat(NMI_NMI);
-	mci.val = S390_lowcore.mcck_interruption_code;
+	mci.val = get_lowcore()->mcck_interruption_code;
 	mcck = this_cpu_ptr(&cpu_mcck);
 
 	/*
@@ -453,9 +453,9 @@ void notrace s390_do_machine_check(struct pt_regs *regs)
 	}
 	if (mci.ed && mci.ec) {
 		/* External damage */
-		if (S390_lowcore.external_damage_code & (1U << ED_STP_SYNC))
+		if (get_lowcore()->external_damage_code & (1U << ED_STP_SYNC))
 			mcck->stp_queue |= stp_sync_check();
-		if (S390_lowcore.external_damage_code & (1U << ED_STP_ISLAND))
+		if (get_lowcore()->external_damage_code & (1U << ED_STP_ISLAND))
 			mcck->stp_queue |= stp_island_check();
 		mcck_pending = 1;
 	}

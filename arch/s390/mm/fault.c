@@ -180,15 +180,15 @@ static void dump_fault_info(struct pt_regs *regs)
 	pr_cont("mode while using ");
 	switch (get_fault_type(regs)) {
 	case USER_FAULT:
-		asce = S390_lowcore.user_asce.val;
+		asce = get_lowcore()->user_asce.val;
 		pr_cont("user ");
 		break;
 	case GMAP_FAULT:
-		asce = ((struct gmap *)S390_lowcore.gmap)->asce;
+		asce = ((struct gmap *)get_lowcore()->gmap)->asce;
 		pr_cont("gmap ");
 		break;
 	case KERNEL_FAULT:
-		asce = S390_lowcore.kernel_asce.val;
+		asce = get_lowcore()->kernel_asce.val;
 		pr_cont("kernel ");
 		break;
 	default:
@@ -348,7 +348,7 @@ lock_mmap:
 	mmap_read_lock(mm);
 	gmap = NULL;
 	if (IS_ENABLED(CONFIG_PGSTE) && type == GMAP_FAULT) {
-		gmap = (struct gmap *)S390_lowcore.gmap;
+		gmap = (struct gmap *)get_lowcore()->gmap;
 		current->thread.gmap_addr = address;
 		current->thread.gmap_write_flag = !!(flags & FAULT_FLAG_WRITE);
 		current->thread.gmap_int_code = regs->int_code & 0xffff;
@@ -519,7 +519,7 @@ void do_secure_storage_access(struct pt_regs *regs)
 	switch (get_fault_type(regs)) {
 	case GMAP_FAULT:
 		mm = current->mm;
-		gmap = (struct gmap *)S390_lowcore.gmap;
+		gmap = (struct gmap *)get_lowcore()->gmap;
 		mmap_read_lock(mm);
 		addr = __gmap_translate(gmap, addr);
 		mmap_read_unlock(mm);
@@ -559,7 +559,7 @@ NOKPROBE_SYMBOL(do_secure_storage_access);
 
 void do_non_secure_storage_access(struct pt_regs *regs)
 {
-	struct gmap *gmap = (struct gmap *)S390_lowcore.gmap;
+	struct gmap *gmap = (struct gmap *)get_lowcore()->gmap;
 	unsigned long gaddr = get_fault_address(regs);
 
 	if (WARN_ON_ONCE(get_fault_type(regs) != GMAP_FAULT))
@@ -571,7 +571,7 @@ NOKPROBE_SYMBOL(do_non_secure_storage_access);
 
 void do_secure_storage_violation(struct pt_regs *regs)
 {
-	struct gmap *gmap = (struct gmap *)S390_lowcore.gmap;
+	struct gmap *gmap = (struct gmap *)get_lowcore()->gmap;
 	unsigned long gaddr = get_fault_address(regs);
 
 	/*
