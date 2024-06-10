@@ -98,11 +98,16 @@ unsigned int resctrl_rmid_realloc_limit;
  *
  * The domain's rmid_busy_llc and rmid_ptrs[] are sized by index. The arch code
  * must accept an attempt to read every index.
+ *
+ * Returns NULL if the rmid_ptrs[] array is not allocated.
  */
 static inline struct rmid_entry *__rmid_entry(u32 idx)
 {
 	struct rmid_entry *entry;
 	u32 closid, rmid;
+
+	if (!rmid_ptrs)
+		return NULL;
 
 	entry = &rmid_ptrs[idx];
 	resctrl_arch_rmid_idx_decode(idx, &closid, &rmid);
@@ -175,6 +180,8 @@ void __check_limbo(struct rdt_l3_mon_domain *d, bool force_free)
 			break;
 
 		entry = __rmid_entry(idx);
+		if (!entry)
+			break;
 		if (resctrl_arch_rmid_read(r, &d->hdr, entry->closid, entry->rmid,
 					   QOS_L3_OCCUP_EVENT_ID, arch_priv, &val,
 					   arch_mon_ctx)) {
@@ -355,6 +362,8 @@ void free_rmid(u32 closid, u32 rmid)
 		return;
 
 	entry = __rmid_entry(idx);
+	if (!entry)
+		return;
 
 	if (resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID))
 		add_rmid_to_limbo(entry);
@@ -961,6 +970,7 @@ int setup_rmid_lru_list(void)
 	idx = resctrl_arch_rmid_idx_encode(RESCTRL_RESERVED_CLOSID,
 					   RESCTRL_RESERVED_RMID);
 	entry = __rmid_entry(idx);
+	WARN_ON_ONCE(!entry);
 	list_del(&entry->list);
 
 	return 0;
