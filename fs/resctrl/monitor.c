@@ -113,6 +113,20 @@ static inline struct rmid_entry *__rmid_entry(u32 idx)
 	return entry;
 }
 
+static bool __has_closid_num_dirty_rmid_array(void)
+{
+	lockdep_assert_held(&rdtgroup_mutex);
+
+	if (!IS_ENABLED(CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID))
+		return false;
+
+	/*
+	 * Avoid a race with dom_data_exit() freeing the array under
+	 * rdtgroup_mutex.
+	 */
+	return closid_num_dirty_rmid;
+}
+
 static void limbo_release_entry(struct rmid_entry *entry)
 {
 	lockdep_assert_held(&rdtgroup_mutex);
@@ -120,7 +134,7 @@ static void limbo_release_entry(struct rmid_entry *entry)
 	rmid_limbo_count--;
 	list_add_tail(&entry->list, &rmid_free_lru);
 
-	if (IS_ENABLED(CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID))
+	if (__has_closid_num_dirty_rmid_array())
 		closid_num_dirty_rmid[entry->closid]--;
 }
 
@@ -240,7 +254,7 @@ int resctrl_find_cleanest_closid(void)
 
 	lockdep_assert_held(&rdtgroup_mutex);
 
-	if (!IS_ENABLED(CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID))
+	if (!__has_closid_num_dirty_rmid_array())
 		return -EIO;
 
 	for (i = 0; i < closids_supported(); i++) {
@@ -313,7 +327,7 @@ static void add_rmid_to_limbo(struct rmid_entry *entry)
 	}
 
 	rmid_limbo_count++;
-	if (IS_ENABLED(CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID))
+	if (__has_closid_num_dirty_rmid_array())
 		closid_num_dirty_rmid[entry->closid]++;
 }
 
