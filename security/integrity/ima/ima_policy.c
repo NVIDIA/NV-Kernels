@@ -649,8 +649,7 @@ retry:
 		case LSM_OBJ_USER:
 		case LSM_OBJ_ROLE:
 		case LSM_OBJ_TYPE:
-			/* stacking scaffolding */
-			security_inode_getsecid(inode, &blob.scaffold.secid);
+			security_inode_getlsmblob(inode, &blob);
 			rc = ima_filter_rule_match(&blob, lsm_rule->lsm[i].type,
 						   Audit_equal,
 						   lsm_rule->lsm[i].rule);
