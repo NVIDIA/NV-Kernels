@@ -1909,11 +1909,9 @@ static int gswip_gphy_fw_load(struct gswip_priv *priv, struct gswip_gphy_fw *gph
 	msleep(200);
 
 	ret = request_firmware(&fw, gphy_fw->fw_name, dev);
-	if (ret) {
-		dev_err(dev, "failed to load firmware: %s, error: %i\n",
-			gphy_fw->fw_name, ret);
-		return ret;
-	}
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to load firmware: %s\n",
+				     gphy_fw->fw_name);
 
 	/* GPHY cores need the firmware code in a persistent and contiguous
 	 * memory area with a 16 kB boundary aligned start address.
@@ -1926,9 +1924,9 @@ static int gswip_gphy_fw_load(struct gswip_priv *priv, struct gswip_gphy_fw *gph
 		dev_addr = ALIGN(dma_addr, XRX200_GPHY_FW_ALIGN);
 		memcpy(fw_addr, fw->data, fw->size);
 	} else {
-		dev_err(dev, "failed to alloc firmware memory\n");
 		release_firmware(fw);
-		return -ENOMEM;
+		return dev_err_probe(dev, -ENOMEM,
+				     "failed to alloc firmware memory\n");
 	}
 
 	release_firmware(fw);
@@ -1955,8 +1953,8 @@ static int gswip_gphy_fw_probe(struct gswip_priv *priv,
 
 	gphy_fw->clk_gate = devm_clk_get(dev, gphyname);
 	if (IS_ERR(gphy_fw->clk_gate)) {
-		dev_err(dev, "Failed to lookup gate clock\n");
-		return PTR_ERR(gphy_fw->clk_gate);
+		return dev_err_probe(dev, PTR_ERR(gphy_fw->clk_gate),
+				     "Failed to lookup gate clock\n");
 	}
 
 	ret = of_property_read_u32(gphy_fw_np, "reg", &gphy_fw->fw_addr_offset);
@@ -1976,8 +1974,8 @@ static int gswip_gphy_fw_probe(struct gswip_priv *priv,
 		gphy_fw->fw_name = priv->gphy_fw_name_cfg->ge_firmware_name;
 		break;
 	default:
-		dev_err(dev, "Unknown GPHY mode %d\n", gphy_mode);
-		return -EINVAL;
+		return dev_err_probe(dev, -EINVAL, "Unknown GPHY mode %d\n",
+				     gphy_mode);
 	}
 
 	gphy_fw->reset = of_reset_control_array_get_exclusive(gphy_fw_np);
@@ -2028,8 +2026,9 @@ static int gswip_gphy_fw_list(struct gswip_priv *priv,
 			priv->gphy_fw_name_cfg = &xrx200a2x_gphy_data;
 			break;
 		default:
-			dev_err(dev, "unknown GSWIP version: 0x%x", version);
-			return -ENOENT;
+			return dev_err_probe(dev, -ENOENT,
+					     "unknown GSWIP version: 0x%x\n",
+					     version);
 		}
 	}
 
@@ -2037,10 +2036,9 @@ static int gswip_gphy_fw_list(struct gswip_priv *priv,
 	if (match && match->data)
 		priv->gphy_fw_name_cfg = match->data;
 
-	if (!priv->gphy_fw_name_cfg) {
-		dev_err(dev, "GPHY compatible type not supported");
-		return -ENOENT;
-	}
+	if (!priv->gphy_fw_name_cfg)
+		return dev_err_probe(dev, -ENOENT,
+				     "GPHY compatible type not supported\n");
 
 	priv->num_gphy_fw = of_get_available_child_count(gphy_fw_list_np);
 	if (!priv->num_gphy_fw)
@@ -2140,8 +2138,8 @@ static int gswip_probe(struct platform_device *pdev)
 			return -EINVAL;
 		break;
 	default:
-		dev_err(dev, "unknown GSWIP version: 0x%x", version);
-		return -ENOENT;
+		return dev_err_probe(dev, -ENOENT,
+				     "unknown GSWIP version: 0x%x\n", version);
 	}
 
 	/* bring up the mdio bus */
@@ -2149,28 +2147,27 @@ static int gswip_probe(struct platform_device *pdev)
 	if (gphy_fw_np) {
 		err = gswip_gphy_fw_list(priv, gphy_fw_np, version);
 		of_node_put(gphy_fw_np);
-		if (err) {
-			dev_err(dev, "gphy fw probe failed\n");
-			return err;
-		}
+		if (err)
+			return dev_err_probe(dev, err,
+					     "gphy fw probe failed\n");
 	}
 
 	/* bring up the mdio bus */
 	err = gswip_mdio(priv);
 	if (err) {
-		dev_err(dev, "mdio probe failed\n");
+		dev_err_probe(dev, err, "mdio probe failed\n");
 		goto gphy_fw_remove;
 	}
 
 	err = dsa_register_switch(priv->ds);
 	if (err) {
-		dev_err(dev, "dsa switch register failed: %i\n", err);
+		dev_err_probe(dev, err, "dsa switch registration failed\n");
 		goto gphy_fw_remove;
 	}
 	if (!dsa_is_cpu_port(priv->ds, priv->hw_info->cpu_port)) {
-		dev_err(dev, "wrong CPU port defined, HW only supports port: %i",
-			priv->hw_info->cpu_port);
-		err = -EINVAL;
+		err = dev_err_probe(dev, -EINVAL,
+				    "wrong CPU port defined, HW only supports port: %i\n",
+				    priv->hw_info->cpu_port);
 		goto disable_switch;
 	}
 
