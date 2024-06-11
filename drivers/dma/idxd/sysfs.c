@@ -1114,6 +1114,7 @@ static umode_t idxd_wq_attr_visible(struct kobject *kobj,
 
 static const struct attribute_group idxd_wq_attribute_group = {
 	.attrs = idxd_wq_attributes,
+	.is_visible = idxd_wq_attr_visible,
 };
 
 static const struct attribute_group *idxd_wq_attribute_groups[] = {
