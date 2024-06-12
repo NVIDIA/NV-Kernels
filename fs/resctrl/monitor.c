@@ -324,6 +324,10 @@ void free_rmid(u32 closid, u32 rmid)
 
 	lockdep_assert_held(&rdtgroup_mutex);
 
+	/* rmid_ptrs[] not allocated if there are no monitors */
+	if (!resctrl_arch_mon_capable())
+		return;
+
 	/*
 	 * Do not allow the default rmid to be free'd. Comparing by index
 	 * allows architectures that ignore the closid parameter to avoid an
