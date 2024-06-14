@@ -288,3 +288,9 @@ int xe_sched_job_last_fence_add_dep(struct xe_sched_job *job, struct xe_vm *vm)
 
 	return drm_sched_job_add_dependency(&job->drm, fence);
 }
+
+int xe_sched_job_add_deps(struct xe_sched_job *job, struct dma_resv *resv,
+			  enum dma_resv_usage usage)
+{
+	return drm_sched_job_add_resv_dependencies(&job->drm, resv, usage);
+}

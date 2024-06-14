@@ -77,4 +77,7 @@ xe_sched_job_add_migrate_flush(struct xe_sched_job *job, u32 flags)
 
 bool xe_sched_job_is_migration(struct xe_exec_queue *q);
 
+int xe_sched_job_add_deps(struct xe_sched_job *job, struct dma_resv *resv,
+			  enum dma_resv_usage usage);
+
 #endif
