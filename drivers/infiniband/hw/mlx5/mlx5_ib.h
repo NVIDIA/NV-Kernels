@@ -1174,6 +1174,8 @@ struct mlx5_ib_dev {
 #ifdef CONFIG_MLX5_MACSEC
 	struct mlx5_macsec macsec;
 #endif
+
+	u8 num_plane;
 };
 
 static inline struct mlx5_ib_cq *to_mibcq(struct mlx5_core_cq *mcq)
