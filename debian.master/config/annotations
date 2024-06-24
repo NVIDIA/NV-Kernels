@@ -1245,6 +1245,7 @@ CONFIG_ARCH_BINFMT_ELF_EXTRA_PHDRS              policy<{'arm64': 'y'}>
 CONFIG_ARCH_BINFMT_ELF_STATE                    policy<{'arm64': 'y', 's390x': 'y'}>
 CONFIG_ARCH_BITMAIN                             policy<{'arm64': 'y'}>
 CONFIG_ARCH_CLOCKSOURCE_INIT                    policy<{'amd64': 'y', 'riscv64': '-'}>
+CONFIG_ARCH_CONFIGURES_CPU_MITIGATIONS          policy<{'amd64': 'y'}>
 CONFIG_ARCH_CORRECT_STACKTRACE_ON_KRETPROBE     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 's390x': 'y'}>
 CONFIG_ARCH_CPUIDLE_HALTPOLL                    policy<{'amd64': 'y'}>
 CONFIG_ARCH_CPU_PROBE_RELEASE                   policy<{'ppc64el': 'y'}>
@@ -3314,6 +3315,7 @@ CONFIG_CPU_IDLE_MULTIPLE_DRIVERS                policy<{'arm64': 'y', 'armhf': '
 CONFIG_CPU_IDLE_THERMAL                         policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_CPU_ISOLATION                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CPU_LITTLE_ENDIAN                        policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y'}>
+CONFIG_CPU_MITIGATIONS                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CPU_PABRT_V7                             policy<{'armhf': 'y'}>
 CONFIG_CPU_PJ4                                  policy<{'armhf': 'y'}>
 CONFIG_CPU_PJ4B                                 policy<{'armhf': 'y'}>
@@ -13225,7 +13227,6 @@ CONFIG_SPEAKUP_SYNTH_LTLK                       policy<{'amd64': 'm', 'arm64': '
 CONFIG_SPEAKUP_SYNTH_SOFT                       policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SPEAKUP_SYNTH_SPKOUT                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SPEAKUP_SYNTH_TXPRT                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
-CONFIG_SPECULATION_MITIGATIONS                  policy<{'amd64': 'y'}>
 CONFIG_SPI                                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'n'}>
 CONFIG_SPI_ALTERA                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_SPI_ALTERA_CORE                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
