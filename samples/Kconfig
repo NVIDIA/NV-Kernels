@@ -128,6 +128,12 @@ config SAMPLE_RPMSG_CLIENT
 	  to communicate with an AMP-configured remote processor over
 	  the rpmsg bus.
 
+config SAMPLE_SMMUV3TESTENGINE
+	tristate "Arm FVP SMMUv3 Test Engine"
+	default m
+	help
+	  Provides kernel module for testing SMMUv3 test engine in FVP.
+
 config SAMPLE_LIVEPATCH
 	tristate "Build live patching samples -- loadable modules only"
 	depends on LIVEPATCH && m
