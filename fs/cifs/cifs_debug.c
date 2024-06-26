@@ -380,6 +380,11 @@ skip_rdma:
 		list_for_each(tmp2, &server->smb_ses_list) {
 			ses = list_entry(tmp2, struct cifs_ses,
 					 smb_ses_list);
+			spin_lock(&GlobalMid_Lock);
+			if (ses->status == CifsExiting) {
+				spin_unlock(&GlobalMid_Lock);
+				continue;
+			}
 			i++;
 			if ((ses->serverDomain == NULL) ||
 				(ses->serverOS == NULL) ||
@@ -400,6 +405,7 @@ skip_rdma:
 				ses->ses_count, ses->serverOS, ses->serverNOS,
 				ses->capabilities, ses->status);
 			}
+			spin_unlock(&GlobalMid_Lock);
 
 			seq_printf(m, "\n\tSecurity type: %s ",
 				get_security_type_str(server->ops->select_sectype(server, ses->sectype)));
