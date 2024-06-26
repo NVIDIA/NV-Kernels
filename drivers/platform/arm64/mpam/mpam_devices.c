@@ -777,6 +777,12 @@ static const struct mpam_quirk mpam_quirks[] = {
 	.iidr_mask  = IIDR_MATCH_ONE,
 	.workaround = T241_MBW_COUNTER_SCALE_64,
 	},
+	{
+	/* ARM CMN-650 CSU erratum 3642720 */
+	.iidr       = IIDR_PROD(0) | IIDR_VAR(0) | IIDR_REV(0) | IIDR_IMP(0x43b),
+	.iidr_mask  = IIDR_MATCH_ONE,
+	.workaround = IGNORE_CSU_NRDY,
+	},
 	{ NULL }, /* Sentinel */
 };
 
@@ -1088,6 +1094,7 @@ struct mon_read {
 	enum mpam_device_features	type;
 	u64				*val;
 	int				err;
+	bool				waited_timeout;
 };
 
 static bool mpam_ris_has_mbwu_long_counter(struct mpam_msc_ris *ris)
@@ -1289,6 +1296,10 @@ static void __ris_msmon_read(void *arg)
 		if (mpam_has_feature(mpam_feat_msmon_csu_hw_nrdy, rprops))
 			nrdy = now & MSMON___NRDY;
 		now = FIELD_GET(MSMON___VALUE, now);
+
+		if (mpam_has_quirk(IGNORE_CSU_NRDY, msc) && m->waited_timeout)
+			nrdy = false;
+
 		break;
 	case mpam_feat_msmon_mbwu:
 		/*
@@ -1399,6 +1410,7 @@ int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 	arg.ctx = ctx;
 	arg.type = type;
 	arg.val = val;
+	arg.waited_timeout = false;
 	*val = 0;
 
 	err = _msmon_read(comp, &arg);
@@ -1413,6 +1425,7 @@ int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 		arg.ctx = ctx;
 		arg.type = type;
 		arg.val = val;
+		arg.waited_timeout = true;
 		*val = 0;
 
 		err = _msmon_read(comp, &arg);
