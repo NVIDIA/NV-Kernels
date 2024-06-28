@@ -611,7 +611,8 @@ static int apparmor_inode_unlink(struct inode *dir, struct dentry *dentry)
 	return error;
 }
 
-static int apparmor_inode_setattr(struct dentry *dentry, struct iattr *iattr)
+static int apparmor_inode_setattr(struct mnt_idmap *idmap,
+				  struct dentry *dentry, struct iattr *iattr)
 {
 	/* TODO: extend to support iattr as a parameter */
 	if (is_mqueue_dentry(dentry))
