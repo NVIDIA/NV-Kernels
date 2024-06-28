@@ -66,7 +66,6 @@ struct mpam_msc {
 	/* Not modified after mpam_is_enabled() becomes true */
 	enum mpam_msc_iface	iface;
 	u32			pcc_subspace_id;
-	struct mbox_client	pcc_cl;
 	struct pcc_mbox_chan	*pcc_chan;
 	struct mpam_fb_channel	mpam_fb_chan;
 	int			mpam_fb_msc_id;	/* in its own name space */
@@ -486,6 +485,8 @@ int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 		    enum mpam_device_features, u64 *val);
 void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx);
 void mpam_msmon_reset_all_mbwu(struct mpam_component *comp);
+
+void mpam_pcc_rx_callback(struct mbox_client *cl, void *msg);
 
 #ifdef CONFIG_RESCTRL_FS
 int mpam_resctrl_setup(void);

@@ -479,6 +479,8 @@ static void mpam_ris_destroy(struct mpam_msc_ris *ris)
 		mpam_vmsc_destroy(vmsc);
 }
 
+static void mpam_pcc_put(u8 subspace_id);
+
 /*
  * There are two ways of reaching a struct mpam_msc_ris. Via the
  * class->component->vmsc->ris, or via the msc.
@@ -500,6 +502,9 @@ static void mpam_msc_destroy(struct mpam_msc *msc)
 	debugfs_remove_recursive(msc->debugfs);
 	msc->debugfs = NULL;
 
+	if (msc->iface == MPAM_IFACE_PCC)
+		mpam_pcc_put(msc->pcc_subspace_id);
+
 	add_to_garbage(msc);
 	msc->garbage.pdev = pdev;
 }
@@ -519,6 +524,102 @@ static void mpam_free_garbage(void)
 			devm_kfree(&iter->pdev->dev, iter->to_free);
 		else
 			kfree(iter->to_free);
+	}
+}
+
+static LIST_HEAD(mpam_pcc_channels);
+
+struct mpam_pcc_chan {
+	struct list_head	pcc_channels_list;
+
+	u32			refs;
+	u32			subspace_id;
+	struct pcc_mbox_chan	*channel;
+	struct mbox_client	pcc_cl;
+
+	struct mpam_garbage	garbage;
+};
+
+static struct pcc_mbox_chan *mpam_pcc_alloc(u8 subspace_id, gfp_t gfp)
+{
+	struct mpam_pcc_chan *chan;
+
+	lockdep_assert_held(&mpam_list_lock);
+
+	chan = kzalloc(sizeof(*chan), gfp);
+	if (!chan)
+		return ERR_PTR(-ENOMEM);
+
+	INIT_LIST_HEAD_RCU(&chan->pcc_channels_list);
+	chan->refs = 1;
+	chan->subspace_id = subspace_id;
+	/*
+	 * TODO is the device important - these subspace_id can be re-used, so
+	 * there is no one device to put here ...
+	 */
+	chan->pcc_cl.rx_callback = mpam_pcc_rx_callback;
+	chan->pcc_cl.tx_block = false;
+	chan->pcc_cl.tx_tout = 1000; /* 1s */
+	chan->pcc_cl.knows_txdone = false;
+
+	chan->channel = pcc_mbox_request_channel(&chan->pcc_cl, subspace_id);
+	if (IS_ERR(chan->channel)) {
+		kfree(chan);
+		return NULL;
+	}
+
+	init_garbage(chan);
+	list_add(&chan->pcc_channels_list, &mpam_pcc_channels);
+	return chan->channel;
+}
+
+static struct pcc_mbox_chan *mpam_pcc_get(u8 subspace_id, bool alloc, gfp_t gfp)
+{
+	bool found = false;
+	struct mpam_pcc_chan *chan;
+
+	lockdep_assert_held(&mpam_list_lock);
+
+	list_for_each_entry(chan, &mpam_pcc_channels, pcc_channels_list) {
+		if (chan->subspace_id == subspace_id) {
+			found = true;
+			break;
+		}
+	}
+
+	if (found) {
+		chan->refs++;
+		return chan->channel;
+	}
+
+	if (!alloc)
+		return ERR_PTR(-ENOENT);
+
+	return mpam_pcc_alloc(subspace_id, gfp);
+}
+
+static void mpam_pcc_put(u8 subspace_id)
+{
+	bool found = false;
+	struct mpam_pcc_chan *chan;
+
+	lockdep_assert_held(&mpam_list_lock);
+
+	list_for_each_entry(chan, &mpam_pcc_channels, pcc_channels_list) {
+		if (chan->subspace_id == subspace_id) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found)
+		return;
+
+	chan->refs--;
+	if (!chan->refs) {
+		list_del(&chan->pcc_channels_list);
+		pcc_mbox_free_channel(chan->channel);
+		add_to_garbage(chan);
 	}
 }
 
@@ -2120,7 +2221,7 @@ static int get_msc_affinity(struct mpam_msc *msc)
 
 static int fw_num_msc;
 
-static void mpam_pcc_rx_callback(struct mbox_client *cl, void *msg)
+void mpam_pcc_rx_callback(struct mbox_client *cl, void *msg)
 {
 	/* TODO: wake up tasks blocked on this MSC's PCC channel */
 }
@@ -2204,14 +2305,7 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 			void * __iomem io;
 			pgprot_t prot;
 
-			msc->pcc_cl.dev = &pdev->dev;
-			msc->pcc_cl.rx_callback = mpam_pcc_rx_callback;
-			msc->pcc_cl.tx_block = false;
-			msc->pcc_cl.tx_tout = 1000; /* 1s */
-			msc->pcc_cl.knows_txdone = false;
-
-			msc->pcc_chan = pcc_mbox_request_channel(&msc->pcc_cl,
-								 msc->pcc_subspace_id);
+			msc->pcc_chan = mpam_pcc_get(msc->pcc_subspace_id, true, GFP_KERNEL);
 			if (IS_ERR(msc->pcc_chan)) {
 				pr_err("Failed to request MSC PCC channel\n");
 				err = PTR_ERR(msc->pcc_chan);
@@ -2223,7 +2317,7 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 					  msc->pcc_chan->shmem_size, pgprot_val(prot));
 			if (IS_ERR(io)) {
 				pr_err("Failed to map MSC base address\n");
-				pcc_mbox_free_channel(msc->pcc_chan);
+				mpam_pcc_put(msc->pcc_subspace_id);
 				err = PTR_ERR(io);
 				break;
 			}
