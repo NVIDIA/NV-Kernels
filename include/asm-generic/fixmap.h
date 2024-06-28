@@ -96,7 +96,7 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
  */
 #ifndef set_fixmap_io
 #define set_fixmap_io(idx, phys) \
-	__set_fixmap(idx, phys, FIXMAP_PAGE_IO)
+	__set_fixmap(idx, phys & PAGE_MASK, FIXMAP_PAGE_IO)
 #endif
 
 #endif /* __ASSEMBLY__ */
