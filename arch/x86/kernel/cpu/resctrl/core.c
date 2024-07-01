@@ -72,7 +72,7 @@ struct rdt_hw_resource rdt_resources_all[] = {
 			.mon_scope		= RESCTRL_L3_CACHE,
 			.ctrl_domains		= ctrl_domain_init(RDT_RESOURCE_L3),
 			.mon_domains		= mon_domain_init(RDT_RESOURCE_L3),
-			.parse_ctrlval		= parse_cbm,
+			.schema_fmt		= RESCTRL_SCHEMA_BITMAP,
 			.format_str		= "%d=%0*x",
 		},
 		.msr_base		= MSR_IA32_L3_CBM_BASE,
@@ -85,7 +85,7 @@ struct rdt_hw_resource rdt_resources_all[] = {
 			.name			= "L2",
 			.ctrl_scope		= RESCTRL_L2_CACHE,
 			.ctrl_domains		= ctrl_domain_init(RDT_RESOURCE_L2),
-			.parse_ctrlval		= parse_cbm,
+			.schema_fmt		= RESCTRL_SCHEMA_BITMAP,
 			.format_str		= "%d=%0*x",
 		},
 		.msr_base		= MSR_IA32_L2_CBM_BASE,
@@ -98,7 +98,11 @@ struct rdt_hw_resource rdt_resources_all[] = {
 			.name			= "MB",
 			.ctrl_scope		= RESCTRL_L3_CACHE,
 			.ctrl_domains		= ctrl_domain_init(RDT_RESOURCE_MBA),
-			.parse_ctrlval		= parse_bw,
+			/*
+			 * MBA schema_fmt is modified by
+			 * __rdt_get_mem_config_amd()
+			 */
+			.schema_fmt		= RESCTRL_SCHEMA_PERCENTAGE,
 			.format_str		= "%d=%*u",
 		},
 	},
@@ -109,7 +113,7 @@ struct rdt_hw_resource rdt_resources_all[] = {
 			.name			= "SMBA",
 			.ctrl_scope		= RESCTRL_L3_CACHE,
 			.ctrl_domains		= ctrl_domain_init(RDT_RESOURCE_SMBA),
-			.parse_ctrlval		= parse_bw,
+			.schema_fmt		= RESCTRL_SCHEMA_MBPS,
 			.format_str		= "%d=%*u",
 		},
 	},
@@ -259,6 +263,7 @@ static bool __rdt_get_mem_config_amd(struct rdt_resource *r)
 	cpuid_count(0x80000020, subleaf, &eax, &ebx, &ecx, &edx);
 	hw_res->num_closid = edx + 1;
 	r->default_ctrl = 1 << eax;
+	r->schema_fmt = RESCTRL_SCHEMA_MBPS;
 
 	/* AMD does not use delay */
 	r->membw.delay_linear = false;
