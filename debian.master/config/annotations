@@ -11609,14 +11609,14 @@ CONFIG_SCTP_DEFAULT_COOKIE_HMAC_NONE            policy<{'amd64': 'n', 'arm64': '
 CONFIG_SCTP_DEFAULT_COOKIE_HMAC_SHA1            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_SC_CAMCC_7180                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_CAMCC_7280                            policy<{'arm64': 'm', 'armhf': '-'}>
-CONFIG_SC_CAMCC_8280XP                          policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_SC_CAMCC_8280XP                          policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_DISPCC_7180                           policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_DISPCC_7280                           policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_DISPCC_8280XP                         policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_GCC_7180                              policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_GCC_7280                              policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_GCC_8180X                             policy<{'arm64': 'm', 'armhf': '-'}>
-CONFIG_SC_GCC_8280XP                            policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_SC_GCC_8280XP                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_GPUCC_7180                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_GPUCC_7280                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_GPUCC_8280XP                          policy<{'arm64': 'm', 'armhf': '-'}>
