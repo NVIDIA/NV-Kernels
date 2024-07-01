@@ -12231,7 +12231,7 @@ CONFIG_SM_GCC_8250                              policy<{'arm64': 'm', 'armhf': '
 CONFIG_SM_GCC_8350                              policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_GCC_8450                              policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_GCC_8550                              policy<{'arm64': 'm', 'armhf': '-'}>
-CONFIG_SM_GCC_8650                              policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_SM_GCC_8650                              policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_GPUCC_6115                            policy<{'arm64': 'm'}>
 CONFIG_SM_GPUCC_6125                            policy<{'arm64': 'm'}>
 CONFIG_SM_GPUCC_6350                            policy<{'arm64': 'm', 'armhf': '-'}>
@@ -12241,7 +12241,7 @@ CONFIG_SM_GPUCC_8250                            policy<{'arm64': 'm', 'armhf': '
 CONFIG_SM_GPUCC_8350                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_GPUCC_8450                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_GPUCC_8550                            policy<{'arm64': 'm', 'armhf': '-'}>
-CONFIG_SM_GPUCC_8650                            policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_SM_GPUCC_8650                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_TCSRCC_8550                           policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SM_TCSRCC_8650                           policy<{'arm64': 'm'}>
 CONFIG_SM_VIDEOCC_8150                          policy<{'arm64': 'm', 'armhf': '-'}>
