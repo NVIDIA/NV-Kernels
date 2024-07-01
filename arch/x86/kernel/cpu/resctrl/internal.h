@@ -27,26 +27,6 @@
  */
 #define MBM_CNTR_WIDTH_OFFSET_MAX (62 - MBM_CNTR_WIDTH_BASE)
 
-/* rdtgroup.flags */
-#define	RDT_DELETED		1
-
-/*
- * Define the file type flags for base and info directories.
- */
-#define RFTYPE_INFO			BIT(0)
-#define RFTYPE_BASE			BIT(1)
-#define RFTYPE_CTRL			BIT(4)
-#define RFTYPE_MON			BIT(5)
-#define RFTYPE_TOP			BIT(6)
-#define RFTYPE_RES_CACHE		BIT(8)
-#define RFTYPE_RES_MB			BIT(9)
-#define RFTYPE_DEBUG			BIT(10)
-#define RFTYPE_CTRL_INFO		(RFTYPE_INFO | RFTYPE_CTRL)
-#define RFTYPE_MON_INFO			(RFTYPE_INFO | RFTYPE_MON)
-#define RFTYPE_TOP_INFO			(RFTYPE_INFO | RFTYPE_TOP)
-#define RFTYPE_CTRL_BASE		(RFTYPE_BASE | RFTYPE_CTRL)
-#define RFTYPE_MON_BASE			(RFTYPE_BASE | RFTYPE_MON)
-
 /**
  * struct arch_mbm_state - values used to compute resctrl_arch_rmid_read()s
  *			   return value.
