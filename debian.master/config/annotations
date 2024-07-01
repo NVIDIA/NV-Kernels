@@ -4803,7 +4803,7 @@ CONFIG_ERRATA_SIFIVE_CIP_1200                   policy<{'riscv64': 'y'}>
 CONFIG_ERRATA_SIFIVE_CIP_453                    policy<{'riscv64': 'y'}>
 CONFIG_ERRATA_THEAD                             policy<{'riscv64': 'y'}>
 CONFIG_ERRATA_THEAD_CMO                         policy<{'riscv64': 'y'}>
-CONFIG_ERRATA_THEAD_PBMT                        policy<{'riscv64': 'y'}>
+CONFIG_ERRATA_THEAD_MAE                         policy<{'riscv64': 'y'}>
 CONFIG_ERRATA_THEAD_PMU                         policy<{'riscv64': 'y'}>
 CONFIG_ET131X                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_ETHERNET                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
