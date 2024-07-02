@@ -29,4 +29,7 @@ void iommu_device_unregister_bus(struct iommu_device *iommu,
 
 int iommu_mock_device_add(struct device *dev, struct iommu_device *iommu);
 
+struct iommu_attach_handle *iommu_attach_handle_get(struct iommu_group *group,
+						    ioasid_t pasid,
+						    unsigned int type);
 #endif /* __LINUX_IOMMU_PRIV_H */
