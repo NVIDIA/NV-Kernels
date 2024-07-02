@@ -2838,7 +2838,8 @@ static int gup_hugepte(pte_t *ptep, unsigned long sz, unsigned long addr,
 	if (pte_end < end)
 		end = pte_end;
 
-	pte = huge_ptep_get(ptep);
+	/* No VMA/mm is available in the fast-GUP hugepd walk. */
+	pte = huge_ptep_get(NULL, addr, ptep);
 
 	if (!pte_access_permitted(pte, flags & FOLL_WRITE))
 		return 0;
