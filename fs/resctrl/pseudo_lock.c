@@ -30,9 +30,6 @@
 #include "../../events/perf_event.h" /* For X86_CONFIG() */
 #include "internal.h"
 
-#define CREATE_TRACE_POINTS
-#include "pseudo_lock_trace.h"
-
 /*
  * Major number assigned to and shared by all devices exposing
  * pseudo-locked regions.

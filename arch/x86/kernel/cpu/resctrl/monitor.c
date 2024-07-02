@@ -27,9 +27,6 @@
 
 #include "internal.h"
 
-#define CREATE_TRACE_POINTS
-#include "monitor_trace.h"
-
 /*
  * Global boolean for rdt_monitor which is true if any
  * resource monitoring is enabled.
