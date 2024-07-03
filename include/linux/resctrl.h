@@ -3,6 +3,7 @@
 #define _RESCTRL_H
 
 #include <linux/cacheinfo.h>
+#include <linux/cpu.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/pid.h>
@@ -397,6 +398,42 @@ static inline u32 resctrl_get_config_index(u32 closid,
 	case CDP_DATA:
 		return closid * 2;
 	}
+}
+
+/*
+ * Caller must hold the cpuhp read lock to prevent the struct rdt_domain from
+ * being freed.
+ */
+static inline struct rdt_ctrl_domain *
+resctrl_get_ctrl_domain_from_cpu(int cpu, struct rdt_resource *r)
+{
+	struct rdt_ctrl_domain *d;
+
+	lockdep_assert_cpus_held();
+
+	list_for_each_entry(d, &r->ctrl_domains, hdr.list) {
+		/* Find the domain that contains this CPU */
+		if (cpumask_test_cpu(cpu, &d->hdr.cpu_mask))
+			return d;
+	}
+
+	return NULL;
+}
+
+static inline struct rdt_mon_domain *
+resctrl_get_mon_domain_from_cpu(int cpu, struct rdt_resource *r)
+{
+	struct rdt_mon_domain *d;
+
+	lockdep_assert_cpus_held();
+
+	list_for_each_entry(d, &r->mon_domains, hdr.list) {
+		/* Find the domain that contains this CPU */
+		if (cpumask_test_cpu(cpu, &d->hdr.cpu_mask))
+			return d;
+	}
+
+	return NULL;
 }
 
 /*
