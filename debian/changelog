@@ -1,3 +1,9 @@
+linux-meta (6.8.0-40.40) noble; urgency=medium
+
+  * Main version: 6.8.0-40.40
+
+ -- Stefan Bader <stefan.bader@canonical.com>  Fri, 05 Jul 2024 11:12:43 +0200
+
 linux-meta (6.8.0-38.38) noble; urgency=medium
 
   * Main version: 6.8.0-38.38
