@@ -658,10 +658,11 @@ struct arm_smmu_device {
 #define ARM_SMMU_FEAT_HD		(1 << 22)
 	u32				features;
 
-#define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-#define ARM_SMMU_OPT_PAGE0_REGS_ONLY	(1 << 1)
-#define ARM_SMMU_OPT_MSIPOLL		(1 << 2)
-#define ARM_SMMU_OPT_CMDQ_FORCE_SYNC	(1 << 3)
+#define ARM_SMMU_OPT_SKIP_PREFETCH			(1 << 0)
+#define ARM_SMMU_OPT_PAGE0_REGS_ONLY			(1 << 1)
+#define ARM_SMMU_OPT_MSIPOLL				(1 << 2)
+#define ARM_SMMU_OPT_CMDQ_FORCE_SYNC			(1 << 3)
+#define ARM_SMMU_OPT_SECONDARY_CMDQ_CS_NONE_ONLY	(1 << 4)
 	u32				options;
 
 	struct arm_smmu_cmdq		cmdq;
