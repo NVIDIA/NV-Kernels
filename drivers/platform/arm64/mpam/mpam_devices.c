@@ -771,6 +771,12 @@ static const struct mpam_quirk mpam_quirks[] = {
 	.iidr_mask  = IIDR_MATCH_ONE,
 	.workaround = T241_FORCE_MBW_MIN_TO_ONE,
 	},
+	{
+	/* NVIDIA t241 erratum T241-MPAM-6 */
+	.iidr       = IIDR_PROD(0x241) | IIDR_VAR(0) | IIDR_REV(0) | IIDR_IMP(0x36b),
+	.iidr_mask  = IIDR_MATCH_ONE,
+	.workaround = T241_MBW_COUNTER_SCALE_64,
+	},
 	{ NULL }, /* Sentinel */
 };
 
@@ -1304,6 +1310,9 @@ static void __ris_msmon_read(void *arg)
 			now = FIELD_GET(MSMON___VALUE, now);
 		}
 
+		if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc))
+			now *= 64;
+
 		if (nrdy)
 			break;
 
@@ -1311,8 +1320,12 @@ static void __ris_msmon_read(void *arg)
 			break;
 
 		/* Add any pre-overflow value to the mbwu_state->val */
-		if (mbwu_state->prev_val > now)
-			overflow_val = mpam_msmon_overflow_val(ris) - mbwu_state->prev_val;
+		if (mbwu_state->prev_val > now) {
+			overflow_val = mpam_msmon_overflow_val(ris);
+			if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc))
+				overflow_val *= 64;
+			overflow_val -= mbwu_state->prev_val;
+		}
 
 		mbwu_state->prev_val = now;
 		mbwu_state->correction += overflow_val;
