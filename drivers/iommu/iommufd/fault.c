@@ -16,7 +16,7 @@
 #include "../iommu-priv.h"
 #include "iommufd_private.h"
 
-static int iommufd_fault_iopf_enable(struct iommufd_device *idev)
+static int iommufd_event_iopf_enable(struct iommufd_device *idev)
 {
 	struct device *dev = idev->dev;
 	int ret;
@@ -45,7 +45,7 @@ static int iommufd_fault_iopf_enable(struct iommufd_device *idev)
 	return ret;
 }
 
-static void iommufd_fault_iopf_disable(struct iommufd_device *idev)
+static void iommufd_event_iopf_disable(struct iommufd_device *idev)
 {
 	mutex_lock(&idev->iopf_lock);
 	if (!WARN_ON(idev->iopf_enabled == 0)) {
@@ -55,8 +55,8 @@ static void iommufd_fault_iopf_disable(struct iommufd_device *idev)
 	mutex_unlock(&idev->iopf_lock);
 }
 
-static int __fault_domain_attach_dev(struct iommufd_hw_pagetable *hwpt,
-				     struct iommufd_device *idev)
+static int __iopf_domain_attach_dev(struct iommufd_hw_pagetable *hwpt,
+				    struct iommufd_device *idev)
 {
 	struct iommufd_attach_handle *handle;
 	int ret;
@@ -74,29 +74,29 @@ static int __fault_domain_attach_dev(struct iommufd_hw_pagetable *hwpt,
 	return ret;
 }
 
-int iommufd_fault_domain_attach_dev(struct iommufd_hw_pagetable *hwpt,
-				    struct iommufd_device *idev)
+int iommufd_event_iopf_domain_attach_dev(struct iommufd_hw_pagetable *hwpt,
+					 struct iommufd_device *idev)
 {
 	int ret;
 
 	if (!hwpt->fault)
 		return -EINVAL;
 
-	ret = iommufd_fault_iopf_enable(idev);
+	ret = iommufd_event_iopf_enable(idev);
 	if (ret)
 		return ret;
 
-	ret = __fault_domain_attach_dev(hwpt, idev);
+	ret = __iopf_domain_attach_dev(hwpt, idev);
 	if (ret)
-		iommufd_fault_iopf_disable(idev);
+		iommufd_event_iopf_disable(idev);
 
 	return ret;
 }
 
-static void iommufd_auto_response_faults(struct iommufd_hw_pagetable *hwpt,
-					 struct iommufd_attach_handle *handle)
+static void iommufd_event_iopf_auto_response(struct iommufd_hw_pagetable *hwpt,
+					     struct iommufd_attach_handle *handle)
 {
-	struct iommufd_fault *fault = hwpt->fault;
+	struct iommufd_event *fault = hwpt->fault;
 	struct iopf_group *group, *next;
 	unsigned long index;
 
@@ -134,21 +134,21 @@ iommufd_device_get_attach_handle(struct iommufd_device *idev)
 	return to_iommufd_handle(handle);
 }
 
-void iommufd_fault_domain_detach_dev(struct iommufd_hw_pagetable *hwpt,
-				     struct iommufd_device *idev)
+void iommufd_event_iopf_domain_detach_dev(struct iommufd_hw_pagetable *hwpt,
+					  struct iommufd_device *idev)
 {
 	struct iommufd_attach_handle *handle;
 
 	handle = iommufd_device_get_attach_handle(idev);
 	iommu_detach_group_handle(hwpt->domain, idev->igroup->group);
-	iommufd_auto_response_faults(hwpt, handle);
-	iommufd_fault_iopf_disable(idev);
+	iommufd_event_iopf_auto_response(hwpt, handle);
+	iommufd_event_iopf_disable(idev);
 	kfree(handle);
 }
 
-static int __fault_domain_replace_dev(struct iommufd_device *idev,
-				      struct iommufd_hw_pagetable *hwpt,
-				      struct iommufd_hw_pagetable *old)
+static int __iopf_domain_replace_dev(struct iommufd_device *idev,
+				     struct iommufd_hw_pagetable *hwpt,
+				     struct iommufd_hw_pagetable *old)
 {
 	struct iommufd_attach_handle *handle, *curr = NULL;
 	int ret;
@@ -171,43 +171,43 @@ static int __fault_domain_replace_dev(struct iommufd_device *idev,
 	}
 
 	if (!ret && curr) {
-		iommufd_auto_response_faults(old, curr);
+		iommufd_event_iopf_auto_response(old, curr);
 		kfree(curr);
 	}
 
 	return ret;
 }
 
-int iommufd_fault_domain_replace_dev(struct iommufd_device *idev,
-				     struct iommufd_hw_pagetable *hwpt,
-				     struct iommufd_hw_pagetable *old)
+int iommufd_event_iopf_domain_replace_dev(struct iommufd_device *idev,
+					  struct iommufd_hw_pagetable *hwpt,
+					  struct iommufd_hw_pagetable *old)
 {
 	bool iopf_off = !hwpt->fault && old->fault;
 	bool iopf_on = hwpt->fault && !old->fault;
 	int ret;
 
 	if (iopf_on) {
-		ret = iommufd_fault_iopf_enable(idev);
+		ret = iommufd_event_iopf_enable(idev);
 		if (ret)
 			return ret;
 	}
 
-	ret = __fault_domain_replace_dev(idev, hwpt, old);
+	ret = __iopf_domain_replace_dev(idev, hwpt, old);
 	if (ret) {
 		if (iopf_on)
-			iommufd_fault_iopf_disable(idev);
+			iommufd_event_iopf_disable(idev);
 		return ret;
 	}
 
 	if (iopf_off)
-		iommufd_fault_iopf_disable(idev);
+		iommufd_event_iopf_disable(idev);
 
 	return 0;
 }
 
-void iommufd_fault_destroy(struct iommufd_object *obj)
+void iommufd_event_destroy(struct iommufd_object *obj)
 {
-	struct iommufd_fault *fault = container_of(obj, struct iommufd_fault, obj);
+	struct iommufd_event *fault = container_of(obj, struct iommufd_event, obj);
 	struct iopf_group *group, *next;
 
 	/*
@@ -238,11 +238,11 @@ static void iommufd_compose_fault_message(struct iommu_fault *fault,
 	hwpt_fault->cookie = cookie;
 }
 
-static ssize_t iommufd_fault_fops_read(struct file *filep, char __user *buf,
+static ssize_t iommufd_event_fops_read(struct file *filep, char __user *buf,
 				       size_t count, loff_t *ppos)
 {
 	size_t fault_size = sizeof(struct iommu_hwpt_pgfault);
-	struct iommufd_fault *fault = filep->private_data;
+	struct iommufd_event *fault = filep->private_data;
 	struct iommu_hwpt_pgfault data;
 	struct iommufd_device *idev;
 	struct iopf_group *group;
@@ -286,11 +286,11 @@ static ssize_t iommufd_fault_fops_read(struct file *filep, char __user *buf,
 	return done == 0 ? rc : done;
 }
 
-static ssize_t iommufd_fault_fops_write(struct file *filep, const char __user *buf,
+static ssize_t iommufd_event_fops_write(struct file *filep, const char __user *buf,
 					size_t count, loff_t *ppos)
 {
 	size_t response_size = sizeof(struct iommu_hwpt_page_response);
-	struct iommufd_fault *fault = filep->private_data;
+	struct iommufd_event *fault = filep->private_data;
 	struct iommu_hwpt_page_response response;
 	struct iopf_group *group;
 	size_t done = 0;
@@ -320,44 +320,44 @@ static ssize_t iommufd_fault_fops_write(struct file *filep, const char __user *b
 	return done == 0 ? rc : done;
 }
 
-static __poll_t iommufd_fault_fops_poll(struct file *filep,
+static __poll_t iommufd_event_fops_poll(struct file *filep,
 					struct poll_table_struct *wait)
 {
-	struct iommufd_fault *fault = filep->private_data;
+	struct iommufd_event *event = filep->private_data;
 	__poll_t pollflags = EPOLLOUT;
 
-	poll_wait(filep, &fault->wait_queue, wait);
-	mutex_lock(&fault->mutex);
-	if (!list_empty(&fault->deliver))
+	poll_wait(filep, &event->wait_queue, wait);
+	mutex_lock(&event->mutex);
+	if (!list_empty(&event->deliver))
 		pollflags |= EPOLLIN | EPOLLRDNORM;
-	mutex_unlock(&fault->mutex);
+	mutex_unlock(&event->mutex);
 
 	return pollflags;
 }
 
-static int iommufd_fault_fops_release(struct inode *inode, struct file *filep)
+static int iommufd_event_fops_release(struct inode *inode, struct file *filep)
 {
-	struct iommufd_fault *fault = filep->private_data;
+	struct iommufd_event *event = filep->private_data;
 
-	refcount_dec(&fault->obj.users);
-	iommufd_ctx_put(fault->ictx);
+	refcount_dec(&event->obj.users);
+	iommufd_ctx_put(event->ictx);
 	return 0;
 }
 
-static const struct file_operations iommufd_fault_fops = {
+static const struct file_operations iommufd_event_fops = {
 	.owner		= THIS_MODULE,
 	.open		= nonseekable_open,
-	.read		= iommufd_fault_fops_read,
-	.write		= iommufd_fault_fops_write,
-	.poll		= iommufd_fault_fops_poll,
-	.release	= iommufd_fault_fops_release,
+	.read		= iommufd_event_fops_read,
+	.write		= iommufd_event_fops_write,
+	.poll		= iommufd_event_fops_poll,
+	.release	= iommufd_event_fops_release,
 	.llseek		= no_llseek,
 };
 
-int iommufd_fault_alloc(struct iommufd_ucmd *ucmd)
+int iommufd_event_alloc(struct iommufd_ucmd *ucmd)
 {
 	struct iommu_fault_alloc *cmd = ucmd->cmd;
-	struct iommufd_fault *fault;
+	struct iommufd_event *event;
 	struct file *filep;
 	int fdno;
 	int rc;
@@ -365,26 +365,26 @@ int iommufd_fault_alloc(struct iommufd_ucmd *ucmd)
 	if (cmd->flags)
 		return -EOPNOTSUPP;
 
-	fault = iommufd_object_alloc(ucmd->ictx, fault, IOMMUFD_OBJ_FAULT);
-	if (IS_ERR(fault))
-		return PTR_ERR(fault);
+	event = iommufd_object_alloc(ucmd->ictx, event, IOMMUFD_OBJ_EVENT);
+	if (IS_ERR(event))
+		return PTR_ERR(event);
 
-	fault->ictx = ucmd->ictx;
-	INIT_LIST_HEAD(&fault->deliver);
-	xa_init_flags(&fault->response, XA_FLAGS_ALLOC1);
-	mutex_init(&fault->mutex);
-	init_waitqueue_head(&fault->wait_queue);
+	event->ictx = ucmd->ictx;
+	INIT_LIST_HEAD(&event->deliver);
+	xa_init_flags(&event->response, XA_FLAGS_ALLOC1);
+	mutex_init(&event->mutex);
+	init_waitqueue_head(&event->wait_queue);
 
-	filep = anon_inode_getfile("[iommufd-pgfault]", &iommufd_fault_fops,
-				   fault, O_RDWR);
+	filep = anon_inode_getfile("[iommufd-pgfault]", &iommufd_event_fops,
+				   event, O_RDWR);
 	if (IS_ERR(filep)) {
 		rc = PTR_ERR(filep);
 		goto out_abort;
 	}
 
-	refcount_inc(&fault->obj.users);
-	iommufd_ctx_get(fault->ictx);
-	fault->filep = filep;
+	refcount_inc(&event->obj.users);
+	iommufd_ctx_get(event->ictx);
+	event->filep = filep;
 
 	fdno = get_unused_fd_flags(O_CLOEXEC);
 	if (fdno < 0) {
@@ -392,42 +392,42 @@ int iommufd_fault_alloc(struct iommufd_ucmd *ucmd)
 		goto out_fput;
 	}
 
-	cmd->out_fault_id = fault->obj.id;
+	cmd->out_fault_id = event->obj.id;
 	cmd->out_fault_fd = fdno;
 
 	rc = iommufd_ucmd_respond(ucmd, sizeof(*cmd));
 	if (rc)
 		goto out_put_fdno;
-	iommufd_object_finalize(ucmd->ictx, &fault->obj);
+	iommufd_object_finalize(ucmd->ictx, &event->obj);
 
-	fd_install(fdno, fault->filep);
+	fd_install(fdno, event->filep);
 
 	return 0;
 out_put_fdno:
 	put_unused_fd(fdno);
 out_fput:
 	fput(filep);
-	refcount_dec(&fault->obj.users);
-	iommufd_ctx_put(fault->ictx);
+	refcount_dec(&event->obj.users);
+	iommufd_ctx_put(event->ictx);
 out_abort:
-	iommufd_object_abort_and_destroy(ucmd->ictx, &fault->obj);
+	iommufd_object_abort_and_destroy(ucmd->ictx, &event->obj);
 
 	return rc;
 }
 
-int iommufd_fault_iopf_handler(struct iopf_group *group)
+int iommufd_event_iopf_handler(struct iopf_group *group)
 {
 	struct iommufd_hw_pagetable *hwpt;
-	struct iommufd_fault *fault;
+	struct iommufd_event *event;
 
 	hwpt = group->attach_handle->domain->fault_data;
-	fault = hwpt->fault;
+	event = hwpt->fault;
 
-	mutex_lock(&fault->mutex);
-	list_add_tail(&group->node, &fault->deliver);
-	mutex_unlock(&fault->mutex);
+	mutex_lock(&event->mutex);
+	list_add_tail(&group->node, &event->deliver);
+	mutex_unlock(&event->mutex);
 
-	wake_up_interruptible(&fault->wait_queue);
+	wake_up_interruptible(&event->wait_queue);
 
 	return 0;
 }
