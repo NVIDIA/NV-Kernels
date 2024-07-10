@@ -14,7 +14,7 @@ static void __iommufd_hwpt_destroy(struct iommufd_hw_pagetable *hwpt)
 		iommu_domain_free(hwpt->domain);
 
 	if (hwpt->fault)
-		refcount_dec(&hwpt->fault->obj.users);
+		refcount_dec(&hwpt->fault->common.obj.users);
 }
 
 void iommufd_hwpt_paging_destroy(struct iommufd_object *obj)
@@ -342,18 +342,18 @@ int iommufd_hwpt_alloc(struct iommufd_ucmd *ucmd)
 	}
 
 	if (cmd->flags & IOMMU_HWPT_FAULT_ID_VALID) {
-		struct iommufd_fault *fault;
+		struct iommufd_event_iopf *fault;
 
-		fault = iommufd_get_fault(ucmd, cmd->fault_id);
+		fault = iommufd_get_event_iopf(ucmd, cmd->fault_id);
 		if (IS_ERR(fault)) {
 			rc = PTR_ERR(fault);
 			goto out_hwpt;
 		}
 		hwpt->fault = fault;
-		hwpt->domain->iopf_handler = iommufd_fault_iopf_handler;
+		hwpt->domain->iopf_handler = iommufd_event_iopf_handler;
 		hwpt->domain->fault_data = hwpt;
-		refcount_inc(&fault->obj.users);
-		iommufd_put_object(ucmd->ictx, &fault->obj);
+		refcount_inc(&fault->common.obj.users);
+		iommufd_put_object(ucmd->ictx, &fault->common.obj);
 	}
 
 	cmd->out_hwpt_id = hwpt->obj.id;
