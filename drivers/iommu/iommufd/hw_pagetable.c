@@ -326,6 +326,11 @@ int iommufd_hwpt_alloc(struct iommufd_ucmd *ucmd)
 			rc = PTR_ERR(fault);
 			goto out_hwpt;
 		}
+		if (fault->type != IOMMU_EVENT_TYPE_HWPT_IOPF) {
+			iommufd_put_object(ucmd->ictx, &fault->obj);
+			rc = -EINVAL;
+			goto out_hwpt;
+		}
 		hwpt->fault = fault;
 		hwpt->domain->iopf_handler = iommufd_event_iopf_handler;
 		hwpt->domain->fault_data = hwpt;

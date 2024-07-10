@@ -51,6 +51,7 @@ enum {
 	IOMMUFD_CMD_HWPT_GET_DIRTY_BITMAP,
 	IOMMUFD_CMD_HWPT_INVALIDATE,
 	IOMMUFD_CMD_FAULT_QUEUE_ALLOC,
+	IOMMUFD_CMD_EVENT_QUEUE_ALLOC = IOMMUFD_CMD_FAULT_QUEUE_ALLOC,
 };
 
 /**
@@ -435,8 +436,8 @@ enum iommu_hwpt_data_type {
  * @data_type: One of enum iommu_hwpt_data_type
  * @data_len: Length of the type specific data
  * @data_uptr: User pointer to the type specific data
- * @fault_id: The ID of IOMMUFD_FAULT object. Valid only if flags field of
- *            IOMMU_HWPT_FAULT_ID_VALID is set.
+ * @fault_id: The ID of IOMMUFD_EVENT object (IOMMU_EVENT_TYPE_HWPT_IOPF).
+ *            Valid only if flags field of IOMMU_HWPT_FAULT_ID_VALID is set.
  * @__reserved2: Padding to 64-bit alignment. Must be 0.
  *
  * Explicitly allocate a hardware page table object. This is the same object
@@ -880,4 +881,29 @@ struct iommu_fault_alloc {
 	__u32 out_fault_fd;
 };
 #define IOMMU_FAULT_QUEUE_ALLOC _IO(IOMMUFD_TYPE, IOMMUFD_CMD_FAULT_QUEUE_ALLOC)
+
+enum iommu_event_type {
+	IOMMU_EVENT_TYPE_HWPT_IOPF = 0,
+};
+
+/**
+ * struct iommu_event_alloc - ioctl(IOMMU_EVENT_QUEUE_ALLOC)
+ * @size: sizeof(struct iommu_event_alloc)
+ * @flags: Must be 0
+ * @out_event_id: The ID of the new EVENT
+ * @out_event_fd: The fd of the new EVENT
+ * @type: One of enum iommu_event_type
+ * @__reserved: Must be 0
+ *
+ * Explicitly allocate an event handling object.
+ */
+struct iommu_event_alloc {
+	__u32 size;
+	__u32 flags;
+	__u32 out_event_id;
+	__u32 out_event_fd;
+	__u32 type;
+	__u32 __reserved;
+};
+#define IOMMU_EVENT_QUEUE_ALLOC _IO(IOMMUFD_TYPE, IOMMUFD_CMD_EVENT_QUEUE_ALLOC)
 #endif

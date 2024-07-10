@@ -432,6 +432,14 @@ void iopt_remove_access(struct io_pagetable *iopt,
 			u32 iopt_access_list_id);
 void iommufd_access_destroy_object(struct iommufd_object *obj);
 
+struct iommufd_event_ops {
+	void (*destroy)(struct iommufd_event *event);
+	ssize_t (*read)(struct iommufd_event *event, char __user *buf,
+			size_t count, loff_t *ppos);
+	ssize_t (*write)(struct iommufd_event *event, const char __user *buf,
+			size_t count, loff_t *ppos);
+};
+
 /*
  * An iommufd_event object represents an interface to deliver IOMMU events
  * to the user space. These objects are created/destroyed by the user space.
@@ -447,6 +455,9 @@ struct iommufd_event {
 	struct xarray response;
 
 	struct wait_queue_head wait_queue;
+
+	enum iommu_event_type type;
+	const struct iommufd_event_ops *ops;
 };
 
 struct iommufd_attach_handle {
