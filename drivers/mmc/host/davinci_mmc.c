@@ -238,6 +238,9 @@ static void davinci_fifo_data_trans(struct mmc_davinci_host *host,
 	host->buffer_bytes_left -= n;
 	host->bytes_left -= n;
 
+	if (n > sgm->length)
+		n = sgm->length;
+
 	/* NOTE:  we never transfer more than rw_threshold bytes
 	 * to/from the fifo here; there's no I/O overlap.
 	 * This also assumes that access width( i.e. ACCWD) is 4 bytes
