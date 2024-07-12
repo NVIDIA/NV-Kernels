@@ -837,6 +837,7 @@ struct arm_smmu_domain {
 struct arm_smmu_nested_domain {
 	struct iommu_domain domain;
 	struct arm_smmu_domain *s2_parent;
+	u8 enable_ats : 1;
 
 	__le64 ste[2];
 };
