@@ -1676,6 +1676,8 @@ static __net_init int nfsd_net_init(struct net *net)
 		goto out_repcache_error;
 	nn->nfsd_versions = NULL;
 	nn->nfsd4_minorversions = NULL;
+	nn->nfsd_info.mutex = &nfsd_mutex;
+	nn->nfsd_serv = NULL;
 	nfsd4_init_leases_net(nn);
 	get_random_bytes(&nn->siphash_key, sizeof(nn->siphash_key));
 	seqlock_init(&nn->writeverf_lock);
