@@ -938,6 +938,7 @@ static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 
 	mutex_init(&msc->probe_lock);
 	mutex_init(&msc->part_sel_lock);
+	mpam_mon_sel_lock_init(msc);
 	msc->id = pdev->id;
 	msc->pdev = pdev;
 	INIT_LIST_HEAD_RCU(&msc->all_msc_list);
@@ -1032,7 +1033,7 @@ static void mpam_enable_once(void)
 				      "mpam:online");
 
 	/* Use printk() to avoid the pr_fmt adding the function name. */
-	printk(KERN_INFO, "MPAM enabled with %u PARTIDs and %u PMGs\n",
+	printk(KERN_INFO "MPAM enabled with %u PARTIDs and %u PMGs\n",
 	       mpam_partid_max + 1, mpam_pmg_max + 1);
 }
 
