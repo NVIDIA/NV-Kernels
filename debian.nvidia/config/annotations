@@ -33,6 +33,12 @@ CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE note<'Required for Grace enable
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE note<'Required for Grace enablement'>
 
+CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
+CONFIG_ARM_SMMU_V3_IOMMUFD                      note<'LP: #2095028'>
+
+CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '32', 'arm64-nvidia': '128', 'arm64-nvidia-64k': '1024'}>
+CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2095028'>
+
 CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT                                note<'Required for Grace enablement'>
 
@@ -117,6 +123,9 @@ CONFIG_ETM4X_IMPDEF_FEATURE                     note<'Required for Grace enablem
 CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
 CONFIG_GPIO_AAEON                               note<'Disable all Ubuntu ODM drivers'>
 
+CONFIG_IOMMUFD_VFIO_CONTAINER                   policy<{'arm64': 'y'}>
+CONFIG_IOMMUFD_VFIO_CONTAINER                   note<'LP: #2095028'>
+
 CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
 CONFIG_LEDS_AAEON                               note<'Disable all Ubuntu ODM drivers'>
 
@@ -164,6 +173,12 @@ CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM dri
 
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
+
+CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'n'}>
+CONFIG_VFIO_CONTAINER                           note<'LP: #2095028'>
+
+CONFIG_VFIO_IOMMU_TYPE1                         policy<{'amd64': 'm', 'arm64': '-'}>
+CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
 
 
 # ---- Annotations without notes ----
