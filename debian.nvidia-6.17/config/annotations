@@ -36,6 +36,9 @@ CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE note<'Required for Grace enable
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE note<'Required for Grace enablement'>
 
+CONFIG_CMA_SIZE_MBYTES                          policy<{'arm64': '32', 'arm64-nvidia': '128', 'arm64-nvidia-64k': '1024'}>
+CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2095028'>
+
 CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT                                note<'Required for Grace enablement'>
 
@@ -174,6 +177,7 @@ CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablem
 
 # ---- Annotations without notes ----
 
+CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_AS_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
 CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
@@ -186,6 +190,7 @@ CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-
 CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_GCC_VERSION                              policy<{'amd64': '130300', 'arm64': '130300'}>
 CONFIG_HAVE_RUST                                policy<{'amd64': 'y', 'arm64': '-'}>
+CONFIG_IOMMUFD_VFIO_CONTAINER                   policy<{'arm64': 'y'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125'}>
@@ -202,4 +207,7 @@ CONFIG_RUST_FW_LOADER_ABSTRACTIONS              policy<{'amd64': '-', 'arm64': '
 CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_RUST_PHYLIB_ABSTRACTIONS                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_SAMPLES_RUST                             policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_TEGRA241_CMDQV                           policy<{'arm64': 'n'}>
 CONFIG_TOOLS_SUPPORT_RELR                       policy<{'amd64': 'y', 'arm64': '-'}>
+CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'n'}>
+CONFIG_VFIO_IOMMU_TYPE1                         policy<{'amd64': 'm', 'arm64': '-'}>
