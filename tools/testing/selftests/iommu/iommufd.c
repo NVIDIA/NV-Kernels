@@ -564,6 +564,8 @@ TEST_F(iommufd_ioas, viommu_default)
 	uint32_t nested_hwpt_id = 0, hwpt_id = 0;
 	uint32_t dev_id = self->device_id;
 	uint32_t viommu_id = 0;
+	uint32_t virq_id;
+	uint32_t virq_fd;
 
 	if (dev_id) {
 		/* Negative test -- invalid hwpt */
@@ -595,16 +597,25 @@ TEST_F(iommufd_ioas, viommu_default)
 					   sizeof(data));
 		test_cmd_mock_domain_replace(self->stdev_id, nested_hwpt_id);
 
+		test_cmd_virq_alloc(viommu_id, IOMMU_VIRQ_TYPE_SELFTEST,
+				    &virq_id, &virq_fd);
+		test_err_virq_alloc(EEXIST, viommu_id, IOMMU_VIRQ_TYPE_SELFTEST,
+				    &virq_id, &virq_fd);
+
 		/* Set vdev_id to 0x99, unset it, and set to 0x88 */
 		test_cmd_viommu_set_vdev_id(viommu_id, dev_id, 0x99);
+		test_cmd_trigger_virq(dev_id, virq_fd, 0x99);
 		test_err_viommu_set_vdev_id(EEXIST, viommu_id, dev_id, 0x99);
 		test_err_viommu_unset_vdev_id(EINVAL, viommu_id, dev_id, 0x88);
 		test_cmd_viommu_unset_vdev_id(viommu_id, dev_id, 0x99);
 		test_cmd_viommu_set_vdev_id(viommu_id, dev_id, 0x88);
+		test_cmd_trigger_virq(dev_id, virq_fd, 0x88);
+		close(virq_fd);
 
 		test_cmd_mock_domain_replace(self->stdev_id, hwpt_id);
 		test_ioctl_destroy(nested_hwpt_id);
 		test_cmd_mock_domain_replace(self->stdev_id, self->ioas_id);
+		test_ioctl_destroy(virq_id);
 		test_ioctl_destroy(viommu_id);
 		test_ioctl_destroy(hwpt_id);
 	} else {
