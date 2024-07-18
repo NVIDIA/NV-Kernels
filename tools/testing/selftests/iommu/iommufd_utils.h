@@ -9,6 +9,7 @@
 #include <sys/ioctl.h>
 #include <stdint.h>
 #include <assert.h>
+#include <poll.h>
 
 #include "../kselftest_harness.h"
 #include "../../../../drivers/iommu/iommufd/iommufd_test.h"
@@ -888,3 +889,66 @@ static int _test_cmd_viommu_unset_vdev_id(int fd, __u32 viommu_id,
 	EXPECT_ERRNO(_errno,                                               \
 		     _test_cmd_viommu_unset_vdev_id(self->fd, viommu_id,   \
 						    idev_id, vdev_id))
+
+static int _test_ioctl_virq_alloc(int fd, __u32 viommu_id, __u32 type,
+				  __u32 *virq_id, __u32 *virq_fd)
+{
+	struct iommu_virq_alloc cmd = {
+		.size = sizeof(cmd),
+		.type = type,
+		.viommu_id = viommu_id,
+	};
+	int ret;
+
+	ret = ioctl(fd, IOMMU_VIRQ_ALLOC, &cmd);
+	if (ret)
+		return ret;
+	if (virq_id)
+		*virq_id = cmd.out_virq_id;
+	if (virq_fd)
+		*virq_fd = cmd.out_virq_fd;
+	return 0;
+}
+
+#define test_cmd_virq_alloc(viommu_id, type, virq_id, virq_fd)         \
+	ASSERT_EQ(0, _test_ioctl_virq_alloc(self->fd, viommu_id, type, \
+					    virq_id, virq_fd))
+#define test_err_virq_alloc(_errno, viommu_id, type, virq_id, virq_fd) \
+	EXPECT_ERRNO(_errno,                                           \
+		     _test_ioctl_virq_alloc(self->fd, viommu_id, type, \
+					    virq_id, virq_fd))
+
+static int _test_cmd_trigger_virq(int fd, __u32 dev_id,
+				  __u32 event_fd, __u32 vdev_id)
+{
+	struct iommu_test_cmd trigger_virq_cmd = {
+		.size = sizeof(trigger_virq_cmd),
+		.op = IOMMU_TEST_OP_TRIGGER_VIRQ,
+		.trigger_virq = {
+			.dev_id = dev_id,
+		},
+	};
+	struct pollfd pollfd = { .fd = event_fd, .events = POLLIN };
+	struct iommu_viommu_irq_selftest irq;
+	ssize_t bytes;
+	int ret;
+
+	ret = ioctl(fd, _IOMMU_TEST_CMD(IOMMU_TEST_OP_TRIGGER_VIRQ),
+		    &trigger_virq_cmd);
+	if (ret)
+		return ret;
+
+	ret = poll(&pollfd, 1, 1000);
+	if (ret < 0)
+		return ret;
+
+	bytes = read(event_fd, &irq, sizeof(irq));
+	if (bytes <= 0)
+		return -EIO;
+
+	return irq.vdev_id == vdev_id ? 0 : -EINVAL;
+}
+
+#define test_cmd_trigger_virq(dev_id, event_fd, vdev_id)      \
+	ASSERT_EQ(0, _test_cmd_trigger_virq(self->fd, dev_id, \
+					    event_fd, vdev_id))
