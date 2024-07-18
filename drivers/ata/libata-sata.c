@@ -806,7 +806,7 @@ static bool ata_scsi_lpm_supported(struct ata_port *ap)
 
 	ata_for_each_link(link, ap, EDGE) {
 		ata_for_each_dev(dev, &ap->link, ENABLED) {
-			if (dev->horkage & ATA_HORKAGE_NOLPM)
+			if (dev->quirks & ATA_QUIRK_NOLPM)
 				return false;
 		}
 	}
