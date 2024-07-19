@@ -327,7 +327,7 @@ static void test_mpam_enable_merge_features(struct kunit *test)
 static void test_mpam_reset_msc_bitmap(struct kunit *test)
 {
 	char *buf = kunit_kzalloc(test, SZ_16K, GFP_KERNEL);
-	struct mpam_msc fake_msc;
+	struct mpam_msc fake_msc = {0};
 	u32 *test_result;
 
 	if (!buf)
