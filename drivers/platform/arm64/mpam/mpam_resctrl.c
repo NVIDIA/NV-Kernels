@@ -962,3 +962,7 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 
 	return 0;
 }
+
+#ifdef CONFIG_MPAM_KUNIT_TEST
+#include "test_mpam_resctrl.c"
+#endif
