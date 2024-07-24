@@ -4315,8 +4315,6 @@ static int mtk_free_dev(struct mtk_eth *eth)
 		dst_release(&eth->dsa_meta[i]->dst);
 	}
 
-	free_netdev(eth->dummy_dev);
-
 	return 0;
 }
 
@@ -5162,6 +5160,7 @@ static void mtk_remove(struct platform_device *pdev)
 	netif_napi_del(&eth->tx_napi);
 	netif_napi_del(&eth->rx_napi);
 	mtk_cleanup(eth);
+	free_netdev(eth->dummy_dev);
 	mtk_mdio_cleanup(eth);
 }
 
