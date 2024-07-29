@@ -308,7 +308,8 @@ static __init void __parse_cmdline(const char *cmdline, bool parse_aliases)
 		match_options(buf);
 
 		for (i = 0; parse_aliases && i < ARRAY_SIZE(aliases); i++)
-			if (!memcmp(buf, aliases[i].alias, len + 1))
+			if (len == strlen(aliases[i].alias) &&
+			    !memcmp(buf, aliases[i].alias, len + 1))
 				__parse_cmdline(aliases[i].feature, false);
 	} while (1);
 }
