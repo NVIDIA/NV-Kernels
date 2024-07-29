@@ -2970,6 +2970,31 @@ static void mpam_debugfs_setup(void)
 	}
 }
 
+static int mpam_force_disable_show(struct seq_file *s, void *data)
+{
+	seq_puts(s, "Write 1 to this file to trigger an MPAM error.\n");
+	return 0;
+}
+
+static ssize_t mpam_force_disable_write(struct file *file,
+					const char __user *userbuf, size_t count,
+					loff_t *ppos)
+{
+	u32 user_val;
+	int err;
+
+	err = kstrtou32_from_user(userbuf, count, 10, &user_val);
+	if (err)
+		return err;
+
+	if (user_val == 1)
+		mpam_disable(NULL);
+
+	return count;
+}
+
+DEFINE_SHOW_STORE_ATTRIBUTE(mpam_force_disable);
+
 static void mpam_enable_once(void)
 {
 	int err;
@@ -3000,6 +3025,9 @@ static void mpam_enable_once(void)
 	} while (0);
 	mutex_unlock(&mpam_list_lock);
 	cpus_read_unlock();
+
+	debugfs_create_file("force_disable", 0600, mpam_debugfs, NULL,
+			    &mpam_force_disable_fops);
 
 	if (!err) {
 		err = mpam_resctrl_setup();
