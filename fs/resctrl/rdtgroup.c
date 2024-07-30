@@ -3835,8 +3835,12 @@ static int rdtgroup_setup_root(struct rdt_fs_context *ctx)
 
 static void rdtgroup_destroy_root(void)
 {
-	kernfs_destroy_root(rdt_root);
-	rdtgroup_default.kn = NULL;
+	lockdep_assert_held(&rdtgroup_mutex);
+
+	if (rdt_root) {
+		kernfs_destroy_root(rdt_root);
+		rdtgroup_default.kn = NULL;
+	}
 }
 
 static void rdtgroup_setup_default(void)
@@ -4114,7 +4118,10 @@ cleanup_mountpoint:
 
 void resctrl_exit(void)
 {
+	mutex_lock(&rdtgroup_mutex);
 	rdtgroup_destroy_root();
+	mutex_unlock(&rdtgroup_mutex);
+
 	debugfs_remove_recursive(debugfs_resctrl);
 	unregister_filesystem(&rdt_fs_type);
 
