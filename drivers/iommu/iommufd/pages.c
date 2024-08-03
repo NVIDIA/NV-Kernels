@@ -46,16 +46,16 @@
  * ULONG_MAX so last_index + 1 cannot overflow.
  */
 #include <linux/file.h>
+#include <linux/highmem.h>
+#include <linux/iommu.h>
+#include <linux/iommufd.h>
+#include <linux/kthread.h>
 #include <linux/overflow.h>
 #include <linux/slab.h>
-#include <linux/iommu.h>
 #include <linux/sched/mm.h>
-#include <linux/highmem.h>
-#include <linux/kthread.h>
-#include <linux/iommufd.h>
 
-#include "io_pagetable.h"
 #include "double_span.h"
+#include "io_pagetable.h"
 
 #ifndef CONFIG_IOMMUFD_TEST
 #define TEMP_MEMORY_LIMIT 65536

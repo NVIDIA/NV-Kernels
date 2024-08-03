@@ -6,8 +6,8 @@
 #ifndef __LINUX_IOMMUFD_H
 #define __LINUX_IOMMUFD_H
 
-#include <linux/errno.h>
 #include <linux/err.h>
+#include <linux/errno.h>
 #include <linux/refcount.h>
 #include <linux/types.h>
 #include <linux/xarray.h>
