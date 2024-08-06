@@ -67,6 +67,32 @@ void __init arm64_rsi_setup_memory(void)
 	}
 }
 
+bool arm64_rsi_is_protected_mmio(phys_addr_t base, size_t size)
+{
+	enum ripas ripas;
+	phys_addr_t end, top;
+
+	/* Overflow ? */
+	if (WARN_ON(base + size < base))
+		return false;
+
+	end = ALIGN(base + size, RSI_GRANULE_SIZE);
+	base = ALIGN_DOWN(base, RSI_GRANULE_SIZE);
+
+	while (base < end) {
+		if (WARN_ON(rsi_ipa_state_get(base, end, &ripas, &top)))
+			break;
+		if (WARN_ON(top <= base))
+			break;
+		if (ripas != RSI_RIPAS_IO)
+			break;
+		base = top;
+	}
+
+	return (size && base >= end);
+}
+EXPORT_SYMBOL(arm64_rsi_is_protected_mmio);
+
 void __init arm64_rsi_init(void)
 {
 	if (!rsi_version_matches())
