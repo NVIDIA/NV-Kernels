@@ -1207,7 +1207,7 @@ void set_fixmap_io(enum fixed_addresses idx, phys_addr_t phys)
 	else
 		prot = pgprot_encrypted(prot);
 
-	__set_fixmap(idx, phys, prot);
+	__set_fixmap(idx, phys & PAGE_MASK, prot);
 }
 
 int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
