@@ -339,6 +339,67 @@ static const struct iommufd_event_ops iommufd_event_iopf_ops = {
 	.write = &iommufd_event_iopf_fops_write,
 };
 
+/* IOMMUFD_OBJ_EVENT_VIRQ Functions */
+
+void iommufd_event_virq_destroy(struct iommufd_object *obj)
+{
+	struct iommufd_event *event =
+		container_of(obj, struct iommufd_event, obj);
+	struct iommufd_event_virq *event_virq = to_event_virq(event);
+	struct iommufd_viommu_irq *virq, *next;
+
+	/*
+	 * The iommufd object's reference count is zero at this point.
+	 * We can be confident that no other threads are currently
+	 * accessing this pointer. Therefore, acquiring the mutex here
+	 * is unnecessary.
+	 */
+	list_for_each_entry_safe(virq, next, &event->deliver, node) {
+		list_del(&virq->node);
+		kfree(virq);
+	}
+	destroy_workqueue(event_virq->irq_wq);
+	list_del(&event_virq->node);
+	refcount_dec(&event_virq->viommu->obj.users);
+}
+
+static ssize_t
+iommufd_event_virq_fops_read(struct iommufd_event *event,
+			     char __user *buf, size_t count, loff_t *ppos)
+{
+	size_t done = 0;
+	int rc = 0;
+
+	if (*ppos)
+		return -ESPIPE;
+
+	mutex_lock(&event->mutex);
+	while (!list_empty(&event->deliver) && count > done) {
+		struct iommufd_viommu_irq *virq =
+			list_first_entry(&event->deliver,
+					 struct iommufd_viommu_irq, node);
+		void *virq_data = (void *)virq + sizeof(*virq);
+
+		if (virq->irq_len > count - done)
+			break;
+
+		if (copy_to_user(buf + done, virq_data, virq->irq_len)) {
+			rc = -EFAULT;
+			break;
+		}
+		done += virq->irq_len;
+		list_del(&virq->node);
+		kfree(virq);
+	}
+	mutex_unlock(&event->mutex);
+
+	return done == 0 ? rc : done;
+}
+
+static const struct iommufd_event_ops iommufd_event_virq_ops = {
+	.read = &iommufd_event_virq_fops_read,
+};
+
 /* Common Event Functions */
 
 static ssize_t iommufd_event_fops_read(struct file *filep, char __user *buf,
@@ -472,6 +533,81 @@ out_put_fdno:
 	iommufd_event_deinit(&event_iopf->common);
 out_abort:
 	iommufd_object_abort_and_destroy(ucmd->ictx, &event_iopf->common.obj);
+
+	return rc;
+}
+
+int iommufd_event_virq_alloc(struct iommufd_ucmd *ucmd)
+{
+	struct iommu_virq_alloc *cmd = ucmd->cmd;
+	struct iommufd_event_virq *event_virq;
+	struct workqueue_struct *irq_wq;
+	struct iommufd_viommu *viommu;
+	int fdno;
+	int rc;
+
+	if (cmd->flags)
+		return -EOPNOTSUPP;
+	if (cmd->type == IOMMU_VIRQ_TYPE_NONE)
+		return -EINVAL;
+
+	viommu = iommufd_get_viommu(ucmd, cmd->viommu_id);
+	if (IS_ERR(viommu))
+		return PTR_ERR(viommu);
+	down_write(&viommu->virqs_rwsem);
+
+	if (iommufd_viommu_find_event_virq(viommu, cmd->type)) {
+		rc = -EEXIST;
+		goto out_unlock_virqs;
+	}
+
+	event_virq = __iommufd_object_alloc(ucmd->ictx, event_virq,
+					    IOMMUFD_OBJ_EVENT_VIRQ, common.obj);
+	if (IS_ERR(event_virq)) {
+		rc = PTR_ERR(event_virq);
+		goto out_unlock_virqs;
+	}
+
+	irq_wq = alloc_workqueue("viommu_irq/%d", WQ_UNBOUND, 0,
+				 event_virq->common.obj.id);
+	if (!irq_wq) {
+		rc = -ENOMEM;
+		goto out_abort;
+	}
+
+	rc = iommufd_event_init(&event_virq->common, "[iommufd-viommu-irq]",
+				ucmd->ictx, &fdno, &iommufd_event_virq_ops);
+	if (rc)
+		goto out_irq_wq;
+
+	event_virq->irq_wq = irq_wq;
+	event_virq->viommu = viommu;
+	event_virq->type = cmd->type;
+	cmd->out_virq_id = event_virq->common.obj.id;
+	cmd->out_virq_fd = fdno;
+
+	rc = iommufd_ucmd_respond(ucmd, sizeof(*cmd));
+	if (rc)
+		goto out_put_fdno;
+	iommufd_object_finalize(ucmd->ictx, &event_virq->common.obj);
+
+	fd_install(fdno, event_virq->common.filep);
+
+	list_add_tail(&event_virq->node, &viommu->virqs);
+	refcount_inc(&viommu->obj.users);
+
+	goto out_unlock_virqs;
+out_put_fdno:
+	put_unused_fd(fdno);
+	fput(event_virq->common.filep);
+	iommufd_event_deinit(&event_virq->common);
+out_irq_wq:
+	destroy_workqueue(irq_wq);
+out_abort:
+	iommufd_object_abort_and_destroy(ucmd->ictx, &event_virq->common.obj);
+out_unlock_virqs:
+	up_write(&viommu->virqs_rwsem);
+	iommufd_put_object(ucmd->ictx, &viommu->obj);
 
 	return rc;
 }

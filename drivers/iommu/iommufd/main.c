@@ -361,6 +361,8 @@ static const struct iommufd_ioctl_op iommufd_ioctl_ops[] = {
 	IOCTL_OP(IOMMU_DESTROY, iommufd_destroy, struct iommu_destroy, id),
 	IOCTL_OP(IOMMU_FAULT_QUEUE_ALLOC, iommufd_event_iopf_alloc,
 		 struct iommu_fault_alloc, out_fault_fd),
+	IOCTL_OP(IOMMU_VIRQ_ALLOC, iommufd_event_virq_alloc,
+		 struct iommu_virq_alloc, out_virq_fd),
 	IOCTL_OP(IOMMU_GET_HW_INFO, iommufd_get_hw_info, struct iommu_hw_info,
 		 __reserved),
 	IOCTL_OP(IOMMU_HWPT_ALLOC, iommufd_hwpt_alloc, struct iommu_hwpt_alloc,
@@ -527,6 +529,9 @@ static const struct iommufd_object_ops iommufd_object_ops[] = {
 	},
 	[IOMMUFD_OBJ_EVENT_IOPF] = {
 		.destroy = iommufd_event_iopf_destroy,
+	},
+	[IOMMUFD_OBJ_EVENT_VIRQ] = {
+		.destroy = iommufd_event_virq_destroy,
 	},
 	[IOMMUFD_OBJ_VIOMMU] = {
 		.destroy = iommufd_viommu_destroy,

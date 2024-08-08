@@ -67,6 +67,8 @@ int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd)
 
 	xa_init(&viommu->vdev_ids);
 	init_rwsem(&viommu->vdev_ids_rwsem);
+	INIT_LIST_HEAD(&viommu->virqs);
+	init_rwsem(&viommu->virqs_rwsem);
 
 	refcount_inc(&viommu->hwpt->common.obj.users);
 
