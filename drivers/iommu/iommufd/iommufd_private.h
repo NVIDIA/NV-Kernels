@@ -133,6 +133,7 @@ enum iommufd_object_type {
 	IOMMUFD_OBJ_IOAS,
 	IOMMUFD_OBJ_ACCESS,
 	IOMMUFD_OBJ_EVENT_IOPF,
+	IOMMUFD_OBJ_EVENT_VIRQ,
 	IOMMUFD_OBJ_VIOMMU,
 #ifdef CONFIG_IOMMUFD_TEST
 	IOMMUFD_OBJ_SELFTEST,
@@ -548,6 +549,43 @@ static inline int iommufd_hwpt_replace_device(struct iommufd_device *idev,
 	return iommu_group_replace_domain(idev->igroup->group, hwpt->domain);
 }
 
+struct iommufd_event_virq {
+	struct iommufd_event common;
+	struct iommufd_viommu *viommu;
+	struct workqueue_struct *irq_wq;
+	struct list_head node;
+
+	unsigned int type;
+};
+
+static inline struct iommufd_event_virq *
+to_event_virq(struct iommufd_event *event)
+{
+	return container_of(event, struct iommufd_event_virq, common);
+}
+
+static inline struct iommufd_event_virq *
+iommufd_get_event_virq(struct iommufd_ucmd *ucmd, u32 id)
+{
+	return container_of(iommufd_get_object(ucmd->ictx, id,
+					       IOMMUFD_OBJ_EVENT_VIRQ),
+			    struct iommufd_event_virq, common.obj);
+}
+
+int iommufd_event_virq_alloc(struct iommufd_ucmd *ucmd);
+void iommufd_event_virq_destroy(struct iommufd_object *obj);
+
+struct iommufd_viommu_irq {
+	struct iommufd_event_virq *event_virq;
+	struct list_head node;
+	ssize_t irq_len;
+};
+
+static inline int iommufd_event_virq_handler(struct iommufd_viommu_irq *virq)
+{
+	return iommufd_event_notify(&virq->event_virq->common, &virq->node);
+}
+
 struct iommufd_viommu {
 	struct iommufd_object obj;
 	struct iommufd_ctx *ictx;
@@ -556,6 +594,8 @@ struct iommufd_viommu {
 	/* The locking order is vdev_ids_rwsem -> igroup::lock */
 	struct rw_semaphore vdev_ids_rwsem;
 	struct xarray vdev_ids;
+	struct rw_semaphore virqs_rwsem;
+	struct list_head virqs;
 
 	const struct iommufd_viommu_ops *ops;
 
@@ -574,6 +614,20 @@ iommufd_get_viommu(struct iommufd_ucmd *ucmd, u32 id)
 	return container_of(iommufd_get_object(ucmd->ictx, id,
 					       IOMMUFD_OBJ_VIOMMU),
 			    struct iommufd_viommu, obj);
+}
+
+static inline struct iommufd_event_virq *
+iommufd_viommu_find_event_virq(struct iommufd_viommu *viommu, u32 type)
+{
+	struct iommufd_event_virq *event_virq, *next;
+
+	lockdep_assert_held(&viommu->virqs_rwsem);
+
+	list_for_each_entry_safe(event_virq, next, &viommu->virqs, node) {
+		if (event_virq->type == type)
+			return event_virq;
+	}
+	return NULL;
 }
 
 int iommufd_viommu_alloc_ioctl(struct iommufd_ucmd *ucmd);
