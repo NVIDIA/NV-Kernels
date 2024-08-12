@@ -1,4 +1,5 @@
 # Recreate any symlinks created since the orig.
+chmod +x 'arch/mips/pci/pcie-octeon.c'
 chmod +x 'arch/s390/tools/gcc-thunk-extern.sh'
 chmod +x 'debian/cloud-tools/hv_get_dhcp_info'
 chmod +x 'debian/cloud-tools/hv_get_dns_info'
