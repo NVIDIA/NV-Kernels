@@ -2193,6 +2193,8 @@ static inline int to_bpp_x16(int bpp)
 	((p) ? &to_i915(p)->display : NULL)
 #define __device_to_intel_display(p)			\
 	__drm_device_to_intel_display(&kdev_to_i915(p)->drm)
+#define __intel_atomic_state_to_intel_display(p)	\
+	__drm_device_to_intel_display((p)->base.dev)
 #define __intel_connector_to_intel_display(p)		\
 	__drm_device_to_intel_display((p)->base.dev)
 #define __intel_crtc_to_intel_display(p)		\
@@ -2217,6 +2219,7 @@ static inline int to_bpp_x16(int bpp)
 	_Generic(*p,					\
 		 __assoc(drm_device, p),		\
 		 __assoc(device, p),			\
+		 __assoc(intel_atomic_state, p),	\
 		 __assoc(intel_connector, p),		\
 		 __assoc(intel_crtc, p),		\
 		 __assoc(intel_crtc_state, p),		\
