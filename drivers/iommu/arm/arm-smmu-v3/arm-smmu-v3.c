@@ -1815,6 +1815,7 @@ static int arm_smmu_handle_evt(struct arm_smmu_device *smmu, u64 *evt)
 {
 	int ret = 0;
 	u32 perm = 0;
+	struct iommu_domain *domain;
 	struct arm_smmu_master *master;
 	bool ssid_valid = evt[0] & EVTQ_0_SSV;
 	u32 sid = FIELD_GET(EVTQ_0_SID, evt[0]);
@@ -1835,41 +1836,59 @@ static int arm_smmu_handle_evt(struct arm_smmu_device *smmu, u64 *evt)
 	if (evt[1] & EVTQ_1_S2)
 		return -EFAULT;
 
-	if (!(evt[1] & EVTQ_1_STALL))
-		return -EOPNOTSUPP;
-
-	if (evt[1] & EVTQ_1_RnW)
-		perm |= IOMMU_FAULT_PERM_READ;
-	else
-		perm |= IOMMU_FAULT_PERM_WRITE;
-
-	if (evt[1] & EVTQ_1_InD)
-		perm |= IOMMU_FAULT_PERM_EXEC;
-
-	if (evt[1] & EVTQ_1_PnU)
-		perm |= IOMMU_FAULT_PERM_PRIV;
-
-	flt->type = IOMMU_FAULT_PAGE_REQ;
-	flt->prm = (struct iommu_fault_page_request) {
-		.flags = IOMMU_FAULT_PAGE_REQUEST_LAST_PAGE,
-		.grpid = FIELD_GET(EVTQ_1_STAG, evt[1]),
-		.perm = perm,
-		.addr = FIELD_GET(EVTQ_2_ADDR, evt[2]),
-	};
-
-	if (ssid_valid) {
-		flt->prm.flags |= IOMMU_FAULT_PAGE_REQUEST_PASID_VALID;
-		flt->prm.pasid = FIELD_GET(EVTQ_0_SSID, evt[0]);
-	}
-
 	mutex_lock(&smmu->streams_mutex);
 	master = arm_smmu_find_master(smmu, sid);
 	if (!master) {
 		ret = -EINVAL;
 		goto out_unlock;
 	}
+	domain = iommu_get_domain_for_dev(master->dev);
 
-	ret = iommu_report_device_fault(master->dev, &fault_evt);
+	if (evt[1] & EVTQ_1_STALL) {
+		if (evt[1] & EVTQ_1_RnW)
+			perm |= IOMMU_FAULT_PERM_READ;
+		else
+			perm |= IOMMU_FAULT_PERM_WRITE;
+
+		if (evt[1] & EVTQ_1_InD)
+			perm |= IOMMU_FAULT_PERM_EXEC;
+
+		if (evt[1] & EVTQ_1_PnU)
+			perm |= IOMMU_FAULT_PERM_PRIV;
+
+		flt->type = IOMMU_FAULT_PAGE_REQ;
+		flt->prm = (struct iommu_fault_page_request) {
+			.flags = IOMMU_FAULT_PAGE_REQUEST_LAST_PAGE,
+			.grpid = FIELD_GET(EVTQ_1_STAG, evt[1]),
+			.perm = perm,
+			.addr = FIELD_GET(EVTQ_2_ADDR, evt[2]),
+		};
+
+		if (ssid_valid) {
+			flt->prm.flags |= IOMMU_FAULT_PAGE_REQUEST_PASID_VALID;
+			flt->prm.pasid = FIELD_GET(EVTQ_0_SSID, evt[0]);
+		}
+
+		ret = iommu_report_device_fault(master->dev, &fault_evt);
+	} else if (domain && domain->type == IOMMU_DOMAIN_NESTED) {
+		mutex_lock(&master->lock);
+		if (master->vdev_id) {
+			struct iommu_virq_arm_smmuv3 virq_data =
+				*(struct iommu_virq_arm_smmuv3 *)evt;
+
+			virq_data.evt[0] &= ~EVTQ_0_SID;
+			virq_data.evt[0] |=
+				FIELD_PREP(EVTQ_0_SID, master->vdev_id->id);
+
+			iommufd_viommu_report_irq(master->vdev_id->viommu,
+						  IOMMU_VIRQ_TYPE_ARM_SMMUV3,
+						  &virq_data, sizeof(virq_data));
+		}
+		mutex_unlock(&master->lock);
+	} else {
+		/* Unhandled events should be pinned */
+		ret = -EFAULT;
+	}
 out_unlock:
 	mutex_unlock(&smmu->streams_mutex);
 	return ret;
@@ -3744,6 +3763,7 @@ static struct iommu_device *arm_smmu_probe_device(struct device *dev)
 
 	master->dev = dev;
 	master->smmu = smmu;
+	mutex_init(&master->lock);
 	dev_iommu_priv_set(dev, master);
 
 	ret = arm_smmu_insert_master(smmu, master);
@@ -3796,6 +3816,7 @@ static void arm_smmu_release_device(struct device *dev)
 	arm_smmu_remove_master(master);
 	if (arm_smmu_cdtab_allocated(&master->cd_table))
 		arm_smmu_free_cd_tables(master);
+	mutex_destroy(&master->lock);
 	kfree(master);
 }
 
@@ -3931,6 +3952,36 @@ static int arm_smmu_def_domain_type(struct device *dev)
 	return 0;
 }
 
+static struct iommufd_vdev_id *
+arm_smmu_viommu_set_vdev_id(struct iommufd_viommu *viommu, struct device *dev,
+			    u64 id)
+{
+	struct arm_smmu_master *master = dev_iommu_priv_get(dev);
+	struct iommufd_vdev_id *vdev_id;
+
+	vdev_id = kzalloc(sizeof(*vdev_id), GFP_KERNEL);
+	if (!vdev_id)
+		return ERR_PTR(-ENOMEM);
+
+	mutex_lock(&master->lock);
+	master->vdev_id = vdev_id;
+	mutex_unlock(&master->lock);
+
+	return vdev_id;
+}
+
+static void arm_smmu_viommu_unset_vdev_id(struct iommufd_vdev_id *vdev_id)
+{
+	struct device *dev = iommufd_vdev_id_to_dev(vdev_id);
+	struct arm_smmu_master *master = dev_iommu_priv_get(dev);
+
+	mutex_lock(&master->lock);
+	master->vdev_id = NULL;
+	mutex_unlock(&master->lock);
+
+	/* IOMMUFD core frees the memory of vdev_id */
+}
+
 static int arm_smmu_viommu_cache_invalidate(struct iommufd_viommu *viommu,
 					    struct iommu_user_data_array *array)
 {
@@ -3971,6 +4022,8 @@ static struct iommu_ops arm_smmu_ops = {
 		.iova_to_phys		= arm_smmu_iova_to_phys,
 		.free			= arm_smmu_domain_free_paging,
 		.default_viommu_ops = &(const struct iommufd_viommu_ops) {
+			.set_vdev_id = arm_smmu_viommu_set_vdev_id,
+			.unset_vdev_id = arm_smmu_viommu_unset_vdev_id,
 			.cache_invalidate = arm_smmu_viommu_cache_invalidate,
 		}
 	}
