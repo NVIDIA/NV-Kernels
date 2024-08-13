@@ -1692,7 +1692,13 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 		if(fwspec->param_count != 2)
 			return -EINVAL;
 
-		if (fwspec->param[0] < 16) {
+		/*
+		 * Below check was added on assumption that MAX_IPI
+		 * value will not be greater than 8.
+		 */
+		BUILD_BUG_ON(MAX_IPI > 8);
+
+		if (fwspec->param[0] < MAX_IPI) {
 			pr_err(FW_BUG "Illegal GSI%d translation request\n",
 			       fwspec->param[0]);
 			return -EINVAL;
