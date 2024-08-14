@@ -1027,6 +1027,7 @@ struct edid_mfgid_prodcode {
 	{ .mfg_id0 = (id0), .mfg_id1 = (id1), .prod_code0 = (code0), .prod_code1 = (code1) }
 
 static struct edid_mfgid_prodcode psr2_disable_quirk_tbl[] = {
+	PSR2_DISABLE_QUIRK_ENTRY(0x4d, 0x10, 0x93, 0x15), /* A sharp FHD panel */
 	{ }
 };
 
