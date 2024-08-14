@@ -5508,6 +5508,17 @@ intel_dp_get_edid(struct intel_dp *intel_dp)
 	return drm_edid_read_ddc(&connector->base, &intel_dp->aux.ddc);
 }
 
+const struct edid *
+intel_dp_fetch_edid(struct intel_dp *intel_dp)
+{
+	const struct drm_edid * d_edid;
+	d_edid = intel_dp_get_edid(intel_dp);
+	if (d_edid)
+		return drm_edid_raw(d_edid);
+
+	return NULL;
+}
+
 static void
 intel_dp_update_dfp(struct intel_dp *intel_dp,
 		    const struct drm_edid *drm_edid)

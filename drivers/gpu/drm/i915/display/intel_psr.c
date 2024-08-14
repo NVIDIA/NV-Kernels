@@ -24,6 +24,7 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_damage_helper.h>
 #include <drm/drm_debugfs.h>
+#include <drm/drm_edid.h>
 
 #include "i915_drv.h"
 #include "i915_reg.h"
@@ -1015,10 +1016,49 @@ tgl_dc3co_exitline_compute_config(struct intel_dp *intel_dp,
 	crtc_state->dc3co_exitline = crtc_vdisplay - exit_scanlines;
 }
 
+struct edid_mfgid_prodcode {
+	u8 mfg_id0;
+	u8 mfg_id1;
+	u8 prod_code0;
+	u8 prod_code1;
+};
+
+#define PSR2_DISABLE_QUIRK_ENTRY(id0, id1, code0, code1) \
+	{ .mfg_id0 = (id0), .mfg_id1 = (id1), .prod_code0 = (code0), .prod_code1 = (code1) }
+
+static struct edid_mfgid_prodcode psr2_disable_quirk_tbl[] = {
+	{ }
+};
+
+static bool is_edid_in_psr2_disable_quirk_tbl(struct intel_dp *intel_dp)
+{
+	const struct edid *p_edid;
+	int i;
+
+	p_edid = intel_dp_fetch_edid(intel_dp);
+	if (p_edid) {
+		for (i = 0; i < ARRAY_SIZE(psr2_disable_quirk_tbl); i ++) {
+			if (p_edid->mfg_id[0] == psr2_disable_quirk_tbl[i].mfg_id0 &&
+			    p_edid->mfg_id[1] == psr2_disable_quirk_tbl[i].mfg_id1 &&
+			    p_edid->prod_code[0] == psr2_disable_quirk_tbl[i].prod_code0 &&
+			    p_edid->prod_code[1] == psr2_disable_quirk_tbl[i].prod_code1)
+				return true;
+		}
+	}
+
+	return false;
+}
+
 static bool intel_psr2_sel_fetch_config_valid(struct intel_dp *intel_dp,
 					      struct intel_crtc_state *crtc_state)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
+
+	if (is_edid_in_psr2_disable_quirk_tbl(intel_dp)) {
+		drm_info_once(&dev_priv->drm,
+			      "PSR2 sel fetch disabled by the edid quirk table\n");
+		return false;
+	}
 
 	if (!dev_priv->display.params.enable_psr2_sel_fetch &&
 	    intel_dp->psr.debug != I915_PSR_DEBUG_ENABLE_SEL_FETCH) {

@@ -187,4 +187,6 @@ intel_dp_compute_config_link_bpp_limits(struct intel_dp *intel_dp,
 
 void intel_dp_get_dsc_sink_cap(u8 dpcd_rev, struct intel_connector *connector);
 
+const struct edid *intel_dp_fetch_edid(struct intel_dp *intel_dp);
+
 #endif /* __INTEL_DP_H__ */
