@@ -6,6 +6,7 @@
 #include <linux/sizes.h>
 #include <linux/vfio_pci_core.h>
 #include <linux/vmalloc.h>
+#include <linux/delay.h>
 
 #ifdef CONFIG_MEMORY_FAILURE
 #include <linux/bitmap.h>
@@ -39,6 +40,13 @@ struct h_node {
 #define MIG_SUPPORTED_WITH_CACHED_RESMEM BIT(0)
 
 #define GPU_CAP_DVSEC_REGISTER 3
+
+#define C2C_LINK_BAR0_OFFSET 0x1498
+#define HBM_TRAINING_BAR0_OFFSET 0x200BC
+#define STATUS_READY 0xFF
+
+#define POLL_QUANTUM_MS 1000
+#define POLL_TIMEOUT_MS (30 * 1000)
 
 /*
  * The state of the two device memory region - resmem and usemem - is
@@ -970,6 +978,47 @@ static bool nvgrace_gpu_has_mig_hw_bug_fix(struct pci_dev *pdev)
 	return false;
 }
 
+/*
+ * To reduce the system bootup time, the HBM training has
+ * been moved out of the UEFI on the Grace-Blackwell systems.
+ *
+ * The onus of checking whether the HBM training has completed
+ * thus falls on the module. The HBM training status can be
+ * determined from a BAR0 register.
+ *
+ * Similarly, another BAR0 register exposes the status of the
+ * CPU-GPU chip-to-chip (C2C) cache coherent interconnect.
+ *
+ * Poll these register and check for 30s. If the HBM training is
+ * not complete or if the C2C link is not ready, fail the probe.
+ *
+ * While the wait is not required on Grace Hopper systems, it
+ * is beneficial to make the check to ensure the device is in an
+ * expected state.
+ */
+static int nvgrace_gpu_check_device_status(struct pci_dev *pdev)
+{
+	void __iomem *io;
+	int time_elasped;
+
+	io = pci_iomap(pdev, 0, ~0UL);
+	if (!io)
+		return -ENOMEM;
+
+	for (time_elasped = 0; time_elasped < POLL_TIMEOUT_MS;
+	     time_elasped += POLL_QUANTUM_MS) {
+		if ((ioread32(io + C2C_LINK_BAR0_OFFSET) == STATUS_READY) &&
+		    (ioread32(io + HBM_TRAINING_BAR0_OFFSET) == STATUS_READY)) {
+			pci_iounmap(pdev, io);
+			return 0;
+		}
+		msleep(POLL_QUANTUM_MS);
+	}
+
+	pci_iounmap(pdev, io);
+	return -ENODEV;
+}
+
 static int nvgrace_gpu_probe(struct pci_dev *pdev,
 			     const struct pci_device_id *id)
 {
@@ -977,6 +1026,10 @@ static int nvgrace_gpu_probe(struct pci_dev *pdev,
 	struct nvgrace_gpu_pci_core_device *nvdev;
 	u64 memphys, memlength;
 	int ret;
+
+	ret = nvgrace_gpu_check_device_status(pdev);
+	if (ret)
+		return ret;
 
 	ret = nvgrace_gpu_fetch_memory_property(pdev, &memphys, &memlength);
 	if (!ret)
