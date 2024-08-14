@@ -1032,7 +1032,8 @@ static struct edid_mfgid_prodcode psr2_disable_quirk_tbl[] = {
 	PSR2_DISABLE_QUIRK_ENTRY(0x30, 0xe4, 0x8b, 0x07), /* A LG FHD panel */
 	PSR2_DISABLE_QUIRK_ENTRY(0x30, 0xe4, 0x78, 0x07), /* A LG OLED panel */
 	PSR2_DISABLE_QUIRK_ENTRY(0x30, 0xe4, 0x8c, 0x07), /* A LG QHD panel */
-	PSR2_DISABLE_QUIRK_ENTRY(0x06, 0xaf, 0x9a, 0xf9),
+	PSR2_DISABLE_QUIRK_ENTRY(0x06, 0xaf, 0x9a, 0xf9), /* An AUO panel */
+	PSR2_DISABLE_QUIRK_ENTRY(0x06, 0xaf, 0xa3, 0xc3), /* An AUO panel */
 	{ }
 };
 
