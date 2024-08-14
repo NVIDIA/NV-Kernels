@@ -1029,6 +1029,7 @@ struct edid_mfgid_prodcode {
 static struct edid_mfgid_prodcode psr2_disable_quirk_tbl[] = {
 	PSR2_DISABLE_QUIRK_ENTRY(0x4d, 0x10, 0x93, 0x15), /* A sharp FHD panel */
 	PSR2_DISABLE_QUIRK_ENTRY(0x30, 0xe4, 0x8b, 0x07), /* A LG FHD panel */
+	PSR2_DISABLE_QUIRK_ENTRY(0x30, 0xe4, 0x78, 0x07), /* A LG OLED panel */
 	{ }
 };
 
