@@ -3142,8 +3142,8 @@ arm_smmu_domain_alloc_user(struct device *dev, u32 flags,
 		return ERR_PTR(-EOPNOTSUPP);
 
 	smmu_domain = arm_smmu_domain_alloc();
-	if (!smmu_domain)
-		return ERR_PTR(-ENOMEM);
+	if (IS_ERR(smmu_domain))
+		return ERR_CAST(smmu_domain);
 
 	if (flags & IOMMU_HWPT_ALLOC_NEST_PARENT) {
 		if (!(master->smmu->features & ARM_SMMU_FEAT_NESTING)) {
