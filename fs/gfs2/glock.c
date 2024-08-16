@@ -170,7 +170,7 @@ void gfs2_glock_free(struct gfs2_glock *gl)
 	wake_up_glock(gl);
 	call_rcu(&gl->gl_rcu, gfs2_glock_dealloc);
 	if (atomic_dec_and_test(&sdp->sd_glock_disposal))
-		wake_up(&sdp->sd_glock_wait);
+		wake_up(&sdp->sd_kill_wait);
 }
 
 /**
@@ -1193,7 +1193,7 @@ out_free:
 	kfree(gl->gl_lksb.sb_lvbptr);
 	kmem_cache_free(cachep, gl);
 	if (atomic_dec_and_test(&sdp->sd_glock_disposal))
-		wake_up(&sdp->sd_glock_wait);
+		wake_up(&sdp->sd_kill_wait);
 
 out:
 	return ret;
@@ -2180,7 +2180,7 @@ void gfs2_gl_hash_clear(struct gfs2_sbd *sdp)
 	flush_workqueue(glock_workqueue);
 	glock_hash_walk(clear_glock, sdp);
 	flush_workqueue(glock_workqueue);
-	wait_event_timeout(sdp->sd_glock_wait,
+	wait_event_timeout(sdp->sd_kill_wait,
 			   atomic_read(&sdp->sd_glock_disposal) == 0,
 			   HZ * 600);
 	glock_hash_walk(dump_glock_func, sdp);
