@@ -155,6 +155,11 @@ static void __mpam_write_reg(struct mpam_msc *msc, u16 reg, u32 val)
 	__mpam_write_reg(msc, MSMON_##reg, val);		\
 })
 
+static inline bool mpam_t241_erratum_is_enabled(void)
+{
+	return static_branch_likely(&nvidia_t241_erratum);
+}
+
 static u64 mpam_msc_read_idr(struct mpam_msc *msc)
 {
 	u64 idr_high = 0, idr_low;
@@ -998,6 +1003,8 @@ static void __ris_msmon_read(void *arg)
 			nrdy = now & MSMON___NRDY;
 			now = FIELD_GET(MSMON___VALUE, now);
 		}
+		if (mpam_t241_erratum_is_enabled())
+			now *=64;
 
 		if (nrdy)
 			break;
@@ -1006,8 +1013,12 @@ static void __ris_msmon_read(void *arg)
 			break;
 
 		/* Add any pre-overflow value to the mbwu_state->val */
-		if (mbwu_state->prev_val > now)
-			overflow_val = mpam_msmon_overflow_val(ris) - mbwu_state->prev_val;
+		if (mbwu_state->prev_val > now) {
+			overflow_val = mpam_msmon_overflow_val(ris);
+			if (mpam_t241_erratum_is_enabled())
+				overflow_val *= 64;
+			overflow_val -= mbwu_state->prev_val;
+		}
 
 		mbwu_state->prev_val = now;
 		mbwu_state->correction += overflow_val;
@@ -1182,11 +1193,6 @@ static void mpam_reset_msc_bitmap(struct mpam_msc *msc, u16 reg, u16 wd)
 	bm = GENMASK(msb , 0);
 	if (bm)
 		__mpam_write_reg(msc, reg, bm);
-}
-
-static inline bool mpam_t241_erratum_is_enabled(void)
-{
-        return static_branch_likely(&nvidia_t241_erratum);
 }
 
 static void mpam_apply_t241_erratum(struct mpam_msc_ris *ris, u16 partid,
@@ -1785,7 +1791,7 @@ static bool mpam_enable_quirk_nvidia_t241(struct mpam_msc *msc)
 
 static const struct mpam_quirk mpam_quirks[] = {
 	{
-		.desc	= "NVIDIA T241 erratum T241-MPAM-1 & T241-MPAM-4",
+		.desc	= "NVIDIA T241 erratum T241-MPAM-1 & T241-MPAM-4 & T241-MPAM-6",
 		.iidr	= 0x2410036b,
 		.mask	= 0xffffffff,
 		.init	= mpam_enable_quirk_nvidia_t241,
