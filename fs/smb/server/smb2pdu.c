@@ -2232,7 +2232,7 @@ int smb2_session_logoff(struct ksmbd_work *work)
 	ksmbd_conn_unlock(conn);
 
 	ksmbd_close_session_fds(work);
-	ksmbd_conn_wait_idle(conn, sess_id);
+	ksmbd_conn_wait_idle(conn);
 
 	if (ksmbd_tree_conn_session_logoff(sess)) {
 		ksmbd_debug(SMB, "Invalid tid %d\n", req->hdr.Id.SyncId.TreeId);
