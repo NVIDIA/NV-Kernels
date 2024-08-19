@@ -677,12 +677,7 @@ static u32 get_mba_granularity(struct mpam_props *cprops)
 
 static u32 mbw_pbm_to_percent(const unsigned long mbw_pbm, struct mpam_props *cprops)
 {
-	u32 num_bits = bitmap_weight(&mbw_pbm, (unsigned int)cprops->mbw_pbm_bits);
-
-	if (cprops->mbw_pbm_bits == 0)
-		return 0;
-
-	return (num_bits * MAX_MBA_BW) / cprops->mbw_pbm_bits;
+	return DIV_ROUND_CLOSEST((mbw_pbm + 1) * 100, 65536);
 }
 
 static u32 fract16_to_percent(u16 fract, u8 wd)
@@ -741,18 +736,7 @@ static u16 percent_to_cmax(u8 pc, struct mpam_props *cprops)
 
 static u16 percent_to_mbw_max(u8 pc, struct mpam_props *cprops)
 {
-	u16 value;
-
-	if (!cprops->bwa_wd)
-		return 0;
-
-	value = percent_to_fract16(pc, cprops->bwa_wd);
-
-	/* Mask out unimplemented bits */
-	if (cprops->bwa_wd <= 16)
-		value &= GENMASK(15, 16 - cprops->bwa_wd);
-
-	return value;
+	return (((pc * 65536) / 100) - 1);
 }
 
 /* Find the L3 component that holds this CPU */
@@ -1337,7 +1321,9 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r))
 		return -EINVAL;
 
-	cfg.features = 0;
+	/* Update with requested configuration only */
+	cfg = dom->comp->cfg[partid];
+
 	switch (r->rid) {
 	case RDT_RESOURCE_L2:
 	case RDT_RESOURCE_L3:
@@ -1358,6 +1344,8 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		} else if (mpam_has_feature(mpam_feat_mbw_max, cprops)) {
 			cfg.mbw_max = percent_to_mbw_max(cfg_val, cprops);
 			mpam_set_feature(mpam_feat_mbw_max, &cfg);
+			/* Resctrl doesn't support MBW_MIN yet, use default value */
+			mpam_clear_feature(mpam_feat_mbw_min, &cfg.features);
 			break;
 		}
 		fallthrough;
