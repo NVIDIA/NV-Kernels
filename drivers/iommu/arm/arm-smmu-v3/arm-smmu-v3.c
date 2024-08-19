@@ -1347,7 +1347,7 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_master *master, u32 sid,
 
 		BUG_ON(ste_live);
 		dst->data[1] = cpu_to_le64(
-			 FIELD_PREP(STRTAB_STE_1_S1DSS, s1_cfg->s1dss) |
+			 FIELD_PREP(STRTAB_STE_1_S1DSS, cd_table->s1dss) |
 			 FIELD_PREP(STRTAB_STE_1_SHCFG, STRTAB_STE_1_SHCFG_INCOMING) |
 			 FIELD_PREP(STRTAB_STE_1_S1CIR, STRTAB_STE_1_S1C_CACHE_WBRA) |
 			 FIELD_PREP(STRTAB_STE_1_S1COR, STRTAB_STE_1_S1C_CACHE_WBRA) |
