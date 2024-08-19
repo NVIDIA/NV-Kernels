@@ -601,7 +601,6 @@ struct arm_smmu_ctx_desc_cfg {
 	struct arm_smmu_l1_ctx_desc	*l1_desc;
 	unsigned int			num_l1_ents;
 	u8				s1fmt;
-	u8				s1dss;
 	/* log2 of the maximum number of CDs supported by this table */
 	u8				s1cdmax;
 	/* Whether CD entries in this table have the stall bit set. */
