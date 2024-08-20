@@ -2,7 +2,7 @@
 # FORMAT: 4
 # ARCH: amd64 arm64
 # FLAVOUR: amd64-nvidia-lowlatency arm64-nvidia-lowlatency arm64-nvidia-lowlatency-64k
-# FLAVOUR_DEP: {'amd64-nvidia-lowlatency': 'amd64-nvidia', 'arm64-nvidia-lowlatency': 'arm64-nvidia', 'arm64-nvidia-lowlatency-64k': 'arm64-nvidia-64k'}
+# FLAVOUR_DEP: {'amd64-nvidia-lowlatency': 'amd64-generic', 'arm64-nvidia-lowlatency': 'arm64-generic', 'arm64-nvidia-lowlatency-64k': 'arm64-generic-64k'}
 
 include "../../debian.nvidia/config/annotations"
 
@@ -14,9 +14,6 @@ CONFIG_HZ_250                                   note<'Override default HZ used i
 
 CONFIG_LATENCYTOP                               policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_LATENCYTOP                               note<'https://lists.ubuntu.com/archives/kernel-team/2014-July/045006.html, LP#1655986'>
-
-CONFIG_MARVELL_GTI_WDT                          policy<{'arm64-nvidia-lowlatency': 'm', 'arm64-nvidia-lowlatency-64k': 'y'}>
-CONFIG_MARVELL_GTI_WDT                          note<'Not specific to Nvidia, we need to explicitly declare this here because it was defined in generic and annotations do not support 2 levels of inheritence for flavours.'>
 
 CONFIG_NO_HZ_FULL                               policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_NO_HZ_FULL                               note<'Enable access to "Full tickless mode" (LP: #2023007)'>
@@ -41,9 +38,6 @@ CONFIG_RCU_NOCB_CPU                             note<'Move RCU callbacks from so
 
 CONFIG_RCU_NOCB_CPU_DEFAULT_ALL                 policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_RCU_NOCB_CPU_DEFAULT_ALL                 note<'Enable CONFIG_RCU_NOCB_CPU across all CPUs by default (LP: #2023007)'>
-
-CONFIG_TEE_STMM_EFI                             policy<{'arm64-nvidia-lowlatency': 'n', 'arm64-nvidia-lowlatency-64k': 'm'}>
-CONFIG_TEE_STMM_EFI                             note<'Not specific to Nvidia, we need to explicitly declare this here because it was defined in generic and annotations do not support 2 levels of inheritence for flavours.'>
 
 
 # ---- Annotations without notes ----
