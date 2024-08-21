@@ -65,3 +65,43 @@ struct device *iommufd_vdev_id_to_dev(struct iommufd_vdev_id *vdev_id)
 	return vdev_id->idev->dev;
 }
 EXPORT_SYMBOL_NS_GPL(iommufd_vdev_id_to_dev, IOMMUFD);
+
+/**
+ * IOMMU drivers can call this helper to report a per-VIOMMU virtual IRQ. Caller
+ * must ensure the lifecycle of the viommu object, likely by passing it from a
+ * vdev_id structure that was set via a set_vdev_id callback and by holding the
+ * same driver-level lock to protect the passed-in vdev_id from any race against
+ * a potential unset_vdev_id callback.
+ */
+void iommufd_viommu_report_irq(struct iommufd_viommu *viommu, unsigned int type,
+			       void *irq_ptr, size_t irq_len)
+{
+	struct iommufd_event_virq *event_virq;
+	struct iommufd_viommu_irq *virq;
+	void *irq_data;
+
+	might_sleep();
+
+	if (!viommu)
+		return;
+
+	down_read(&viommu->virqs_rwsem);
+
+	event_virq = iommufd_viommu_find_event_virq(viommu, type);
+	if (!event_virq)
+		goto out_unlock_vdev_ids;
+
+	virq = kzalloc(sizeof(*virq) + irq_len, GFP_KERNEL);
+	if (!virq)
+		goto out_unlock_vdev_ids;
+	irq_data = (void *)virq + sizeof(*virq);
+	memcpy(irq_data, irq_ptr, irq_len);
+
+	virq->event_virq = event_virq;
+	virq->irq_len = irq_len;
+
+	iommufd_event_virq_handler(virq);
+out_unlock_vdev_ids:
+	up_read(&viommu->virqs_rwsem);
+}
+EXPORT_SYMBOL_NS_GPL(iommufd_viommu_report_irq, IOMMUFD);
