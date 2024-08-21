@@ -108,6 +108,8 @@ void iommufd_viommu_unlock_vdev_id(struct iommufd_viommu *viommu);
 struct device *iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id);
 struct iommu_domain *
 iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu);
+void iommufd_viommu_report_irq(struct iommufd_viommu *viommu, unsigned int type,
+			       void *irq_ptr, size_t irq_len);
 #else /* !CONFIG_IOMMUFD */
 static inline struct iommufd_ctx *iommufd_ctx_from_file(struct file *file)
 {
@@ -172,6 +174,12 @@ static inline struct iommu_domain *
 iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu)
 {
 	return NULL;
+}
+
+static inline void
+iommufd_viommu_report_irq(struct iommufd_viommu *viommu, unsigned int type,
+			  void *irq_ptr, size_t irq_len)
+{
 }
 #endif /* CONFIG_IOMMUFD */
 #endif
