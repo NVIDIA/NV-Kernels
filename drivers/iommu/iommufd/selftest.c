@@ -138,6 +138,8 @@ enum selftest_obj_type {
 
 struct mock_dev {
 	struct device dev;
+	struct mutex lock;
+	struct iommufd_vdev_id *vdev_id;
 	unsigned long flags;
 	int id;
 	u32 cache[MOCK_DEV_CACHE_NUM];
@@ -542,6 +544,36 @@ static int mock_dev_disable_feat(struct device *dev, enum iommu_dev_features fea
 	return 0;
 }
 
+static struct iommufd_vdev_id *
+mock_viommu_set_vdev_id(struct iommufd_viommu *viommu, struct device *dev,
+			u64 id)
+{
+	struct mock_dev *mdev = container_of(dev, struct mock_dev, dev);
+	struct iommufd_vdev_id *vdev_id;
+
+	vdev_id = kzalloc(sizeof(*vdev_id), GFP_KERNEL);
+	if (!vdev_id)
+		return ERR_PTR(-ENOMEM);
+
+	mutex_lock(&mdev->lock);
+	mdev->vdev_id = vdev_id;
+	mutex_unlock(&mdev->lock);
+
+	return vdev_id;
+}
+
+static void mock_viommu_unset_vdev_id(struct iommufd_vdev_id *vdev_id)
+{
+	struct device *dev = iommufd_vdev_id_to_dev(vdev_id);
+	struct mock_dev *mdev = container_of(dev, struct mock_dev, dev);
+
+	mutex_lock(&mdev->lock);
+	mdev->vdev_id = NULL;
+	mutex_unlock(&mdev->lock);
+
+	/* IOMMUFD core frees the memory of vdev_id */
+}
+
 static int mock_viommu_cache_invalidate(struct iommufd_viommu *viommu,
 					struct iommu_user_data_array *array)
 {
@@ -637,6 +669,8 @@ static const struct iommu_ops mock_ops = {
 			.unmap_pages = mock_domain_unmap_pages,
 			.iova_to_phys = mock_domain_iova_to_phys,
 			.default_viommu_ops = &(struct iommufd_viommu_ops){
+				.set_vdev_id = mock_viommu_set_vdev_id,
+				.unset_vdev_id = mock_viommu_unset_vdev_id,
 				.cache_invalidate = mock_viommu_cache_invalidate,
 			},
 		},
@@ -758,6 +792,7 @@ static void mock_dev_release(struct device *dev)
 	struct mock_dev *mdev = container_of(dev, struct mock_dev, dev);
 
 	ida_free(&mock_dev_ida, mdev->id);
+	mutex_destroy(&mdev->lock);
 	kfree(mdev);
 }
 
@@ -774,6 +809,7 @@ static struct mock_dev *mock_dev_create(unsigned long dev_flags)
 	if (!mdev)
 		return ERR_PTR(-ENOMEM);
 
+	mutex_init(&mdev->lock);
 	device_initialize(&mdev->dev);
 	mdev->flags = dev_flags;
 	mdev->dev.release = mock_dev_release;
