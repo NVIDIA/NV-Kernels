@@ -51,3 +51,17 @@ iommufd_viommu_to_parent_domain(struct iommufd_viommu *viommu)
 	return viommu->hwpt->common.domain;
 }
 EXPORT_SYMBOL_NS_GPL(iommufd_viommu_to_parent_domain, IOMMUFD);
+
+/*
+ * Fetch the dev pointer in the vdev_id structure. Caller must make ensure the
+ * lifecycle of the vdev_id structure, likely by adding a driver-level lock to
+ * protect the passed-in vdev_id for any race against a potential unset_vdev_id
+ * callback.
+ */
+struct device *iommufd_vdev_id_to_dev(struct iommufd_vdev_id *vdev_id)
+{
+	if (!vdev_id || !vdev_id->viommu)
+		return NULL;
+	return vdev_id->idev->dev;
+}
+EXPORT_SYMBOL_NS_GPL(iommufd_vdev_id_to_dev, IOMMUFD);
