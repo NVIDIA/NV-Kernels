@@ -99,6 +99,7 @@ void iommufd_access_unpin_pages(struct iommufd_access *access,
 				unsigned long iova, unsigned long length);
 int iommufd_access_rw(struct iommufd_access *access, unsigned long iova,
 		      void *data, size_t len, unsigned int flags);
+struct device *iommufd_vdev_id_to_dev(struct iommufd_vdev_id *vdev_id);
 int iommufd_vfio_compat_ioas_get_id(struct iommufd_ctx *ictx, u32 *out_ioas_id);
 int iommufd_vfio_compat_ioas_create(struct iommufd_ctx *ictx);
 int iommufd_vfio_compat_set_no_iommu(struct iommufd_ctx *ictx);
@@ -136,6 +137,12 @@ static inline int iommufd_access_rw(struct iommufd_access *access, unsigned long
 		      void *data, size_t len, unsigned int flags)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline struct device *
+iommufd_vdev_id_to_dev(struct iommufd_vdev_id *vdev_id)
+{
+	return NULL;
 }
 
 static inline int iommufd_vfio_compat_ioas_create(struct iommufd_ctx *ictx)
