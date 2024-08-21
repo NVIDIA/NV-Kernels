@@ -89,6 +89,9 @@ int iommufd_access_rw(struct iommufd_access *access, unsigned long iova,
 int iommufd_vfio_compat_ioas_get_id(struct iommufd_ctx *ictx, u32 *out_ioas_id);
 int iommufd_vfio_compat_ioas_create(struct iommufd_ctx *ictx);
 int iommufd_vfio_compat_set_no_iommu(struct iommufd_ctx *ictx);
+void iommufd_viommu_lock_vdev_id(struct iommufd_viommu *viommu);
+void iommufd_viommu_unlock_vdev_id(struct iommufd_viommu *viommu);
+struct device *iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id);
 #else /* !CONFIG_IOMMUFD */
 static inline struct iommufd_ctx *iommufd_ctx_from_file(struct file *file)
 {
@@ -128,6 +131,19 @@ static inline int iommufd_vfio_compat_ioas_create(struct iommufd_ctx *ictx)
 static inline int iommufd_vfio_compat_set_no_iommu(struct iommufd_ctx *ictx)
 {
 	return -EOPNOTSUPP;
+}
+
+void iommufd_viommu_lock_vdev_id(struct iommufd_viommu *viommu)
+{
+}
+
+void iommufd_viommu_unlock_vdev_id(struct iommufd_viommu *viommu)
+{
+}
+
+struct device *iommufd_viommu_find_device(struct iommufd_viommu *viommu, u64 id)
+{
+	return NULL;
 }
 #endif /* CONFIG_IOMMUFD */
 #endif
