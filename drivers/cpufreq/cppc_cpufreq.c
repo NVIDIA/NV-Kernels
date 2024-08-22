@@ -36,7 +36,10 @@ static LIST_HEAD(cpu_data_list);
 
 static bool boost_supported;
 
-static struct cpufreq_driver cppc_cpufreq_driver;
+/* Autonomous Selection */
+static bool auto_sel_mode;
+
+static struct cpufreq_driver *current_cppc_cpufreq_driver;
 
 #ifdef CONFIG_ACPI_CPPC_CPUFREQ_FIE
 static enum {
@@ -521,7 +524,7 @@ static int populate_efficiency_class(void)
 		}
 		index++;
 	}
-	cppc_cpufreq_driver.register_em = cppc_cpufreq_register_em;
+	current_cppc_cpufreq_driver->register_em = cppc_cpufreq_register_em;
 
 	return 0;
 }
@@ -566,6 +569,12 @@ static struct cppc_cpudata *cppc_cpufreq_get_cpu_data(unsigned int cpu)
 	ret = cppc_get_perf_caps(cpu, &cpu_data->perf_caps);
 	if (ret) {
 		pr_debug("Err reading CPU%d perf caps: ret:%d\n", cpu, ret);
+		goto free_mask;
+	}
+
+	ret = cppc_get_perf_ctrls(cpu, &cpu_data->perf_ctrls);
+	if (ret) {
+		pr_debug("Err reading CPU%d perf ctrls: ret:%d\n", cpu, ret);
 		goto free_mask;
 	}
 
@@ -671,6 +680,167 @@ static int cppc_cpufreq_cpu_init(struct cpufreq_policy *policy)
 out:
 	cppc_cpufreq_put_cpu_data(policy);
 	return ret;
+}
+
+static int cppc_cpufreq_epp_cpu_init(struct cpufreq_policy *policy)
+{
+	unsigned int cpu = policy->cpu;
+	struct cppc_cpudata *cpu_data;
+	struct cppc_perf_ctrls *ctrls;
+	struct cppc_perf_caps *caps;
+	int ret;
+
+	cpu_data = cppc_cpufreq_get_cpu_data(cpu);
+	if (!cpu_data) {
+		pr_err("Error in acquiring _CPC/_PSD data for CPU%d.\n", cpu);
+		return -ENODEV;
+	}
+	caps = &cpu_data->perf_caps;
+	ctrls = &cpu_data->perf_ctrls;
+	policy->driver_data = cpu_data;
+
+	policy->min = cppc_perf_to_khz(caps, ctrls->min_perf);
+	policy->max = cppc_perf_to_khz(caps, ctrls->max_perf);
+
+	/*
+	 * Set cpuinfo.min_freq to Lowest to make the full range of performance
+	 * available if userspace wants to use any perf between lowest & minimum
+	 * perf.
+	 */
+	policy->cpuinfo.min_freq = cppc_perf_to_khz(caps, caps->lowest_perf);
+	policy->cpuinfo.max_freq = cppc_perf_to_khz(caps, caps->highest_perf);
+
+	policy->transition_delay_us = cppc_cpufreq_get_transition_delay_us(cpu);
+	policy->shared_type = cpu_data->shared_type;
+
+	switch (policy->shared_type) {
+		case CPUFREQ_SHARED_TYPE_HW:
+		case CPUFREQ_SHARED_TYPE_NONE:
+			/* Nothing to be done - we'll have a policy for each CPU */
+			break;
+		case CPUFREQ_SHARED_TYPE_ANY:
+			/*
+			 * All CPUs in the domain will share a policy and all cpufreq
+			 * operations will use a single cppc_cpudata structure stored
+			 * in policy->driver_data.
+			 */
+			cpumask_copy(policy->cpus, cpu_data->shared_cpu_map);
+			break;
+		default:
+			pr_debug("Unsupported CPU co-ord type: %d\n",
+					policy->shared_type);
+			ret = -EFAULT;
+			goto out;
+	}
+
+	/* Set policy->cur to max now. The governors will adjust later. */
+	policy->cur = cppc_perf_to_khz(caps, caps->highest_perf);
+
+	ret = cppc_set_perf_ctrls(cpu, &cpu_data->perf_ctrls);
+	if (ret) {
+		pr_debug("Err setting perf value:%d on CPU:%d. ret:%d\n",
+				caps->highest_perf, cpu, ret);
+		goto out;
+	}
+
+	cppc_cpufreq_cpu_fie_init(policy);
+	return 0;
+
+out:
+	cppc_cpufreq_put_cpu_data(policy);
+	return ret;
+}
+
+static int cppc_cpufreq_epp_update_perf_ctrls(struct cpufreq_policy *policy,
+					      u32 highest_perf, u32 lowest_perf)
+{
+	struct cppc_cpudata *cpu_data = policy->driver_data;
+	int ret;
+
+	pr_debug("cpu%d, curr max_perf:%u, curr min_perf:%u, highest_perf:%u, lowest_perf:%u\n",
+			policy->cpu, cpu_data->perf_ctrls.max_perf, cpu_data->perf_ctrls.min_perf,
+			highest_perf, lowest_perf);
+
+	cpu_data->perf_ctrls.max_perf = highest_perf;
+	cpu_data->perf_ctrls.min_perf = lowest_perf;
+
+	ret = cppc_set_perf_ctrls(policy->cpu, &cpu_data->perf_ctrls);
+	if (ret) {
+		pr_debug("Failed to set perf_ctrls on CPU:%d. ret:%d\n", policy->cpu, ret);
+		return ret;
+	}
+
+	return ret;
+}
+
+static int cppc_cpufreq_epp_update_auto_mode(struct cpufreq_policy *policy, int auto_sel, u32 epp)
+{
+	struct cppc_cpudata *cpu_data = policy->driver_data;
+	int ret, curr_epp;
+
+	curr_epp = cpu_data->perf_ctrls.energy_perf;
+	pr_debug("cpu%d, curr epp:%u, new epp:%u, curr mode:%u, new mode:%d\n",
+		 policy->cpu, curr_epp, epp, cpu_data->perf_caps.auto_sel, auto_sel);
+
+	/* set Performance preference as default */
+	cpu_data->perf_ctrls.energy_perf = epp;
+	ret = cppc_set_epp_perf(policy->cpu, &cpu_data->perf_ctrls, auto_sel);
+	if (ret < 0) {
+		pr_err("failed to set energy perf value (%d)\n", ret);
+		cpu_data->perf_ctrls.energy_perf = curr_epp;
+		return ret;
+	}
+	cpu_data->perf_caps.auto_sel = auto_sel;
+
+	return ret;
+}
+
+
+static int cppc_cpufreq_epp_update_perf(struct cpufreq_policy *policy, int auto_sel, u32 epp,
+					u32 highest_perf, u32 lowest_perf)
+{
+	int ret;
+
+	ret = cppc_cpufreq_epp_update_perf_ctrls(policy, highest_perf, lowest_perf);
+	if (ret)
+		return ret;
+
+	ret = cppc_cpufreq_epp_update_auto_mode(policy, auto_sel, epp);
+	if (ret)
+		return ret;
+
+	return ret;
+}
+
+static int cppc_cpufreq_epp_set_policy(struct cpufreq_policy *policy)
+{
+	struct cppc_cpudata *cpu_data = policy->driver_data;
+
+	if (!cpu_data)
+		return -ENODEV;
+
+	return cppc_cpufreq_epp_update_perf(policy, true, CPPC_EPP_PERFORMANCE_PREF,
+					   cpu_data->perf_caps.highest_perf,
+					   cpu_data->perf_caps.lowest_perf);
+}
+
+static void cppc_cpufreq_epp_cpu_exit(struct cpufreq_policy *policy)
+{
+	struct cppc_cpudata *cpu_data = policy->driver_data;
+	int ret;
+
+	cppc_cpufreq_cpu_fie_exit(policy);
+
+	cpu_data->perf_ctrls.desired_perf = cpu_data->perf_caps.lowest_perf;
+
+	cppc_cpufreq_epp_update_perf_ctrls(policy, cpu_data->perf_caps.highest_perf,
+					   cpu_data->perf_caps.lowest_perf);
+
+	ret = cppc_set_auto_sel(policy->cpu, false);
+	if (ret)
+		pr_debug("failed to disable autonomous selection (%d)\n", ret);
+
+	cppc_cpufreq_put_cpu_data(policy);
 }
 
 static void cppc_cpufreq_cpu_exit(struct cpufreq_policy *policy)
@@ -834,17 +1004,62 @@ static struct cpufreq_driver cppc_cpufreq_driver = {
 	.name = "cppc_cpufreq",
 };
 
+static struct cpufreq_driver cppc_cpufreq_epp_driver = {
+	.flags = CPUFREQ_CONST_LOOPS,
+	.verify = cppc_verify_policy,
+	.setpolicy = cppc_cpufreq_epp_set_policy,
+	.get = cppc_cpufreq_get_rate,
+	.init = cppc_cpufreq_epp_cpu_init,
+	.exit = cppc_cpufreq_epp_cpu_exit,
+	.attr = cppc_cpufreq_attr,
+	.name = "cppc_cpufreq_epp",
+};
+
+static int cppc_cpufreq_enable_auto_sel_support(bool use_auto_sel_mode)
+{
+	int cpu, ret = 0;
+
+	if (use_auto_sel_mode) {
+		for_each_present_cpu(cpu) {
+			ret = cppc_set_enable(cpu, use_auto_sel_mode);
+			if (ret)
+				return ret;
+
+			/* Enable autonomous mode */
+			ret = cppc_set_auto_sel(cpu, true);
+			if (ret)
+				pr_debug("failed to enable autonomous selection (%d)\n", ret);
+		}
+	}
+
+	return ret;
+}
+
 static int __init cppc_cpufreq_init(void)
 {
+	struct cppc_perf_caps caps;
 	int ret;
 
 	if (!acpi_cpc_valid())
 		return -ENODEV;
 
+	cppc_get_auto_sel_caps(0, &caps);
+	if (auto_sel_mode || caps.auto_sel) {
+		ret = cppc_cpufreq_enable_auto_sel_support(true);
+		if (ret) {
+			pr_err("Failed to enable cppc_cpufreq_epp_driver. Defaulting to cppc_cpufreq_driver.\n");
+			current_cppc_cpufreq_driver = &cppc_cpufreq_driver;
+		} else {
+			current_cppc_cpufreq_driver = &cppc_cpufreq_epp_driver;
+		}
+	} else {
+		current_cppc_cpufreq_driver = &cppc_cpufreq_driver;
+	}
+
 	cppc_freq_invariance_init();
 	populate_efficiency_class();
 
-	ret = cpufreq_register_driver(&cppc_cpufreq_driver);
+	ret = cpufreq_register_driver(current_cppc_cpufreq_driver);
 	if (ret)
 		cppc_freq_invariance_exit();
 
@@ -865,11 +1080,14 @@ static inline void free_cpu_data(void)
 
 static void __exit cppc_cpufreq_exit(void)
 {
-	cpufreq_unregister_driver(&cppc_cpufreq_driver);
+	cpufreq_unregister_driver(current_cppc_cpufreq_driver);
 	cppc_freq_invariance_exit();
 
 	free_cpu_data();
 }
+
+module_param(auto_sel_mode, bool, 0000);
+MODULE_PARM_DESC(auto_sel_mode, "Enable Autonomous Performance Level Selection");
 
 module_exit(cppc_cpufreq_exit);
 MODULE_AUTHOR("Ashwin Chaugule");
