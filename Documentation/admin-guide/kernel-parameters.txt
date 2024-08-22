@@ -904,6 +904,18 @@
 			Format:
 			<first_slot>,<last_slot>,<port>,<enum_bit>[,<debug>]
 
+	cppc_cpufreq.auto_sel_mode=
+			[CPU_FREQ] Autonomous Performance Level Selection.
+			When Autonomous selection is enabled, then the hardware is
+			allowed to autonomously select the CPU frequency.
+			In Autonomous mode, Engergy Performance Preference(EPP)
+			provides input to the hardware to favour performance (0x0)
+			or energy efficiency (0xff).
+			Format: <bool>
+			Default: disabled.
+			0: force disabled
+			1: force enabled
+
 	cpuidle.off=1	[CPU_IDLE]
 			disable the cpuidle sub-system
 
