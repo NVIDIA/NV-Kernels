@@ -1156,10 +1156,12 @@ int btrfs_load_block_group_zone_info(struct btrfs_block_group *cache, bool new)
 		struct btrfs_dev_replace *dev_replace = &fs_info->dev_replace;
 		int dev_replace_is_ongoing = 0;
 
+		down_read(&dev_replace->rwsem);
 		device = map->stripes[i].dev;
 		physical = map->stripes[i].physical;
 
 		if (device->bdev == NULL) {
+			up_read(&dev_replace->rwsem);
 			alloc_offsets[i] = WP_MISSING_DEV;
 			continue;
 		}
@@ -1171,6 +1173,7 @@ int btrfs_load_block_group_zone_info(struct btrfs_block_group *cache, bool new)
 			num_conventional++;
 
 		if (!is_sequential) {
+			up_read(&dev_replace->rwsem);
 			alloc_offsets[i] = WP_CONVENTIONAL;
 			continue;
 		}
@@ -1181,11 +1184,9 @@ int btrfs_load_block_group_zone_info(struct btrfs_block_group *cache, bool new)
 		 */
 		btrfs_dev_clear_zone_empty(device, physical);
 
-		down_read(&dev_replace->rwsem);
 		dev_replace_is_ongoing = btrfs_dev_replace_is_ongoing(dev_replace);
 		if (dev_replace_is_ongoing && dev_replace->tgtdev != NULL)
 			btrfs_dev_clear_zone_empty(dev_replace->tgtdev, physical);
-		up_read(&dev_replace->rwsem);
 
 		/*
 		 * The group is mapped to a sequential zone. Get the zone write
@@ -1196,6 +1197,7 @@ int btrfs_load_block_group_zone_info(struct btrfs_block_group *cache, bool new)
 		ret = btrfs_get_dev_zone(device, physical, &zone);
 		memalloc_nofs_restore(nofs_flag);
 		if (ret == -EIO || ret == -EOPNOTSUPP) {
+			up_read(&dev_replace->rwsem);
 			ret = 0;
 			alloc_offsets[i] = WP_MISSING_DEV;
 			continue;
@@ -1208,6 +1210,7 @@ int btrfs_load_block_group_zone_info(struct btrfs_block_group *cache, bool new)
 	"zoned: unexpected conventional zone %llu on device %s (devid %llu)",
 				zone.start << SECTOR_SHIFT,
 				rcu_str_deref(device->name), device->devid);
+			up_read(&dev_replace->rwsem);
 			ret = -EIO;
 			goto out;
 		}
@@ -1233,6 +1236,8 @@ int btrfs_load_block_group_zone_info(struct btrfs_block_group *cache, bool new)
 					((zone.wp - zone.start) << SECTOR_SHIFT);
 			break;
 		}
+
+		up_read(&dev_replace->rwsem);
 	}
 
 	if (num_sequential > 0)
