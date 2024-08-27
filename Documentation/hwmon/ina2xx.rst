@@ -53,6 +53,16 @@ Supported chips:
 
 	       https://www.ti.com/
 
+  * Texas Instruments INA260
+
+    Prefix: 'ina260'
+
+    Addresses: I2C 0x40 - 0x4f
+
+    Datasheet: Publicly available at the Texas Instruments website
+
+	       https://www.ti.com/
+
 Author: Lothar Felten <lothar.felten@gmail.com>
 
 Description
@@ -71,6 +81,9 @@ The INA226 monitors both a shunt voltage drop and bus supply voltage.
 INA230 and INA231 are high or low side current shunt and power monitors
 with an I2C interface. The chips monitor both a shunt voltage drop and
 bus supply voltage.
+
+INA260 is a high or low side current and power monitor with integrated shunt
+resistor.
 
 The shunt value in micro-ohms can be set via platform data or device tree at
 compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
@@ -92,11 +105,11 @@ in0_input		Shunt voltage(mV) channel
 in1_input		Bus voltage(mV) channel
 curr1_input		Current(mA) measurement channel
 power1_input		Power(uW) measurement channel
-shunt_resistor		Shunt resistance(uOhm) channel
+shunt_resistor		Shunt resistance(uOhm) channel (not for ina260)
 ======================= ===============================
 
-Sysfs entries for ina226, ina230 and ina231 only
-------------------------------------------------
+Sysfs entries for ina226, ina230, ina231, and ina260
+---------------------------------------------------
 
 ======================= ====================================================
 in0_lcrit		Critical low shunt voltage

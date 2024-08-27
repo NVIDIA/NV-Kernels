@@ -60,12 +60,14 @@
 /* settings - depend on use case */
 #define INA219_CONFIG_DEFAULT		0x399F	/* PGA=8 */
 #define INA226_CONFIG_DEFAULT		0x4527	/* averages=16 */
+#define INA260_CONFIG_DEFAULT		0x6527	/* averages=16 */
 
 /* worst case is 68.10 ms (~14.6Hz, ina219) */
 #define INA2XX_CONVERSION_RATE		15
 #define INA2XX_MAX_DELAY		69 /* worst case delay in ms */
 
 #define INA2XX_RSHUNT_DEFAULT		10000
+#define INA260_RSHUNT			2000
 
 /* bit mask for reading the averaging setting in the configuration register */
 #define INA226_AVG_RD_MASK		0x0E00
@@ -98,11 +100,12 @@ static struct regmap_config ina2xx_regmap_config = {
 	.val_bits = 16,
 };
 
-enum ina2xx_ids { ina219, ina226 };
+enum ina2xx_ids { ina219, ina226, ina260 };
 
 struct ina2xx_config {
 	u16 config_default;
 	bool has_alerts;	/* chip supports alerts and limits */
+	bool has_ishunt;	/* chip has internal shunt resistor */
 	int calibration_value;
 	int registers;
 	int shunt_div;
@@ -133,6 +136,7 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.bus_voltage_lsb = 4000,
 		.power_lsb_factor = 20,
 		.has_alerts = false,
+		.has_ishunt = false,
 	},
 	[ina226] = {
 		.config_default = INA226_CONFIG_DEFAULT,
@@ -143,6 +147,17 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.bus_voltage_lsb = 1250,
 		.power_lsb_factor = 25,
 		.has_alerts = true,
+		.has_ishunt = false,
+	},
+	[ina260] = {
+		.config_default = INA260_CONFIG_DEFAULT,
+		.registers = INA226_REGISTERS,
+		.shunt_div = 400,
+		.bus_voltage_shift = 0,
+		.bus_voltage_lsb = 1250,
+		.power_lsb_factor = 8,
+		.has_alerts = true,
+		.has_ishunt = true,
 	},
 };
 
@@ -199,9 +214,11 @@ static int ina2xx_calibrate(struct ina2xx_data *data)
 static int ina2xx_init(struct ina2xx_data *data)
 {
 	int ret = regmap_write(data->regmap, INA2XX_CONFIG,
-			       data->config->config_default);
+				data->config->config_default);
 	if (ret < 0)
 		return ret;
+	if (data->config->has_ishunt)
+		return 0;
 
 	return ina2xx_calibrate(data);
 }
@@ -210,6 +227,12 @@ static int ina2xx_read_reg(struct device *dev, int reg, unsigned int *regval)
 {
 	struct ina2xx_data *data = dev_get_drvdata(dev);
 	int ret, retry;
+
+	if (data->config->has_ishunt) {
+		if (reg == INA2XX_CURRENT)
+			reg = INA2XX_SHUNT_VOLTAGE;
+		return regmap_read(data->regmap, reg, regval);
+	}
 
 	dev_dbg(dev, "Starting register %d read\n", reg);
 
@@ -596,6 +619,17 @@ static const struct attribute_group ina2xx_group = {
 	.attrs = ina2xx_attrs,
 };
 
+static struct attribute *ina260_attrs[] = {
+	&sensor_dev_attr_in1_input.dev_attr.attr,
+	&sensor_dev_attr_curr1_input.dev_attr.attr,
+	&sensor_dev_attr_power1_input.dev_attr.attr,
+	NULL,
+};
+
+static const struct attribute_group ina260_group = {
+	.attrs = ina260_attrs,
+};
+
 static struct attribute *ina226_attrs[] = {
 	&sensor_dev_attr_in0_crit.dev_attr.attr,
 	&sensor_dev_attr_in0_lcrit.dev_attr.attr,
@@ -639,7 +673,9 @@ static int ina2xx_probe(struct i2c_client *client)
 	data->config = &ina2xx_config[chip];
 	mutex_init(&data->config_lock);
 
-	if (of_property_read_u32(dev->of_node, "shunt-resistor", &val) < 0) {
+	if (data->config->has_ishunt) {
+		val = INA260_RSHUNT;
+	} else if (of_property_read_u32(dev->of_node, "shunt-resistor", &val) < 0) {
 		struct ina2xx_platform_data *pdata = dev_get_platdata(dev);
 
 		if (pdata)
@@ -668,7 +704,8 @@ static int ina2xx_probe(struct i2c_client *client)
 		return -ENODEV;
 	}
 
-	data->groups[group++] = &ina2xx_group;
+	data->groups[group++] = data->config->has_ishunt ?
+				&ina260_group : &ina2xx_group;
 	if (data->config->has_alerts)
 		data->groups[group++] = &ina226_group;
 
@@ -689,6 +726,7 @@ static const struct i2c_device_id ina2xx_id[] = {
 	{ "ina226", ina226 },
 	{ "ina230", ina226 },
 	{ "ina231", ina226 },
+	{ "ina260", ina260 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ina2xx_id);
@@ -713,6 +751,10 @@ static const struct of_device_id __maybe_unused ina2xx_of_match[] = {
 	{
 		.compatible = "ti,ina231",
 		.data = (void *)ina226
+	},
+	{
+		.compatible = "ti,ina260",
+		.data = (void *)ina260
 	},
 	{ },
 };
