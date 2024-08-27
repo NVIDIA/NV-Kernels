@@ -364,6 +364,10 @@ struct mpam_config {
 	u32	mbw_pbm;
 	u16	mbw_max;
 	u16	mbw_min;
+	u16	cmax;
+	u16	cmin;
+
+	bool	cmax_softlim;
 
 	bool	reset_cpbm;
 	bool	reset_mbw_pbm;
