@@ -6375,7 +6375,7 @@ static void quirk_no_rrs_sv(struct pci_dev *dev)
 	root = pcie_find_root_port(dev);
 	if (root) {
 		root->dev_flags |= PCI_DEV_FLAGS_NO_RRS_SV;
-		root->config_crs_sv = 0;
+		root->config_rrs_sv = 0;
 	}
 }
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x0a54, quirk_no_rrs_sv);
