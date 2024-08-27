@@ -1131,4 +1131,4 @@ out:
 
 module_init(damon_dbgfs_init);
 
-#include "dbgfs-test.h"
+#include "tests/dbgfs-kunit.h"
