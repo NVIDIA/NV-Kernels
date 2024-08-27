@@ -18,6 +18,12 @@
 
 DECLARE_STATIC_KEY_FALSE(mpam_enabled);
 
+#ifdef CONFIG_MPAM_KUNIT_TEST
+#define PACKED_FOR_KUNIT __packed
+#else
+#define PACKED_FOR_KUNIT
+#endif
+
 static inline bool mpam_is_enabled(void)
 {
 	return static_branch_likely(&mpam_enabled);
@@ -207,7 +213,7 @@ struct mpam_props {
 	u16			dspri_wd;
 	u16			num_csu_mon;
 	u16			num_mbwu_mon;
-};
+} PACKED_FOR_KUNIT;
 
 #define mpam_has_feature(_feat, x)	((1 << (_feat)) & (x)->features)
 
