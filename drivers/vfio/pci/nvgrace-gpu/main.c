@@ -7,6 +7,7 @@
 #include <linux/vfio_pci_core.h>
 #include <linux/vmalloc.h>
 #include <linux/delay.h>
+#include "egm.h"
 
 #ifdef CONFIG_MEMORY_FAILURE
 #include <linux/bitmap.h>
@@ -76,7 +77,10 @@ struct nvgrace_gpu_pci_core_device {
 	/* Lock to control device memory kernel mapping */
 	struct mutex remap_lock;
 	bool has_mig_hw_bug_fix;
+	int egm_node;
 };
+
+static bool egm_enabled;
 
 #ifdef CONFIG_MEMORY_FAILURE
 static void
@@ -892,6 +896,13 @@ nvgrace_gpu_fetch_memory_property(struct pci_dev *pdev,
 }
 
 static int
+nvgrace_gpu_has_egm_property(struct pci_dev *pdev, u64 *pegmpxm)
+{
+	return device_property_read_u64(&pdev->dev, "nvidia,egm-pxm",
+					pegmpxm);
+}
+
+static int
 nvgrace_gpu_init_nvdev_struct_war(struct pci_dev *pdev,
 				  struct nvgrace_gpu_pci_core_device *nvdev,
 				  u64 memphys, u64 memlength)
@@ -1025,6 +1036,7 @@ static int nvgrace_gpu_probe(struct pci_dev *pdev,
 	const struct vfio_device_ops *ops = &nvgrace_gpu_pci_core_ops;
 	struct nvgrace_gpu_pci_core_device *nvdev;
 	u64 memphys, memlength;
+	u64 egmpxm;
 	int ret;
 
 	ret = nvgrace_gpu_check_device_status(pdev);
@@ -1032,8 +1044,13 @@ static int nvgrace_gpu_probe(struct pci_dev *pdev,
 		return ret;
 
 	ret = nvgrace_gpu_fetch_memory_property(pdev, &memphys, &memlength);
-	if (!ret)
+	if (!ret) {
 		ops = &nvgrace_gpu_pci_ops;
+
+		ret = nvgrace_gpu_has_egm_property(pdev, &egmpxm);
+		if (!ret)
+			egm_enabled = true;
+	}
 
 	nvdev = vfio_alloc_device(nvgrace_gpu_pci_core_device, core_device.vdev,
 				  &pdev->dev, ops);
@@ -1059,6 +1076,12 @@ static int nvgrace_gpu_probe(struct pci_dev *pdev,
 			if (ret)
 				goto out_put_vdev;
 		}
+
+		if (egm_enabled) {
+			register_egm_node(pdev);
+			nvdev->egm_node = egmpxm;
+		}
+
 	}
 
 	ret = vfio_pci_core_register_device(&nvdev->core_device);
@@ -1073,6 +1096,7 @@ static int nvgrace_gpu_probe(struct pci_dev *pdev,
 		hash_init(nvdev->resmem.htbl);
 	hash_init(nvdev->usemem.htbl);
 #endif
+
 	return ret;
 
 out_put_vdev:
@@ -1083,14 +1107,14 @@ out_put_vdev:
 static void nvgrace_gpu_remove(struct pci_dev *pdev)
 {
 	struct vfio_pci_core_device *core_device = dev_get_drvdata(&pdev->dev);
+	struct nvgrace_gpu_pci_core_device *nvdev =
+		container_of(core_device, struct nvgrace_gpu_pci_core_device,
+			     core_device);
 
 #ifdef CONFIG_MEMORY_FAILURE
 	struct h_node *cur;
 	unsigned long bkt;
 	struct hlist_node *tmp_node;
-	struct nvgrace_gpu_pci_core_device *nvdev =
-		container_of(core_device, struct nvgrace_gpu_pci_core_device,
-			     core_device);
 	hash_for_each_safe(nvdev->resmem.htbl, bkt, tmp_node, cur, node) {
 		hash_del(&cur->node);
 		vfree(cur);
@@ -1101,6 +1125,9 @@ static void nvgrace_gpu_remove(struct pci_dev *pdev)
 		vfree(cur);
 	}
 #endif
+
+	if (egm_enabled)
+		unregister_egm_node(nvdev->egm_node);
 
 	vfio_pci_core_unregister_device(core_device);
 	vfio_put_device(&core_device->vdev);
