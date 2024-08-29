@@ -4,6 +4,8 @@
  */
 
 #include <linux/vfio_pci_core.h>
+#include <linux/hashtable.h>
+#include <linux/egm.h>
 #include "egm.h"
 
 #define MAX_EGM_NODES 256
@@ -16,6 +18,12 @@ struct egm_region {
 	size_t egmlength;
 	struct device device;
 	struct cdev cdev;
+	DECLARE_HASHTABLE(htbl, 0x10);
+};
+
+struct h_node {
+	unsigned long mem_offset;
+	struct hlist_node node;
 };
 
 static dev_t dev;
@@ -76,11 +84,80 @@ static int nvgrace_egm_mmap(struct file *file, struct vm_area_struct *vma)
 	return ret;
 }
 
+static long nvgrace_egm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	unsigned long minsz = offsetofend(struct egm_bad_pages_list, count);
+	struct egm_bad_pages_list info;
+	void __user *uarg = (void __user *)arg;
+	struct egm_region *region = file->private_data;
+
+	if (copy_from_user(&info, uarg, minsz))
+		return -EFAULT;
+
+	if (info.argsz < minsz)
+		return -EINVAL;
+
+	if (!region)
+		return -EINVAL;
+
+	switch (cmd) {
+	case EGM_BAD_PAGES_LIST:
+		int ret;
+		unsigned long bad_page_struct_size = sizeof(struct egm_bad_pages_info);
+		struct egm_bad_pages_info tmp;
+		struct h_node *cur_page;
+		struct hlist_node *tmp_node;
+		unsigned long bkt;
+		int count = 0, index = 0;
+
+		hash_for_each_safe(region->htbl, bkt, tmp_node, cur_page, node)
+			count++;
+
+		if (info.argsz < (minsz + count * bad_page_struct_size)) {
+			info.argsz = minsz + count * bad_page_struct_size;
+			info.count = 0;
+			goto done;
+		} else {
+			hash_for_each_safe(region->htbl, bkt, tmp_node, cur_page, node) {
+				/*
+				 * This check fails if there was an ECC error
+				 * after the usermode app read the count of
+				 * bad pages through this ioctl.
+				 */
+				if (minsz + index * bad_page_struct_size >= info.argsz) {
+					info.argsz = minsz + index * bad_page_struct_size;
+					info.count = index;
+					goto done;
+				}
+
+				tmp.offset = cur_page->mem_offset;
+				tmp.size = PAGE_SIZE;
+
+				ret = copy_to_user(uarg + minsz +
+						   index * bad_page_struct_size,
+						   &tmp, bad_page_struct_size);
+				if (ret)
+					return ret;
+				index++;
+			}
+
+			info.count = index;
+		}
+		break;
+	default:
+		return -EINVAL;
+	}
+
+done:
+	return copy_to_user(uarg, &info, minsz) ? -EFAULT : 0;
+}
+
 static const struct file_operations file_ops = {
 	.owner = THIS_MODULE,
 	.open = nvgrace_egm_open,
 	.release = nvgrace_egm_release,
 	.mmap = nvgrace_egm_mmap,
+	.unlocked_ioctl = nvgrace_egm_ioctl,
 };
 
 static int setup_egm_chardev(struct egm_region *region)
@@ -143,6 +220,45 @@ nvgrace_gpu_fetch_egm_property(struct pci_dev *pdev, u64 *pegmphys,
 	return ret;
 }
 
+static void nvgrace_egm_fetch_bad_pages(struct pci_dev *pdev,
+					struct egm_region *region)
+{
+	u64 retiredpagesphys, count;
+	void *memaddr;
+	int index;
+
+	if (device_property_read_u64(&pdev->dev,
+				     "nvidia,egm-retired-pages-data-base",
+				     &retiredpagesphys))
+		return;
+
+	memaddr = memremap(retiredpagesphys, PAGE_SIZE, MEMREMAP_WB);
+	if (!memaddr)
+		return;
+
+	count = *(u64 *)memaddr;
+
+	hash_init(region->htbl);
+
+	for (index = 0; index < count; index++) {
+		struct h_node *retired_page;
+
+		/*
+		 * Since the EGM is linearly mapped, the offset in the
+		 * carveout is the same offset in the VM system memory.
+		 *
+		 * Calculate the offset to communicate to the usermode
+		 * apps.
+		 */
+		retired_page = (struct h_node *)(vzalloc(sizeof(struct h_node)));
+		retired_page->mem_offset = *((u64 *)memaddr + index + 1) -
+					   region->egmphys;
+		hash_add(region->htbl, &retired_page->node, retired_page->mem_offset);
+	}
+
+	memunmap(memaddr);
+}
+
 int register_egm_node(struct pci_dev *pdev)
 {
 	struct egm_region *region = NULL;
@@ -165,6 +281,8 @@ int register_egm_node(struct pci_dev *pdev)
 
 	atomic_set(&region->open_count, 0);
 
+	nvgrace_egm_fetch_bad_pages(pdev, region);
+
 	list_add_tail(&region->list, &egm_list);
 
 	setup_egm_chardev(region);
@@ -181,9 +299,17 @@ static void destroy_egm_chardev(struct egm_region *region)
 void unregister_egm_node(int egm_node)
 {
 	struct egm_region *region, *temp_region;
+	struct h_node *cur_page;
+	unsigned long bkt;
+	struct hlist_node *temp_node;
 
 	list_for_each_entry_safe(region, temp_region, &egm_list, list) {
 		if (egm_node == region->egmpxm) {
+			hash_for_each_safe(region->htbl, bkt, temp_node, cur_page, node) {
+				hash_del(&cur_page->node);
+				vfree(cur_page);
+			}
+
 			destroy_egm_chardev(region);
 			list_del(&region->list);
 		}
