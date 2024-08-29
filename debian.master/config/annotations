@@ -12044,7 +12044,7 @@ CONFIG_SERIAL_MILBEAUT_USIO                     policy<{'armhf': 'm'}>
 CONFIG_SERIAL_MILBEAUT_USIO_PORTS               policy<{'armhf': '4'}>
 CONFIG_SERIAL_MSM                               policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_SERIAL_MSM_CONSOLE                       policy<{'arm64': 'y', 'armhf': 'y'}>
-CONFIG_SERIAL_MULTI_INSTANTIATE                 policy<{'amd64': 'm'}>
+CONFIG_SERIAL_MULTI_INSTANTIATE                 policy<{'amd64': 'm', 'arm64': 'n', 'riscv64': 'n'}>
 CONFIG_SERIAL_MVEBU_CONSOLE                     policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_SERIAL_MVEBU_UART                        policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_SERIAL_NONSTANDARD                       policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'n'}>
