@@ -1438,6 +1438,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	bool device = false, vfio_allow_any_uc = false;
 	unsigned long mmu_seq;
 	phys_addr_t ipa = fault_ipa;
+	unsigned long mt;
 	struct kvm *kvm = vcpu->kvm;
 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
 	struct vm_area_struct *vma;
@@ -1564,6 +1565,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 
 	vfio_allow_any_uc = vma->vm_flags & VM_ALLOW_ANY_UNCACHED;
 
+	mt = mapping_type(vma->vm_page_prot);
+
 	/*
 	 * Figure out the memory type based on the user va mapping properties
 	 * Only MT_DEVICE_nGnRE and MT_DEVICE_nGnRnE will be set using
@@ -1623,7 +1626,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		writable = false;
 	}
 
-	if (exec_fault && device)
+	if (exec_fault && device && mt != MT_NORMAL)
 		return -ENOEXEC;
 
 	/*
