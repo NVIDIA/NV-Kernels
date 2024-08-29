@@ -1493,6 +1493,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	bool s2_force_noncacheable = false, vfio_allow_any_uc = false;
 	unsigned long mmu_seq;
 	phys_addr_t ipa = fault_ipa;
+	unsigned long mt;
 	struct kvm *kvm = vcpu->kvm;
 	struct vm_area_struct *vma;
 	short vma_shift;
@@ -1612,6 +1613,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		vma_pagesize = min(vma_pagesize, (long)max_map_size);
 	}
 
+	mt = FIELD_GET(PTE_ATTRINDX_MASK, pgprot_val(vma->vm_page_prot));
+
 	/*
 	 * Both the canonical IPA and fault IPA must be hugepage-aligned to
 	 * ensure we find the right PFN and lay down the mapping in the right
@@ -1695,7 +1698,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		writable = false;
 	}
 
-	if (exec_fault && s2_force_noncacheable)
+	if (exec_fault && s2_force_noncacheable && mt != MT_NORMAL)
 		ret = -ENOEXEC;
 
 	if (ret) {
