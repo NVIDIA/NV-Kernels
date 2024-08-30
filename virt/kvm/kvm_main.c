@@ -139,8 +139,8 @@ static int kvm_no_compat_open(struct inode *inode, struct file *file)
 #define KVM_COMPAT(c)	.compat_ioctl	= kvm_no_compat_ioctl,	\
 			.open		= kvm_no_compat_open
 #endif
-static int hardware_enable_all(void);
-static void hardware_disable_all(void);
+static int kvm_enable_virtualization(void);
+static void kvm_disable_virtualization(void);
 
 static void kvm_io_bus_destroy(struct kvm_io_bus *bus);
 
@@ -1269,7 +1269,7 @@ static struct kvm *kvm_create_vm(unsigned long type, const char *fdname)
 	if (r)
 		goto out_err_no_arch_destroy_vm;
 
-	r = hardware_enable_all();
+	r = kvm_enable_virtualization();
 	if (r)
 		goto out_err_no_disable;
 
@@ -1312,7 +1312,7 @@ out_no_coalesced_mmio:
 		mmu_notifier_unregister(&kvm->mmu_notifier, current->mm);
 #endif
 out_err_no_mmu_notifier:
-	hardware_disable_all();
+	kvm_disable_virtualization();
 out_err_no_disable:
 	kvm_arch_destroy_vm(kvm);
 out_err_no_arch_destroy_vm:
@@ -1401,7 +1401,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
 #endif
 	kvm_arch_free_vm(kvm);
 	preempt_notifier_dec();
-	hardware_disable_all();
+	kvm_disable_virtualization();
 	mmdrop(mm);
 }
 
@@ -5564,13 +5564,13 @@ static struct miscdevice kvm_dev = {
 __visible bool kvm_rebooting;
 EXPORT_SYMBOL_GPL(kvm_rebooting);
 
-static DEFINE_PER_CPU(bool, hardware_enabled);
+static DEFINE_PER_CPU(bool, virtualization_enabled);
 static DEFINE_MUTEX(kvm_usage_lock);
 static int kvm_usage_count;
 
-static int __hardware_enable_nolock(void)
+static int __kvm_enable_virtualization_cpu(void)
 {
-	if (__this_cpu_read(hardware_enabled))
+	if (__this_cpu_read(virtualization_enabled))
 		return 0;
 
 	if (kvm_arch_hardware_enable()) {
@@ -5579,13 +5579,13 @@ static int __hardware_enable_nolock(void)
 		return -EIO;
 	}
 
-	__this_cpu_write(hardware_enabled, true);
+	__this_cpu_write(virtualization_enabled, true);
 	return 0;
 }
 
-static void hardware_enable_nolock(void *failed)
+static void kvm_enable_virtualization_cpu(void *failed)
 {
-	if (__hardware_enable_nolock())
+	if (__kvm_enable_virtualization_cpu())
 		atomic_inc(failed);
 }
 
@@ -5600,53 +5600,53 @@ static int kvm_online_cpu(unsigned int cpu)
 	 */
 	mutex_lock(&kvm_usage_lock);
 	if (kvm_usage_count)
-		ret = __hardware_enable_nolock();
+		ret = __kvm_enable_virtualization_cpu();
 	mutex_unlock(&kvm_usage_lock);
 	return ret;
 }
 
-static void hardware_disable_nolock(void *junk)
+static void kvm_disable_virtualization_cpu(void *ign)
 {
 	/*
-	 * Note, hardware_disable_all_nolock() tells all online CPUs to disable
-	 * hardware, not just CPUs that successfully enabled hardware!
+	 * Note, kvm_disable_virtualization_all_cpus() tells all online CPUs to
+	 * disable hardware, not just CPUs that successfully enabled hardware!
 	 */
-	if (!__this_cpu_read(hardware_enabled))
+	if (!__this_cpu_read(virtualization_enabled))
 		return;
 
 	kvm_arch_hardware_disable();
 
-	__this_cpu_write(hardware_enabled, false);
+	__this_cpu_write(virtualization_enabled, false);
 }
 
 static int kvm_offline_cpu(unsigned int cpu)
 {
 	mutex_lock(&kvm_usage_lock);
 	if (kvm_usage_count)
-		hardware_disable_nolock(NULL);
+		kvm_disable_virtualization_cpu(NULL);
 	mutex_unlock(&kvm_usage_lock);
 	return 0;
 }
 
-static void hardware_disable_all_nolock(void)
+static void kvm_disable_virtualization_all_cpus(void)
 {
 	BUG_ON(!kvm_usage_count);
 
 	kvm_usage_count--;
 	if (!kvm_usage_count)
-		on_each_cpu(hardware_disable_nolock, NULL, 1);
+		on_each_cpu(kvm_disable_virtualization_cpu, NULL, 1);
 }
 
-static void hardware_disable_all(void)
+static void kvm_disable_virtualization(void)
 {
 	cpus_read_lock();
 	mutex_lock(&kvm_usage_lock);
-	hardware_disable_all_nolock();
+	kvm_disable_virtualization_all_cpus();
 	mutex_unlock(&kvm_usage_lock);
 	cpus_read_unlock();
 }
 
-static int hardware_enable_all(void)
+static int kvm_enable_virtualization(void)
 {
 	atomic_t failed = ATOMIC_INIT(0);
 	int r;
@@ -5667,7 +5667,7 @@ static int hardware_enable_all(void)
 	/*
 	 * When onlining a CPU, cpu_online_mask is set before kvm_online_cpu()
 	 * is called, and so on_each_cpu() between them includes the CPU that
-	 * is being onlined.  As a result, hardware_enable_nolock() may get
+	 * is being onlined.  As a result, kvm_enable_virtualization_cpu() may get
 	 * invoked before kvm_online_cpu(), which also enables hardware if the
 	 * usage count is non-zero.  Disable CPU hotplug to avoid attempting to
 	 * enable hardware multiple times.
@@ -5679,10 +5679,10 @@ static int hardware_enable_all(void)
 
 	kvm_usage_count++;
 	if (kvm_usage_count == 1) {
-		on_each_cpu(hardware_enable_nolock, &failed, 1);
+		on_each_cpu(kvm_enable_virtualization_cpu, &failed, 1);
 
 		if (atomic_read(&failed)) {
-			hardware_disable_all_nolock();
+			kvm_disable_virtualization_all_cpus();
 			r = -EBUSY;
 		}
 	}
@@ -5708,7 +5708,7 @@ static void kvm_shutdown(void)
 	 */
 	pr_info("kvm: exiting hardware virtualization\n");
 	kvm_rebooting = true;
-	on_each_cpu(hardware_disable_nolock, NULL, 1);
+	on_each_cpu(kvm_disable_virtualization_cpu, NULL, 1);
 }
 
 static int kvm_suspend(void)
@@ -5725,7 +5725,7 @@ static int kvm_suspend(void)
 	lockdep_assert_irqs_disabled();
 
 	if (kvm_usage_count)
-		hardware_disable_nolock(NULL);
+		kvm_disable_virtualization_cpu(NULL);
 	return 0;
 }
 
@@ -5735,7 +5735,7 @@ static void kvm_resume(void)
 	lockdep_assert_irqs_disabled();
 
 	if (kvm_usage_count)
-		WARN_ON_ONCE(__hardware_enable_nolock());
+		WARN_ON_ONCE(__kvm_enable_virtualization_cpu());
 }
 
 static struct syscore_ops kvm_syscore_ops = {
@@ -5744,12 +5744,12 @@ static struct syscore_ops kvm_syscore_ops = {
 	.shutdown = kvm_shutdown,
 };
 #else /* CONFIG_KVM_GENERIC_HARDWARE_ENABLING */
-static int hardware_enable_all(void)
+static int kvm_enable_virtualization(void)
 {
 	return 0;
 }
 
-static void hardware_disable_all(void)
+static void kvm_disable_virtualization(void)
 {
 
 }
