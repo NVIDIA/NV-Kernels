@@ -367,7 +367,7 @@ static struct svc_xprt *svc_rdma_create(struct svc_serv *serv,
 		 */
 		__module_get(cma_xprt->sc_xprt.xpt_class->xcl_owner);
 		svc_xprt_put(&cma_xprt->sc_xprt);
-		return (struct svc_xprt *)listen_id;
+		return ERR_CAST(listen_id);
 	}
 	cma_xprt->sc_cm_id = listen_id;
 
