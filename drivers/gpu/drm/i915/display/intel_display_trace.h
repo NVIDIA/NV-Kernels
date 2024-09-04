@@ -118,7 +118,8 @@ TRACE_EVENT(intel_cpu_fifo_underrun,
 			     ),
 
 	    TP_fast_assign(
-			    struct intel_crtc *crtc = intel_crtc_for_pipe(dev_priv, pipe);
+			   struct intel_display *display = &dev_priv->display;
+			   struct intel_crtc *crtc = intel_crtc_for_pipe(display, pipe);
 			   __assign_str(dev, __dev_name_kms(crtc));
 			   __entry->pipe = pipe;
 			   __entry->frame = intel_crtc_get_vblank_counter(crtc);
@@ -142,8 +143,9 @@ TRACE_EVENT(intel_pch_fifo_underrun,
 			     ),
 
 	    TP_fast_assign(
+			   struct intel_display *display = &dev_priv->display;
 			   enum pipe pipe = pch_transcoder;
-			   struct intel_crtc *crtc = intel_crtc_for_pipe(dev_priv, pipe);
+			   struct intel_crtc *crtc = intel_crtc_for_pipe(display, pipe);
 			   __assign_str(dev, __dev_name_i915(dev_priv));
 			   __entry->pipe = pipe;
 			   __entry->frame = intel_crtc_get_vblank_counter(crtc);
@@ -408,7 +410,8 @@ TRACE_EVENT(intel_fbc_activate,
 			     ),
 
 	    TP_fast_assign(
-			   struct intel_crtc *crtc = intel_crtc_for_pipe(to_i915(plane->base.dev),
+			   struct intel_display *display = to_intel_display(plane->base.dev);
+			   struct intel_crtc *crtc = intel_crtc_for_pipe(display,
 									 plane->pipe);
 			   __assign_str(dev, __dev_name_kms(plane));
 			   __assign_str(name, plane->base.name);
@@ -435,7 +438,8 @@ TRACE_EVENT(intel_fbc_deactivate,
 			     ),
 
 	    TP_fast_assign(
-			   struct intel_crtc *crtc = intel_crtc_for_pipe(to_i915(plane->base.dev),
+			   struct intel_display *display = to_intel_display(plane->base.dev);
+			   struct intel_crtc *crtc = intel_crtc_for_pipe(display,
 									 plane->pipe);
 			   __assign_str(dev, __dev_name_kms(plane));
 			   __assign_str(name, plane->base.name);
@@ -462,7 +466,8 @@ TRACE_EVENT(intel_fbc_nuke,
 			     ),
 
 	    TP_fast_assign(
-			   struct intel_crtc *crtc = intel_crtc_for_pipe(to_i915(plane->base.dev),
+			   struct intel_display *display = to_intel_display(plane->base.dev);
+			   struct intel_crtc *crtc = intel_crtc_for_pipe(display,
 									 plane->pipe);
 			   __assign_str(dev, __dev_name_kms(plane));
 			   __assign_str(name, plane->base.name);
