@@ -807,12 +807,12 @@ static struct arm_smmu_device *
 __tegra241_cmdqv_probe(struct arm_smmu_device *smmu, struct resource *res,
 		       int irq)
 {
-	static struct arm_smmu_device *new_smmu;
 	static const struct arm_smmu_impl_ops init_ops = {
 		.init_structures = tegra241_cmdqv_init_structures,
 		.device_remove = tegra241_cmdqv_remove,
 	};
 	struct tegra241_cmdqv *cmdqv = NULL;
+	struct arm_smmu_device *new_smmu;
 	void __iomem *base;
 	u32 regval;
 	int ret;
