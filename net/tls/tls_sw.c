@@ -47,6 +47,7 @@
 struct tls_decrypt_arg {
 	bool zc;
 	bool async;
+	bool async_done;
 };
 
 noinline void tls_err_abort(struct sock *sk, int err)
@@ -289,15 +290,18 @@ static int tls_do_decryption(struct sock *sk,
 	}
 
 	ret = crypto_aead_decrypt(aead_req);
+	if (ret == -EINPROGRESS)
+		return 0;
+
 	if (ret == -EBUSY) {
 		ret = tls_decrypt_async_wait(ctx);
-		ret = ret ?: -EINPROGRESS;
+		darg->async_done = true;
+		/* all completions have run, we're not doing async anymore */
+		darg->async = false;
+		return ret;
 	}
-	if (ret == -EINPROGRESS) {
-		return 0;
-	} else if (darg->async) {
-		atomic_dec(&ctx->decrypt_pending);
-	}
+
+	atomic_dec(&ctx->decrypt_pending);
 	darg->async = false;
 
 	return ret;
@@ -1554,7 +1558,15 @@ fallback_to_reg_recv:
 	/* Prepare and submit AEAD request */
 	err = tls_do_decryption(sk, skb, sgin, sgout, iv,
 				data_len, aead_req, darg);
+	if (err) {
+		if (darg->async_done)
+			return err;
+	}
+
 	if (darg->async)
+		return 0;
+
+	if (unlikely(darg->async_done))
 		return 0;
 
 	/* Release the pages in case iov was mapped to pages */
