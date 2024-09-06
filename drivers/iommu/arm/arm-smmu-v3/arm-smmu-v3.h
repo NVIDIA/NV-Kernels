@@ -647,8 +647,6 @@ struct arm_smmu_strtab_cfg {
 			unsigned int num_l1_ents;
 		} l2;
 	};
-	u64				strtab_base;
-	u32				strtab_base_cfg;
 };
 
 /* An SMMUv3 instance */
