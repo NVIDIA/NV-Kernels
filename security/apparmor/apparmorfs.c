@@ -2605,6 +2605,11 @@ static struct aa_sfs_entry aa_sfs_entry_versions[] = {
 	{ }
 };
 
+static struct aa_sfs_entry aa_sfs_entry_notify[] = {
+	AA_SFS_FILE_STRING("user", "file"),
+	{ }
+};
+
 /* permstable v1: skipped
               v2: accept1 index, no accept2
               v3: accept1 index, accept2 flags
@@ -2619,6 +2624,7 @@ static struct aa_sfs_entry aa_sfs_entry_policy[] = {
 	AA_SFS_FILE_STRING("permstable32", PERMS32STR),
 	AA_SFS_FILE_U64("state32",	1),
 	AA_SFS_DIR("unconfined_restrictions",   aa_sfs_entry_unconfined),
+	AA_SFS_DIR("notify",   aa_sfs_entry_notify),
 	{ }
 };
 
