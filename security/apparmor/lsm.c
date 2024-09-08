@@ -236,7 +236,7 @@ static int common_perm(const char *op, const struct path *path, u32 mask,
 	label = __begin_current_label_crit_section();
 	if (label_mediates(label, AA_CLASS_FILE))
 		error = aa_path_perm(op, current_cred(), label, path, 0, mask,
-				     cond);
+				     cond, NULL);
 	__end_current_label_crit_section(label);
 
 	return error;
@@ -426,12 +426,12 @@ static int apparmor_path_rename(const struct path *old_dir, struct dentry *old_d
 					     label, &new_path, 0,
 					     MAY_READ | AA_MAY_GETATTR | MAY_WRITE |
 					     AA_MAY_SETATTR | AA_MAY_DELETE,
-					     &cond_exchange);
+					     &cond_exchange, NULL);
 			if (!error)
 				error = aa_path_perm(OP_RENAME_DEST, current_cred(),
 						     label, &old_path,
 						     0, MAY_WRITE | AA_MAY_SETATTR |
-						     AA_MAY_CREATE, &cond_exchange);
+						     AA_MAY_CREATE, &cond_exchange, NULL);
 		}
 
 		if (!error)
@@ -439,12 +439,12 @@ static int apparmor_path_rename(const struct path *old_dir, struct dentry *old_d
 					     label, &old_path, 0,
 					     MAY_READ | AA_MAY_GETATTR | MAY_WRITE |
 					     AA_MAY_SETATTR | AA_MAY_DELETE,
-					     &cond);
+					     &cond, NULL);
 		if (!error)
 			error = aa_path_perm(OP_RENAME_DEST, current_cred(),
 					     label, &new_path,
 					     0, MAY_WRITE | AA_MAY_SETATTR |
-					     AA_MAY_CREATE, &cond);
+					     AA_MAY_CREATE, &cond, NULL);
 
 	}
 	end_current_label_crit_section(label);
@@ -652,23 +652,28 @@ static int apparmor_file_open(struct file *file)
 		struct mnt_idmap *idmap = file_mnt_idmap(file);
 		struct inode *inode = file_inode(file);
 		vfsuid_t vfsuid;
+		u32 allow;
 		struct path_cond cond = {
 			.mode = inode->i_mode,
 		};
 		vfsuid = i_uid_into_vfsuid(idmap, inode);
 		cond.uid = vfsuid_into_kuid(vfsuid);
 
-		if (is_mqueue_inode(file_inode(file)))
+		if (is_mqueue_inode(file_inode(file))){
 			error = aa_mqueue_perm(OP_OPEN, file->f_cred,
 					       label, &file->f_path,
 					       aa_map_file_to_perms(file));
-		else
+			allow = aa_map_file_to_perms(file);
+		} else {
+			/* will be intersected and reduced with each profile */
+			allow = ALL_PERMS_MASK;
 			error = aa_path_perm(OP_OPEN, file->f_cred,
 					     label, &file->f_path, 0,
-					     aa_map_file_to_perms(file), &cond);
-		/* todo cache full allowed permissions set and state */
+					     aa_map_file_to_perms(file), &cond,
+					     &allow);
+		}
 		if (!error)
-			fctx->allow = aa_map_file_to_perms(file);
+			fctx->allow = allow;
 	}
 	aa_put_label_condref(label, needput);
 
@@ -720,7 +725,7 @@ static int apparmor_file_receive(struct file *file)
 
 static int apparmor_file_permission(struct file *file, int mask)
 {
-	return common_file_perm(OP_FPERM, file, mask, false);
+	return common_file_perm(OP_FPERM, file, mask, true);
 }
 
 static int apparmor_file_lock(struct file *file, unsigned int cmd)

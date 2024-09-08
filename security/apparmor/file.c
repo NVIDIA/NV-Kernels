@@ -385,7 +385,8 @@ static int profile_path_perm(const char *op, const struct cred *subj_cred,
 			     struct aa_profile *profile,
 			     const struct path *path, char *buffer, u32 request,
 			     struct path_cond *cond, int flags,
-			     struct aa_perms *perms, bool prompt)
+			     struct aa_perms *perms, bool prompt,
+			     u32 *allow)
 {
 	const char *name;
 	int error;
@@ -398,8 +399,13 @@ static int profile_path_perm(const char *op, const struct cred *subj_cred,
 			  request);
 	if (error)
 		return error;
-	return __aa_path_perm(op, subj_cred, profile, name, request, cond,
-			      flags, perms, prompt);
+	error = __aa_path_perm(op, subj_cred, profile, name, request, cond,
+			       flags, perms, prompt);
+	/* accumulate intersection of allowed to set on object cache */
+	if (!error && allow) {
+		*allow &= perms->allow;
+	}
+	return error;
 }
 
 /**
@@ -411,13 +417,14 @@ static int profile_path_perm(const char *op, const struct cred *subj_cred,
  * @flags: any additional path flags beyond what the profile specifies
  * @request: requested permissions
  * @cond: conditional info for this request  (NOT NULL)
+ * @allow: in/out intersected  set of allowed permissions (MAYBE NULL)
  *
  * Returns: %0 else error if access denied or other error
  */
 int aa_path_perm(const char *op, const struct cred *subj_cred,
 		 struct aa_label *label,
 		 const struct path *path, int flags, u32 request,
-		 struct path_cond *cond)
+		 struct path_cond *cond, u32 *allow)
 {
 	struct aa_perms perms = {};
 	struct aa_profile *profile;
@@ -432,7 +439,7 @@ int aa_path_perm(const char *op, const struct cred *subj_cred,
 	error = fn_for_each_confined(label, profile,
 			profile_path_perm(op, subj_cred, profile, path,
 					  buffer, request,
-					  cond, flags, &perms, true));
+					  cond, flags, &perms, true, allow));
 
 	aa_put_buffer(buffer);
 
@@ -597,7 +604,7 @@ out:
 }
 
 static void update_file_ctx(struct aa_file_ctx *fctx, struct aa_label *label,
-			    u32 request)
+			    u32 request, u32 allow)
 {
 	struct aa_label *l, *old;
 
@@ -612,7 +619,10 @@ static void update_file_ctx(struct aa_file_ctx *fctx, struct aa_label *label,
 			aa_put_label(old);
 		} else
 			aa_put_label(l);
-		fctx->allow |= request;
+		/* TODO: reduction of perms here should result in revalidation
+		 * of components not already checked. Only affects stacking
+		 */
+		fctx->allow = allow;
 	}
 	spin_unlock(&fctx->lock);
 }
@@ -631,6 +641,7 @@ static int __file_path_perm(const char *op, const struct cred *subj_cred,
 		.mode = file_inode(file)->i_mode
 	};
 	char *buffer;
+	u32 allow = ALL_PERMS_MASK;
 	int flags, error;
 
 	/* revalidation due to label out of date. No revocation at this time */
@@ -647,7 +658,7 @@ static int __file_path_perm(const char *op, const struct cred *subj_cred,
 	error = fn_for_each_not_in_set(flabel, label, profile,
 			profile_path_perm(op, subj_cred, profile,
 					  &file->f_path, buffer,
-					  request, &cond, flags, &perms, false));
+					  request, &cond, flags, &perms, in_atomic, &allow));
 	if (denied && !error) {
 		/*
 		 * check every profile in file label that was not tested
@@ -662,16 +673,16 @@ static int __file_path_perm(const char *op, const struct cred *subj_cred,
 				profile_path_perm(op, subj_cred,
 						  profile, &file->f_path,
 						  buffer, request, &cond, flags,
-						  &perms, false));
+						  &perms, in_atomic, &allow));
 		else
 			error = fn_for_each_not_in_set(label, flabel, profile,
 				profile_path_perm(op, subj_cred,
 						  profile, &file->f_path,
 						  buffer, request, &cond, flags,
-						  &perms, false));
+						  &perms, in_atomic, &allow));
 	}
 	if (!error)
-		update_file_ctx(file_ctx(file), label, request);
+		update_file_ctx(file_ctx(file), label, request, allow);
 
 	aa_put_buffer(buffer);
 
@@ -701,7 +712,7 @@ static int __file_sock_perm(const char *op, const struct cred *subj_cred,
 						    request, sock));
 	}
 	if (!error)
-		update_file_ctx(file_ctx(file), label, request);
+		update_file_ctx(file_ctx(file), label, request, request);
 
 	return error;
 }
@@ -754,7 +765,7 @@ static int __file_mqueue_perm(const char *op, const struct cred *subj_cred,
 						       request, buffer, &ad));
 	}
 	if (!error)
-		update_file_ctx(file_ctx(file), label, request);
+		update_file_ctx(file_ctx(file), label, request, request);
 
 	aa_put_buffer(buffer);
 

@@ -67,7 +67,7 @@ static inline int unix_fs_perm(const char *op, u32 mask,
 		if (ctx->path.dentry)
 			return aa_path_perm(op, subj_cred, label, &ctx->path,
 					    flags, mask,
-					    &cond);
+					    &cond, NULL);
 		return fn_for_each_confined(label, profile,
 			((flags | profile->path_flags) & PATH_MEDIATE_DELETED) ?
 				__aa_path_perm(op, subj_cred, profile,
@@ -86,7 +86,7 @@ static inline int unix_fs_perm(const char *op, u32 mask,
 		};
 
 		return aa_path_perm(op, subj_cred, label, &u->path, flags,
-				    mask, &cond);
+				    mask, &cond, NULL);
 	}
 
 	return 0;
