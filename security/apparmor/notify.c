@@ -957,7 +957,7 @@ static long build_v3_unotif(struct aa_knotif *knotif, void __user *buf,
 	unotif.base.ntype = knotif->ntype;
 	unotif.base.id = knotif->id;
 	unotif.base.error = knotif->ad->error;
-	unotif.op.allow = knotif->ad->request & knotif->ad->denied;
+	unotif.op.allow = knotif->ad->request & ~knotif->ad->denied;
 	unotif.op.deny = knotif->ad->denied;
 	AA_DEBUG(DEBUG_UPCALL,
 		 "notif %lld: sent to user read request 0x%x, denied 0x%x, error %d",
