@@ -1193,6 +1193,14 @@ static inline bool mptcp_try_fallback(struct sock *ssk)
 
 #define pr_fallback(a) pr_debug("%s:fallback to TCP (msk=%p)\n", __func__, a)
 
+static inline void mptcp_subflow_early_fallback(struct mptcp_sock *msk,
+						struct mptcp_subflow_context *subflow)
+{
+	pr_fallback(msk);
+	subflow->request_mptcp = 0;
+	WARN_ON_ONCE(!__mptcp_try_fallback(msk));
+}
+
 static inline bool mptcp_check_infinite_map(struct sk_buff *skb)
 {
 	struct mptcp_ext *mpext;
