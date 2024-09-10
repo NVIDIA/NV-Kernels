@@ -84,12 +84,6 @@ static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 	u32 closid = data->closid;
 	u32 bw_val;
 
-	cfg = &d->staged_config[s->conf_type];
-	if (cfg->have_new_ctrl) {
-		rdt_last_cmd_printf("Duplicate domain %d\n", d->hdr.id);
-		return -EINVAL;
-	}
-
 	if (!bw_validate(data->buf, &bw_val, r))
 		return -EINVAL;
 
@@ -98,6 +92,7 @@ static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 		return 0;
 	}
 
+	cfg = &d->staged_config[s->conf_type];
 	cfg->new_ctrl = bw_val;
 	cfg->have_new_ctrl = true;
 
@@ -165,12 +160,6 @@ static int parse_cbm(struct rdt_parse_data *data, struct resctrl_schema *s,
 	u32 closid = data->closid;
 	u32 cbm_val;
 
-	cfg = &d->staged_config[s->conf_type];
-	if (cfg->have_new_ctrl) {
-		rdt_last_cmd_printf("Duplicate domain %d\n", d->hdr.id);
-		return -EINVAL;
-	}
-
 	/*
 	 * Cannot set up more than one pseudo-locked region in a cache
 	 * hierarchy.
@@ -207,6 +196,7 @@ static int parse_cbm(struct rdt_parse_data *data, struct resctrl_schema *s,
 		}
 	}
 
+	cfg = &d->staged_config[s->conf_type];
 	cfg->new_ctrl = cbm_val;
 	cfg->have_new_ctrl = true;
 
@@ -264,13 +254,18 @@ next:
 	dom = strim(dom);
 	list_for_each_entry(d, &r->ctrl_domains, hdr.list) {
 		if (d->hdr.id == dom_id) {
+			cfg = &d->staged_config[t];
+			if (cfg->have_new_ctrl) {
+				rdt_last_cmd_printf("Duplicate domain %d\n", d->hdr.id);
+				return -EINVAL;
+			}
+
 			data.buf = dom;
 			data.closid = rdtgrp->closid;
 			data.mode = rdtgrp->mode;
 			if (parse_ctrlval(&data, s, d))
 				return -EINVAL;
 			if (rdtgrp->mode ==  RDT_MODE_PSEUDO_LOCKSETUP) {
-				cfg = &d->staged_config[t];
 				/*
 				 * In pseudo-locking setup mode and just
 				 * parsed a valid CBM that should be
