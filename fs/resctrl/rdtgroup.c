@@ -1762,6 +1762,30 @@ static int mbm_local_bytes_config_show(struct kernfs_open_file *of,
 	return 0;
 }
 
+static int resctrl_schema_format_show(struct kernfs_open_file *of,
+				      struct seq_file *seq, void *v)
+{
+	struct resctrl_schema *s = rdt_kn_parent_priv(of->kn);
+
+	switch (s->schema_fmt) {
+	case RESCTRL_SCHEMA_BITMAP:
+		seq_puts(seq, "bitmap\n");
+		break;
+	case RESCTRL_SCHEMA_PERCENT:
+		seq_puts(seq, "percentage\n");
+		break;
+	case RESCTRL_SCHEMA_MBPS:
+		seq_puts(seq, "mbps\n");
+		break;
+	/* The way these schema behave isn't discoverable from resctrl */
+	case RESCTRL_SCHEMA__AMD_MBA:
+		seq_puts(seq, "platform\n");
+		break;
+	}
+
+	return 0;
+}
+
 static void mbm_config_write_domain(struct rdt_resource *r,
 				    struct rdt_mon_domain *d, u32 evtid, u32 val)
 {
@@ -2192,6 +2216,14 @@ static struct rftype res_common_files[] = {
 		.seq_show	= rdtgroup_closid_show,
 		.fflags		= RFTYPE_CTRL_BASE | RFTYPE_DEBUG,
 	},
+	{
+		.name		= "schema_format",
+		.mode		= 0444,
+		.kf_ops		= &rdtgroup_kf_single_ops,
+		.seq_show	= resctrl_schema_format_show,
+		.fflags		= RFTYPE_CTRL_INFO,
+	},
+
 };
 
 static int rdtgroup_add_files(struct kernfs_node *kn, unsigned long fflags)
