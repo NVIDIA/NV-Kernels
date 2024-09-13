@@ -41,11 +41,27 @@ Following IOMMUFD objects are exposed to userspace:
 - IOMMUFD_OBJ_DEVICE, representing a device that is bound to iommufd by an
   external driver.
 
-- IOMMUFD_OBJ_HW_PAGETABLE, representing an actual hardware I/O page table
-  (i.e. a single struct iommu_domain) managed by the iommu driver.
+- IOMMUFD_OBJ_HWPT_PAGING, representing an actual hardware I/O page table
+  (i.e. a single struct iommu_domain) managed by the iommu driver. "PAGING"
+  primarly indicates this type of HWPT should be linked to an IOAS. It also
+  indicates that it is backed by an iommu_domain with __IOMMU_DOMAIN_PAGING
+  feature flag. This can be either an UNMANAGED stage-1 domain for a device
+  running in the user space, or a nesting parent stage-2 domain for mappings
+  from guest-level physical addresses to host-level physical addresses.
 
-  The IOAS has a list of HW_PAGETABLES that share the same IOVA mapping and
-  it will synchronize its mapping with each member HW_PAGETABLE.
+  The IOAS has a list of HWPT_PAGINGs that share the same IOVA mapping and
+  it will synchronize its mapping with each member HWPT_PAGING.
+
+- IOMMUFD_OBJ_HWPT_NESTED, representing an actual hardware I/O page table
+  (i.e. a single struct iommu_domain) managed by user space (e.g. guest OS).
+  "NESTED" indicates that this type of HWPT should be linked to an HWPT_PAGING.
+  It also indicates that it is backed by an iommu_domain that has a type of
+  IOMMU_DOMAIN_NESTED. This must be a stage-1 domain for a device running in
+  the user space (e.g. in a guest VM enabling the IOMMU nested translation
+  feature.) As such, it must be created with a given nesting parent stage-2
+  domain to associate to. This nested stage-1 page table managed by the user
+  space usually has mappings from guest-level I/O virtual addresses to guest-
+  level physical addresses.
 
 - IOMMUFD_OBJ_VIOMMU, representing a slice of the physical IOMMU instance,
   passed to or shared with a VM. It may be some HW-accelerated virtualization
@@ -95,38 +111,41 @@ Following IOMMUFD objects are exposed to userspace:
 
 All user-visible objects are destroyed via the IOMMU_DESTROY uAPI.
 
-The diagram below shows relationship between user-visible objects and kernel
+The diagrams below show relationships between user-visible objects and kernel
 datastructures (external to iommufd), with numbers referred to operations
 creating the objects and links::
 
-  _________________________________________________________
- |                         iommufd                         |
- |       [1]                                               |
- |  _________________                                      |
- | |                 |                                     |
- | |                 |                                     |
- | |                 |                                     |
- | |                 |                                     |
- | |                 |                                     |
- | |                 |                                     |
- | |                 |        [3]                 [2]      |
- | |                 |    ____________         __________  |
- | |      IOAS       |<--|            |<------|          | |
- | |                 |   |HW_PAGETABLE|       |  DEVICE  | |
- | |                 |   |____________|       |__________| |
- | |                 |         |                   |       |
- | |                 |         |                   |       |
- | |                 |         |                   |       |
- | |                 |         |                   |       |
- | |                 |         |                   |       |
- | |_________________|         |                   |       |
- |         |                   |                   |       |
- |_________|___________________|___________________|_______|
-           |                   |                   |
-           |              _____v______      _______v_____
-           | PFN storage |            |    |             |
-           |------------>|iommu_domain|    |struct device|
-                         |____________|    |_____________|
+  _______________________________________________________________________
+ |                      iommufd (HWPT_PAGING only)                       |
+ |                                                                       |
+ |        [1]                  [3]                                [2]    |
+ |  ________________      _____________                        ________  |
+ | |                |    |             |                      |        | |
+ | |      IOAS      |<---| HWPT_PAGING |<---------------------| DEVICE | |
+ | |________________|    |_____________|                      |________| |
+ |         |                    |                                  |     |
+ |_________|____________________|__________________________________|_____|
+           |                    |                                  |
+           |              ______v_____                          ___v__
+           | PFN storage |  (paging)  |                        |struct|
+           |------------>|iommu_domain|<-----------------------|device|
+                         |____________|                        |______|
+
+  _______________________________________________________________________
+ |                      iommufd (with HWPT_NESTED)                       |
+ |                                                                       |
+ |        [1]                  [3]                [4]             [2]    |
+ |  ________________      _____________      _____________     ________  |
+ | |                |    |             |    |             |   |        | |
+ | |      IOAS      |<---| HWPT_PAGING |<---| HWPT_NESTED |<--| DEVICE | |
+ | |________________|    |_____________|    |_____________|   |________| |
+ |         |                    |                  |               |     |
+ |_________|____________________|__________________|_______________|_____|
+           |                    |                  |               |
+           |              ______v_____       ______v_____       ___v__
+           | PFN storage |  (paging)  |     |  (nested)  |     |struct|
+           |------------>|iommu_domain|<----|iommu_domain|<----|device|
+                         |____________|     |____________|     |______|
 
   _______________________________________________________________________
  |                      iommufd (with vIOMMU/vDEVICE)                    |
@@ -195,8 +214,9 @@ creating the objects and links::
 
    .. note::
 
-      Future IOMMUFD updates will provide an API to create and manipulate the
-      HW_PAGETABLE directly.
+      Either a manual IOMMUFD_OBJ_HWPT_PAGING or an IOMMUFD_OBJ_HWPT_NESTED is
+      created via the same IOMMU_HWPT_ALLOC uAPI. The difference is at the type
+      of the object passed in via the @pt_id field of struct iommufd_hwpt_alloc.
 
 5. IOMMUFD_OBJ_VIOMMU can be only manually created via the IOMMU_VIOMMU_ALLOC
    uAPI, provided a dev_id (for the device's physical IOMMU to back the vIOMMU)
@@ -229,6 +249,8 @@ User visible objects are backed by following datastructures:
 
 - iommufd_ioas for IOMMUFD_OBJ_IOAS.
 - iommufd_device for IOMMUFD_OBJ_DEVICE.
+- iommufd_hwpt_paging for IOMMUFD_OBJ_HWPT_PAGING.
+- iommufd_hwpt_nested for IOMMUFD_OBJ_HWPT_NESTED.
 - iommufd_viommu for IOMMUFD_OBJ_VIOMMU.
 - iommufd_vdevice for IOMMUFD_OBJ_VDEVICE.
 
