@@ -1,0 +1,37 @@
+Package: linux-headers-nvidia-adv-64k${variant:suffix}
+Architecture: arm64
+Section: kernel
+Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}-nvidia-adv-64k
+Description: Nvidia-Adv 64K Linux kernel headers
+ This package will always depend on the latest nvidia-adv-64k kernel headers
+ available.
+
+Package: linux-image-nvidia-adv-64k${variant:suffix}
+Architecture: arm64
+Section: kernel
+Provides: ${dkms:wireguard-linux-compat-modules}
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}-nvidia-adv-64k, linux-modules-extra-${kernel-abi-version}-nvidia-adv-64k, linux-firmware
+Recommends: thermald [amd64]
+Description: Nvidia-Adv 64K Linux kernel image
+ This package will always depend on the latest nvidia-adv-64k kernel image
+ available.
+
+Package: linux-tools-nvidia-adv-64k${variant:suffix}
+Architecture: arm64
+Section: kernel
+Provides: linux-tools
+Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}-nvidia-adv-64k
+Description: Nvidia-Adv 64K Linux kernel tools
+ This package will always depend on the latest nvidia-adv-64k kernel tools
+ available.
+
+Package: linux-nvidia-adv-64k${variant:suffix}
+Architecture: arm64
+Section: kernel
+Provides: ${test:provides-full-nvidia-adv-64k}
+Depends: ${misc:Depends}, linux-image-nvidia-adv-64k${variant:suffix} (= ${binary:Version}), linux-headers-nvidia-adv-64k${variant:suffix} (= ${binary:Version})
+Recommends: linux-tools-${kernel-abi-version}-nvidia-adv-64k, ubuntu-kernel-accessories
+Description: Complete Nvidia-Adv 64K Linux kernel and headers
+ This package will always depend on the latest complete nvidia-adv-64k Linux kernel
+ and headers.
+

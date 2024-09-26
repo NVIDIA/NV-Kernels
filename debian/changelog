@@ -1,3 +1,9 @@
+linux-meta-nvidia-adv (6.8.0-1000.0) noble; urgency=medium
+
+  * Initialize meta for noble:linux-nvidia-adv.
+
+ -- Jacob Martin <jacob.martin@canonical.com>  Thu, 26 Sep 2024 14:26:10 -0500
+
 linux-meta (6.8.0-44.44) noble; urgency=medium
 
   * Main version: 6.8.0-44.44
