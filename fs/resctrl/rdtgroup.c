@@ -1601,7 +1601,7 @@ unsigned int rdtgroup_cbm_to_size(struct rdt_resource *r,
 	struct cacheinfo *ci;
 	int num_b;
 
-	if (WARN_ON_ONCE(r->ctrl_scope != RESCTRL_L2_CACHE && r->ctrl_scope != RESCTRL_L3_CACHE))
+	if (WARN_ON_ONCE(r->schema_fmt != RESCTRL_SCHEMA_BITMAP))
 		return size;
 
 	num_b = bitmap_weight(&cbm, r->cache.cbm_len);
@@ -1688,11 +1688,11 @@ static int rdtgroup_size_show(struct kernfs_open_file *of,
 					ctrl = resctrl_arch_get_config(r, d,
 								       closid,
 								       type);
-				if (r->rid == RDT_RESOURCE_MBA ||
-				    r->rid == RDT_RESOURCE_SMBA)
-					size = ctrl;
-				else
+
+				if (schema->schema_fmt == RESCTRL_SCHEMA_BITMAP)
 					size = rdtgroup_cbm_to_size(r, d, ctrl);
+				else
+					size = ctrl;
 			}
 			seq_printf(s, "%d=%u", d->hdr.id, size);
 			sep = true;
