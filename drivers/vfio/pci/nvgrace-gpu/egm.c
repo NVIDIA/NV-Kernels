@@ -6,8 +6,8 @@
 #include <linux/vfio_pci_core.h>
 #include <linux/hashtable.h>
 #include <linux/egm.h>
+#include <linux/nvgrace-egm.h>
 #include <linux/vmalloc.h>
-#include "egm.h"
 
 #ifdef CONFIG_MEMORY_FAILURE
 #include <linux/bitmap.h>

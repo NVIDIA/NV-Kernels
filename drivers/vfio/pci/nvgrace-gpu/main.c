@@ -8,7 +8,7 @@
 #include <linux/delay.h>
 #include <linux/jiffies.h>
 #include <linux/vmalloc.h>
-#include "egm.h"
+#include <linux/nvgrace-egm.h>
 
 #ifdef CONFIG_MEMORY_FAILURE
 #include <linux/bitmap.h>
