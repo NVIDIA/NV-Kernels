@@ -10,7 +10,7 @@
 #include <linux/pci-p2pdma.h>
 #include <linux/pm_runtime.h>
 #include <linux/memory-failure.h>
-#include "egm.h"
+#include <linux/nvgrace-egm.h>
 
 /*
  * The device memory usable to the workloads running in the VM is cached
