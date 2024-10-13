@@ -7,7 +7,7 @@
 #include <linux/vfio_pci_core.h>
 #include <linux/vmalloc.h>
 #include <linux/delay.h>
-#include "egm.h"
+#include <linux/nvgrace-egm.h>
 
 #ifdef CONFIG_MEMORY_FAILURE
 #include <linux/bitmap.h>
