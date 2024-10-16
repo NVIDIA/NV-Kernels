@@ -114,8 +114,14 @@ CONFIG_GPIO_AAEON                               note<'{Disable all Ubuntu ODM dr
 CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
 CONFIG_LEDS_AAEON                               note<'{Disable all Ubuntu ODM drivers}'>
 
+CONFIG_MANA_INFINIBAND                          policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_MANA_INFINIBAND                          note<'LP: #2084598'>
+
 CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
 CONFIG_MFD_AAEON                                note<'{Disable all Ubuntu ODM drivers}'>
+
+CONFIG_MICROSOFT_MANA                           policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_MICROSOFT_MANA                           note<'LP: #2084598'>
 
 CONFIG_MTD                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_MTD                                      note<'boot essential on arm'>
