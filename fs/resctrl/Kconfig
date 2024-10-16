@@ -1,0 +1,39 @@
+config RESCTRL_FS
+	bool "CPU Resource Control Filesystem (resctrl)"
+	depends on ARCH_HAS_CPU_RESCTRL
+	select KERNFS
+	select PROC_CPU_RESCTRL               if PROC_FS
+	help
+	  Resctrl is a filesystem interface to control allocation and
+	  monitoring of system resources usage by the CPU.
+
+config CGROUP_RESCTRL
+	bool "cgroup controller for resctrl tasks"
+	depends on RESCTRL_FS && CGROUPS
+	help
+	  Use cgroups to manage the task assignment to control and monitor
+	  groups. This option adds a 'resctrl' controller which allows the
+	  control or monitor group 'id' to be written to a cgroup. The tasks
+	  in that cgroup are then part of the specified control or monitor
+	  group. Creation and configuration of control and monitor groups
+	  is still done through resctrl. This option requires the
+	  'abi playground' mount option to resctrl, and is not to be relied on.
+
+config RESCTRL_FS_PSEUDO_LOCK
+	bool
+	help
+	  Software mechanism to try and pin data in a cache portion using
+	  micro-architecture tricks.
+
+config RESCTRL_RMID_DEPENDS_ON_CLOSID
+	bool
+	help
+	  Enable by the architecture when the RMID values depend on the CLOSID.
+	  This causes the closid allocator to search for CLOSID with clean
+	  RMID.
+
+config RESCTRL_IOMMU
+	bool
+	help
+	  Enabled by the architecture when some IOMMU are able to be configured
+	  with CLOSID/RMID.

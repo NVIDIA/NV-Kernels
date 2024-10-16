@@ -1136,6 +1136,26 @@ void cpu_enable_sve(const struct arm64_cpu_capabilities *__always_unused p)
 	isb();
 }
 
+/*
+ * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
+ * vector length.
+ *
+ * Use only if SVE is present.
+ * This function clobbers the SVE vector length.
+ */
+u64 read_zcr_features(void)
+{
+       /*
+        * Set the maximum possible VL, and write zeroes to all other
+        * bits to see if they stick.
+        */
+       cpu_enable_sve(NULL);
+       write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
+
+       /* Return LEN value that would be written to get the maximum VL */
+       return sve_vq_from_vl(sve_get_vl()) - 1;
+}
+
 void __init sve_setup(void)
 {
 	struct vl_info *info = &vl_info[ARM64_VEC_SVE];
@@ -1351,6 +1371,37 @@ static void sve_init_regs(void)
 		fpsimd_to_sve(current);
 		current->thread.fp_type = FP_STATE_SVE;
 	}
+}
+
+/*
+ * Read the pseudo-SMCR used by cpufeatures to identify the supported
+ * vector length.
+ *
+ * Use only if SME is present.
+ * This function clobbers the SME vector length.
+ */
+u64 read_smcr_features(void)
+{
+       u64 smcr;
+       unsigned int vq_max;
+
+       cpu_enable_sme(NULL);
+       sme_smstart_sm();
+
+       /*
+        * Set the maximum possible VL.
+        */
+       write_sysreg_s(read_sysreg_s(SYS_SMCR_EL1) | SMCR_ELx_LEN_MASK,
+                      SYS_SMCR_EL1);
+
+       smcr = read_sysreg_s(SYS_SMCR_EL1);
+       smcr &= ~(u64)SMCR_ELx_LEN_MASK; /* Only the LEN field */
+       vq_max = sve_vq_from_vl(sve_get_vl());
+       smcr |= vq_max - 1; /* set LEN field to maximum effective value */
+
+       sme_smstop_sm();
+
+       return smcr;
 }
 
 /*

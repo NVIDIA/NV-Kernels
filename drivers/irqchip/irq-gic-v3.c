@@ -41,8 +41,6 @@
 #define FLAGS_WORKAROUND_CAVIUM_ERRATUM_38539	(1ULL << 1)
 #define FLAGS_WORKAROUND_ASR_ERRATUM_8601001	(1ULL << 2)
 
-#define GIC_IRQ_TYPE_PARTITION	(GIC_IRQ_TYPE_LPI + 1)
-
 struct redist_region {
 	void __iomem		*redist_base;
 	phys_addr_t		phys_base;
@@ -1578,7 +1576,8 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 		return 0;
 	}
 
-	if (is_of_node(fwspec->fwnode)) {
+	if (is_of_node(fwspec->fwnode) ||
+	    is_fwnode_irqchip(fwspec->fwnode)) {
 		if (fwspec->param_count < 3)
 			return -EINVAL;
 
@@ -1595,7 +1594,14 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 		case 3:			/* EPPI */
 			*hwirq = fwspec->param[1] + EPPI_BASE_INTID;
 			break;
+		case GIC_IRQ_TYPE_GSI:	/* GSI */
 		case GIC_IRQ_TYPE_LPI:	/* LPI */
+			if (fwspec->param[1] < 16) {
+				pr_err(FW_BUG "Illegal GSI%d translation request\n",
+				       fwspec->param[0]);
+				return -EINVAL;
+			}
+
 			*hwirq = fwspec->param[1];
 			break;
 		case GIC_IRQ_TYPE_PARTITION:
@@ -1610,30 +1616,12 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 		}
 
 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-
 		/*
 		 * Make it clear that broken DTs are... broken.
 		 * Partitioned PPIs are an unfortunate exception.
 		 */
 		WARN_ON(*type == IRQ_TYPE_NONE &&
 			fwspec->param[0] != GIC_IRQ_TYPE_PARTITION);
-		return 0;
-	}
-
-	if (is_fwnode_irqchip(fwspec->fwnode)) {
-		if(fwspec->param_count != 2)
-			return -EINVAL;
-
-		if (fwspec->param[0] < 16) {
-			pr_err(FW_BUG "Illegal GSI%d translation request\n",
-			       fwspec->param[0]);
-			return -EINVAL;
-		}
-
-		*hwirq = fwspec->param[0];
-		*type = fwspec->param[1];
-
-		WARN_ON(*type == IRQ_TYPE_NONE);
 		return 0;
 	}
 
@@ -1681,10 +1669,11 @@ static bool fwspec_is_partitioned_ppi(struct irq_fwspec *fwspec,
 	if (!gic_data.ppi_descs)
 		return false;
 
-	if (!is_of_node(fwspec->fwnode))
+	if (fwspec->param_count < 4)
 		return false;
 
-	if (fwspec->param_count < 4 || !fwspec->param[3])
+	/* '0' us a valid UID for ACPI */
+	if (is_of_node(fwspec->fwnode) && !fwspec->param[3])
 		return false;
 
 	range = __get_intid_range(hwirq);
@@ -1704,10 +1693,6 @@ static int gic_irq_domain_select(struct irq_domain *d,
 	/* Not for us */
         if (fwspec->fwnode != d->fwnode)
 		return 0;
-
-	/* If this is not DT, then we have a single domain */
-	if (!is_of_node(fwspec->fwnode))
-		return 1;
 
 	ret = gic_irq_domain_translate(d, fwspec, &hwirq, &type);
 	if (WARN_ON_ONCE(ret))
@@ -1739,22 +1724,27 @@ static int partition_domain_translate(struct irq_domain *d,
 	unsigned long ppi_intid;
 	struct device_node *np;
 	unsigned int ppi_idx;
+	void *part_id;
 	int ret;
 
 	if (!gic_data.ppi_descs)
 		return -ENOMEM;
 
-	np = of_find_node_by_phandle(fwspec->param[3]);
-	if (WARN_ON(!np))
-		return -EINVAL;
+	if (is_of_node(fwspec->fwnode)) {
+		np = of_find_node_by_phandle(fwspec->param[3]);
+		if (WARN_ON(!np))
+			return -EINVAL;
+		part_id = of_node_to_fwnode(np);
+	} else {
+		part_id = (void *)(long)fwspec->param[3];
+	}
 
 	ret = gic_irq_domain_translate(d, fwspec, &ppi_intid, type);
 	if (WARN_ON_ONCE(ret))
 		return 0;
 
 	ppi_idx = __gic_get_ppi_index(ppi_intid);
-	ret = partition_translate_id(gic_data.ppi_descs[ppi_idx],
-				     of_node_to_fwnode(np));
+	ret = partition_translate_id(gic_data.ppi_descs[ppi_idx], part_id);
 	if (ret < 0)
 		return ret;
 
@@ -2099,8 +2089,37 @@ static int __init gic_validate_dist_version(void __iomem *dist_base)
 	return 0;
 }
 
+static void __partition_ppis(struct partition_affinity *parts, int nr_parts)
+{
+	int i;
+	unsigned int irq;
+	struct partition_desc *desc;
+
+	for (i = 0; i < gic_data.ppi_nr; i++) {
+		struct irq_fwspec ppi_fwspec = {
+			.fwnode		= gic_data.fwnode,
+			.param_count	= 3,
+			.param		= {
+				[0]	= GIC_IRQ_TYPE_PARTITION,
+				[1]	= i,
+				[2]	= IRQ_TYPE_NONE,
+			},
+		};
+
+		irq = irq_create_fwspec_mapping(&ppi_fwspec);
+		if (WARN_ON_ONCE(!irq))
+			continue;
+		desc = partition_create_desc(gic_data.fwnode, parts, nr_parts,
+					     irq, &partition_domain_ops);
+		if (WARN_ON_ONCE(!desc))
+			continue;
+
+		gic_data.ppi_descs[i] = desc;
+	}
+}
+
 /* Create all possible partitions at boot time */
-static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
+static void __init gic_populate_of_ppi_partitions(struct device_node *gic_node)
 {
 	struct device_node *parts_node, *child_part;
 	int part_idx = 0, i;
@@ -2131,10 +2150,6 @@ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
 		part = &parts[part_idx];
 
 		part->partition_id = of_node_to_fwnode(child_part);
-
-		pr_info("GIC: PPI partition %pOFn[%d] { ",
-			child_part, part_idx);
-
 		n = of_property_count_elems_of_size(child_part, "affinity",
 						    sizeof(u32));
 		WARN_ON(n <= 0);
@@ -2159,39 +2174,16 @@ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
 				continue;
 			}
 
-			pr_cont("%pOF[%d] ", cpu_node, cpu);
-
 			cpumask_set_cpu(cpu, &part->mask);
 			of_node_put(cpu_node);
 		}
 
-		pr_cont("}\n");
+		pr_info("GIC: PPI partition:%pOFn [%d] { CPUs:<%*pbl> }",
+			child_part, part_idx, cpumask_pr_args(&part->mask));
 		part_idx++;
 	}
 
-	for (i = 0; i < gic_data.ppi_nr; i++) {
-		unsigned int irq;
-		struct partition_desc *desc;
-		struct irq_fwspec ppi_fwspec = {
-			.fwnode		= gic_data.fwnode,
-			.param_count	= 3,
-			.param		= {
-				[0]	= GIC_IRQ_TYPE_PARTITION,
-				[1]	= i,
-				[2]	= IRQ_TYPE_NONE,
-			},
-		};
-
-		irq = irq_create_fwspec_mapping(&ppi_fwspec);
-		if (WARN_ON(!irq))
-			continue;
-		desc = partition_create_desc(gic_data.fwnode, parts, nr_parts,
-					     irq, &partition_domain_ops);
-		if (WARN_ON(!desc))
-			continue;
-
-		gic_data.ppi_descs[i] = desc;
-	}
+	__partition_ppis(parts, nr_parts);
 
 out_put_node:
 	of_node_put(parts_node);
@@ -2301,7 +2293,7 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 	if (err)
 		goto out_unmap_rdist;
 
-	gic_populate_ppi_partitions(node);
+	gic_populate_of_ppi_partitions(node);
 
 	if (static_branch_likely(&supports_deactivate_key))
 		gic_of_setup_kvm_info(node);
@@ -2570,6 +2562,57 @@ static struct fwnode_handle *gic_v3_get_gsi_domain_id(u32 gsi)
 	return gsi_domain_handle;
 }
 
+struct acpi_ppi_partition_arg
+{
+	struct partition_affinity *parts;
+	int part_idx;
+};
+
+static int __init __alloc_ppi_partition(struct acpi_pptt_processor *container,
+					void *arg)
+{
+	struct acpi_ppi_partition_arg *data = arg;
+	struct partition_affinity *parts = data->parts;
+	struct partition_affinity *part;
+
+	if (!(container->flags & ACPI_PPTT_ACPI_PROCESSOR_ID_VALID))
+		return -1;
+
+	part = &parts[data->part_idx];
+	part->partition_id = (void *)(long)container->acpi_processor_id;
+	acpi_pptt_get_child_cpus(container, &part->mask);
+
+	pr_info("GIC: PPI partition:0x%x [%d] { CPUs:<%*pbl> }",
+		container->acpi_processor_id, data->part_idx,
+		cpumask_pr_args(&part->mask));
+
+	data->part_idx++;
+	return 0;
+}
+
+static void __init gic_populate_acpi_ppi_partitions(void)
+{
+	struct acpi_ppi_partition_arg arg = { 0 };
+	int nr_parts, ret;
+
+	nr_parts = acpi_pptt_count_containers();
+	if (!nr_parts)
+		return;
+
+	gic_data.ppi_descs = kcalloc(gic_data.ppi_nr,
+				     sizeof(*gic_data.ppi_descs), GFP_KERNEL);
+	if (!gic_data.ppi_descs)
+		return;
+
+	arg.parts = kcalloc(nr_parts, sizeof(*arg.parts), GFP_KERNEL);
+	if (WARN_ON(!arg.parts))
+		return;
+
+	ret = acpi_pptt_for_each_container(&__alloc_ppi_partition, &arg);
+	if (!ret)
+		__partition_ppis(arg.parts, nr_parts);
+}
+
 static int __init
 gic_acpi_init(union acpi_subtable_headers *header, const unsigned long end)
 {
@@ -2618,6 +2661,8 @@ gic_acpi_init(union acpi_subtable_headers *header, const unsigned long end)
 		goto out_fwhandle_free;
 
 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, gic_v3_get_gsi_domain_id);
+
+	gic_populate_acpi_ppi_partitions();
 
 	if (static_branch_likely(&supports_deactivate_key))
 		gic_acpi_setup_kvm_info();

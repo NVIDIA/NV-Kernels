@@ -1092,7 +1092,9 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 		return 0;
 	}
 
-	if (is_of_node(fwspec->fwnode)) {
+
+	if (is_of_node(fwspec->fwnode) ||
+	    is_fwnode_irqchip(fwspec->fwnode)) {
 		if (fwspec->param_count < 3)
 			return -EINVAL;
 
@@ -1103,6 +1105,17 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 		case 1:			/* PPI */
 			*hwirq = fwspec->param[1] + 16;
 			break;
+#ifdef GIC_IRQ_TYPE_GSI
+		case GIC_IRQ_TYPE_GSI:	/* GSI */
+			if (fwspec->param[1] < 16) {
+				pr_err(FW_BUG "Illegal GSI%d translation request\n",
+				       fwspec->param[0]);
+				return -EINVAL;
+			}
+
+			*hwirq = fwspec->param[1];
+			break;
+#endif /* GIC_IRQ_TYPE_GSI */
 		default:
 			return -EINVAL;
 		}
@@ -1110,24 +1123,6 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
 
 		/* Make it clear that broken DTs are... broken */
-		WARN(*type == IRQ_TYPE_NONE,
-		     "HW irq %ld has invalid type\n", *hwirq);
-		return 0;
-	}
-
-	if (is_fwnode_irqchip(fwspec->fwnode)) {
-		if(fwspec->param_count != 2)
-			return -EINVAL;
-
-		if (fwspec->param[0] < 16) {
-			pr_err(FW_BUG "Illegal GSI%d translation request\n",
-			       fwspec->param[0]);
-			return -EINVAL;
-		}
-
-		*hwirq = fwspec->param[0];
-		*type = fwspec->param[1];
-
 		WARN(*type == IRQ_TYPE_NONE,
 		     "HW irq %ld has invalid type\n", *hwirq);
 		return 0;

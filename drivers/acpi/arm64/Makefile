@@ -6,3 +6,4 @@ obj-$(CONFIG_ACPI_APMT) 	+= apmt.o
 obj-$(CONFIG_ARM_AMBA)		+= amba.o
 obj-y				+= dma.o init.o
 obj-y				+= thermal_cpufreq.o
+obj-$(CONFIG_ACPI_MPAM) 	+= mpam.o

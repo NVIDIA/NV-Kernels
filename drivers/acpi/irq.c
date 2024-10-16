@@ -10,6 +10,10 @@
 #include <linux/irqdomain.h>
 #include <linux/of.h>
 
+#ifndef ACPI_IRQCHIP_FWSPEC_ARG0
+#define ACPI_IRQCHIP_FWSPEC_ARG0	0 /* unused */
+#endif
+
 enum acpi_irq_model_id acpi_irq_model;
 
 static struct fwnode_handle *(*acpi_get_gsi_domain_id)(u32 gsi);
@@ -43,6 +47,55 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
 }
 EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
 
+
+static void pack_fwspec(struct irq_fwspec *fwspec, u32 gsi, int trigger,
+			int polarity)
+{
+	unsigned int offset = 0;
+
+	if (IS_ENABLED(CONFIG_ACPI_IRQCHIP_FWSPEC_ARG0) &&
+	    (fwspec->fwnode == acpi_get_gsi_domain_id(gsi))) {
+		fwspec->param[0] = ACPI_IRQCHIP_FWSPEC_ARG0;
+		offset = 1;
+	}
+
+	fwspec->param[0 + offset] = gsi;
+	fwspec->param[1 + offset] = acpi_dev_get_irq_type(trigger, polarity);
+	fwspec->param_count = 2 + offset;
+}
+
+/**
+ * acpi_register_partitioned_percpu_gsi() - Map a GSI to a percpu IRQ in the
+ * provided partition.
+ * @dev: device for which IRQ has to be mapped
+ * @gsi: GSI IRQ number
+ * @trigger: trigger type of the GSI number to be mapped
+ * @polarity: polarity of the GSI to be mapped
+ * @processor_container_uid: Which group of CPUs the percpu interrupt can be
+ * 			     triggered on.
+ *
+ * Returns: a valid linux IRQ number on success
+ *          -EINVAL on failure
+ */
+int acpi_register_partitioned_percpu_gsi(struct device *dev, u32 gsi,
+					 int trigger, int polarity,
+					 u32 processor_container_uid)
+{
+	struct irq_fwspec fwspec;
+
+	fwspec.fwnode = acpi_get_gsi_domain_id(gsi);
+	if (WARN_ON(!fwspec.fwnode)) {
+		pr_warn("GSI: No registered irqchip, giving up\n");
+		return -EINVAL;
+	}
+
+	pack_fwspec(&fwspec, gsi, trigger, polarity);
+	fwspec.param[fwspec.param_count] = processor_container_uid;
+	fwspec.param_count++;
+
+	return irq_create_fwspec_mapping(&fwspec);
+}
+
 /**
  * acpi_register_gsi() - Map a GSI to a linux IRQ number
  * @dev: device for which IRQ has to be mapped
@@ -65,9 +118,7 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
 		return -EINVAL;
 	}
 
-	fwspec.param[0] = gsi;
-	fwspec.param[1] = acpi_dev_get_irq_type(trigger, polarity);
-	fwspec.param_count = 2;
+	pack_fwspec(&fwspec, gsi, trigger, polarity);
 
 	irq = irq_create_fwspec_mapping(&fwspec);
 	if (!irq)
@@ -170,10 +221,9 @@ static inline void acpi_irq_parse_one_match(struct fwnode_handle *fwnode,
 		return;
 	ctx->rc = 0;
 	*ctx->res_flags = acpi_dev_irq_flags(triggering, polarity, shareable, wake_capable);
+
 	ctx->fwspec->fwnode = fwnode;
-	ctx->fwspec->param[0] = hwirq;
-	ctx->fwspec->param[1] = acpi_dev_get_irq_type(triggering, polarity);
-	ctx->fwspec->param_count = 2;
+	pack_fwspec(ctx->fwspec, hwirq, triggering, polarity);
 }
 
 /**

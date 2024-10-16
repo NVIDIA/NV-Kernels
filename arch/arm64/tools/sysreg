@@ -2835,11 +2835,43 @@ Res0	1
 Field	0	EN
 EndSysreg
 
+Sysreg	MPAMIDR_EL1	3	0	10	4	4
+Res0	63:62
+Field	61	HAS_SDEFLT
+Field	60	HAS_FORCE_NS
+Field	59	SP4
+Field	58	HAS_TIDR
+Field	57	HAS_ALTSP
+Res0	56:40
+Field	39:32	PMG_MAX
+Res0	31:21
+Field	20:18	VPMR_MAX
+Field	17	HAS_HCR
+Res0	16
+Field	15:0	PARTID_MAX
+EndSysreg
+
 Sysreg	LORID_EL1	3	0	10	4	7
 Res0	63:24
 Field	23:16	LD
 Res0	15:8
 Field	7:0	LR
+EndSysreg
+
+Sysreg	MPAM1_EL1	3	0	10	5	0
+Res0	63:48
+Field	47:40	PMG_D
+Field	39:32	PMG_I
+Field	31:16	PARTID_D
+Field	15:0	PARTID_I
+EndSysreg
+
+Sysreg	MPAM0_EL1	3	0	10	5	1
+Res0	63:48
+Field	47:40	PMG_D
+Field	39:32	PMG_I
+Field	31:16	PARTID_D
+Field	15:0	PARTID_I
 EndSysreg
 
 Sysreg	ISR_EL1	3	0	12	1	0
@@ -2855,6 +2887,7 @@ EndSysreg
 Sysreg	ICC_NMIAR1_EL1	3	0	12	9	5
 Res0	63:24
 Field	23:0	INTID
+
 EndSysreg
 
 Sysreg	TRBLIMITR_EL1	3	0	9	11	0
@@ -2932,4 +2965,11 @@ Res0	7:6
 Field	5	F
 Field	4	P
 Field	3:0	Align
+EndSysreg
+
+Sysreg MPAMVPM0_EL2	3	4	10	6	0
+Field	63:48	PhyPARTID3
+Field	47:32	PhyPARTID2
+Field	31:16	PhyPARTID1
+Field	15:0	PhyPARTID0
 EndSysreg

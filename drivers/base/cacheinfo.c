@@ -186,6 +186,38 @@ static bool cache_node_is_unified(struct cacheinfo *this_leaf,
 	return of_property_read_bool(np, "cache-unified");
 }
 
+unsigned long cache_of_get_id(struct device_node *np)
+{
+	struct device_node *cpu;
+	unsigned long min_id = ~0UL;
+
+	for_each_of_cpu_node(cpu) {
+		struct device_node *cache_node = cpu;
+		u64 id = of_get_cpu_hwid(cache_node, 0);
+
+		while ((cache_node = of_find_next_cache_node(cache_node))) {
+			if ((cache_node == np) && (id < min_id)) {
+				min_id = id;
+				of_node_put(cache_node);
+				break;
+			}
+			of_node_put(cache_node);
+		}
+	}
+
+	return min_id;
+}
+
+static void cache_of_set_id(struct cacheinfo *this_leaf, struct device_node *np)
+{
+	unsigned long id = cache_of_get_id(np);
+
+	if (id != ~0UL) {
+		this_leaf->id = id;
+		this_leaf->attributes |= CACHE_ID;
+	}
+}
+
 static void cache_of_set_props(struct cacheinfo *this_leaf,
 			       struct device_node *np)
 {
@@ -201,6 +233,7 @@ static void cache_of_set_props(struct cacheinfo *this_leaf,
 	cache_get_line_size(this_leaf, np);
 	cache_nr_sets(this_leaf, np);
 	cache_associativity(this_leaf);
+	cache_of_set_id(this_leaf, np);
 }
 
 static int cache_setup_of_node(unsigned int cpu)
@@ -627,12 +660,18 @@ static ssize_t file_name##_show(struct device *dev,		\
 	return sysfs_emit(buf, "%u\n", this_leaf->object);	\
 }
 
-show_one(id, id);
 show_one(level, level);
 show_one(coherency_line_size, coherency_line_size);
 show_one(number_of_sets, number_of_sets);
 show_one(physical_line_partition, physical_line_partition);
 show_one(ways_of_associativity, ways_of_associativity);
+
+static ssize_t id_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct cacheinfo *this_leaf = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%lu\n", this_leaf->id);
+}
 
 static ssize_t size_show(struct device *dev,
 			 struct device_attribute *attr, char *buf)

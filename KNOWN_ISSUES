@@ -1,0 +1,91 @@
+MPAM branch snapshot: v6.1
+
+This snapshot exists to give the full context for any x86 resctrl changes.
+
+When reporting a bug with this tree, please include the following three things:
+ 1. The output of:
+| find /sys/kernel/debug/mpam/ -type l -print -o -type f -print -exec cat \{\} \;
+ 2. The full kernel boot log, and kernel '..config''
+ 3. The DT, or MPAM+PPTT+SRAT ACPI tables.
+
+
+MPAM spec:
+https://developer.arm.com/docs/ddi0598/latest
+
+The DT binding is a draft. This is very likely to change before the code is
+merged by mainline.
+All this code is likely to change before the code is merged by mainline.
+Patches marked 'untested' are just that.
+
+
+Only features that match what resctrl already supports are supported.
+This is very deliberate.
+
+If there are no monitors on the L3 cache, then resctrl will report that
+there are no monitors, even though there may be some on the 'next' resource.
+
+How these get exposed via resctrl is visible to user-space. If a new schema
+for the 'next' resource is created, the monitors should live there.
+
+Until this code is merged by mainline, we should rigidly stick to the user-space
+interface as it is supported by Intel RDT. This is the only way to ensure
+user-space code remains portable.
+
+Once the code is merged, adding support for the missing pieces, and how
+this impacts user-space can be discussed.
+
+
+ABI PROBLEMS:
+ * RMIDs.
+   These are an independent number space for RDT. For MPAM they are an
+   extension of the partid/closid space. There is no value that can be
+   exposed to user-space as num_rmid as it depends on how they will be
+   used.
+
+ * Monitors.
+   RDT has one counter per RMID, they run continuously. MPAM advertises
+   how many monitors it has, which is very likely to be fewer than we
+   want. This means MPAM can't expose the free-runing MBM_* counters
+   via the filesystem. These would need exposing via perf.
+
+ * Bitmaps.
+   MPAM has some bitmaps, but it has other stuff too. Forcing the bitmaps
+   to be the user-space interface requires the underlying control to be
+   capable of isolation. Ideally user-space would set a priority/cost for
+   each rdtgroup, and indicate whether they should be isolated from other
+   rdtgroup at the same level.
+
+ * Memory bandwidth.
+   For MB resources that control bandwidth, X86 provides user-space with
+   the cache-id of the cache that implements that bandwidth controls. For
+   MPAM there is no expectation that this is being done by a cache, it could
+   equally be a memory controller. MPAM systems always provide the numa node
+   id here as this repesents the locality, instead of a cache id. If these
+   numbers are the same for x86, it would be good to switch x86 over.
+
+
+KNOWN ISSUES:
+ * The PCC support is incomplete and untested.
+
+ * The PMU support is a bit rough, the x86 code isn't quite correct. The PMU
+   code should run on the CPU that handeles the resctrl overflow.
+
+ * Exclusive reservations don't work as they overlap with devices.
+   This in turn is because we don't have GIC/SMMU support yet, and these
+   will continue to use partid=0.
+
+ * partid=0 should be reserved for the unknown hardware, not reserved for the
+   resctrl default, which we let user-space play with it. This also affects
+   the kernel, which is not (currently) the intention.
+
+ * ACPI's 'functional dependencies' are not yet supported.
+
+ * scaling of counters is not implemented
+
+ * overflow of counters is not yet supported
+
+ * driver unload has not been tested
+
+ * Controls interact, for example CMAX needs to be set with the fraction of
+   bits set in the CPOR bitmap if CMAX is supported in hardware, but not
+   specified in the configuration. Today only the reset code does this.

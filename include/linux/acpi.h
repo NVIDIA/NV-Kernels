@@ -330,6 +330,9 @@ static inline bool acpi_sci_irq_valid(void)
 extern int sbf_port;
 extern unsigned long acpi_realmode_flags;
 
+int acpi_register_partitioned_percpu_gsi(struct device *dev, u32 gsi,
+					 int trigger, int polarity,
+					 u32 processor_container_uid);
 int acpi_register_gsi (struct device *dev, u32 gsi, int triggering, int polarity);
 int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
 int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
@@ -1488,12 +1491,22 @@ static inline unsigned int arch_get_idle_state_flags(u32 arch_flags)
 #endif
 #endif /* CONFIG_ACPI_PROCESSOR_IDLE */
 
+typedef int (*acpi_pptt_cpu_callback_t)(struct acpi_pptt_processor *, void *);
+
 #ifdef CONFIG_ACPI_PPTT
 int acpi_pptt_cpu_is_thread(unsigned int cpu);
 int find_acpi_cpu_topology(unsigned int cpu, int level);
 int find_acpi_cpu_topology_cluster(unsigned int cpu);
 int find_acpi_cpu_topology_package(unsigned int cpu);
 int find_acpi_cpu_topology_hetero_id(unsigned int cpu);
+int find_acpi_cpu_cache_topology(unsigned int cpu, int level);
+int find_acpi_cache_level_from_id(u32 cache_id);
+u32 acpi_pptt_count_containers(void);
+int acpi_pptt_for_each_container(acpi_pptt_cpu_callback_t callback, void *arg);
+void acpi_pptt_get_child_cpus(struct acpi_pptt_processor *parent_node, cpumask_t *cpus);
+int acpi_pptt_get_cpus_from_container(u32 acpi_cpu_id, cpumask_t *cpus);
+int acpi_pptt_get_cpumask_from_cache_id(u32 cache_id, cpumask_t *cpus);
+u32 pptt_get_repainted_cache_id(u32 orig);
 #else
 static inline int acpi_pptt_cpu_is_thread(unsigned int cpu)
 {
@@ -1514,6 +1527,42 @@ static inline int find_acpi_cpu_topology_package(unsigned int cpu)
 static inline int find_acpi_cpu_topology_hetero_id(unsigned int cpu)
 {
 	return -EINVAL;
+}
+static inline int find_acpi_cpu_cache_topology(unsigned int cpu, int level)
+{
+	return -EINVAL;
+}
+static inline u32 acpi_pptt_count_containers(void)
+{
+	return 0;
+}
+static inline int find_acpi_cache_level_from_id(u32 cache_id)
+{
+	return -EINVAL;
+}
+static inline int
+acpi_pptt_for_each_container(acpi_pptt_cpu_callback_t *callback, void *arg)
+{
+	return -EINVAL;
+}
+static inline void
+acpi_pptt_get_child_cpus(struct acpi_pptt_processor *parent_node,
+			 cpumask_t *cpus)
+{
+}
+static inline int acpi_pptt_get_cpus_from_container(u32 acpi_cpu_id,
+						    cpumask_t *cpus)
+{
+	return -EINVAL;
+}
+static inline int acpi_pptt_get_cpumask_from_cache_id(u32 cache_id,
+						      cpumask_t *cpus)
+{
+	return -EINVAL;
+}
+static inline u32 pptt_get_repainted_cache_id(u32 orig)
+{
+	return orig;
 }
 #endif
 

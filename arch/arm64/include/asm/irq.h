@@ -7,9 +7,11 @@
 #include <linux/cpumask.h>
 
 #include <asm-generic/irq.h>
+#include <linux/irqchip/arm-gic-common.h>
 
 void arch_trigger_cpumask_backtrace(const cpumask_t *mask, int exclude_cpu);
 #define arch_trigger_cpumask_backtrace arch_trigger_cpumask_backtrace
+#define ACPI_IRQCHIP_FWSPEC_ARG0	GIC_IRQ_TYPE_GSI
 
 struct pt_regs;
 
