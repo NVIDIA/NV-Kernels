@@ -96,6 +96,15 @@ CONFIG_DRM_NOUVEAU_SVM                          note<'Disable nouveau for NVIDIA
 CONFIG_ETM4X_IMPDEF_FEATURE                     policy<{'arm64': 'n'}>
 CONFIG_ETM4X_IMPDEF_FEATURE                     note<'Required for Grace enablement'>
 
+CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
+CONFIG_GPIO_AAEON                               note<'Disable all Ubuntu ODM drivers'>
+
+CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
+CONFIG_LEDS_AAEON                               note<'Disable all Ubuntu ODM drivers'>
+
+CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
+CONFIG_MFD_AAEON                                note<'Disable all Ubuntu ODM drivers'>
+
 CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_NOUVEAU_DEBUG                            note<'Disable nouveau for NVIDIA kernels'>
 
@@ -116,6 +125,12 @@ CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablem
 
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablement'>
+
+CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
+CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM drivers'>
+
+CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM drivers'>
 
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
