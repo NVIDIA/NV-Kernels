@@ -123,6 +123,13 @@ struct tegra_gpio_soc {
 	bool has_vm_support;
 };
 
+struct tegra_gpio_regs {
+	u32 val;
+	u32 conf;
+	u32 out;
+	u32 debounce;
+};
+
 struct tegra_gpio {
 	struct gpio_chip gpio;
 	unsigned int num_irq;
@@ -134,6 +141,7 @@ struct tegra_gpio {
 
 	void __iomem *secure;
 	void __iomem *base;
+	struct tegra_gpio_regs *gpio_rval;
 };
 
 static const struct tegra_gpio_port *
@@ -890,6 +898,10 @@ static int tegra186_gpio_probe(struct platform_device *pdev)
 	if (IS_ERR(gpio->base))
 		return PTR_ERR(gpio->base);
 
+	gpio->gpio_rval = devm_kzalloc(&pdev->dev, gpio->soc->num_ports * 8 *
+			sizeof(*gpio->gpio_rval), GFP_KERNEL);
+	if (!gpio->gpio_rval)
+		return -ENOMEM;
 	err = platform_irq_count(pdev);
 	if (err < 0)
 		return err;
@@ -1038,8 +1050,68 @@ static int tegra186_gpio_probe(struct platform_device *pdev)
 		offset += port->pins;
 	}
 
+	platform_set_drvdata(pdev, gpio);
 	return devm_gpiochip_add_data(&pdev->dev, &gpio->gpio, gpio);
 }
+
+#ifdef CONFIG_PM_SLEEP
+static int tegra_gpio_suspend_late(struct device *dev)
+{
+	struct tegra_gpio *gpio = dev_get_drvdata(dev);
+	struct tegra_gpio_regs *regs;
+	void __iomem *base;
+	int i;
+
+	for (i = 0; i < gpio->gpio.ngpio; i++) {
+		if (!tegra186_gpio_is_accessible(gpio, i))
+			continue;
+
+		base = tegra186_gpio_get_base(gpio, i);
+		if (WARN_ON(base == NULL))
+			return -EINVAL;
+		regs = &gpio->gpio_rval[i];
+		regs->conf = readl(base + TEGRA186_GPIO_ENABLE_CONFIG),
+		regs->out = readl(base + TEGRA186_GPIO_OUTPUT_CONTROL),
+		regs->val = readl(base + TEGRA186_GPIO_OUTPUT_VALUE),
+		regs->debounce = readl(base + TEGRA186_GPIO_DEBOUNCE_CONTROL);
+	}
+		return 0;
+
+}
+
+static int tegra_gpio_resume_noirq(struct device *dev)
+{
+	struct tegra_gpio *gpio = dev_get_drvdata(dev);
+	struct tegra_gpio_regs *regs;
+	void __iomem *base;
+	int i;
+
+	for (i = 0; i < gpio->gpio.ngpio; i++) {
+		if (!tegra186_gpio_is_accessible(gpio, i))
+				continue;
+
+		base = tegra186_gpio_get_base(gpio, i);
+		if (WARN_ON(base == NULL))
+			return -EINVAL;
+		regs = &gpio->gpio_rval[i];
+
+		writel(regs->val,  base + TEGRA186_GPIO_OUTPUT_VALUE);
+		writel(regs->out,  base + TEGRA186_GPIO_OUTPUT_CONTROL);
+		writel(regs->conf, base + TEGRA186_GPIO_ENABLE_CONFIG);
+		writel(regs->debounce, base + TEGRA186_GPIO_DEBOUNCE_CONTROL);
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops tegra_gpio_pm = {
+	.suspend_late = tegra_gpio_suspend_late,
+	.resume_noirq = tegra_gpio_resume_noirq,
+};
+#define TEGRA_GPIO_PM		(&tegra_gpio_pm)
+#else
+#define TEGRA_GPIO_PM		NULL
+#endif /* CONFIG_PM_SLEEP */
 
 #define TEGRA_GPIO_PORT(_prefix, _name, _bank, _port, _pins) \
 	[_prefix##_GPIO_PORT_##_name] = { \
@@ -1630,6 +1702,7 @@ static struct platform_driver tegra186_gpio_driver = {
 		.name = "tegra186-gpio",
 		.of_match_table = tegra186_gpio_of_match,
 		.acpi_match_table = tegra186_gpio_acpi_match,
+		.pm = TEGRA_GPIO_PM,
 	},
 	.probe = tegra186_gpio_probe,
 };
