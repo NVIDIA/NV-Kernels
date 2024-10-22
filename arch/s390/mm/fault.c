@@ -68,9 +68,9 @@ static enum fault_type get_fault_type(struct pt_regs *regs)
 {
 	union teid teid = { .val = regs->int_parm_long };
 
+	if (user_mode(regs))
+		return USER_FAULT;
 	if (likely(teid.as == PSW_BITS_AS_PRIMARY)) {
-		if (user_mode(regs))
-			return USER_FAULT;
 		if (!IS_ENABLED(CONFIG_PGSTE))
 			return KERNEL_FAULT;
 		if (test_pt_regs_flag(regs, PIF_GUEST_FAULT))
@@ -79,10 +79,6 @@ static enum fault_type get_fault_type(struct pt_regs *regs)
 	}
 	if (teid.as == PSW_BITS_AS_SECONDARY)
 		return USER_FAULT;
-	/* Access register mode, not used in the kernel */
-	if (teid.as == PSW_BITS_AS_ACCREG)
-		return USER_FAULT;
-	/* Home space -> access via kernel ASCE */
 	return KERNEL_FAULT;
 }
 
