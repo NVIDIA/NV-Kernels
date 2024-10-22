@@ -3076,13 +3076,12 @@ static int emac_probe(struct platform_device *ofdev)
 		goto err_free;
 
 	/* Get interrupts. EMAC irq is mandatory, WOL irq is optional */
-	dev->emac_irq = irq_of_parse_and_map(np, 0);
-	dev->wol_irq = irq_of_parse_and_map(np, 1);
-	if (!dev->emac_irq) {
-		printk(KERN_ERR "%pOF: Can't map main interrupt\n", np);
-		err = -ENODEV;
+	dev->emac_irq = platform_get_irq(ofdev, 0);
+	if (dev->emac_irq < 0) {
+		err = dev->emac_irq;
 		goto err_free;
 	}
+	dev->wol_irq = irq_of_parse_and_map(np, 1);
 	ndev->irq = dev->emac_irq;
 
 	dev->emacp = devm_platform_ioremap_resource(ofdev, 0);
@@ -3234,8 +3233,6 @@ static int emac_probe(struct platform_device *ofdev)
  err_irq_unmap:
 	if (dev->wol_irq)
 		irq_dispose_mapping(dev->wol_irq);
-	if (dev->emac_irq)
-		irq_dispose_mapping(dev->emac_irq);
  err_free:
 	free_netdev(ndev);
  err_gone:
@@ -3281,8 +3278,6 @@ static void emac_remove(struct platform_device *ofdev)
 
 	if (dev->wol_irq)
 		irq_dispose_mapping(dev->wol_irq);
-	if (dev->emac_irq)
-		irq_dispose_mapping(dev->emac_irq);
 
 	free_netdev(dev->ndev);
 }
