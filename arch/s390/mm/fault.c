@@ -154,6 +154,7 @@ bad:
 static void dump_fault_info(struct pt_regs *regs)
 {
 	union teid teid = { .val = regs->int_parm_long };
+	enum fault_type type;
 	unsigned long asce;
 
 	pr_alert("Failing address: %016lx TEID: %016lx\n",
@@ -174,21 +175,16 @@ static void dump_fault_info(struct pt_regs *regs)
 		break;
 	}
 	pr_cont("mode while using ");
-	switch (get_fault_type(regs)) {
-	case USER_FAULT:
+	type = get_fault_type(regs);
+	if (type == USER_FAULT) {
 		asce = get_lowcore()->user_asce.val;
 		pr_cont("user ");
-		break;
-	case GMAP_FAULT:
+	} else if (type == GMAP_FAULT) {
 		asce = ((struct gmap *)get_lowcore()->gmap)->asce;
 		pr_cont("gmap ");
-		break;
-	case KERNEL_FAULT:
+	} else {
 		asce = get_lowcore()->kernel_asce.val;
 		pr_cont("kernel ");
-		break;
-	default:
-		unreachable();
 	}
 	pr_cont("ASCE.\n");
 	dump_pagetable(asce, get_fault_address(regs));
@@ -223,7 +219,6 @@ static void do_sigsegv(struct pt_regs *regs, int si_code)
 
 static void handle_fault_error_nolock(struct pt_regs *regs, int si_code)
 {
-	enum fault_type fault_type;
 	unsigned long address;
 	bool is_write;
 
@@ -234,17 +229,15 @@ static void handle_fault_error_nolock(struct pt_regs *regs, int si_code)
 	}
 	if (fixup_exception(regs))
 		return;
-	fault_type = get_fault_type(regs);
-	if (fault_type == KERNEL_FAULT) {
+	if (get_fault_type(regs) == KERNEL_FAULT) {
 		address = get_fault_address(regs);
 		is_write = fault_is_write(regs);
 		if (kfence_handle_page_fault(address, is_write, regs))
 			return;
-	}
-	if (fault_type == KERNEL_FAULT)
 		pr_alert("Unable to handle kernel pointer dereference in virtual kernel address space\n");
-	else
+	} else {
 		pr_alert("Unable to handle kernel paging request in virtual user address space\n");
+	}
 	dump_fault_info(regs);
 	die(regs, "Oops");
 }
@@ -295,15 +288,8 @@ static void do_exception(struct pt_regs *regs, int access)
 	address = get_fault_address(regs);
 	is_write = fault_is_write(regs);
 	type = get_fault_type(regs);
-	switch (type) {
-	case KERNEL_FAULT:
+	if (type == KERNEL_FAULT || faulthandler_disabled() || !mm)
 		return handle_fault_error_nolock(regs, 0);
-	case USER_FAULT:
-	case GMAP_FAULT:
-		if (faulthandler_disabled() || !mm)
-			return handle_fault_error_nolock(regs, 0);
-		break;
-	}
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, address);
 	flags = FAULT_FLAG_DEFAULT;
 	if (user_mode(regs))
@@ -484,6 +470,7 @@ void do_secure_storage_access(struct pt_regs *regs)
 {
 	union teid teid = { .val = regs->int_parm_long };
 	unsigned long addr = get_fault_address(regs);
+	enum fault_type type;
 	struct vm_area_struct *vma;
 	struct mm_struct *mm;
 	struct page *page;
@@ -512,38 +499,11 @@ void do_secure_storage_access(struct pt_regs *regs)
 		 */
 		panic("Unexpected PGM 0x3d with TEID bit 61=0");
 	}
-	switch (get_fault_type(regs)) {
-	case GMAP_FAULT:
-		mm = current->mm;
-		gmap = (struct gmap *)get_lowcore()->gmap;
-		mmap_read_lock(mm);
-		addr = __gmap_translate(gmap, addr);
-		mmap_read_unlock(mm);
-		if (IS_ERR_VALUE(addr))
-			return handle_fault_error_nolock(regs, SEGV_MAPERR);
-		fallthrough;
-	case USER_FAULT:
-		if (faulthandler_disabled())
-			return handle_fault_error_nolock(regs, 0);
-		mm = current->mm;
-		mmap_read_lock(mm);
-		vma = find_vma(mm, addr);
-		if (!vma)
-			return handle_fault_error(regs, SEGV_MAPERR);
-		page = follow_page(vma, addr, FOLL_WRITE | FOLL_GET);
-		if (IS_ERR_OR_NULL(page)) {
-			mmap_read_unlock(mm);
-			break;
-		}
-		if (arch_make_page_accessible(page))
-			send_sig(SIGSEGV, current, 0);
-		put_page(page);
-		mmap_read_unlock(mm);
-		break;
-	case KERNEL_FAULT:
+	type = get_fault_type(regs);
+	if (type == KERNEL_FAULT) {
 		page = phys_to_page(addr);
 		if (unlikely(!try_get_page(page)))
-			break;
+			return;
 		rc = uv_convert_from_secure(page_to_phys(page));
 		if (!rc)
 			clear_bit(PG_arch_1, &page->flags);
@@ -555,9 +515,32 @@ void do_secure_storage_access(struct pt_regs *regs)
 		 */
 		if (rc)
 			return handle_fault_error_nolock(regs, 0);
-		break;
-	default:
-		unreachable();
+	} else {
+		if (type == GMAP_FAULT) {
+			mm = current->mm;
+			gmap = (struct gmap *)get_lowcore()->gmap;
+			mmap_read_lock(mm);
+			addr = __gmap_translate(gmap, addr);
+			mmap_read_unlock(mm);
+			if (IS_ERR_VALUE(addr))
+				return handle_fault_error_nolock(regs, SEGV_MAPERR);
+		}
+		if (faulthandler_disabled())
+			return handle_fault_error_nolock(regs, 0);
+		mm = current->mm;
+		mmap_read_lock(mm);
+		vma = find_vma(mm, addr);
+		if (!vma)
+			return handle_fault_error(regs, SEGV_MAPERR);
+		page = follow_page(vma, addr, FOLL_WRITE | FOLL_GET);
+		if (IS_ERR_OR_NULL(page)) {
+			mmap_read_unlock(mm);
+			return;
+		}
+		if (arch_make_page_accessible(page))
+			send_sig(SIGSEGV, current, 0);
+		put_page(page);
+		mmap_read_unlock(mm);
 	}
 }
 NOKPROBE_SYMBOL(do_secure_storage_access);
