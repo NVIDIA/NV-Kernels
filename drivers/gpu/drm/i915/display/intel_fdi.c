@@ -24,6 +24,7 @@ struct intel_fdi_funcs {
 static void assert_fdi_tx(struct drm_i915_private *dev_priv,
 			  enum pipe pipe, bool state)
 {
+	struct intel_display *display = &dev_priv->display;
 	bool cur_state;
 
 	if (HAS_DDI(dev_priv)) {
@@ -38,9 +39,9 @@ static void assert_fdi_tx(struct drm_i915_private *dev_priv,
 	} else {
 		cur_state = intel_de_read(dev_priv, FDI_TX_CTL(pipe)) & FDI_TX_ENABLE;
 	}
-	I915_STATE_WARN(dev_priv, cur_state != state,
-			"FDI TX state assertion failure (expected %s, current %s)\n",
-			str_on_off(state), str_on_off(cur_state));
+	INTEL_DISPLAY_STATE_WARN(display, cur_state != state,
+				 "FDI TX state assertion failure (expected %s, current %s)\n",
+				 str_on_off(state), str_on_off(cur_state));
 }
 
 void assert_fdi_tx_enabled(struct drm_i915_private *i915, enum pipe pipe)
@@ -56,12 +57,13 @@ void assert_fdi_tx_disabled(struct drm_i915_private *i915, enum pipe pipe)
 static void assert_fdi_rx(struct drm_i915_private *dev_priv,
 			  enum pipe pipe, bool state)
 {
+	struct intel_display *display = &dev_priv->display;
 	bool cur_state;
 
 	cur_state = intel_de_read(dev_priv, FDI_RX_CTL(pipe)) & FDI_RX_ENABLE;
-	I915_STATE_WARN(dev_priv, cur_state != state,
-			"FDI RX state assertion failure (expected %s, current %s)\n",
-			str_on_off(state), str_on_off(cur_state));
+	INTEL_DISPLAY_STATE_WARN(display, cur_state != state,
+				 "FDI RX state assertion failure (expected %s, current %s)\n",
+				 str_on_off(state), str_on_off(cur_state));
 }
 
 void assert_fdi_rx_enabled(struct drm_i915_private *i915, enum pipe pipe)
@@ -77,6 +79,7 @@ void assert_fdi_rx_disabled(struct drm_i915_private *i915, enum pipe pipe)
 void assert_fdi_tx_pll_enabled(struct drm_i915_private *i915,
 			       enum pipe pipe)
 {
+	struct intel_display *display = &i915->display;
 	bool cur_state;
 
 	/* ILK FDI PLL is always enabled */
@@ -88,19 +91,20 @@ void assert_fdi_tx_pll_enabled(struct drm_i915_private *i915,
 		return;
 
 	cur_state = intel_de_read(i915, FDI_TX_CTL(pipe)) & FDI_TX_PLL_ENABLE;
-	I915_STATE_WARN(i915, !cur_state,
-			"FDI TX PLL assertion failure, should be active but is disabled\n");
+	INTEL_DISPLAY_STATE_WARN(display, !cur_state,
+				 "FDI TX PLL assertion failure, should be active but is disabled\n");
 }
 
 static void assert_fdi_rx_pll(struct drm_i915_private *i915,
 			      enum pipe pipe, bool state)
 {
+	struct intel_display *display = &i915->display;
 	bool cur_state;
 
 	cur_state = intel_de_read(i915, FDI_RX_CTL(pipe)) & FDI_RX_PLL_ENABLE;
-	I915_STATE_WARN(i915, cur_state != state,
-			"FDI RX PLL assertion failure (expected %s, current %s)\n",
-			str_on_off(state), str_on_off(cur_state));
+	INTEL_DISPLAY_STATE_WARN(display, cur_state != state,
+				 "FDI RX PLL assertion failure (expected %s, current %s)\n",
+				 str_on_off(state), str_on_off(cur_state));
 }
 
 void assert_fdi_rx_pll_enabled(struct drm_i915_private *i915, enum pipe pipe)
