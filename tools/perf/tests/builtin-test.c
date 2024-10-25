@@ -214,10 +214,17 @@ static bool perf_test__matches(const char *desc, int curr, int argc, const char 
 }
 
 static jmp_buf run_test_jmp_buf;
+static jmp_buf cmd_test_jmp_buf;
+static pid_t running_test_pid = -1;
 
 static void child_test_sig_handler(int sig)
 {
 	siglongjmp(run_test_jmp_buf, sig);
+}
+
+static void cmd_test_sig_handler(int sig)
+{
+	siglongjmp(cmd_test_jmp_buf, sig);
 }
 
 static int run_test(struct test_suite *test, int subtest)
@@ -275,7 +282,9 @@ err_out:
 	}
 
 	if (!dont_fork) {
+		running_test_pid = child;
 		wait(&status);
+		running_test_pid = -1;
 
 		if (WIFEXITED(status)) {
 			err = (signed char)WEXITSTATUS(status);
@@ -399,6 +408,22 @@ static int __cmd_test(int argc, const char *argv[], struct intlist *skiplist)
 	unsigned int j, k;
 	int i = 0;
 	int width = list_script_max_width();
+	int err;
+
+	err = sigsetjmp(cmd_test_jmp_buf, 1);
+	if (err) {
+		pr_err("\nSignal (%d) while running tests.\nTerminating tests with the same signal\n",
+		       err);
+		if (running_test_pid > 0) {
+			pr_debug3("Killing pid %d\n", running_test_pid);
+			kill(running_test_pid, err);
+			waitpid(running_test_pid, NULL, 0);
+			running_test_pid = -1;
+		}
+		goto err_out;
+	}
+	signal(SIGINT, cmd_test_sig_handler);
+	signal(SIGTERM, cmd_test_sig_handler);
 
 	for_each_test(j, k, t) {
 		int len = strlen(test_description(t, -1));
@@ -474,7 +499,11 @@ static int __cmd_test(int argc, const char *argv[], struct intlist *skiplist)
 		}
 	}
 
-	return run_shell_tests(argc, argv, i, width, skiplist);
+	err = run_shell_tests(argc, argv, i, width, skiplist);
+err_out:
+	signal(SIGINT, SIG_DFL);
+	signal(SIGTERM, SIG_DFL);
+	return err;
 }
 
 static int perf_test__list_shell(int argc, const char **argv, int i)
