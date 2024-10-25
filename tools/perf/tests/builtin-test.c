@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <setjmp.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -212,8 +213,18 @@ static bool perf_test__matches(const char *desc, int curr, int argc, const char 
 	return false;
 }
 
+static jmp_buf run_test_jmp_buf;
+
+static void child_test_sig_handler(int sig)
+{
+	siglongjmp(run_test_jmp_buf, sig);
+}
+
 static int run_test(struct test_suite *test, int subtest)
 {
+	const int signals[] = {
+		SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGINT, SIGPIPE, SIGQUIT, SIGSEGV, SIGTERM,
+	};
 	int status, err = -1, child = dont_fork ? 0 : fork();
 	char sbuf[STRERR_BUFSIZE];
 
@@ -225,6 +236,13 @@ static int run_test(struct test_suite *test, int subtest)
 
 	if (!child) {
 		if (!dont_fork) {
+			err = sigsetjmp(run_test_jmp_buf, 1);
+			if (err) {
+				fprintf(stderr, "\n---- unexpected signal (%d) ----\n", err);
+				err = err > 0 ? -err : -1;
+				goto err_out;
+			}
+
 			pr_debug("test child forked, pid %d\n", getpid());
 
 			if (verbose <= 0) {
@@ -242,11 +260,18 @@ static int run_test(struct test_suite *test, int subtest)
 				signal(SIGSEGV, sighandler_dump_stack);
 				signal(SIGFPE, sighandler_dump_stack);
 			}
+			for (size_t i = 0; i < ARRAY_SIZE(signals); i++)
+				signal(signals[i], child_test_sig_handler);
 		}
 
 		err = test_function(test, subtest)(test, subtest);
-		if (!dont_fork)
+		if (!dont_fork) {
+err_out:
+			fflush(NULL);
+			for (size_t i = 0; i < ARRAY_SIZE(signals); i++)
+				signal(signals[i], SIG_DFL);
 			exit(err);
+		}
 	}
 
 	if (!dont_fork) {
