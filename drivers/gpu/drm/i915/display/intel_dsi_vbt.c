@@ -367,7 +367,7 @@ static void icl_native_gpio_set_value(struct drm_i915_private *dev_priv,
 	case MIPI_AVEE_EN_2:
 		index = gpio == MIPI_AVEE_EN_1 ? 1 : 2;
 
-		intel_de_rmw(dev_priv, GPIO(dev_priv, index),
+		intel_de_rmw(dev_priv, GPIO(&dev_priv->display, index),
 			     GPIO_CLOCK_VAL_OUT,
 			     GPIO_CLOCK_DIR_MASK | GPIO_CLOCK_DIR_OUT |
 			     GPIO_CLOCK_VAL_MASK | (value ? GPIO_CLOCK_VAL_OUT : 0));
@@ -376,7 +376,7 @@ static void icl_native_gpio_set_value(struct drm_i915_private *dev_priv,
 	case MIPI_VIO_EN_2:
 		index = gpio == MIPI_VIO_EN_1 ? 1 : 2;
 
-		intel_de_rmw(dev_priv, GPIO(dev_priv, index),
+		intel_de_rmw(dev_priv, GPIO(&dev_priv->display, index),
 			     GPIO_DATA_VAL_OUT,
 			     GPIO_DATA_DIR_MASK | GPIO_DATA_DIR_OUT |
 			     GPIO_DATA_VAL_MASK | (value ? GPIO_DATA_VAL_OUT : 0));

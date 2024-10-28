@@ -840,6 +840,7 @@ static void intel_lvds_add_properties(struct drm_connector *connector)
  */
 void intel_lvds_init(struct drm_i915_private *i915)
 {
+	struct intel_display *display = &i915->display;
 	struct intel_lvds_encoder *lvds_encoder;
 	struct intel_connector *connector;
 	const struct drm_edid *drm_edid;
@@ -900,7 +901,7 @@ void intel_lvds_init(struct drm_i915_private *i915)
 	drm_connector_init_with_ddc(&i915->drm, &connector->base,
 				    &intel_lvds_connector_funcs,
 				    DRM_MODE_CONNECTOR_LVDS,
-				    intel_gmbus_get_adapter(i915, ddc_pin));
+				    intel_gmbus_get_adapter(display, ddc_pin));
 
 	drm_encoder_init(&i915->drm, &encoder->base, &intel_lvds_enc_funcs,
 			 DRM_MODE_ENCODER_LVDS, "LVDS");

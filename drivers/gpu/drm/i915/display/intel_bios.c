@@ -2822,7 +2822,7 @@ parse_general_definitions(struct drm_i915_private *i915)
 
 	bus_pin = defs->crt_ddc_gmbus_pin;
 	drm_dbg_kms(&i915->drm, "crt_ddc_bus_pin: %d\n", bus_pin);
-	if (intel_gmbus_is_valid_pin(i915, bus_pin))
+	if (intel_gmbus_is_valid_pin(&i915->display, bus_pin))
 		i915->display.vbt.crt_ddc_pin = bus_pin;
 
 	if (i915->display.vbt.version < 106) {
@@ -3388,7 +3388,7 @@ bool intel_bios_is_lvds_present(struct drm_i915_private *i915, u8 *i2c_pin)
 		    child->device_type != DEVICE_TYPE_LFP)
 			continue;
 
-		if (intel_gmbus_is_valid_pin(i915, child->i2c_pin))
+		if (intel_gmbus_is_valid_pin(&i915->display, child->i2c_pin))
 			*i2c_pin = child->i2c_pin;
 
 		/* However, we cannot trust the BIOS writers to populate
