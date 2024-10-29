@@ -756,7 +756,9 @@ free_list:
 	return res;
 }
 
+#ifdef CONFIG_IOMMU_DEBUGFS
 static struct dentry *cmdqv_debugfs_dir;
+#endif
 
 static int tegra241_cmdqv_init_structures(struct arm_smmu_device *smmu)
 {
