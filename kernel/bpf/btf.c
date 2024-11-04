@@ -6320,6 +6320,10 @@ bool btf_ctx_access(int off, int size, enum bpf_access_type type,
 	    !strcmp(tname, "sched_process_wait"))
 		info->reg_type |= PTR_MAYBE_NULL;
 
+	/* Raw tracepoint arguments always get marked as maybe NULL */
+	if (bpf_prog_is_raw_tp(prog))
+		info->reg_type |= PTR_MAYBE_NULL;
+
 	if (tgt_prog) {
 		enum bpf_prog_type tgt_type;
 
