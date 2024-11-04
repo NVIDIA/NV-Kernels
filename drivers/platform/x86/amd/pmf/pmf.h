@@ -12,6 +12,7 @@
 #define PMF_H
 
 #include <linux/acpi.h>
+#include <linux/platform_device.h>
 #include <linux/platform_profile.h>
 
 #define POLICY_BUF_MAX_SZ		0x4b000
@@ -294,17 +295,19 @@ struct amd_pmf_dev {
 	/* Smart PC solution builder */
 	struct dentry *esbin;
 	unsigned char *policy_buf;
-	u32 policy_sz;
+	resource_size_t policy_sz;
 	struct tee_context *tee_ctx;
 	struct tee_shm *fw_shm_pool;
 	u32 session_id;
 	void *shbuf;
 	struct delayed_work pb_work;
 	struct pmf_action_table *prev_data;
-	u64 policy_addr;
-	void *policy_base;
+	resource_size_t policy_addr;
+	void __iomem *policy_base;
 	bool smart_pc_enabled;
 	u16 pmf_if_version;
+	struct resource *res;
+	struct mutex cb_mutex;
 };
 
 struct apmf_sps_prop_granular_v2 {
