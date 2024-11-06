@@ -51,6 +51,11 @@
 #define INA226_ALERT_LIMIT		0x07
 #define INA226_DIE_ID			0xFF
 
+/* SY24655 register definitions */
+#define SY24655_EIN			0x0A
+#define SY24655_ACCUM_CONFIG		0x0D
+#define SY24655_ACCUM_CONFIG_DEFAULT	0x044C
+
 /* register count */
 #define INA219_REGISTERS		6
 #define INA226_REGISTERS		8
@@ -87,7 +92,7 @@
 #define INA226_ALERT_FUNCTION_FLAG	BIT(4)
 
 /* common attrs, ina226 attrs and NULL */
-#define INA2XX_MAX_ATTRIBUTE_GROUPS	3
+#define INA2XX_MAX_ATTRIBUTE_GROUPS	4
 
 /*
  * Both bus voltage and shunt voltage conversion times for ina226 are set
@@ -100,12 +105,13 @@ static struct regmap_config ina2xx_regmap_config = {
 	.val_bits = 16,
 };
 
-enum ina2xx_ids { ina219, ina226, ina260 };
+enum ina2xx_ids { ina219, ina226, ina260, sy24655 };
 
 struct ina2xx_config {
 	u16 config_default;
 	bool has_alerts;	/* chip supports alerts and limits */
 	bool has_ishunt;	/* chip has internal shunt resistor */
+	bool has_power_average;
 	int calibration_value;
 	int registers;
 	int shunt_div;
@@ -122,6 +128,7 @@ struct ina2xx_data {
 	long power_lsb_uW;
 	struct mutex config_lock;
 	struct regmap *regmap;
+	struct i2c_client *client;
 
 	const struct attribute_group *groups[INA2XX_MAX_ATTRIBUTE_GROUPS];
 };
@@ -137,6 +144,7 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.power_lsb_factor = 20,
 		.has_alerts = false,
 		.has_ishunt = false,
+		.has_power_average = false,
 	},
 	[ina226] = {
 		.config_default = INA226_CONFIG_DEFAULT,
@@ -148,6 +156,7 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.power_lsb_factor = 25,
 		.has_alerts = true,
 		.has_ishunt = false,
+		.has_power_average = false,
 	},
 	[ina260] = {
 		.config_default = INA260_CONFIG_DEFAULT,
@@ -158,6 +167,19 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.power_lsb_factor = 8,
 		.has_alerts = true,
 		.has_ishunt = true,
+		.has_power_average = false,
+	},
+	[sy24655] = {
+		.config_default = INA226_CONFIG_DEFAULT,
+		.calibration_value = 4096,
+		.registers = SY24655_ACCUM_CONFIG + 1,
+		.shunt_div = 400,
+		.bus_voltage_shift = 0,
+		.bus_voltage_lsb = 1250,
+		.power_lsb_factor = 25,
+		.has_alerts = true,
+		.has_ishunt = false,
+		.has_power_average = true,
 	},
 };
 
@@ -217,6 +239,12 @@ static int ina2xx_init(struct ina2xx_data *data)
 				data->config->config_default);
 	if (ret < 0)
 		return ret;
+	if (data->config->has_power_average) {
+		ret = regmap_write(data->regmap, SY24655_ACCUM_CONFIG,
+				   SY24655_ACCUM_CONFIG_DEFAULT);
+		if (ret < 0)
+			return ret;
+	}
 	if (data->config->has_ishunt)
 		return 0;
 
@@ -477,6 +505,29 @@ static ssize_t ina226_alarm_show(struct device *dev,
 	return sysfs_emit(buf, "%d\n", alarm);
 }
 
+static ssize_t sy24655_average_power_show(struct device *dev,
+					  struct device_attribute *da, char *buf)
+{
+	struct ina2xx_data *data = dev_get_drvdata(dev);
+	u8 values[6];
+	long accumulator, sample_count, val;
+	int ret;
+
+	ret = i2c_smbus_read_i2c_block_data(data->client, SY24655_EIN,
+					    sizeof(values), values);
+	if (ret < 0)
+		return ret;
+	if (ret != sizeof(values))
+		return -EIO;
+
+	accumulator = (values[3] << 16) | (values[4] << 8) | values[5];
+	sample_count = (values[0] << 16) | (values[1] << 8) | values[2];
+	val = sample_count ? DIV_ROUND_CLOSEST(accumulator, sample_count) *
+			     data->power_lsb_uW : 0;
+
+	return sysfs_emit(buf, "%ld\n", val);
+}
+
 /*
  * In order to keep calibration register value fixed, the product
  * of current_lsb and shunt_resistor should also be fixed and equal
@@ -598,6 +649,7 @@ static SENSOR_DEVICE_ATTR_RW(power1_crit, ina226_alert,
 			     INA226_POWER_OVER_LIMIT_BIT);
 static SENSOR_DEVICE_ATTR_RO(power1_crit_alarm, ina226_alarm,
 			     INA226_POWER_OVER_LIMIT_BIT);
+static SENSOR_DEVICE_ATTR_RO(power1_average, sy24655_average_power, 0);
 
 /* shunt resistance */
 static SENSOR_DEVICE_ATTR_RW(shunt_resistor, ina2xx_shunt, INA2XX_CALIBRATION);
@@ -649,6 +701,15 @@ static const struct attribute_group ina226_group = {
 	.attrs = ina226_attrs,
 };
 
+static struct attribute *sy24655_attrs[] = {
+	&sensor_dev_attr_power1_average.dev_attr.attr,
+	NULL,
+};
+
+static const struct attribute_group sy24655_group = {
+	.attrs = sy24655_attrs,
+};
+
 static const struct i2c_device_id ina2xx_id[];
 
 static int ina2xx_probe(struct i2c_client *client)
@@ -670,6 +731,7 @@ static int ina2xx_probe(struct i2c_client *client)
 		return -ENOMEM;
 
 	/* set the device type */
+	data->client = client;
 	data->config = &ina2xx_config[chip];
 	mutex_init(&data->config_lock);
 
@@ -708,6 +770,8 @@ static int ina2xx_probe(struct i2c_client *client)
 				&ina260_group : &ina2xx_group;
 	if (data->config->has_alerts)
 		data->groups[group++] = &ina226_group;
+	if (data->config->has_power_average)
+		data->groups[group++] = &sy24655_group;
 
 	hwmon_dev = devm_hwmon_device_register_with_groups(dev, client->name,
 							   data, data->groups);
@@ -727,11 +791,16 @@ static const struct i2c_device_id ina2xx_id[] = {
 	{ "ina230", ina226 },
 	{ "ina231", ina226 },
 	{ "ina260", ina260 },
+	{ "sy24655", sy24655 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ina2xx_id);
 
 static const struct of_device_id __maybe_unused ina2xx_of_match[] = {
+	{
+		.compatible = "silergy,sy24655",
+		.data = (void *)sy24655
+	},
 	{
 		.compatible = "ti,ina219",
 		.data = (void *)ina219
