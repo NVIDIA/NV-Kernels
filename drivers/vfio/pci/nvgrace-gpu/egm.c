@@ -359,6 +359,9 @@ int register_egm_node(struct pci_dev *pdev)
 	}
 
 	region = kvzalloc(sizeof(*region), GFP_KERNEL);
+	if (!region)
+		return -ENOMEM;
+
 	region->egmphys = egmphys;
 	region->egmlength = egmlength;
 	region->egmpxm = egmpxm;
@@ -368,11 +371,16 @@ int register_egm_node(struct pci_dev *pdev)
 
 	nvgrace_egm_fetch_bad_pages(pdev, region);
 
+	ret = setup_egm_chardev(region);
+	if (ret)
+		goto err;
+
 	list_add_tail(&region->list, &egm_list);
 
-	setup_egm_chardev(region);
-
 	return 0;
+err:
+	kfree(region);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(register_egm_node);
 
