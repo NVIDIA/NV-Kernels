@@ -1121,6 +1121,7 @@ static void nvgrace_gpu_remove(struct pci_dev *pdev)
 	struct h_node *cur;
 	unsigned long bkt;
 	struct hlist_node *tmp_node;
+
 	hash_for_each_safe(nvdev->resmem.htbl, bkt, tmp_node, cur, node) {
 		hash_del(&cur->node);
 		vfree(cur);
