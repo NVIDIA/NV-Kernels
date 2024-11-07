@@ -312,6 +312,7 @@ void unregister_egm_node(int egm_node)
 
 			destroy_egm_chardev(region);
 			list_del(&region->list);
+			kfree(region);
 		}
 	}
 }
