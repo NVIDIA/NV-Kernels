@@ -324,8 +324,6 @@ static void nvgrace_egm_fetch_bad_pages(struct pci_dev *pdev,
 
 	count = *(u64 *)memaddr;
 
-	hash_init(region->htbl);
-
 	for (index = 0; index < count; index++) {
 		struct h_node *retired_page;
 
@@ -365,6 +363,7 @@ int register_egm_node(struct pci_dev *pdev)
 	region->egmlength = egmlength;
 	region->egmpxm = egmpxm;
 
+	hash_init(region->htbl);
 	atomic_set(&region->open_count, 0);
 
 	nvgrace_egm_fetch_bad_pages(pdev, region);
