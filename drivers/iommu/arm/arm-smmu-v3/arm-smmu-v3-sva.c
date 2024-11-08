@@ -570,7 +570,8 @@ void arm_smmu_sva_remove_dev_pasid(struct iommu_domain *domain,
 }
 
 static int arm_smmu_sva_set_dev_pasid(struct iommu_domain *domain,
-				      struct device *dev, ioasid_t id)
+				      struct device *dev, ioasid_t id,
+				      struct iommu_domain *old)
 {
 	int ret = 0;
 	struct mm_struct *mm = domain->mm;
