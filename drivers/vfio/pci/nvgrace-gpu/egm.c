@@ -23,6 +23,7 @@ struct egm_region {
 	size_t egmlength;
 	struct device device;
 	struct cdev cdev;
+	struct pci_dev *pdev;
 	DECLARE_HASHTABLE(htbl, 0x10);
 #ifdef CONFIG_MEMORY_FAILURE
 	struct pfn_address_space pfn_address_space;
@@ -242,9 +243,37 @@ static const struct file_operations file_ops = {
 	.unlocked_ioctl = nvgrace_egm_ioctl,
 };
 
+static void pci_egm_link_remove(struct egm_region *region)
+{
+	sysfs_remove_link(&region->pdev->dev.kobj, dev_name(&region->device));
+	sysfs_remove_link(&region->device.kobj, dev_name(&region->pdev->dev));
+}
+
+static int pci_egm_link_create(struct egm_region *region)
+{
+	int rc;
+
+	rc = sysfs_create_link(&region->pdev->dev.kobj,
+			       &region->device.kobj,
+			       dev_name(&region->device));
+	if (rc)
+		goto err;
+
+	rc = sysfs_create_link(&region->device.kobj,
+			       &region->pdev->dev.kobj,
+			       dev_name(&region->pdev->dev));
+	if (rc)
+		goto err;
+
+	return 0;
+err:
+	pci_egm_link_remove(region);
+	return rc;
+}
+
 static int setup_egm_chardev(struct egm_region *region)
 {
-	int ret = 0;
+	int ret;
 
 	device_initialize(&region->device);
 
@@ -263,7 +292,16 @@ static int setup_egm_chardev(struct egm_region *region)
 		return ret;
 
 	ret = cdev_device_add(&region->cdev, &region->device);
+	if (ret)
+		return ret;
 
+	ret = pci_egm_link_create(region);
+	if (ret)
+		goto err;
+
+	return 0;
+err:
+	cdev_device_del(&region->cdev, &region->device);
 	return ret;
 }
 
@@ -367,6 +405,7 @@ int register_egm_node(struct pci_dev *pdev)
 	region->egmphys = egmphys;
 	region->egmlength = egmlength;
 	region->egmpxm = egmpxm;
+	region->pdev = pdev;
 
 	hash_init(region->htbl);
 	atomic_set(&region->open_count, 0);
@@ -388,6 +427,7 @@ EXPORT_SYMBOL_GPL(register_egm_node);
 
 static void destroy_egm_chardev(struct egm_region *region)
 {
+	pci_egm_link_remove(region);
 	cdev_device_del(&region->cdev, &region->device);
 }
 
