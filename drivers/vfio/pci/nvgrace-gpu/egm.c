@@ -109,9 +109,6 @@ static int nvgrace_egm_open(struct inode *inode, struct file *file)
 	struct egm_region *region = container_of(inode->i_cdev,
 						 struct egm_region, cdev);
 
-	if (!region)
-		return -EINVAL;
-
 	if (atomic_inc_return(&region->open_count) > 1)
 		return 0;
 
@@ -132,9 +129,6 @@ static int nvgrace_egm_release(struct inode *inode, struct file *file)
 {
 	struct egm_region *region = container_of(inode->i_cdev,
 						 struct egm_region, cdev);
-
-	if (!region)
-		return -EINVAL;
 
 	if (atomic_dec_and_test(&region->open_count)) {
 #ifdef CONFIG_MEMORY_FAILURE
@@ -225,7 +219,7 @@ static long nvgrace_egm_ioctl(struct file *file, unsigned int cmd, unsigned long
 						   index * bad_page_struct_size,
 						   &tmp, bad_page_struct_size);
 				if (ret)
-					return ret;
+					return -EFAULT;
 				index++;
 			}
 
@@ -289,7 +283,7 @@ nvgrace_gpu_fetch_egm_property(struct pci_dev *pdev, u64 *pegmphys,
 	if (ret)
 		return ret;
 
-	if (*pegmlength > type_max(size_t))
+	if (overflows_type(*pegmlength, size_t))
 		return -EOVERFLOW;
 
 	ret = device_property_read_u64(&pdev->dev, "nvidia,egm-base-pa",
@@ -297,13 +291,13 @@ nvgrace_gpu_fetch_egm_property(struct pci_dev *pdev, u64 *pegmphys,
 	if (ret)
 		return ret;
 
-	if (*pegmphys > type_max(phys_addr_t))
+	if (overflows_type(*pegmphys, phys_addr_t))
 		return -EOVERFLOW;
 
 	ret = device_property_read_u64(&pdev->dev, "nvidia,egm-pxm",
 				       pegmpxm);
 
-	if (*pegmpxm > type_max(phys_addr_t))
+	if (overflows_type(*pegmpxm, int))
 		return -EOVERFLOW;
 
 	return ret;
