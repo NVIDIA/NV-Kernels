@@ -874,7 +874,7 @@ nvgrace_gpu_fetch_memory_property(struct pci_dev *pdev,
 	if (ret)
 		return ret;
 
-	if (*pmemphys > type_max(phys_addr_t))
+	if (overflows_type(*pmemphys, phys_addr_t))
 		return -EOVERFLOW;
 
 	ret = device_property_read_u64(&pdev->dev, "nvidia,gpu-mem-size",
@@ -882,7 +882,7 @@ nvgrace_gpu_fetch_memory_property(struct pci_dev *pdev,
 	if (ret)
 		return ret;
 
-	if (*pmemlength > type_max(size_t))
+	if (overflows_type(*pmemlength, size_t))
 		return -EOVERFLOW;
 
 	/*
