@@ -188,6 +188,7 @@ static long nvgrace_egm_ioctl(struct file *file, unsigned int cmd, unsigned long
 
 	switch (cmd) {
 	case EGM_BAD_PAGES_LIST:
+	{
 		int ret;
 		unsigned long bad_page_struct_size = sizeof(struct egm_bad_pages_info);
 		struct egm_bad_pages_info tmp;
@@ -230,6 +231,7 @@ static long nvgrace_egm_ioctl(struct file *file, unsigned int cmd, unsigned long
 			info.count = index;
 		}
 		break;
+	}
 	default:
 		return -EINVAL;
 	}
