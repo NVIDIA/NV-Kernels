@@ -417,9 +417,6 @@ static int iommufd_fops_mmap(struct file *filp, struct vm_area_struct *vma)
 	unsigned long pfn;
 	int rc;
 
-	if (size > PAGE_SIZE)
-		return -EINVAL;
-
 	viommu = container_of(iommufd_get_object(ictx, viommu_id,
 						 IOMMUFD_OBJ_VIOMMU),
 			      struct iommufd_viommu, obj);
