@@ -1725,18 +1725,31 @@ struct nft_trans_table {
 #define nft_trans_table_update(trans)	\
 	(((struct nft_trans_table *)trans->data)->update)
 
-struct nft_trans_elem {
-	struct nft_set			*set;
-	struct nft_elem_priv		*elem_priv;
-	bool				bound;
+enum nft_trans_elem_flags {
+	NFT_TRANS_UPD_TIMEOUT		= (1 << 0),
+	NFT_TRANS_UPD_EXPIRATION	= (1 << 1),
 };
 
+struct nft_trans_one_elem {
+	struct nft_elem_priv		*priv;
+	u64				timeout;
+	u64				expiration;
+	u8				update_flags;
+};
+
+struct nft_trans_elem {
+	struct nft_set			*set;
+	bool				bound;
+	unsigned int			nelems;
+	struct nft_trans_one_elem	elems[] __counted_by(nelems);
+};
+
+#define nft_trans_container_elem(trans) \
+	((struct nft_trans_elem *)(trans)->data)
 #define nft_trans_elem_set(trans)	\
-	(((struct nft_trans_elem *)trans->data)->set)
-#define nft_trans_elem_priv(trans)	\
-	(((struct nft_trans_elem *)trans->data)->elem_priv)
+	nft_trans_container_elem(trans)->set
 #define nft_trans_elem_set_bound(trans)	\
-	(((struct nft_trans_elem *)trans->data)->bound)
+	nft_trans_container_elem(trans)->bound
 
 struct nft_trans_obj {
 	struct nft_object		*obj;
