@@ -1115,8 +1115,10 @@ void domain_update_iommu_cap(struct dmar_domain *domain);
 int dmar_ir_support(void);
 
 void iommu_flush_write_buffer(struct intel_iommu *iommu);
-struct iommu_domain *intel_nested_domain_alloc(struct iommu_domain *parent,
-					       const struct iommu_user_data *user_data);
+struct iommu_domain *
+intel_iommu_domain_alloc_nested(struct device *dev, struct iommu_domain *parent,
+				u32 flags,
+				const struct iommu_user_data *user_data);
 struct device *device_rbtree_find(struct intel_iommu *iommu, u16 rid);
 
 enum cache_tag_type {
