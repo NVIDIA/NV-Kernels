@@ -2433,14 +2433,13 @@ static struct iommu_domain *amd_iommu_domain_alloc(unsigned int type)
 }
 
 static struct iommu_domain *
-amd_iommu_domain_alloc_user(struct device *dev, u32 flags,
-			    struct iommu_domain *parent,
-			    const struct iommu_user_data *user_data)
+amd_iommu_domain_alloc_paging_flags(struct device *dev, u32 flags,
+				    const struct iommu_user_data *user_data)
 
 {
 	unsigned int type = IOMMU_DOMAIN_UNMANAGED;
 
-	if ((flags & ~IOMMU_HWPT_ALLOC_DIRTY_TRACKING) || parent || user_data)
+	if ((flags & ~IOMMU_HWPT_ALLOC_DIRTY_TRACKING) || user_data)
 		return ERR_PTR(-EOPNOTSUPP);
 
 	return do_iommu_domain_alloc(type, dev, flags);
@@ -2863,7 +2862,7 @@ static int amd_iommu_dev_disable_feature(struct device *dev,
 const struct iommu_ops amd_iommu_ops = {
 	.capable = amd_iommu_capable,
 	.domain_alloc = amd_iommu_domain_alloc,
-	.domain_alloc_user = amd_iommu_domain_alloc_user,
+	.domain_alloc_paging_flags = amd_iommu_domain_alloc_paging_flags,
 	.domain_alloc_sva = amd_iommu_domain_alloc_sva,
 	.probe_device = amd_iommu_probe_device,
 	.release_device = amd_iommu_release_device,
