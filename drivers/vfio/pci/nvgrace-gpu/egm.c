@@ -316,6 +316,10 @@ static void nvgrace_egm_fetch_bad_pages(struct pci_dev *pdev,
 				     &retiredpagesphys))
 		return;
 
+	/* Catch firmware bug and avoid a crash */
+	if (WARN_ON_ONCE(retiredpagesphys == 0))
+		return;
+
 	memaddr = memremap(retiredpagesphys, PAGE_SIZE, MEMREMAP_WB);
 	if (!memaddr)
 		return;
