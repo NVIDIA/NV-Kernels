@@ -139,8 +139,6 @@ static int kvm_no_compat_open(struct inode *inode, struct file *file)
 #define KVM_COMPAT(c)	.compat_ioctl	= kvm_no_compat_ioctl,	\
 			.open		= kvm_no_compat_open
 #endif
-static int kvm_enable_virtualization(void);
-static void kvm_disable_virtualization(void);
 
 static void kvm_io_bus_destroy(struct kvm_io_bus *bus);
 
@@ -5637,7 +5635,7 @@ static void kvm_disable_virtualization_all_cpus(void)
 		on_each_cpu(kvm_disable_virtualization_cpu, NULL, 1);
 }
 
-static void kvm_disable_virtualization(void)
+void kvm_disable_virtualization(void)
 {
 	cpus_read_lock();
 	mutex_lock(&kvm_usage_lock);
@@ -5645,8 +5643,9 @@ static void kvm_disable_virtualization(void)
 	mutex_unlock(&kvm_usage_lock);
 	cpus_read_unlock();
 }
+EXPORT_SYMBOL_GPL(kvm_disable_virtualization);
 
-static int kvm_enable_virtualization(void)
+int kvm_enable_virtualization(void)
 {
 	atomic_t failed = ATOMIC_INIT(0);
 	int r;
@@ -5692,6 +5691,7 @@ static int kvm_enable_virtualization(void)
 
 	return r;
 }
+EXPORT_SYMBOL_GPL(kvm_enable_virtualization);
 
 static void kvm_shutdown(void)
 {
@@ -5743,16 +5743,6 @@ static struct syscore_ops kvm_syscore_ops = {
 	.resume = kvm_resume,
 	.shutdown = kvm_shutdown,
 };
-#else /* CONFIG_KVM_GENERIC_HARDWARE_ENABLING */
-static int kvm_enable_virtualization(void)
-{
-	return 0;
-}
-
-static void kvm_disable_virtualization(void)
-{
-
-}
 #endif /* CONFIG_KVM_GENERIC_HARDWARE_ENABLING */
 
 static void kvm_iodevice_destructor(struct kvm_io_device *dev)
