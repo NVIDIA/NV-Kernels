@@ -47,6 +47,7 @@ chmod +x 'drivers/watchdog/f71808e_wdt.c'
 chmod +x 'scripts/pahole-flags.sh'
 chmod +x 'scripts/pahole-version.sh'
 chmod +x 'tools/testing/selftests/net/fib_nexthop_nongw.sh'
+chmod -x 'tools/testing/selftests/net/setup_loopback.sh'
 chmod +x 'tools/testing/selftests/netfilter/conntrack_vrf.sh'
 # Remove any files deleted from the orig.
 rm -f 'Documentation/devicetree/bindings/ata/ahci-ceva.txt'
