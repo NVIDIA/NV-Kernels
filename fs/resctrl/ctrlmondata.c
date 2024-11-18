@@ -46,7 +46,8 @@ static bool bw_validate(char *buf, u32 *data, struct rdt_resource *r)
 	/*
 	 * Only linear delay values is supported for current Intel SKUs.
 	 */
-	if (!r->membw.delay_linear && r->membw.arch_needs_linear) {
+	if (r->rid == RDT_RESOURCE_MBA &&
+	    !r->mba.delay_linear && r->mba.arch_needs_linear) {
 		rdt_last_cmd_puts("No support for non-linear MB domains\n");
 		return false;
 	}

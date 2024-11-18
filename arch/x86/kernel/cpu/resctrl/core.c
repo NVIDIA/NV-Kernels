@@ -193,21 +193,21 @@ static __init bool __get_mem_config_intel(struct rdt_resource *r)
 	hw_res->num_closid = edx.split.cos_max + 1;
 	max_delay = eax.split.max_delay + 1;
 	r->membw.max_bw = MAX_MBA_BW;
-	r->membw.arch_needs_linear = true;
+	r->mba.arch_needs_linear = true;
 	if (ecx & MBA_IS_LINEAR) {
-		r->membw.delay_linear = true;
+		r->mba.delay_linear = true;
 		r->membw.min_bw = MAX_MBA_BW - max_delay;
 		r->membw.bw_gran = MAX_MBA_BW - max_delay;
 	} else {
 		if (!rdt_get_mb_table(r))
 			return false;
-		r->membw.arch_needs_linear = false;
+		r->mba.arch_needs_linear = false;
 	}
 
 	if (boot_cpu_has(X86_FEATURE_PER_THREAD_MBA))
-		r->membw.throttle_mode = THREAD_THROTTLE_PER_THREAD;
+		r->mba.throttle_mode = THREAD_THROTTLE_PER_THREAD;
 	else
-		r->membw.throttle_mode = THREAD_THROTTLE_MAX;
+		r->mba.throttle_mode = THREAD_THROTTLE_MAX;
 
 	r->alloc_capable = true;
 
@@ -230,14 +230,14 @@ static __init bool __rdt_get_mem_config_amd(struct rdt_resource *r)
 	r->membw.max_bw = 1 << eax;
 
 	/* AMD does not use delay */
-	r->membw.delay_linear = false;
-	r->membw.arch_needs_linear = false;
+	r->mba.delay_linear = false;
+	r->mba.arch_needs_linear = false;
 
 	/*
 	 * AMD does not use memory delay throttle model to control
 	 * the allocation like Intel does.
 	 */
-	r->membw.throttle_mode = THREAD_THROTTLE_UNDEFINED;
+	r->mba.throttle_mode = THREAD_THROTTLE_UNDEFINED;
 	r->membw.min_bw = 0;
 	r->membw.bw_gran = 1;
 
@@ -301,7 +301,7 @@ static void mba_wrmsr_amd(struct msr_param *m)
  */
 static u32 delay_bw_map(unsigned long bw, struct rdt_resource *r)
 {
-	if (r->membw.delay_linear)
+	if (r->mba.delay_linear)
 		return MAX_MBA_BW - bw;
 
 	pr_warn_once("Non Linear delay-bw map not supported but queried\n");
