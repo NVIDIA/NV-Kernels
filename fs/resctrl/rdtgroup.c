@@ -1256,7 +1256,7 @@ static int rdt_delay_linear_show(struct kernfs_open_file *of,
 	struct resctrl_schema *s = of->kn->parent->priv;
 	struct rdt_resource *r = s->res;
 
-	seq_printf(seq, "%u\n", r->membw.delay_linear);
+	seq_printf(seq, "%u\n", r->mba.delay_linear);
 	return 0;
 }
 
@@ -1274,7 +1274,7 @@ static int rdt_thread_throttle_mode_show(struct kernfs_open_file *of,
 	struct resctrl_schema *s = of->kn->parent->priv;
 	struct rdt_resource *r = s->res;
 
-	switch (r->membw.throttle_mode) {
+	switch (r->mba.throttle_mode) {
 	case THREAD_THROTTLE_PER_THREAD:
 		seq_puts(seq, "per-thread\n");
 		return 0;
@@ -1609,7 +1609,7 @@ bool is_mba_sc(struct rdt_resource *r)
 	if (r->rid != RDT_RESOURCE_MBA)
 		return false;
 
-	return r->membw.mba_sc;
+	return r->mba.mba_sc;
 }
 
 /*
@@ -2126,13 +2126,13 @@ static void thread_throttle_mode_init(void)
 
 	r_mba = resctrl_arch_get_resource(RDT_RESOURCE_MBA);
 	if (r_mba->alloc_capable &&
-	    r_mba->membw.throttle_mode != THREAD_THROTTLE_UNDEFINED)
-		throttle_mode = r_mba->membw.throttle_mode;
+	    r_mba->mba.throttle_mode != THREAD_THROTTLE_UNDEFINED)
+		throttle_mode = r_mba->mba.throttle_mode;
 
 	r_smba = resctrl_arch_get_resource(RDT_RESOURCE_SMBA);
 	if (r_smba->alloc_capable &&
-	    r_smba->membw.throttle_mode != THREAD_THROTTLE_UNDEFINED)
-		throttle_mode = r_smba->membw.throttle_mode;
+	    r_smba->mba.throttle_mode != THREAD_THROTTLE_UNDEFINED)
+		throttle_mode = r_smba->mba.throttle_mode;
 
 	if (throttle_mode == THREAD_THROTTLE_UNDEFINED)
 		return;
@@ -2360,7 +2360,7 @@ out_destroy:
 
 static inline bool is_mba_linear(void)
 {
-	return resctrl_arch_get_resource(RDT_RESOURCE_MBA)->membw.delay_linear;
+	return resctrl_arch_get_resource(RDT_RESOURCE_MBA)->mba.delay_linear;
 }
 
 static int mba_sc_domain_allocate(struct rdt_resource *r, struct rdt_ctrl_domain *d)
@@ -2418,7 +2418,7 @@ static int set_mba_sc(bool mba_sc)
 	if (!supports_mba_mbps() || mba_sc == is_mba_sc(r))
 		return -EINVAL;
 
-	r->membw.mba_sc = mba_sc;
+	r->mba.mba_sc = mba_sc;
 
 	rdtgroup_default.mba_mbps_event = mba_mbps_default_event;
 
