@@ -235,22 +235,28 @@ enum membw_throttle_mode {
  * @min_bw:		Minimum memory bandwidth percentage user can request
  * @max_bw:		Maximum memory bandwidth value, used as the reset value
  * @bw_gran:		Granularity at which the memory bandwidth is allocated
- * @delay_linear:	True if memory B/W delay is in linear scale
- * @arch_needs_linear:	True if we can't configure non-linear resources
- * @throttle_mode:	Bandwidth throttling mode when threads request
- *			different memory bandwidths
- * @mba_sc:		True if MBA software controller(mba_sc) is enabled
- * @mb_map:		Mapping of memory B/W percentage to memory B/W delay
  */
 struct resctrl_membw {
 	u32				min_bw;
 	u32				max_bw;
 	u32				bw_gran;
-	u32				delay_linear;
-	bool				arch_needs_linear;
-	enum membw_throttle_mode	throttle_mode;
+};
+
+/**
+ * struct resctrl_mba - Resource properties that are specific to the MBA resource
+ * @mba_sc:		True if MBA software controller(mba_sc) is enabled
+ * @mb_map:		Mapping of memory B/W percentage to memory B/W delay
+ * @delay_linear:	True if control is in linear scale
+ * @arch_needs_linear:	True if we can't configure non-linear resources
+ * @throttle_mode:	Mode when threads request different control values
+ */
+struct resctrl_mba {
 	bool				mba_sc;
 	u32				*mb_map;
+	bool				delay_linear;
+	bool				arch_needs_linear;
+	enum membw_throttle_mode	throttle_mode;
+
 };
 
 struct resctrl_schema;
@@ -301,6 +307,7 @@ struct resctrl_mon {
  * @mon:		Monitoring related data.
  * @ctrl_domains:	RCU list of all control domains for this resource
  * @mon_domains:	RCU list of all monitor domains for this resource
+ * @mba:		Properties of the MBA resource
  * @name:		Name to use in "schemata" file.
  * @schema_fmt:		Which format string and parser is used for this schema.
  * @cdp_capable:	Is the CDP feature available on this resource
@@ -314,6 +321,7 @@ struct rdt_resource {
 	struct resctrl_cache	cache;
 	struct resctrl_membw	membw;
 	struct resctrl_mon	mon;
+	struct resctrl_mba	mba;
 	struct list_head	ctrl_domains;
 	struct list_head	mon_domains;
 	char			*name;
