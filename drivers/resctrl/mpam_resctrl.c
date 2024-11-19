@@ -1398,7 +1398,7 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 		 * fields. Until we configured the SMMU and GIC not to do this
 		 * 'all the bits' is the correct answer here.
 		 */
-		r->cache.shareable_bits = resctrl_get_default_ctrl(r);
+		r->cache.shareable_bits = resctrl_get_resource_default_ctrl(r);
 		break;
 	case RDT_RESOURCE_MBA:
 		r->alloc_capable = true;
@@ -1606,7 +1606,7 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	}
 
 err:
-	return resctrl_get_default_ctrl(r);
+	return resctrl_get_resource_default_ctrl(r);
 }
 
 int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
