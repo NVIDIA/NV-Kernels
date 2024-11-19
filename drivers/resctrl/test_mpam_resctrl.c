@@ -189,7 +189,7 @@ static void test_mbw_pbm_to_percent(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, ret, 0);
 }
 
-static void test_mbw_max_to_percent(struct kunit *test)
+static void test_fract16_to_percent(struct kunit *test)
 {
 	const struct percent_value_case *param = test->param_value;
 	struct percent_value_test_info res;
@@ -438,7 +438,7 @@ static void test_num_assignable_counters(struct kunit *test)
 static struct kunit_case mpam_resctrl_test_cases[] = {
 	KUNIT_CASE(test_get_mba_granularity),
 	KUNIT_CASE(test_mbw_pbm_to_percent),
-	KUNIT_CASE_PARAM(test_mbw_max_to_percent, test_percent_value_gen_params),
+	KUNIT_CASE_PARAM(test_fract16_to_percent, test_percent_value_gen_params),
 	KUNIT_CASE(test_percent_to_mbw_pbm),
 	KUNIT_CASE_PARAM(test_percent_to_mbw_max, test_percent_value_gen_params),
 	KUNIT_CASE_PARAM(test_mbw_max_to_percent_limits, test_all_bwa_wd_gen_params),
