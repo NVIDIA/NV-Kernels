@@ -823,14 +823,14 @@ static u32 percent_to_mbw_pbm(u8 pc, struct mpam_props *cprops)
  * (1 << cprops->bwa_wd) equal bands.
  * Find the nearest percentage value to the upper bound of the selected band:
  */
-static u32 mbw_max_to_percent(u16 mbw_max, struct mpam_props *cprops)
+static u32 fract16_to_percent(u16 fract, u8 wd)
 {
-	u32 val = mbw_max;
+	u32 val = fract;
 
-	val >>= 16 - cprops->bwa_wd;
+	val >>= 16 - wd;
 	val += 1;
 	val *= MAX_MBA_BW;
-	val = DIV_ROUND_CLOSEST(val, 1 << cprops->bwa_wd);
+	val = DIV_ROUND_CLOSEST(val, 1 << wd);
 
 	return val;
 }
@@ -845,16 +845,26 @@ static u32 mbw_max_to_percent(u16 mbw_max, struct mpam_props *cprops)
  * percentages) and over-commit (where the total of the converted
  * allocations is greater than expected).
  */
-static u16 percent_to_mbw_max(u8 pc, struct mpam_props *cprops)
+static u16 percent_to_fract16(u8 pc, u8 wd)
 {
 	u32 val = pc;
 
-	val <<= cprops->bwa_wd;
+	val <<= wd;
 	val = DIV_ROUND_CLOSEST(val, MAX_MBA_BW);
 	val = max(val, 1) - 1;
-	val <<= 16 - cprops->bwa_wd;
+	val <<= 16 - wd;
 
 	return val;
+}
+
+static u32 mbw_max_to_percent(u16 mbw_max, struct mpam_props *cprops)
+{
+	return fract16_to_percent(mbw_max, cprops->bwa_wd);
+}
+
+static u16 percent_to_mbw_max(u8 pc, struct mpam_props *cprops)
+{
+	return percent_to_fract16(pc, cprops->bwa_wd);
 }
 
 static u32 get_mba_min(struct mpam_props *cprops)
