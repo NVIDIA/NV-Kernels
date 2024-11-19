@@ -309,7 +309,10 @@ struct resctrl_mon {
  * @mon_domains:	RCU list of all monitor domains for this resource
  * @mba:		Properties of the MBA resource
  * @name:		Name to use in "schemata" file.
- * @schema_fmt:		Which format string and parser is used for this schema.
+ * @schema_fmt:		Which format control parameters should be in for this resource.
+ * @evt_list:		List of monitoring events
+ * @mbm_cfg_mask:	Bandwidth sources that can be tracked when bandwidth
+ *			monitoring events can be configured.
  * @cdp_capable:	Is the CDP feature available on this resource
  */
 struct rdt_resource {
@@ -388,11 +391,11 @@ struct resctrl_mon_config_info {
 void resctrl_arch_sync_cpu_closid_rmid(void *info);
 
 /**
- * resctrl_get_default_ctrl() - Return the default control value for this
- *                              resource.
- * @r:		The resource whose default control type is queried.
+ * resctrl_get_resource_default_ctrl() - Return the default control value for
+ *                                       this resource.
+ * @r:		The resource whose default control value is queried.
  */
-static inline u32 resctrl_get_default_ctrl(struct rdt_resource *r)
+static inline u32 resctrl_get_resource_default_ctrl(struct rdt_resource *r)
 {
 	switch (r->schema_fmt) {
 	case RESCTRL_SCHEMA_BITMAP:
