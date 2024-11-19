@@ -89,61 +89,56 @@ static void test_mbw_pbm_to_percent(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, ret, 0);
 }
 
-static void test_mbw_max_to_percent(struct kunit *test)
+static void test_fract16_to_percent(struct kunit *test)
 {
 	u32 ret;
-	struct mpam_props fake_props = {0};
 
-	mpam_set_feature(mpam_feat_mbw_max, &fake_props);
-	fake_props.bwa_wd = 8;
-
-	ret = mbw_max_to_percent(0xff00, &fake_props);
+	ret = fract16_to_percent(0xff00, 8);
 	KUNIT_EXPECT_EQ(test, ret, 100);
 
-	ret = mbw_max_to_percent(0x0000, &fake_props);
+	ret = fract16_to_percent(0x0000, 8);
 	KUNIT_EXPECT_EQ(test, ret, 0);
 
-	fake_props.bwa_wd = 16; /* architectural maximum */
 	/* The MPAM spec has a table of values that people think are important: */
-	ret = mbw_max_to_percent(0x028e, &fake_props);
+	ret = fract16_to_percent(0x028e, 16);
 	KUNIT_EXPECT_EQ(test, ret, 1);
-	ret = mbw_max_to_percent(0x1fff, &fake_props);
+	ret = fract16_to_percent(0x1fff, 16);
 	KUNIT_EXPECT_EQ(test, ret, 12);
-	ret = mbw_max_to_percent(0x2aab, &fake_props);
+	ret = fract16_to_percent(0x2aab, 16);
 	KUNIT_EXPECT_EQ(test, ret, 17);
-	ret = mbw_max_to_percent(0x3fff, &fake_props);
+	ret = fract16_to_percent(0x3fff, 16);
 	KUNIT_EXPECT_EQ(test, ret, 25);
-	ret = mbw_max_to_percent(0x5552, &fake_props);
+	ret = fract16_to_percent(0x5552, 16);
 	KUNIT_EXPECT_EQ(test, ret, 33);
-	ret = mbw_max_to_percent(0x5998, &fake_props);
+	ret = fract16_to_percent(0x5998, 16);
 	KUNIT_EXPECT_EQ(test, ret, 35);
-	ret = mbw_max_to_percent(0x5f5b, &fake_props);
+	ret = fract16_to_percent(0x5f5b, 16);
 	KUNIT_EXPECT_EQ(test, ret, 37);
-	ret = mbw_max_to_percent(0x6ccb, &fake_props);
+	ret = fract16_to_percent(0x6ccb, 16);
 	KUNIT_EXPECT_EQ(test, ret, 42);
-	ret = mbw_max_to_percent(0x7332, &fake_props);
+	ret = fract16_to_percent(0x7332, 16);
 	KUNIT_EXPECT_EQ(test, ret, 45);
-	ret = mbw_max_to_percent(0x7fff, &fake_props);
+	ret = fract16_to_percent(0x7fff, 16);
 	KUNIT_EXPECT_EQ(test, ret, 50);
-	ret = mbw_max_to_percent(0x851d, &fake_props);
+	ret = fract16_to_percent(0x851d, 16);
 	KUNIT_EXPECT_EQ(test, ret, 52);
-	ret = mbw_max_to_percent(0x8ccb, &fake_props);
+	ret = fract16_to_percent(0x8ccb, 16);
 	KUNIT_EXPECT_EQ(test, ret, 55);
-	ret = mbw_max_to_percent(0x9479, &fake_props);
+	ret = fract16_to_percent(0x9479, 16);
 	KUNIT_EXPECT_EQ(test, ret, 58);
-	ret = mbw_max_to_percent(0xa0a2, &fake_props);
+	ret = fract16_to_percent(0xa0a2, 16);
 	KUNIT_EXPECT_EQ(test, ret, 63);
-	ret = mbw_max_to_percent(0xaaa9, &fake_props);
+	ret = fract16_to_percent(0xaaa9, 16);
 	KUNIT_EXPECT_EQ(test, ret, 67);
-	ret = mbw_max_to_percent(0xbfff, &fake_props);
+	ret = fract16_to_percent(0xbfff, 16);
 	KUNIT_EXPECT_EQ(test, ret, 75);
-	ret = mbw_max_to_percent(0xd332, &fake_props);
+	ret = fract16_to_percent(0xd332, 16);
 	KUNIT_EXPECT_EQ(test, ret, 82);
-	ret = mbw_max_to_percent(0xe146, &fake_props);
+	ret = fract16_to_percent(0xe146, 16);
 	KUNIT_EXPECT_EQ(test, ret, 88);
-	ret = mbw_max_to_percent(0xf332, &fake_props);
+	ret = fract16_to_percent(0xf332, 16);
 	KUNIT_EXPECT_EQ(test, ret, 95);
-	ret = mbw_max_to_percent(0xffff, &fake_props);
+	ret = fract16_to_percent(0xffff, 16);
 	KUNIT_EXPECT_EQ(test, ret, 100);
 }
 
@@ -206,7 +201,7 @@ static void test_percent_to_mbw_max(struct kunit *test)
 static struct kunit_case mpam_resctrl_test_cases[] = {
 	KUNIT_CASE(test_get_mba_granularity),
 	KUNIT_CASE(test_mbw_pbm_to_percent),
-	KUNIT_CASE(test_mbw_max_to_percent),
+	KUNIT_CASE(test_fract16_to_percent),
 	KUNIT_CASE(test_percent_to_mbw_pbm),
 	KUNIT_CASE(test_percent_to_mbw_max),
 	{}
