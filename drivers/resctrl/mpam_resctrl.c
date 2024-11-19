@@ -764,6 +764,13 @@ static bool cache_has_usable_cpor(struct mpam_class *class)
 	return class->props.cpbm_wd <= 32;
 }
 
+static bool cache_has_usable_cmax(struct mpam_class *class)
+{
+	struct mpam_props *cprops = &class->props;
+
+	return mpam_has_feature(mpam_feat_cmax_cmax, cprops);
+}
+
 static bool mba_class_use_mbw_max(struct mpam_props *cprops)
 {
 	return (mpam_has_feature(mpam_feat_mbw_max, cprops) &&
@@ -896,6 +903,11 @@ static u32 mbw_max_to_percent(u16 mbw_max, struct mpam_props *cprops)
 static u16 percent_to_mbw_max(u8 pc, struct mpam_props *cprops)
 {
 	return percent_to_fract16(pc, cprops->bwa_wd);
+}
+
+static u16 percent_to_cmax(u8 pc, struct mpam_props *cprops)
+{
+	return percent_to_fract16(pc, cprops->cmax_wd);
 }
 
 static u32 get_mba_min(struct mpam_props *cprops)
@@ -1055,6 +1067,7 @@ static bool traffic_matches_l3(struct mpam_class *class)
 /* Test whether we can export MPAM_CLASS_CACHE:{2,3}? */
 static void mpam_resctrl_pick_caches(void)
 {
+	bool has_cpor, has_cmax;
 	struct mpam_class *class;
 	struct mpam_resctrl_res *res;
 
@@ -1073,7 +1086,9 @@ static void mpam_resctrl_pick_caches(void)
 			continue;
 		}
 
-		if (!cache_has_usable_cpor(class)) {
+		has_cpor = cache_has_usable_cpor(class);
+		has_cmax = cache_has_usable_cmax(class);
+		if (!has_cpor && !has_cmax) {
 			pr_debug("class %u cache misses CPOR\n", class->level);
 			continue;
 		}
@@ -1084,12 +1099,22 @@ static void mpam_resctrl_pick_caches(void)
 				 cpumask_pr_args(cpu_possible_mask));
 			continue;
 		}
-
-		if (class->level == 2)
-			res = &mpam_resctrl_controls[RDT_RESOURCE_L2];
-		else
-			res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
-		res->class = class;
+		if (has_cpor) {
+			pr_debug("pick_caches: Class has CPOR\n");
+			if (class->level == 2)
+				res = &mpam_resctrl_controls[RDT_RESOURCE_L2];
+			else
+				res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
+			res->class = class;
+		}
+		if (has_cmax) {
+			pr_debug("pick_caches: Class has CMAX\n");
+			if (class->level == 2)
+				res = &mpam_resctrl_controls[RDT_RESOURCE_L2_MAX];
+			else
+				res = &mpam_resctrl_controls[RDT_RESOURCE_L3_MAX];
+			res->class = class;
+		}
 	}
 }
 
@@ -1414,6 +1439,23 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res)
 		r->cache.shareable_bits = resctrl_get_resource_default_ctrl(r);
 		r->alloc_capable = true;
 		break;
+	case RDT_RESOURCE_L2_MAX:
+	case RDT_RESOURCE_L3_MAX:
+		r->alloc_capable = true;
+		r->schema_fmt = RESCTRL_SCHEMA_PERCENT;
+		r->membw.min_bw = max(100 / (1 << cprops->cmax_wd), 1);
+		r->membw.bw_gran = max(100 / (1 << cprops->cmax_wd), 1);
+		r->membw.max_bw = 100;
+
+		if (r->rid == RDT_RESOURCE_L2_MAX) {
+			r->name = "L2_MAX";
+			r->ctrl_scope = RESCTRL_L2_CACHE;
+		} else {
+			r->name = "L3_MAX";
+			r->ctrl_scope = RESCTRL_L3_CACHE;
+		}
+
+		break;
 	case RDT_RESOURCE_MBA:
 		r->schema_fmt = RESCTRL_SCHEMA_PERCENT;
 		r->ctrl_scope = RESCTRL_L3_CACHE;
@@ -1584,6 +1626,10 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	case RDT_RESOURCE_L3:
 		configured_by = mpam_feat_cpor_part;
 		break;
+	case RDT_RESOURCE_L2_MAX:
+	case RDT_RESOURCE_L3_MAX:
+		configured_by = mpam_feat_cmax_cmax;
+		break;
 	case RDT_RESOURCE_MBA:
 		if (mpam_has_feature(mpam_feat_mbw_max, cprops)) {
 			configured_by = mpam_feat_mbw_max;
@@ -1601,6 +1647,8 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	switch (configured_by) {
 	case mpam_feat_cpor_part:
 		return cfg->cpbm;
+	case mpam_feat_cmax_cmax:
+		return fract16_to_percent(cfg->cmax, cprops->cmax_wd);
 	case mpam_feat_mbw_max:
 		return mbw_max_to_percent(cfg->mbw_max, cprops);
 	default:
@@ -1652,6 +1700,11 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	case RDT_RESOURCE_L3:
 		cfg.cpbm = cfg_val;
 		mpam_set_feature(mpam_feat_cpor_part, &cfg);
+		break;
+	case RDT_RESOURCE_L2_MAX:
+	case RDT_RESOURCE_L3_MAX:
+		cfg.cmax = percent_to_cmax(cfg_val, cprops);
+		mpam_set_feature(mpam_feat_cmax_cmax, &cfg);
 		break;
 	case RDT_RESOURCE_MBA:
 		if (mpam_has_feature(mpam_feat_mbw_max, cprops)) {
