@@ -142,7 +142,7 @@ static inline void cache_alloc_hsw_probe(void)
 	u64 max_cbm, l3_cbm_0;
 
 	r->cache.cbm_len = 20;
-	max_cbm = resctrl_get_default_ctrl(r);
+	max_cbm = resctrl_get_resource_default_ctrl(r);
 
 	if (wrmsrl_safe(MSR_IA32_L3_CBM_BASE, max_cbm))
 		return;
@@ -258,7 +258,7 @@ static void rdt_get_cache_alloc_cfg(int idx, struct rdt_resource *r)
 	cpuid_count(0x00000010, idx, &eax.full, &ebx, &ecx.full, &edx.full);
 	hw_res->num_closid = edx.split.cos_max + 1;
 	r->cache.cbm_len = eax.split.cbm_len + 1;
-	r->cache.shareable_bits = ebx & resctrl_get_default_ctrl(r);
+	r->cache.shareable_bits = ebx & resctrl_get_resource_default_ctrl(r);
 	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
 		r->cache.arch_has_sparse_bitmasks = ecx.split.noncont;
 	r->alloc_capable = true;
@@ -310,7 +310,7 @@ static u32 delay_bw_map(unsigned long bw, struct rdt_resource *r)
 		return MAX_MBA_BW - bw;
 
 	pr_warn_once("Non Linear delay-bw map not supported but queried\n");
-	return resctrl_get_default_ctrl(r);
+	return resctrl_get_resource_default_ctrl(r);
 }
 
 static void mba_wrmsr_intel(struct msr_param *m)
@@ -359,7 +359,7 @@ static void setup_default_ctrlval(struct rdt_resource *r, u32 *dc)
 	 * For Memory Allocation: Set b/w requested to 100%
 	 */
 	for (i = 0; i < hw_res->num_closid; i++, dc++)
-		*dc = resctrl_get_default_ctrl(r);
+		*dc = resctrl_get_resource_default_ctrl(r);
 }
 
 static void ctrl_domain_free(struct rdt_hw_ctrl_domain *hw_dom)
