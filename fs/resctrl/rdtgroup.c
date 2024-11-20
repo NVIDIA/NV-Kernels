@@ -2612,7 +2612,7 @@ static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type
 	 * update_mba_bw().
 	 */
 	if (is_mba_sc(r)) {
-		s->schema_fmt = RESCTRL_SCHEMA_RANGE;
+		s->schema_fmt = RESCTRL_SCHEMA_MIBPS;
 		s->membw.min_bw = 0;
 		s->membw.max_bw = MBA_MAX_MIBPS;
 		s->membw.bw_gran = 1;
@@ -2622,7 +2622,6 @@ static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type
 	case RESCTRL_SCHEMA_BITMAP:
 		s->fmt_str = "%d=%x";
 		break;
-	case RESCTRL_SCHEMA_RANGE:
 	case RESCTRL_SCHEMA_PERCENT:
 	case RESCTRL_SCHEMA_MIBPS:
 	case RESCTRL_SCHEMA__AMD_MBA:
