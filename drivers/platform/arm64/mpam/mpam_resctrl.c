@@ -1030,7 +1030,7 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 		break;
 	case RDT_RESOURCE_MBA:
 		r->alloc_capable = true;
-		r->schema_fmt = RESCTRL_SCHEMA_RANGE;
+		r->schema_fmt = RESCTRL_SCHEMA_PERCENT;
 		r->ctrl_scope = RESCTRL_L3_CACHE;
 
 		r->mba.delay_linear = true;
