@@ -270,14 +270,12 @@ enum resctrl_scope {
 /**
  * enum resctrl_schema_fmt - The format user-space provides for a schema.
  * @RESCTRL_SCHEMA_BITMAP:	The schema is a bitmap in hex.
- * @RESCTRL_SCHEMA_RANGE:	The schema is a decimal number.
  * @RESCTRL_SCHEMA_PERCENT:	The schema is a percentage.
  * @RESCTRL_SCHEMA_MBPS:	The schema ia a MBps value.
  * @RESCTRL_SCHEMA__AMD_MBA:	The schema value is MBA for AMD platforms.
  */
 enum resctrl_schema_fmt {
 	RESCTRL_SCHEMA_BITMAP,
-	RESCTRL_SCHEMA_RANGE,
 	RESCTRL_SCHEMA_PERCENT,
 	RESCTRL_SCHEMA_MBPS,
 	RESCTRL_SCHEMA__AMD_MBA,
@@ -411,7 +409,6 @@ static inline u32 resctrl_get_resource_default_ctrl(struct rdt_resource *r)
 	switch (r->schema_fmt) {
 	case RESCTRL_SCHEMA_BITMAP:
 		return BIT_MASK(r->cache.cbm_len) - 1;
-	case RESCTRL_SCHEMA_RANGE:
 	case RESCTRL_SCHEMA_PERCENT:
 	case RESCTRL_SCHEMA_MBPS:
 	case RESCTRL_SCHEMA__AMD_MBA:
@@ -431,7 +428,6 @@ static inline u32 resctrl_get_schema_default_ctrl(struct resctrl_schema *s)
 	switch (s->schema_fmt) {
 	case RESCTRL_SCHEMA_BITMAP:
 		return resctrl_get_resource_default_ctrl(s->res);
-	case RESCTRL_SCHEMA_RANGE:
 	case RESCTRL_SCHEMA_PERCENT:
 	case RESCTRL_SCHEMA_MBPS:
 	case RESCTRL_SCHEMA__AMD_MBA:
