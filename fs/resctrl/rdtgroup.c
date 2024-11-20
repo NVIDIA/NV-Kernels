@@ -2457,7 +2457,35 @@ static unsigned long fflags_from_resource(struct rdt_resource *r)
 		return RFTYPE_RES_MB;
 	}
 
-	return WARN_ON_ONCE(1);
+	return 0;
+}
+
+static u32 fflags_from_schema(struct resctrl_schema *s)
+{
+	struct rdt_resource *r = s->res;
+	u32 fflags = 0;
+
+	/* Some resources are configured purely from their rid */
+	fflags |= fflags_from_resource(r);
+	if (fflags)
+		return fflags;
+
+	switch (s->schema_fmt) {
+	case RESCTRL_SCHEMA_BITMAP:
+		fflags |= RFTYPE_SCHEMA_BITMAP;
+		break;
+	case RESCTRL_SCHEMA_PERCENT:
+		fflags |= RFTYPE_SCHEMA_PERCENT;
+		break;
+	case RESCTRL_SCHEMA_MBPS:
+		fflags |= RFTYPE_SCHEMA_MBPS;
+		break;
+	case RESCTRL_SCHEMA__AMD_MBA:
+		/* No standard files are exposed */
+		break;
+	}
+
+	return fflags;
 }
 
 static int rdtgroup_create_info_dir(struct kernfs_node *parent_kn)
@@ -2480,7 +2508,7 @@ static int rdtgroup_create_info_dir(struct kernfs_node *parent_kn)
 	/* loop over enabled controls, these are all alloc_capable */
 	list_for_each_entry(s, &resctrl_schema_all, list) {
 		r = s->res;
-		fflags = fflags_from_resource(r) | RFTYPE_CTRL_INFO;
+		fflags = fflags_from_schema(s) | RFTYPE_CTRL_INFO;
 		ret = rdtgroup_mkdir_info_resdir(s, s->name, fflags);
 		if (ret)
 			goto out_destroy;
