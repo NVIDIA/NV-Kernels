@@ -1083,9 +1083,8 @@ static int rdt_default_ctrl_show(struct kernfs_open_file *of,
 				 struct seq_file *seq, void *v)
 {
 	struct resctrl_schema *s = of->kn->parent->priv;
-	struct rdt_resource *r = s->res;
 
-	seq_printf(seq, "%x\n", resctrl_get_resource_default_ctrl(r));
+	seq_printf(seq, "%x\n", resctrl_get_schema_default_ctrl(s));
 	return 0;
 }
 
@@ -1209,9 +1208,8 @@ static int rdt_min_bw_show(struct kernfs_open_file *of,
 			   struct seq_file *seq, void *v)
 {
 	struct resctrl_schema *s = of->kn->parent->priv;
-	struct rdt_resource *r = s->res;
 
-	seq_printf(seq, "%u\n", r->membw.min_bw);
+	seq_printf(seq, "%u\n", s->membw.min_bw);
 	return 0;
 }
 
@@ -1244,9 +1242,8 @@ static int rdt_bw_gran_show(struct kernfs_open_file *of,
 			    struct seq_file *seq, void *v)
 {
 	struct resctrl_schema *s = of->kn->parent->priv;
-	struct rdt_resource *r = s->res;
 
-	seq_printf(seq, "%u\n", r->membw.bw_gran);
+	seq_printf(seq, "%u\n", s->membw.bw_gran);
 	return 0;
 }
 
@@ -2606,7 +2603,22 @@ static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type
 	if (cl > max_name_width)
 		max_name_width = cl;
 
-	switch (r->schema_fmt) {
+	s->schema_fmt = r->schema_fmt;
+	s->membw = r->membw;
+
+	/*
+	 * When mba_sc() is enabled the format used by user space is different
+	 * to that expected by hardware. The conversion is done by
+	 * update_mba_bw().
+	 */
+	if (is_mba_sc(r)) {
+		s->schema_fmt = RESCTRL_SCHEMA_RANGE;
+		s->membw.min_bw = 0;
+		s->membw.max_bw = MBA_MAX_MIBPS;
+		s->membw.bw_gran = 1;
+	}
+
+	switch (s->schema_fmt) {
 	case RESCTRL_SCHEMA_BITMAP:
 		s->fmt_str = "%d=%x";
 		break;
