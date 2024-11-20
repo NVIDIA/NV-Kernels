@@ -218,6 +218,9 @@ static int parse_line(char *line, struct resctrl_schema *s,
 		parse_ctrlval = &parse_cbm;
 		break;
 	case RESCTRL_SCHEMA_RANGE:
+	case RESCTRL_SCHEMA_PERCENT:
+	case RESCTRL_SCHEMA_MBPS:
+	case RESCTRL_SCHEMA__AMD_MBA:
 		parse_ctrlval = &parse_bw;
 		break;
 	}
