@@ -252,8 +252,8 @@ struct rdtgroup {
 
 #define RFTYPE_TOP			BIT(6)
 
+/* files that are specific to a type of resource, e.g. throttle_mode */
 #define RFTYPE_RES_CACHE		BIT(8)
-
 #define RFTYPE_RES_MB			BIT(9)
 
 #define RFTYPE_DEBUG			BIT(10)
@@ -261,6 +261,11 @@ struct rdtgroup {
 #define RFTYPE_ASSIGN_CONFIG		BIT(11)
 
 #define RFTYPE_RES_PERF_PKG		BIT(12)
+
+/* files that are specific to a type of control, e.g. percent_min */
+#define RFTYPE_SCHEMA_BITMAP		BIT(13)
+#define RFTYPE_SCHEMA_PERCENT		BIT(14)
+#define RFTYPE_SCHEMA_MBPS		BIT(15)
 
 #define RFTYPE_CTRL_INFO		(RFTYPE_INFO | RFTYPE_CTRL)
 
