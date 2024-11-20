@@ -2623,6 +2623,9 @@ static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type
 		s->fmt_str = "%d=%x";
 		break;
 	case RESCTRL_SCHEMA_RANGE:
+	case RESCTRL_SCHEMA_PERCENT:
+	case RESCTRL_SCHEMA_MIBPS:
+	case RESCTRL_SCHEMA__AMD_MBA:
 		s->fmt_str = "%d=%u";
 		break;
 	}
