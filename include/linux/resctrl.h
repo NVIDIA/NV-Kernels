@@ -345,9 +345,12 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l);
  * @list:	Member of resctrl_schema_all.
  * @name:	The name to use in the "schemata" file.
  * @fmt_str:	Format string to show domain value.
+ * @schema_fmt:	Which format string and parser is used for this schema.
  * @conf_type:	Whether this schema is specific to code/data.
  * @res:	The resource structure exported by the architecture to describe
  *		the hardware that is configured by this schema.
+ * @membw	The properties of the schema which may be different to the format
+ *		that was specified by the resource,
  * @num_closid:	The number of closid that can be used with this schema. When
  *		features like CDP are enabled, this will be lower than the
  *		hardware supports for the resource.
@@ -356,8 +359,10 @@ struct resctrl_schema {
 	struct list_head		list;
 	char				name[8];
 	const char			*fmt_str;
+	enum resctrl_schema_fmt		schema_fmt;
 	enum resctrl_conf_type		conf_type;
 	struct rdt_resource		*res;
+	struct resctrl_membw		membw;
 	u32				num_closid;
 };
 
@@ -402,6 +407,23 @@ static inline u32 resctrl_get_resource_default_ctrl(struct rdt_resource *r)
 		return BIT_MASK(r->cache.cbm_len) - 1;
 	case RESCTRL_SCHEMA_RANGE:
 		return r->membw.max_bw;
+	}
+
+	return WARN_ON_ONCE(1);
+}
+
+/**
+ * resctrl_get_schema_default_ctrl() - Return the default control value for
+ *                                     this schema.
+ * @s:		The schema whose default control value is queried.
+ */
+static inline u32 resctrl_get_schema_default_ctrl(struct resctrl_schema *s)
+{
+	switch (s->schema_fmt) {
+	case RESCTRL_SCHEMA_BITMAP:
+		return resctrl_get_resource_default_ctrl(s->res);
+	case RESCTRL_SCHEMA_RANGE:
+		return s->membw.max_bw;
 	}
 
 	return WARN_ON_ONCE(1);
@@ -497,7 +519,7 @@ bool resctrl_arch_mbm_cntr_assign_enabled(struct rdt_resource *r);
  */
 int resctrl_arch_mbm_cntr_assign_set(struct rdt_resource *r, bool enable);
 
-u32 resctrl_arch_round_bw(u32 val, const struct rdt_resource *r);
+u32 resctrl_arch_round_bw(u32 val, const struct resctrl_schema *s);
 
 /*
  * Update the ctrl_val and apply this config right now.

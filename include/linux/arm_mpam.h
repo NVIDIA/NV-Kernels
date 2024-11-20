@@ -45,10 +45,8 @@ int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
 		    enum mpam_class_types type, u8 class_id, u32 component_id);
 
 struct resctrl_schema;
-
-struct rdt_resource;
 static inline u32 resctrl_arch_round_bw(u32 val,
-					const struct rdt_resource *r __always_unused)
+					const struct resctrl_schema *s __always_unused)
 {
 	/*
 	 * Do nothing: for MPAM, resctrl_arch_update_one() has the necessary
