@@ -89,7 +89,6 @@ struct rdt_hw_resource rdt_resources_all[RDT_NUM_RESOURCES] = {
 			.name			= "MB",
 			.ctrl_scope		= RESCTRL_L3_CACHE,
 			.ctrl_domains		= ctrl_domain_init(RDT_RESOURCE_MBA),
-			.schema_fmt		= RESCTRL_SCHEMA_RANGE,
 		},
 	},
 	[RDT_RESOURCE_SMBA] =
@@ -98,7 +97,6 @@ struct rdt_hw_resource rdt_resources_all[RDT_NUM_RESOURCES] = {
 			.name			= "SMBA",
 			.ctrl_scope		= RESCTRL_L3_CACHE,
 			.ctrl_domains		= ctrl_domain_init(RDT_RESOURCE_SMBA),
-			.schema_fmt		= RESCTRL_SCHEMA_RANGE,
 		},
 	},
 	[RDT_RESOURCE_PERF_PKG] =
@@ -212,6 +210,7 @@ static __init bool __get_mem_config_intel(struct rdt_resource *r)
 	cpuid_count(0x00000010, 3, &eax.full, &ebx, &ecx, &edx.full);
 	hw_res->num_closid = edx.split.cos_max + 1;
 	max_delay = eax.split.max_delay + 1;
+	r->schema_fmt = RESCTRL_SCHEMA_PERCENT;
 	r->membw.max_bw = MAX_MBA_BW;
 	r->mba.arch_needs_linear = true;
 	if (ecx & MBA_IS_LINEAR) {
@@ -247,6 +246,7 @@ static __init bool __rdt_get_mem_config_amd(struct rdt_resource *r)
 
 	cpuid_count(0x80000020, subleaf, &eax, &ebx, &ecx, &edx);
 	hw_res->num_closid = edx + 1;
+	r->schema_fmt = RESCTRL_SCHEMA__AMD_MBA;
 	if (BITS_PER_TYPE(r->membw.max_bw) <= eax) {
 		pr_warn("Unable to support hardware's maximum bandwidth\n");
 		return false;
