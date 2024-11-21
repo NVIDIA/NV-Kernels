@@ -23,6 +23,7 @@ CONFIG_CC_HAS_AUTO_VAR_INIT_ZERO_BARE           policy<{'amd64': '-', 'arm64': '
 CONFIG_CC_HAVE_SHADOW_CALL_STACK                policy<{'arm64': '-'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"', 'arm64': '"aarch64-linux-gnu-gcc-11 (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"'}>
 CONFIG_DEBUG_INFO_COMPRESSED_ZSTD               policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_GCC_ASM_GOTO_OUTPUT_WORKAROUND           policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_GCC_VERSION                              policy<{'amd64': '110400', 'arm64': '110400'}>
 CONFIG_INIT_STACK_ALL_PATTERN                   policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_INIT_STACK_ALL_ZERO                      policy<{'amd64': '-', 'arm64': '-'}>
