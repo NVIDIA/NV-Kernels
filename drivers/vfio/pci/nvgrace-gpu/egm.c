@@ -295,11 +295,13 @@ nvgrace_gpu_fetch_egm_property(struct pci_dev *pdev, u64 *pegmphys,
 
 	ret = device_property_read_u64(&pdev->dev, "nvidia,egm-pxm",
 				       pegmpxm);
+	if (ret)
+		return ret;
 
 	if (overflows_type(*pegmpxm, int))
 		return -EOVERFLOW;
 
-	return ret;
+	return 0;
 }
 
 static void nvgrace_egm_fetch_bad_pages(struct pci_dev *pdev,
