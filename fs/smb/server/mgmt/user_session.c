@@ -102,7 +102,7 @@ int ksmbd_session_rpc_open(struct ksmbd_session *sess, char *rpc_name)
 	if (!method)
 		return -EINVAL;
 
-	entry = kzalloc(sizeof(struct ksmbd_session_rpc), GFP_KERNEL);
+	entry = kzalloc(sizeof(struct ksmbd_session_rpc), KSMBD_DEFAULT_GFP);
 	if (!entry)
 		return -ENOMEM;
 
@@ -112,7 +112,7 @@ int ksmbd_session_rpc_open(struct ksmbd_session *sess, char *rpc_name)
 		goto free_entry;
 
 	down_write(&sess->rpc_lock);
-	old = xa_store(&sess->rpc_handle_list, id, entry, GFP_KERNEL);
+	old = xa_store(&sess->rpc_handle_list, id, entry, KSMBD_DEFAULT_GFP);
 	if (xa_is_err(old)) {
 		up_write(&sess->rpc_lock);
 		goto free_id;
@@ -215,7 +215,7 @@ int ksmbd_session_register(struct ksmbd_conn *conn,
 	sess->dialect = conn->dialect;
 	memcpy(sess->ClientGUID, conn->ClientGUID, SMB2_CLIENT_GUID_SIZE);
 	ksmbd_expire_session(conn);
-	return xa_err(xa_store(&conn->sessions, sess->id, sess, GFP_KERNEL));
+	return xa_err(xa_store(&conn->sessions, sess->id, sess, KSMBD_DEFAULT_GFP));
 }
 
 static int ksmbd_chann_del(struct ksmbd_conn *conn, struct ksmbd_session *sess)
@@ -362,7 +362,7 @@ struct preauth_session *ksmbd_preauth_session_alloc(struct ksmbd_conn *conn,
 {
 	struct preauth_session *sess;
 
-	sess = kmalloc(sizeof(struct preauth_session), GFP_KERNEL);
+	sess = kmalloc(sizeof(struct preauth_session), KSMBD_DEFAULT_GFP);
 	if (!sess)
 		return NULL;
 
@@ -444,7 +444,7 @@ static struct ksmbd_session *__session_create(int protocol)
 	if (protocol != CIFDS_SESSION_FLAG_SMB2)
 		return NULL;
 
-	sess = kzalloc(sizeof(struct ksmbd_session), GFP_KERNEL);
+	sess = kzalloc(sizeof(struct ksmbd_session), KSMBD_DEFAULT_GFP);
 	if (!sess)
 		return NULL;
 
