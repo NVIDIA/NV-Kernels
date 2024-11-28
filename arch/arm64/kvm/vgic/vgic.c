@@ -957,7 +957,7 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
 
 	summarize_ap_list(vcpu, &als);
 
-	if (irqs_outside_lrs(&als))
+	if (irqs_outside_lrs(&als, vcpu))
 		vgic_sort_ap_list(vcpu);
 
 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
@@ -967,12 +967,12 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
 			}
 		}
 
-		if (count == kvm_vgic_global_state.nr_lr)
+		if (count == kvm_vcpu_vgic_nr_lr(vcpu))
 			break;
 	}
 
 	/* Nuke remaining LRs */
-	for (int i = count ; i < kvm_vgic_global_state.nr_lr; i++)
+	for (int i = count ; i < kvm_vcpu_vgic_nr_lr(vcpu); i++)
 		vgic_clear_lr(vcpu, i);
 
 	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {

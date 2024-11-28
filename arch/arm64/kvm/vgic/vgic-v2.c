@@ -34,11 +34,11 @@ void vgic_v2_configure_hcr(struct kvm_vcpu *vcpu,
 
 	cpuif->vgic_hcr = GICH_HCR_EN;
 
-	if (irqs_pending_outside_lrs(als))
+	if (irqs_pending_outside_lrs(als, vcpu))
 		cpuif->vgic_hcr |= GICH_HCR_NPIE;
-	if (irqs_active_outside_lrs(als))
+	if (irqs_active_outside_lrs(als, vcpu))
 		cpuif->vgic_hcr |= GICH_HCR_LRENPIE;
-	if (irqs_outside_lrs(als))
+	if (irqs_outside_lrs(als, vcpu))
 		cpuif->vgic_hcr |= GICH_HCR_UIE;
 
 	cpuif->vgic_hcr |= (cpuif->vgic_vmcr & GICH_VMCR_ENABLE_GRP0_MASK) ?
