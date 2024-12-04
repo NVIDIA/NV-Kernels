@@ -87,7 +87,6 @@ extern void crash_kexec_prepare(void);
 extern void crash_kexec_secondary(struct pt_regs *regs);
 int __init overlaps_crashkernel(unsigned long start, unsigned long size);
 extern void reserve_crashkernel(void);
-extern void machine_kexec_mask_interrupts(void);
 
 static inline bool kdump_in_progress(void)
 {
