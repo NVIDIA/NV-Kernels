@@ -15,6 +15,7 @@
 #include <asm/archrandom.h>
 #ifdef CONFIG_ARM64
 #include <asm/rsi_cmds.h>
+#include <asm/rmi_smc.h>
 #endif
 
 static u32 smccc_version = ARM_SMCCC_VERSION_1_0;
@@ -99,8 +100,25 @@ static void __init register_rsi_device(struct platform_device *pdev)
 					"arm_cca_guest", RSI_DEV_NAME, NULL, 0);
 
 }
+
+static void __init register_rmi_device(struct platform_device *pdev)
+{
+	struct arm_smccc_res res;
+	unsigned long host_version = RMI_ABI_VERSION(RMI_ABI_MAJOR_VERSION,
+						     RMI_ABI_MINOR_VERSION);
+
+	arm_smccc_1_1_invoke(SMC_RMI_VERSION, host_version, &res);
+	if (res.a0 == RMI_SUCCESS)
+		__devm_auxiliary_device_create(&pdev->dev,
+					"arm_cca_host", RMI_DEV_NAME, NULL, 0);
+}
 #else
 static void __init register_rsi_device(struct platform_device *pdev)
+{
+
+}
+
+static void __init register_rmi_device(struct platform_device *pdev)
 {
 
 }
@@ -120,6 +138,7 @@ static int __init smccc_devices_init(void)
 		 * the required SMCCC function IDs at a supported revision.
 		 */
 		register_rsi_device(pdev);
+		register_rmi_device(pdev);
 	}
 
 	if (smccc_trng_available) {
