@@ -26,7 +26,7 @@
 #define SMC_RMI_DATA_CREATE		SMC_RMI_CALL(0x0153)
 #define SMC_RMI_DATA_CREATE_UNKNOWN	SMC_RMI_CALL(0x0154)
 #define SMC_RMI_DATA_DESTROY		SMC_RMI_CALL(0x0155)
-
+#define SMC_RMI_PDEV_AUX_COUNT		SMC_RMI_CALL(0x0156)
 #define SMC_RMI_REALM_ACTIVATE		SMC_RMI_CALL(0x0157)
 #define SMC_RMI_REALM_CREATE		SMC_RMI_CALL(0x0158)
 #define SMC_RMI_REALM_DESTROY		SMC_RMI_CALL(0x0159)
@@ -46,6 +46,9 @@
 #define SMC_RMI_REC_AUX_COUNT		SMC_RMI_CALL(0x0167)
 #define SMC_RMI_RTT_INIT_RIPAS		SMC_RMI_CALL(0x0168)
 #define SMC_RMI_RTT_SET_RIPAS		SMC_RMI_CALL(0x0169)
+
+#define SMC_RMI_PDEV_CREATE             SMC_RMI_CALL(0x0176)
+#define SMC_RMI_PDEV_GET_STATE		SMC_RMI_CALL(0x0178)
 
 #define RMI_ABI_MAJOR_VERSION	1
 #define RMI_ABI_MINOR_VERSION	0
@@ -267,6 +270,96 @@ struct rec_exit {
 struct rec_run {
 	struct rec_enter enter;
 	struct rec_exit exit;
+};
+
+enum rmi_pdev_state {
+	RMI_PDEV_NEW,
+	RMI_PDEV_NEEDS_KEY,
+	RMI_PDEV_HAS_KEY,
+	RMI_PDEV_READY,
+	RMI_PDEV_IDE_RESETTING,
+	RMI_PDEV_COMMUNICATING,
+	RMI_PDEV_STOPPING,
+	RMI_PDEV_STOPPED,
+	RMI_PDEV_ERROR,
+};
+
+#define MAX_PDEV_AUX_GRANULES	32
+#define MAX_IOCOH_ADDR_RANGE	16
+#define MAX_FCOH_ADDR_RANGE	4
+
+#define RMI_PDEV_FLAGS_SPDM		BIT(0)
+#define RMI_PDEV_FLAGS_NCOH_IDE		BIT(1)
+#define RMI_PDEV_FLAGS_NCOH_ADDR	BIT(2)
+#define RMI_PDEV_FLAGS_COH_IDE		BIT(3)
+#define RMI_PDEV_FLAGS_COH_ADDR		BIT(4)
+#define RMI_PDEV_FLAGS_P2P		BIT(5)
+#define RMI_PDEV_FLAGS_COMP_TRUST	BIT(6)
+#define RMI_PDEV_FLAGS_CATEGORY_MASK	GENMASK(8, 7)
+#define RMI_PDEV_FLAGS_CATEGORY_SHIFT	7
+
+#define RMI_PDEV_FLAGS_CATEGORY_CMEM_CXL	0x1
+
+#define RMI_HASH_SHA_256	0
+#define RMI_HASH_SHA_512	1
+
+struct rmi_pdev_addr_range {
+	u64 base;
+	u64 top;
+};
+
+struct rmi_pdev_params {
+	union {
+		struct {
+			u64 flags;
+			u64 pdev_id;
+			union {
+				u8 segment_id;
+				u64 padding0;
+			};
+			u64 ecam_addr;
+			union {
+				u16 root_id;
+				u64 padding1;
+			};
+			u64 cert_id;
+			union {
+				u16 rid_base;
+				u64 padding2;
+			};
+			union {
+				u16 rid_top;
+				u64 padding3;
+			};
+			union {
+				u8 hash_algo;
+				u64 padding4;
+			};
+			u64 num_aux;
+			u64 ncoh_ide_sid;
+			u64 ncoh_num_addr_range;
+			u64 coh_num_addr_range;
+		};
+		u8 padding5[0x100];
+	};
+
+	union { /* 0x100 */
+		u64 aux_granule[MAX_PDEV_AUX_GRANULES];
+		u8 padding6[0x100];
+	};
+
+	union { /* 0x200 */
+		struct {
+			struct rmi_pdev_addr_range ncoh_addr_range[MAX_IOCOH_ADDR_RANGE];
+		};
+		u8 padding7[0x100];
+	};
+	union { /* 0x300 */
+		struct {
+			struct rmi_pdev_addr_range coh_addr_range[MAX_FCOH_ADDR_RANGE];
+		};
+		u8 padding8[0x100];
+	};
 };
 
 #endif /* __ASM_RMI_SMC_H */
