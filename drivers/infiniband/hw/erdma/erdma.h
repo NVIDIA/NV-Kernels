@@ -16,7 +16,7 @@
 #include "erdma_hw.h"
 
 #define DRV_MODULE_NAME "erdma"
-#define ERDMA_NODE_DESC "Elastic RDMA(iWARP) stack"
+#define ERDMA_NODE_DESC "Elastic RDMA Adapter stack"
 
 struct erdma_eq {
 	void *qbuf;
@@ -214,6 +214,7 @@ struct erdma_dev {
 	struct list_head cep_list;
 
 	struct dma_pool *resp_pool;
+	enum erdma_proto_type proto;
 };
 
 static inline void *get_queue_entry(void *qbuf, u32 idx, u32 depth, u32 shift)
