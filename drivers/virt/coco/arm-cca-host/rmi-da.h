@@ -116,4 +116,5 @@ static inline struct cca_host_comm_data *to_cca_comm_data(struct pci_dev *pdev)
 
 int cca_pdev_create(struct pci_dev *pdev);
 int cca_pdev_ide_setup(struct pci_dev *pdev);
+void cca_pdev_stop_and_destroy(struct pci_dev *pdev);
 #endif
