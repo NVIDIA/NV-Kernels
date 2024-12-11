@@ -146,6 +146,7 @@ struct erdma_devattr {
 	u32 max_pd;
 	u32 max_mw;
 	u32 max_gid;
+	u32 max_ah;
 	u32 local_dma_key;
 };
 
@@ -175,7 +176,8 @@ struct erdma_resource_cb {
 enum {
 	ERDMA_RES_TYPE_PD = 0,
 	ERDMA_RES_TYPE_STAG_IDX = 1,
-	ERDMA_RES_CNT = 2,
+	ERDMA_RES_TYPE_AH = 2,
+	ERDMA_RES_CNT = 3,
 };
 
 #define ERDMA_EXTRA_BUFFER_SIZE ERDMA_DB_SIZE
