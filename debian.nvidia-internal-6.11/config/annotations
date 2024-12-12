@@ -162,6 +162,9 @@ CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablem
 
 # ---- Annotations without notes ----
 
+CONFIG_ARCH_SUPPORTS_HUGE_PFNMAP                policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ARCH_SUPPORTS_PMD_PFNMAP                 policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ARCH_SUPPORTS_PUD_PFNMAP                 policy<{'amd64': 'y'}>
 CONFIG_AS_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
 CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-'}>
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
