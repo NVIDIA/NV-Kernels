@@ -2037,7 +2037,7 @@ static void cleanup_dirty_folios(struct btrfs_inode *inode,
 		/* Cache already dropped, no need to do any cleanup. */
 		if (IS_ERR(folio))
 			continue;
-		btrfs_folio_clamp_finish_io(fs_info, locked_folio, start, len);
+		btrfs_folio_clamp_finish_io(fs_info, folio, start, len);
 		folio_unlock(folio);
 		folio_put(folio);
 	}
