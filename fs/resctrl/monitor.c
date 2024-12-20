@@ -429,9 +429,9 @@ static int __mon_event_count(u32 closid, u32 rmid, struct rmid_read *rr)
  * @rr:		The struct rmid_read populated by __mon_event_count().
  *
  * Supporting function to calculate the memory bandwidth
- * and delta bandwidth in MBps. The chunks value previously read by
+ * and delta bandwidth in MiBps. The chunks value previously read by
  * __mon_event_count() is compared with the chunks value from the previous
- * invocation. This must be called once per second to maintain values in MBps.
+ * invocation. This must be called once per second to maintain values in MiBps.
  */
 static void mbm_bw_count(u32 closid, u32 rmid, struct rmid_read *rr)
 {
@@ -552,7 +552,7 @@ static void update_mba_bw(struct rdtgroup *rgrp, struct rdt_mon_domain *dom_mbm)
 	}
 
 	cur_bw = pmbm_data->prev_bw;
-	user_bw = dom_mba->mbps_val[closid];
+	user_bw = dom_mba->mibps_val[closid];
 
 	/* MBA resource doesn't support CDP */
 	cur_msr_val = resctrl_arch_get_config(r_mba, dom_mba, closid, CDP_NONE);

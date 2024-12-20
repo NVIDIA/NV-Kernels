@@ -286,7 +286,7 @@ struct rftype {
 /**
  * struct mbm_state - status for each MBM counter in each domain
  * @prev_bw_bytes: Previous bytes value read for bandwidth calculation
- * @prev_bw:	The most recent bandwidth in MBps
+ * @prev_bw:	The most recent bandwidth in MiBps
  */
 struct mbm_state {
 	u64	prev_bw_bytes;
