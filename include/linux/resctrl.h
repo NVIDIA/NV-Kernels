@@ -28,8 +28,8 @@ int proc_resctrl_show(struct seq_file *m,
 
 #endif
 
-/* max value for struct rdt_domain's mbps_val */
-#define MBA_MAX_MBPS   U32_MAX
+/* max value for struct rdt_domain's mibps_val */
+#define MBA_MAX_MIBPS   U32_MAX
 
 /* Walk all possible resources, with variants for only controls or monitors. */
 #define for_each_rdt_resource(_r)						\
@@ -136,15 +136,15 @@ struct rdt_domain_hdr {
  * @hdr:		common header for different domain types
  * @plr:		pseudo-locked region (if any) associated with domain
  * @staged_config:	parsed configuration to be applied
- * @mbps_val:		When mba_sc is enabled, this holds the array of user
- *			specified control values for mba_sc in MBps, indexed
+ * @mibps_val:		When mba_sc is enabled, this holds the array of user
+ *			specified control values for mba_sc in MiBps, indexed
  *			by closid
  */
 struct rdt_ctrl_domain {
 	struct rdt_domain_hdr		hdr;
 	struct pseudo_lock_region	*plr;
 	struct resctrl_staged_config	staged_config[CDP_NUM_TYPES];
-	u32				*mbps_val;
+	u32				*mibps_val;
 };
 
 /**

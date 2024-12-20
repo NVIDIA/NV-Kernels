@@ -91,7 +91,7 @@ static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 		return -EINVAL;
 
 	if (is_mba_sc(r)) {
-		d->mbps_val[closid] = bw_val;
+		d->mibps_val[closid] = bw_val;
 		return 0;
 	}
 
@@ -397,7 +397,7 @@ static void show_doms(struct seq_file *s, struct resctrl_schema *schema, int clo
 			seq_puts(s, ";");
 
 		if (is_mba_sc(r))
-			ctrl_val = dom->mbps_val[closid];
+			ctrl_val = dom->mibps_val[closid];
 		else
 			ctrl_val = resctrl_arch_get_config(r, dom, closid,
 							   schema->conf_type);

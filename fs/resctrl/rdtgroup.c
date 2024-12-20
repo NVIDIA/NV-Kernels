@@ -1568,7 +1568,7 @@ static int rdtgroup_size_show(struct kernfs_open_file *of,
 				size = 0;
 			} else {
 				if (is_mba_sc(r))
-					ctrl = d->mbps_val[closid];
+					ctrl = d->mibps_val[closid];
 				else
 					ctrl = resctrl_arch_get_config(r, d,
 								       closid,
@@ -2269,13 +2269,13 @@ static int mba_sc_domain_allocate(struct rdt_resource *r, struct rdt_ctrl_domain
 	int cpu = cpumask_any(&d->hdr.cpu_mask);
 	int i;
 
-	d->mbps_val = kcalloc_node(num_closid, sizeof(*d->mbps_val),
-				   GFP_KERNEL, cpu_to_node(cpu));
-	if (!d->mbps_val)
+	d->mibps_val = kcalloc_node(num_closid, sizeof(*d->mibps_val),
+				    GFP_KERNEL, cpu_to_node(cpu));
+	if (!d->mibps_val)
 		return -ENOMEM;
 
 	for (i = 0; i < num_closid; i++)
-		d->mbps_val[i] = MBA_MAX_MBPS;
+		d->mibps_val[i] = MBA_MAX_MIBPS;
 
 	return 0;
 }
@@ -2283,8 +2283,8 @@ static int mba_sc_domain_allocate(struct rdt_resource *r, struct rdt_ctrl_domain
 static void mba_sc_domain_destroy(struct rdt_resource *r,
 				  struct rdt_ctrl_domain *d)
 {
-	kfree(d->mbps_val);
-	d->mbps_val = NULL;
+	kfree(d->mibps_val);
+	d->mibps_val = NULL;
 }
 
 /*
@@ -2305,7 +2305,7 @@ static bool supports_mba_mbps(void)
 
 /*
  * Enable or disable the MBA software controller
- * which helps user specify bandwidth in MBps.
+ * which helps user specify bandwidth in MiBps.
  */
 static int set_mba_sc(bool mba_sc)
 {
@@ -2324,7 +2324,7 @@ static int set_mba_sc(bool mba_sc)
 
 	list_for_each_entry(d, &r->ctrl_domains, hdr.list) {
 		for (i = 0; i < num_closid; i++)
-			d->mbps_val[i] = MBA_MAX_MBPS;
+			d->mibps_val[i] = MBA_MAX_MIBPS;
 	}
 
 	fflags = mba_sc ? RFTYPE_CTRL_BASE | RFTYPE_MON_BASE : 0;
@@ -3288,7 +3288,7 @@ static void rdtgroup_init_mba(struct rdt_resource *r, u32 closid)
 
 	list_for_each_entry(d, &r->ctrl_domains, hdr.list) {
 		if (is_mba_sc(r)) {
-			d->mbps_val[closid] = MBA_MAX_MBPS;
+			d->mibps_val[closid] = MBA_MAX_MIBPS;
 			continue;
 		}
 
