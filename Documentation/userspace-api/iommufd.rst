@@ -124,6 +124,16 @@ Following IOMMUFD objects are exposed to userspace:
   used to allocate a vEVENTQ. Each vIOMMU can support multiple types of vEVENTS,
   but is confined to one vEVENTQ per vEVENTQ type.
 
+- IOMMUFD_OBJ_VCMDQ, representing a hardware queue as a subset of a vIOMMU's
+  virtualization feature for a VM to directly execute guest-issued commands to
+  invalidate HW cache entries holding the mappings or translations of a guest-
+  owned stage-1 page table. Along with this queue object, iommufd provides the
+  user space a new mmap interface that the VMM can mmap a physical MMIO region
+  from the host physical address space to a guest physical address space. To use
+  this mmap interface, the VMM must define an IOMMU specific driver structure
+  to ask for a pair of VMA info (vm_pgoff/size) to do mmap after a vCMDQ gets
+  allocated.
+
 All user-visible objects are destroyed via the IOMMU_DESTROY uAPI.
 
 The diagrams below show relationships between user-visible objects and kernel
@@ -270,6 +280,7 @@ User visible objects are backed by following datastructures:
 - iommufd_viommu for IOMMUFD_OBJ_VIOMMU.
 - iommufd_vdevice for IOMMUFD_OBJ_VDEVICE.
 - iommufd_veventq for IOMMUFD_OBJ_VEVENTQ.
+- iommufd_vcmdq for IOMMUFD_OBJ_VCMDQ.
 
 Several terminologies when looking at these datastructures:
 
