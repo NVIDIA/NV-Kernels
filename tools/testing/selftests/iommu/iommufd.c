@@ -2777,12 +2777,17 @@ TEST_F(iommufd_viommu, viommu_alloc_with_data)
 	struct iommu_viommu_selftest data = {
 		.in_data = 0xbeef,
 	};
+	uint32_t *test;
 
 	if (self->device_id) {
 		test_cmd_viommu_alloc(self->device_id, self->hwpt_id,
 				      IOMMU_VIOMMU_TYPE_SELFTEST, &data,
 				      sizeof(data), &self->viommu_id);
 		assert(data.out_data == data.in_data);
+		test = mmap(NULL, data.out_mmap_pgsz, PROT_READ | PROT_WRITE,
+			    MAP_SHARED, self->fd, data.out_mmap_pgoff);
+		assert(test && *test == data.in_data);
+		munmap(test, data.out_mmap_pgsz);
 	}
 }
 
