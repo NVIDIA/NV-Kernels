@@ -72,7 +72,7 @@ nvgrace_gpu_memregion(int index,
 	if (index == USEMEM_REGION_INDEX)
 		return &nvdev->usemem;
 
-	if (index == RESMEM_REGION_INDEX)
+	if (!nvdev->has_mig_hw_bug_fix && index == RESMEM_REGION_INDEX)
 		return &nvdev->resmem;
 
 	return NULL;
@@ -715,6 +715,16 @@ static const struct vfio_device_ops nvgrace_gpu_pci_core_ops = {
 	.detach_ioas	= vfio_iommufd_physical_detach_ioas,
 };
 
+static void
+nvgrace_gpu_init_nvdev_struct(struct pci_dev *pdev,
+			      struct nvgrace_gpu_pci_core_device *nvdev,
+			      u64 memphys, u64 memlength)
+{
+	nvdev->usemem.memphys = memphys;
+	nvdev->usemem.memlength = memlength;
+	nvdev->usemem.bar_size = roundup_pow_of_two(nvdev->usemem.memlength);
+}
+
 static int
 nvgrace_gpu_fetch_memory_property(struct pci_dev *pdev,
 				  u64 *pmemphys, u64 *pmemlength)
@@ -752,9 +762,9 @@ nvgrace_gpu_fetch_memory_property(struct pci_dev *pdev,
 }
 
 static int
-nvgrace_gpu_init_nvdev_struct(struct pci_dev *pdev,
-			      struct nvgrace_gpu_pci_core_device *nvdev,
-			      u64 memphys, u64 memlength)
+nvgrace_gpu_nvdev_struct_workaround(struct pci_dev *pdev,
+				    struct nvgrace_gpu_pci_core_device *nvdev,
+				    u64 memphys, u64 memlength)
 {
 	int ret = 0;
 
@@ -864,10 +874,16 @@ static int nvgrace_gpu_probe(struct pci_dev *pdev,
 		 * Device memory properties are identified in the host ACPI
 		 * table. Set the nvgrace_gpu_pci_core_device structure.
 		 */
-		ret = nvgrace_gpu_init_nvdev_struct(pdev, nvdev,
-						    memphys, memlength);
-		if (ret)
-			goto out_put_vdev;
+		if (nvdev->has_mig_hw_bug_fix) {
+			nvgrace_gpu_init_nvdev_struct(pdev, nvdev,
+						      memphys, memlength);
+		} else {
+			ret = nvgrace_gpu_nvdev_struct_workaround(pdev, nvdev,
+								  memphys,
+								  memlength);
+			if (ret)
+				goto out_put_vdev;
+		}
 	}
 
 	ret = vfio_pci_core_register_device(&nvdev->core_device);
