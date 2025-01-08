@@ -159,6 +159,7 @@ int bpf_sk_storage_clone(const struct sock *sk, struct sock *newsk)
 	struct bpf_local_storage_elem *selem;
 	int ret = 0;
 
+	migrate_disable();
 	rcu_read_lock();
 	sk_storage = rcu_dereference(sk->sk_bpf_storage);
 
@@ -211,6 +212,7 @@ int bpf_sk_storage_clone(const struct sock *sk, struct sock *newsk)
 
 out:
 	rcu_read_unlock();
+	migrate_enable();
 
 	/* In case of an error, don't free anything explicitly here, the
 	 * caller is responsible to call bpf_sk_storage_free.
