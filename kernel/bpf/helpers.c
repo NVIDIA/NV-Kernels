@@ -1997,9 +1997,7 @@ unlock:
 		/* The contained type can also have resources, including a
 		 * bpf_list_head which needs to be freed.
 		 */
-		migrate_disable();
 		__bpf_obj_drop_impl(obj, field->graph_root.value_rec, false);
-		migrate_enable();
 	}
 }
 
@@ -2043,9 +2041,7 @@ void bpf_rb_root_free(const struct btf_field *field, void *rb_root,
 		RB_CLEAR_NODE(pos);
 		/* Ensure __bpf_rbtree_add() sees the node as unlinked. */
 		smp_store_release(&node->owner, NULL);
-		migrate_disable();
 		__bpf_obj_drop_impl(obj, field->graph_root.value_rec, false);
-		migrate_enable();
 	}
 }
 
