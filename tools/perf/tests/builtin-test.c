@@ -492,7 +492,7 @@ err_out:
 	return err;
 }
 
-static int perf_test__list_shell(int argc, const char **argv, int i)
+static int perf_test__list_shell(FILE *fp, int argc, const char **argv, int i)
 {
 	const struct script_file *files, *file;
 
@@ -508,12 +508,12 @@ static int perf_test__list_shell(int argc, const char **argv, int i)
 		if (!perf_test__matches(t.desc, curr, argc, argv))
 			continue;
 
-		pr_info("%3d: %s\n", i, t.desc);
+		fprintf(fp, "%3d: %s\n", i, t.desc);
 	}
 	return 0;
 }
 
-static int perf_test__list(int argc, const char **argv)
+static int perf_test__list(FILE *fp, int argc, const char **argv)
 {
 	unsigned int j, k;
 	struct test_suite *t;
@@ -526,17 +526,17 @@ static int perf_test__list(int argc, const char **argv)
 		if (!perf_test__matches(test_description(t, -1), curr_suite, argc, argv))
 			continue;
 
-		pr_info("%3d: %s\n", i, test_description(t, -1));
+		fprintf(fp, "%3d: %s\n", i, test_description(t, -1));
 
 		if (test_suite__num_test_cases(t) <= 1)
 			continue;
 
 		test_suite__for_each_test_case(t, curr_test_case)
-			pr_info("%3d:%1d: %s\n", i, curr_test_case + 1,
+			fprintf(fp, "%3d.%1d: %s\n", i, curr_test_case + 1,
 				test_description(t, curr_test_case));
 	}
 
-	perf_test__list_shell(argc, argv, i);
+	perf_test__list_shell(fp, argc, argv, i);
 
 	return 0;
 }
@@ -597,7 +597,7 @@ int cmd_test(int argc, const char **argv)
 
 	argc = parse_options_subcommand(argc, argv, test_options, test_subcommands, test_usage, 0);
 	if (argc >= 1 && !strcmp(argv[0], "list"))
-		return perf_test__list(argc - 1, argv + 1);
+		return perf_test__list(stdout, argc - 1, argv + 1);
 
 	if (workload)
 		return run_workload(workload, argc, argv);
