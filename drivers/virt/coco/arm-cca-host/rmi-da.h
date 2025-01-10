@@ -139,4 +139,6 @@ static inline struct cca_host_tdi *to_cca_host_tdi(struct pci_dev *pdev)
 int cca_pdev_create(struct pci_dev *pdev);
 int cca_pdev_ide_setup(struct pci_dev *pdev);
 void cca_pdev_stop_and_destroy(struct pci_dev *pdev);
+void *cca_vdev_create(struct realm *realm, struct pci_dev *pdev,
+		      struct pci_dev *pf0_dev, u32 guest_rid);
 #endif
