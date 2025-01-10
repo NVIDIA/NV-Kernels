@@ -141,4 +141,6 @@ int cca_pdev_ide_setup(struct pci_dev *pdev);
 void cca_pdev_stop_and_destroy(struct pci_dev *pdev);
 void *cca_vdev_create(struct realm *realm, struct pci_dev *pdev,
 		      struct pci_dev *pf0_dev, u32 guest_rid);
+void cca_vdev_unlock_and_destroy(struct realm *realm, struct pci_dev *pdev,
+				 struct pci_dev *pf0_dev);
 #endif
