@@ -146,50 +146,43 @@ static struct test_workload *workloads[] = {
 #define workloads__for_each(workload) \
 	for (unsigned i = 0; i < ARRAY_SIZE(workloads) && ({ workload = workloads[i]; 1; }); i++)
 
-static int num_subtests(const struct test_suite *t)
+#define test_suite__for_each_test_case(suite, idx) \
+	for (idx = 0; (suite)->test_cases && (suite)->test_cases[idx].name != NULL; idx++)
+
+static int test_suite__num_test_cases(const struct test_suite *t)
 {
 	int num;
 
-	if (!t->test_cases)
-		return 0;
-
-	num = 0;
-	while (t->test_cases[num].name)
-		num++;
+	test_suite__for_each_test_case(t, num);
 
 	return num;
 }
 
-static bool has_subtests(const struct test_suite *t)
-{
-	return num_subtests(t) > 1;
-}
-
-static const char *skip_reason(const struct test_suite *t, int subtest)
+static const char *skip_reason(const struct test_suite *t, int test_case)
 {
 	if (!t->test_cases)
 		return NULL;
 
-	return t->test_cases[subtest >= 0 ? subtest : 0].skip_reason;
+	return t->test_cases[test_case >= 0 ? test_case : 0].skip_reason;
 }
 
-static const char *test_description(const struct test_suite *t, int subtest)
+static const char *test_description(const struct test_suite *t, int test_case)
 {
-	if (t->test_cases && subtest >= 0)
-		return t->test_cases[subtest].desc;
+	if (t->test_cases && test_case >= 0)
+		return t->test_cases[test_case].desc;
 
 	return t->desc;
 }
 
-static test_fnptr test_function(const struct test_suite *t, int subtest)
+static test_fnptr test_function(const struct test_suite *t, int test_case)
 {
-	if (subtest <= 0)
+	if (test_case <= 0)
 		return t->test_cases[0].run_case;
 
-	return t->test_cases[subtest].run_case;
+	return t->test_cases[test_case].run_case;
 }
 
-static bool perf_test__matches(const char *desc, int curr, int argc, const char *argv[])
+static bool perf_test__matches(const char *desc, int suite_num, int argc, const char *argv[])
 {
 	int i;
 
@@ -201,7 +194,7 @@ static bool perf_test__matches(const char *desc, int curr, int argc, const char 
 		long nr = strtoul(argv[i], &end, 10);
 
 		if (*end == '\0') {
-			if (nr == curr + 1)
+			if (nr == suite_num + 1)
 				return true;
 			continue;
 		}
@@ -227,7 +220,7 @@ static void cmd_test_sig_handler(int sig)
 	siglongjmp(cmd_test_jmp_buf, sig);
 }
 
-static int run_test(struct test_suite *test, int subtest)
+static int run_test(struct test_suite *test, int test_case)
 {
 	const int signals[] = {
 		SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGINT, SIGPIPE, SIGQUIT, SIGSEGV, SIGTERM,
@@ -271,7 +264,7 @@ static int run_test(struct test_suite *test, int subtest)
 				signal(signals[i], child_test_sig_handler);
 		}
 
-		err = test_function(test, subtest)(test, subtest);
+		err = test_function(test, test_case)(test, test_case);
 		if (!dont_fork) {
 err_out:
 			fflush(NULL);
@@ -298,29 +291,29 @@ err_out:
 	return err;
 }
 
-#define for_each_test(j, k, t)			\
+#define for_each_suite(j, k, t)			\
 	for (j = 0, k = 0; j < ARRAY_SIZE(tests); j++, k = 0)	\
 		while ((t = tests[j][k++]) != NULL)
 
-static int test_and_print(struct test_suite *t, int subtest)
+static int test_and_print(struct test_suite *t, int test_case)
 {
 	int err;
 
 	pr_debug("\n--- start ---\n");
-	err = run_test(t, subtest);
+	err = run_test(t, test_case);
 	pr_debug("---- end ----\n");
 
-	if (!has_subtests(t))
+	if (test_suite__num_test_cases(t) <= 1)
 		pr_debug("%s:", t->desc);
 	else
-		pr_debug("%s subtest %d:", t->desc, subtest + 1);
+		pr_debug("%s test case %d:", t->desc, test_case + 1);
 
 	switch (err) {
 	case TEST_OK:
 		pr_info(" Ok\n");
 		break;
 	case TEST_SKIP: {
-		const char *reason = skip_reason(t, subtest);
+		const char *reason = skip_reason(t, test_case);
 
 		if (reason)
 			color_fprintf(stderr, PERF_COLOR_YELLOW, " Skip (%s)\n", reason);
@@ -425,44 +418,45 @@ static int __cmd_test(int argc, const char *argv[], struct intlist *skiplist)
 	signal(SIGINT, cmd_test_sig_handler);
 	signal(SIGTERM, cmd_test_sig_handler);
 
-	for_each_test(j, k, t) {
-		int len = strlen(test_description(t, -1));
+	for_each_suite(j, k, t) {
+		int curr_test_case, len = strlen(test_description(t, -1));
 
 		if (width < len)
 			width = len;
+
+		test_suite__for_each_test_case(t, curr_test_case) {
+			len = strlen(test_description(t, curr_test_case));
+			if (width < len)
+				width = len;
+		}
 	}
 
-	for_each_test(j, k, t) {
-		int curr = i++;
-		int subi;
+	for_each_suite(j, k, t) {
+		int curr_suite = i++;
+		int curr_test_case;
 
-		if (!perf_test__matches(test_description(t, -1), curr, argc, argv)) {
+		if (!perf_test__matches(test_description(t, -1), curr_suite, argc, argv)) {
 			bool skip = true;
-			int subn;
 
-			subn = num_subtests(t);
-
-			for (subi = 0; subi < subn; subi++) {
-				if (perf_test__matches(test_description(t, subi),
-							curr, argc, argv))
+			test_suite__for_each_test_case(t, curr_test_case) {
+				if (perf_test__matches(test_description(t, curr_test_case),
+							curr_suite, argc, argv)) {
 					skip = false;
+					break;
+				}
 			}
 
 			if (skip)
 				continue;
 		}
 
-		pr_info("%3d: %-*s:", i, width, test_description(t, -1));
-
 		if (intlist__find(skiplist, i)) {
+			pr_info("%3d: %-*s:", i, width, test_description(t, -1));
 			color_fprintf(stderr, PERF_COLOR_YELLOW, " Skip (user override)\n");
 			continue;
 		}
 
-		if (!has_subtests(t)) {
-			test_and_print(t, -1);
-		} else {
-			int subn = num_subtests(t);
+		if (test_suite__num_test_cases(t) > 1) {
 			/*
 			 * minus 2 to align with normal testcases.
 			 * For subtest we print additional '.x' in number.
@@ -471,31 +465,23 @@ static int __cmd_test(int argc, const char *argv[], struct intlist *skiplist)
 			 * 35: Test LLVM searching and compiling                        :
 			 * 35.1: Basic BPF llvm compiling test                          : Ok
 			 */
-			int subw = width > 2 ? width - 2 : width;
+			pr_info("%3d: %-*s:\n", i, width, test_description(t, -1));
+		}
 
-			if (subn <= 0) {
-				color_fprintf(stderr, PERF_COLOR_YELLOW,
-					      " Skip (not compiled in)\n");
+		test_suite__for_each_test_case(t, curr_test_case) {
+			if (!perf_test__matches(test_description(t, curr_test_case),
+						curr_suite, argc, argv))
 				continue;
-			}
-			pr_info("\n");
 
-			for (subi = 0; subi < subn; subi++) {
-				int len = strlen(test_description(t, subi));
+			if (test_suite__num_test_cases(t) > 1) {
+				int subw = width > 2 ? width - 2 : width;
 
-				if (subw < len)
-					subw = len;
-			}
-
-			for (subi = 0; subi < subn; subi++) {
-				if (!perf_test__matches(test_description(t, subi),
-							curr, argc, argv))
-					continue;
-
-				pr_info("%3d.%1d: %-*s:", i, subi + 1, subw,
-					test_description(t, subi));
-				test_and_print(t, subi);
-			}
+				pr_info("%3d.%1d: %-*s:", i, curr_test_case + 1, subw,
+					test_description(t, curr_test_case));
+			} else
+				pr_info("%3d: %-*s:", i, width,
+					test_description(t, curr_test_case));
+			test_and_print(t, curr_test_case);
 		}
 	}
 
@@ -533,22 +519,21 @@ static int perf_test__list(int argc, const char **argv)
 	struct test_suite *t;
 	int i = 0;
 
-	for_each_test(j, k, t) {
-		int curr = i++;
+	for_each_suite(j, k, t) {
+		int curr_suite = i++;
+		int curr_test_case;
 
-		if (!perf_test__matches(test_description(t, -1), curr, argc, argv))
+		if (!perf_test__matches(test_description(t, -1), curr_suite, argc, argv))
 			continue;
 
 		pr_info("%3d: %s\n", i, test_description(t, -1));
 
-		if (has_subtests(t)) {
-			int subn = num_subtests(t);
-			int subi;
+		if (test_suite__num_test_cases(t) <= 1)
+			continue;
 
-			for (subi = 0; subi < subn; subi++)
-				pr_info("%3d:%1d: %s\n", i, subi + 1,
-					test_description(t, subi));
-		}
+		test_suite__for_each_test_case(t, curr_test_case)
+			pr_info("%3d:%1d: %s\n", i, curr_test_case + 1,
+				test_description(t, curr_test_case));
 	}
 
 	perf_test__list_shell(argc, argv, i);
