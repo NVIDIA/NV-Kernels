@@ -49,6 +49,7 @@ struct cca_host_comm_data {
  * @rmm_pdev: Delegated granule address of rmm pdev object
  * @num_ax: Number of auxiliary granules allocated for pdev
  * @aux: Delegated auxiliary granules
+ * @rmi_signature_algorith: Signature algorith used for public key
  * @object_lock: lock used to protect access to cached obects in PF0 and TDIs
  * @cert_chain: cetrificate chain
  * @vca: SPDM's Version-Capabilities-Algorithms cache object
@@ -62,6 +63,7 @@ struct cca_host_pf0_dsc {
 	int num_aux;
 	void *aux[MAX_PDEV_AUX_GRANULES];
 
+	uint8_t rmi_signature_algorithm;
 	struct mutex object_lock;
 	struct {
 		struct cache_object *cache;

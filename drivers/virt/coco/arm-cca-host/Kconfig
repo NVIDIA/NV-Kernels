@@ -8,7 +8,11 @@ config ARM_CCA_HOST
 	depends on PCI
 	depends on KVM
 	select PCI_TSM
+	select KEYS
+	select X509_CERTIFICATE_PARSER
 	select AUXILIARY_BUS
+	select CRYPTO_ECDSA
+	select CRYPTO_RSA
 
 	help
 	  ARM CCA RMM firmware is the trusted runtime that enforces memory
