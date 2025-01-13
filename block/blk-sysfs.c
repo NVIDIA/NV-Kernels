@@ -731,13 +731,16 @@ queue_attr_store(struct kobject *kobj, struct attribute *attr,
 	struct queue_sysfs_entry *entry = to_queue(attr);
 	struct gendisk *disk = container_of(kobj, struct gendisk, queue_kobj);
 	struct request_queue *q = disk->queue;
+	unsigned int noio_flag;
 	ssize_t res;
 
 	if (!entry->store)
 		return -EIO;
 
 	mutex_lock(&q->sysfs_lock);
+	noio_flag = memalloc_noio_save();
 	res = entry->store(q, page, length);
+	memalloc_noio_restore(noio_flag);
 	mutex_unlock(&q->sysfs_lock);
 	return res;
 }
