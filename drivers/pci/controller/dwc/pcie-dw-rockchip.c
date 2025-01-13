@@ -308,6 +308,7 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
 
 	pp = &rockchip->pci.pp;
 	pp->ops = &rockchip_pcie_host_ops;
+	pp->use_linkup_irq = true;
 
 	ret = rockchip_pcie_resource_get(pdev, rockchip);
 	if (ret)
