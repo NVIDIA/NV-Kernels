@@ -84,6 +84,18 @@ CONFIG_CORESIGHT_TPDM                           note<'Required for Grace enablem
 CONFIG_CORESIGHT_TRBE                           policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_TRBE                           note<'Required for Grace enablement'>
 
+CONFIG_PREEMPT_NONE                             policy<{'amd64': 'n', 'arm64': 'y'}>
+CONFIG_PREEMPT_NONE                             note<'Required for NVIDIA workloads'>
+
+CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': 'y', 'arm64': 'n'}>
+CONFIG_PREEMPT_VOLUNTARY                        note<'Required for NVIDIA workloads'>
+
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            policy<{'arm64': 'n'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'Required for NVIDIA workloads'>
+
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'n', 'arm64': 'y'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'Required for NVIDIA workloads'>
+
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
 
