@@ -865,7 +865,7 @@ static void addrconf_forward_change(struct net *net, __s32 newf)
 	struct inet6_dev *idev;
 
 	for_each_netdev(net, dev) {
-		idev = __in6_dev_get(dev);
+		idev = __in6_dev_get_rtnl_net(dev);
 		if (idev) {
 			int changed = (!idev->cnf.forwarding) ^ (!newf);
 
@@ -878,13 +878,12 @@ static void addrconf_forward_change(struct net *net, __s32 newf)
 
 static int addrconf_fixup_forwarding(struct ctl_table *table, int *p, int newf)
 {
-	struct net *net;
+	struct net *net = (struct net *)table->extra2;
 	int old;
 
-	if (!rtnl_trylock())
+	if (!rtnl_net_trylock(net))
 		return restart_syscall();
 
-	net = (struct net *)table->extra2;
 	old = *p;
 	WRITE_ONCE(*p, newf);
 
@@ -894,7 +893,7 @@ static int addrconf_fixup_forwarding(struct ctl_table *table, int *p, int newf)
 						     NETCONFA_FORWARDING,
 						     NETCONFA_IFINDEX_DEFAULT,
 						     net->ipv6.devconf_dflt);
-		rtnl_unlock();
+		rtnl_net_unlock(net);
 		return 0;
 	}
 
@@ -916,7 +915,7 @@ static int addrconf_fixup_forwarding(struct ctl_table *table, int *p, int newf)
 						     net->ipv6.devconf_all);
 	} else if ((!newf) ^ (!old))
 		dev_forward_change((struct inet6_dev *)table->extra1);
-	rtnl_unlock();
+	rtnl_net_unlock(net);
 
 	if (newf)
 		rt6_purge_dflt_routers(net);
@@ -929,7 +928,7 @@ static void addrconf_linkdown_change(struct net *net, __s32 newf)
 	struct inet6_dev *idev;
 
 	for_each_netdev(net, dev) {
-		idev = __in6_dev_get(dev);
+		idev = __in6_dev_get_rtnl_net(dev);
 		if (idev) {
 			int changed = (!idev->cnf.ignore_routes_with_linkdown) ^ (!newf);
 
@@ -946,13 +945,12 @@ static void addrconf_linkdown_change(struct net *net, __s32 newf)
 
 static int addrconf_fixup_linkdown(struct ctl_table *table, int *p, int newf)
 {
-	struct net *net;
+	struct net *net = (struct net *)table->extra2;
 	int old;
 
-	if (!rtnl_trylock())
+	if (!rtnl_net_trylock(net))
 		return restart_syscall();
 
-	net = (struct net *)table->extra2;
 	old = *p;
 	*p = newf;
 
@@ -963,7 +961,7 @@ static int addrconf_fixup_linkdown(struct ctl_table *table, int *p, int newf)
 						     NETCONFA_IGNORE_ROUTES_WITH_LINKDOWN,
 						     NETCONFA_IFINDEX_DEFAULT,
 						     net->ipv6.devconf_dflt);
-		rtnl_unlock();
+		rtnl_net_unlock(net);
 		return 0;
 	}
 
@@ -977,7 +975,8 @@ static int addrconf_fixup_linkdown(struct ctl_table *table, int *p, int newf)
 						     NETCONFA_IFINDEX_ALL,
 						     net->ipv6.devconf_all);
 	}
-	rtnl_unlock();
+
+	rtnl_net_unlock(net);
 
 	return 1;
 }
@@ -6394,7 +6393,7 @@ static void addrconf_disable_change(struct net *net, __s32 newf)
 	struct inet6_dev *idev;
 
 	for_each_netdev(net, dev) {
-		idev = __in6_dev_get(dev);
+		idev = __in6_dev_get_rtnl_net(dev);
 		if (idev) {
 			int changed = (!idev->cnf.disable_ipv6) ^ (!newf);
 
@@ -6407,28 +6406,28 @@ static void addrconf_disable_change(struct net *net, __s32 newf)
 
 static int addrconf_disable_ipv6(struct ctl_table *table, int *p, int newf)
 {
-	struct net *net;
+	struct net *net = (struct net *)table->extra2;
 	int old;
 
-	if (!rtnl_trylock())
+	if (!rtnl_net_trylock(net))
 		return restart_syscall();
 
-	net = (struct net *)table->extra2;
 	old = *p;
 	WRITE_ONCE(*p, newf);
 
 	if (p == &net->ipv6.devconf_dflt->disable_ipv6) {
-		rtnl_unlock();
+		rtnl_net_unlock(net);
 		return 0;
 	}
 
 	if (p == &net->ipv6.devconf_all->disable_ipv6) {
 		WRITE_ONCE(net->ipv6.devconf_dflt->disable_ipv6, newf);
 		addrconf_disable_change(net, newf);
-	} else if ((!newf) ^ (!old))
+	} else if ((!newf) ^ (!old)) {
 		dev_disable_change((struct inet6_dev *)table->extra1);
+	}
 
-	rtnl_unlock();
+	rtnl_net_unlock(net);
 	return 0;
 }
 
@@ -6473,20 +6472,20 @@ static int addrconf_sysctl_proxy_ndp(struct ctl_table *ctl, int write,
 	if (write && old != new) {
 		struct net *net = ctl->extra2;
 
-		if (!rtnl_trylock())
+		if (!rtnl_net_trylock(net))
 			return restart_syscall();
 
-		if (valp == &net->ipv6.devconf_dflt->proxy_ndp)
+		if (valp == &net->ipv6.devconf_dflt->proxy_ndp) {
 			inet6_netconf_notify_devconf(net, RTM_NEWNETCONF,
 						     NETCONFA_PROXY_NEIGH,
 						     NETCONFA_IFINDEX_DEFAULT,
 						     net->ipv6.devconf_dflt);
-		else if (valp == &net->ipv6.devconf_all->proxy_ndp)
+		} else if (valp == &net->ipv6.devconf_all->proxy_ndp) {
 			inet6_netconf_notify_devconf(net, RTM_NEWNETCONF,
 						     NETCONFA_PROXY_NEIGH,
 						     NETCONFA_IFINDEX_ALL,
 						     net->ipv6.devconf_all);
-		else {
+		} else {
 			struct inet6_dev *idev = ctl->extra1;
 
 			inet6_netconf_notify_devconf(net, RTM_NEWNETCONF,
@@ -6494,7 +6493,7 @@ static int addrconf_sysctl_proxy_ndp(struct ctl_table *ctl, int write,
 						     idev->dev->ifindex,
 						     &idev->cnf);
 		}
-		rtnl_unlock();
+		rtnl_net_unlock(net);
 	}
 
 	return ret;
@@ -6514,7 +6513,7 @@ static int addrconf_sysctl_addr_gen_mode(struct ctl_table *ctl, int write,
 		.mode = ctl->mode,
 	};
 
-	if (!rtnl_trylock())
+	if (!rtnl_net_trylock(net))
 		return restart_syscall();
 
 	new_val = *((u32 *)ctl->data);
@@ -6544,7 +6543,7 @@ static int addrconf_sysctl_addr_gen_mode(struct ctl_table *ctl, int write,
 
 			WRITE_ONCE(net->ipv6.devconf_dflt->addr_gen_mode, new_val);
 			for_each_netdev(net, dev) {
-				idev = __in6_dev_get(dev);
+				idev = __in6_dev_get_rtnl_net(dev);
 				if (idev &&
 				    idev->cnf.addr_gen_mode != new_val) {
 					idev->cnf.addr_gen_mode = new_val;
@@ -6557,7 +6556,7 @@ static int addrconf_sysctl_addr_gen_mode(struct ctl_table *ctl, int write,
 	}
 
 out:
-	rtnl_unlock();
+	rtnl_net_unlock(net);
 
 	return ret;
 }
@@ -6579,7 +6578,7 @@ static int addrconf_sysctl_stable_secret(struct ctl_table *ctl, int write,
 	lctl.maxlen = IPV6_MAX_STRLEN;
 	lctl.data = str;
 
-	if (!rtnl_trylock())
+	if (!rtnl_net_trylock(net))
 		return restart_syscall();
 
 	if (!write && !secret->initialized) {
@@ -6609,7 +6608,7 @@ static int addrconf_sysctl_stable_secret(struct ctl_table *ctl, int write,
 		struct net_device *dev;
 
 		for_each_netdev(net, dev) {
-			struct inet6_dev *idev = __in6_dev_get(dev);
+			struct inet6_dev *idev = __in6_dev_get_rtnl_net(dev);
 
 			if (idev) {
 				idev->cnf.addr_gen_mode =
@@ -6623,7 +6622,7 @@ static int addrconf_sysctl_stable_secret(struct ctl_table *ctl, int write,
 	}
 
 out:
-	rtnl_unlock();
+	rtnl_net_unlock(net);
 
 	return err;
 }
@@ -6702,16 +6701,15 @@ static
 int addrconf_disable_policy(struct ctl_table *ctl, int *valp, int val)
 {
 	struct inet6_dev *idev;
-	struct net *net;
+	struct net *net = (struct net *)ctl->extra2;
 
-	if (!rtnl_trylock())
+	if (!rtnl_net_trylock(net))
 		return restart_syscall();
 
 	*valp = val;
 
-	net = (struct net *)ctl->extra2;
 	if (valp == &net->ipv6.devconf_dflt->disable_policy) {
-		rtnl_unlock();
+		rtnl_net_unlock(net);
 		return 0;
 	}
 
@@ -6719,7 +6717,7 @@ int addrconf_disable_policy(struct ctl_table *ctl, int *valp, int val)
 		struct net_device *dev;
 
 		for_each_netdev(net, dev) {
-			idev = __in6_dev_get(dev);
+			idev = __in6_dev_get_rtnl_net(dev);
 			if (idev)
 				addrconf_disable_policy_idev(idev, val);
 		}
@@ -6728,7 +6726,7 @@ int addrconf_disable_policy(struct ctl_table *ctl, int *valp, int val)
 		addrconf_disable_policy_idev(idev, val);
 	}
 
-	rtnl_unlock();
+	rtnl_net_unlock(net);
 	return 0;
 }
 
