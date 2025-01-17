@@ -32,12 +32,37 @@
 
 MODULE_IMPORT_NS(DMA_BUF);
 
-#define PCI_DEV_AIC080			0xa080
-#define PCI_DEV_AIC100			0xa100
+#define PCI_DEVICE_ID_QCOM_AIC080	0xa080
+#define PCI_DEVICE_ID_QCOM_AIC100	0xa100
 #define QAIC_NAME			"qaic"
 #define QAIC_DESC			"Qualcomm Cloud AI Accelerators"
 #define CNTL_MAJOR			5
 #define CNTL_MINOR			0
+
+struct qaic_device_config {
+	/* Indicates the AIC family the device belongs to */
+	int family;
+	/* A bitmask representing the available BARs */
+	int bar_mask;
+	/* An index value used to identify the MHI controller BAR */
+	unsigned int mhi_bar_idx;
+	/* An index value used to identify the DBCs BAR */
+	unsigned int dbc_bar_idx;
+};
+
+static const struct qaic_device_config aic080_config = {
+	.family = FAMILY_AIC100,
+	.bar_mask = BIT(0) | BIT(2) | BIT(4),
+	.mhi_bar_idx = 0,
+	.dbc_bar_idx = 2,
+};
+
+static const struct qaic_device_config aic100_config = {
+	.family = FAMILY_AIC100,
+	.bar_mask = BIT(0) | BIT(2) | BIT(4),
+	.mhi_bar_idx = 0,
+	.dbc_bar_idx = 2,
+};
 
 bool datapath_polling;
 module_param(datapath_polling, bool, 0400);
@@ -312,7 +337,8 @@ static void cleanup_qdev(struct qaic_device *qdev)
 	destroy_workqueue(qdev->qts_wq);
 }
 
-static struct qaic_device *create_qdev(struct pci_dev *pdev, const struct pci_device_id *id)
+static struct qaic_device *create_qdev(struct pci_dev *pdev,
+				       const struct qaic_device_config *config)
 {
 	struct qaic_drm_device *qddev;
 	struct qaic_device *qdev;
@@ -323,12 +349,10 @@ static struct qaic_device *create_qdev(struct pci_dev *pdev, const struct pci_de
 		return NULL;
 
 	qdev->dev_state = QAIC_OFFLINE;
-	if (id->device == PCI_DEV_AIC080 || id->device == PCI_DEV_AIC100) {
-		qdev->num_dbc = 16;
-		qdev->dbc = devm_kcalloc(&pdev->dev, qdev->num_dbc, sizeof(*qdev->dbc), GFP_KERNEL);
-		if (!qdev->dbc)
-			return NULL;
-	}
+	qdev->num_dbc = 16;
+	qdev->dbc = devm_kcalloc(&pdev->dev, qdev->num_dbc, sizeof(*qdev->dbc), GFP_KERNEL);
+	if (!qdev->dbc)
+		return NULL;
 
 	qdev->cntl_wq = alloc_workqueue("qaic_cntl", WQ_UNBOUND, 0);
 	if (!qdev->cntl_wq)
@@ -371,7 +395,8 @@ static struct qaic_device *create_qdev(struct pci_dev *pdev, const struct pci_de
 	return qdev;
 }
 
-static int init_pci(struct qaic_device *qdev, struct pci_dev *pdev)
+static int init_pci(struct qaic_device *qdev, struct pci_dev *pdev,
+		    const struct qaic_device_config *config)
 {
 	int bars;
 	int ret;
@@ -379,9 +404,9 @@ static int init_pci(struct qaic_device *qdev, struct pci_dev *pdev)
 	bars = pci_select_bars(pdev, IORESOURCE_MEM) & 0x3f;
 
 	/* make sure the device has the expected BARs */
-	if (bars != (BIT(0) | BIT(2) | BIT(4))) {
-		pci_dbg(pdev, "%s: expected BARs 0, 2, and 4 not found in device. Found 0x%x\n",
-			__func__, bars);
+	if (bars != config->bar_mask) {
+		pci_dbg(pdev, "%s: expected BARs %#x not found in device. Found %#x\n",
+			__func__, config->bar_mask, bars);
 		return -EINVAL;
 	}
 
@@ -396,13 +421,13 @@ static int init_pci(struct qaic_device *qdev, struct pci_dev *pdev)
 	if (ret)
 		return ret;
 
-	qdev->bar_0 = devm_ioremap_resource(&pdev->dev, &pdev->resource[0]);
-	if (IS_ERR(qdev->bar_0))
-		return PTR_ERR(qdev->bar_0);
+	qdev->bar_mhi = devm_ioremap_resource(&pdev->dev, &pdev->resource[config->mhi_bar_idx]);
+	if (IS_ERR(qdev->bar_mhi))
+		return PTR_ERR(qdev->bar_mhi);
 
-	qdev->bar_2 = devm_ioremap_resource(&pdev->dev, &pdev->resource[2]);
-	if (IS_ERR(qdev->bar_2))
-		return PTR_ERR(qdev->bar_2);
+	qdev->bar_dbc = devm_ioremap_resource(&pdev->dev, &pdev->resource[config->dbc_bar_idx]);
+	if (IS_ERR(qdev->bar_dbc))
+		return PTR_ERR(qdev->bar_dbc);
 
 	/* Managed release since we use pcim_enable_device above */
 	pci_set_master(pdev);
@@ -462,21 +487,22 @@ static int init_msi(struct qaic_device *qdev, struct pci_dev *pdev)
 
 static int qaic_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
+	struct qaic_device_config *config = (struct qaic_device_config *)id->driver_data;
 	struct qaic_device *qdev;
 	int mhi_irq;
 	int ret;
 	int i;
 
-	qdev = create_qdev(pdev, id);
+	qdev = create_qdev(pdev, config);
 	if (!qdev)
 		return -ENOMEM;
 
-	ret = init_pci(qdev, pdev);
+	ret = init_pci(qdev, pdev, config);
 	if (ret)
 		goto cleanup_qdev;
 
 	for (i = 0; i < qdev->num_dbc; ++i)
-		qdev->dbc[i].dbc_base = qdev->bar_2 + QAIC_DBC_OFF(i);
+		qdev->dbc[i].dbc_base = qdev->bar_dbc + QAIC_DBC_OFF(i);
 
 	mhi_irq = init_msi(qdev, pdev);
 	if (mhi_irq < 0) {
@@ -488,7 +514,7 @@ static int qaic_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto cleanup_qdev;
 
-	qdev->mhi_cntrl = qaic_mhi_register_controller(pdev, qdev->bar_0, mhi_irq,
+	qdev->mhi_cntrl = qaic_mhi_register_controller(pdev, qdev->bar_mhi, mhi_irq,
 						       qdev->single_msi);
 	if (IS_ERR(qdev->mhi_cntrl)) {
 		ret = PTR_ERR(qdev->mhi_cntrl);
@@ -562,8 +588,8 @@ static struct mhi_driver qaic_mhi_driver = {
 };
 
 static const struct pci_device_id qaic_ids[] = {
-	{ PCI_DEVICE(PCI_VENDOR_ID_QCOM, PCI_DEV_AIC080), },
-	{ PCI_DEVICE(PCI_VENDOR_ID_QCOM, PCI_DEV_AIC100), },
+	{ PCI_DEVICE_DATA(QCOM, AIC080, (kernel_ulong_t)&aic080_config), },
+	{ PCI_DEVICE_DATA(QCOM, AIC100, (kernel_ulong_t)&aic100_config), },
 	{ }
 };
 MODULE_DEVICE_TABLE(pci, qaic_ids);
