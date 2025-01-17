@@ -373,6 +373,40 @@ static inline void resctrl_arch_rmid_read_context_check(void)
 }
 
 /**
+ * resctrl_find_domain() - Search for a domain id in a resource domain list.
+ * @h:		The domain list to search.
+ * @id:		The domain id to search for.
+ * @pos:	A pointer to position in the list id should be inserted.
+ *
+ * Search the domain list to find the domain id. If the domain id is
+ * found, return the domain. NULL otherwise.  If the domain id is not
+ * found (and NULL returned) then the first domain with id bigger than
+ * the input id can be returned to the caller via @pos.
+ */
+static inline struct rdt_domain_hdr *resctrl_find_domain(struct list_head *h,
+							 int id,
+							 struct list_head **pos)
+{
+	struct rdt_domain_hdr *d;
+	struct list_head *l;
+
+	list_for_each(l, h) {
+		d = list_entry(l, struct rdt_domain_hdr, list);
+		/* When id is found, return its domain. */
+		if (id == d->id)
+			return d;
+		/* Stop searching when finding id's position in sorted list. */
+		if (id < d->id)
+			break;
+	}
+
+	if (pos)
+		*pos = l;
+
+	return NULL;
+}
+
+/**
  * resctrl_arch_reset_rmid() - Reset any private state associated with rmid
  *			       and eventid.
  * @r:		The domain's resource.
