@@ -36,9 +36,23 @@ static struct earlycon_device early_console_dev = {
 	.con = &early_con,
 };
 
+#ifdef CONFIG_ARM64
+#include <asm/rsi.h>
+static struct __init realm_config rconf;
+#endif
+
 static void __iomem * __init earlycon_map(resource_size_t paddr, size_t size)
 {
 	void __iomem *base;
+
+#ifdef CONFIG_ARM64
+	if (rsi_request_version(RSI_ABI_VERSION, NULL, NULL) == RSI_SUCCESS) {
+		if (rsi_get_realm_config(&rconf) == RSI_SUCCESS) {
+			paddr |= BIT(rconf.ipa_bits - 1);
+		}
+	}
+#endif
+
 #ifdef CONFIG_FIX_EARLYCON_MEM
 	set_fixmap_io(FIX_EARLYCON_MEM_BASE, paddr & PAGE_MASK);
 	base = (void __iomem *)__fix_to_virt(FIX_EARLYCON_MEM_BASE);
