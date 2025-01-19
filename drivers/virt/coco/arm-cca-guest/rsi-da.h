@@ -10,8 +10,16 @@
 #include <linux/pci-tsm.h>
 #include <asm/rsi_smc.h>
 
+#define MAX_CACHE_OBJ_SIZE	SZ_16M
+
 struct cca_guest_dsc {
 	struct pci_tsm_devsec pci;
+	void *interface_report;
+	int interface_report_size;
+	void *certificate;
+	int certificate_size;
+	void *measurements;
+	int measurements_size;
 };
 
 static inline struct cca_guest_dsc *to_cca_guest_dsc(struct pci_dev *pdev)
