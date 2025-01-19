@@ -242,9 +242,22 @@ err_out:
 	kfree(cca_dsc);
 }
 
+static int cca_tsm_accept(struct pci_dev *pdev)
+{
+	int ret;
+
+	ret = cca_device_verify_and_accept(pdev);
+	if (ret) {
+		pci_err(pdev, "failed to transition the device to run state (%d)\n", ret);
+		return ret;
+	}
+	return 0;
+}
+
 static struct pci_tsm_ops cca_devsec_pci_ops = {
 	.lock = cca_tsm_lock,
 	.unlock = cca_tsm_unlock,
+	.accept	 = cca_tsm_accept,
 };
 
 static void cca_devsec_tsm_remove(void *tsm_dev)

@@ -336,5 +336,10 @@ int cca_device_verify_and_accept(struct pci_dev *pdev)
 		return -EIO;
 	}
 
+	ret = rhi_vdev_set_tdi_state(pdev, RHI_DA_TDI_CONFIG_RUN);
+	if (ret) {
+		pci_err(pdev, "failed to switch the device (%u) to RUN state\n", ret);
+		return -EIO;
+	}
 	return 0;
 }
