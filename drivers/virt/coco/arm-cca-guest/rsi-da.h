@@ -9,6 +9,7 @@
 #include <linux/pci.h>
 #include <linux/pci-tsm.h>
 #include <asm/rsi_smc.h>
+#include <crypto/sha2.h>
 
 #define MAX_CACHE_OBJ_SIZE	SZ_16M
 
@@ -34,6 +35,17 @@ struct pci_tdisp_mmio_range {
 #define TSM_INTF_REPORT_MMIO_RESERVED		GENMASK(15, 4)
 #define TSM_INTF_REPORT_MMIO_RANGE_ID		GENMASK(31, 16)
 
+struct dsm_device_info {
+	u64 cert_id;
+	u64 hash_algo;
+	u64 lock_nonce;
+	u64 meas_nonce;
+	u64 report_nonce;
+	u8 cert_digest[SHA512_DIGEST_SIZE];
+	u8 meas_digest[SHA512_DIGEST_SIZE];
+	u8 report_digest[SHA512_DIGEST_SIZE];
+};
+
 struct cca_guest_dsc {
 	struct pci_tsm_devsec pci;
 	void *interface_report;
@@ -42,6 +54,7 @@ struct cca_guest_dsc {
 	int certificate_size;
 	void *measurements;
 	int measurements_size;
+	struct dsm_device_info dev_info;
 };
 
 static inline struct cca_guest_dsc *to_cca_guest_dsc(struct pci_dev *pdev)
@@ -68,4 +81,5 @@ int cca_update_device_object_cache(struct pci_dev *pdev, struct cca_guest_dsc *d
 struct page *alloc_shared_pages(int nid, gfp_t gfp_mask, unsigned long min_size);
 int free_shared_pages(struct page *page, unsigned long min_size);
 int cca_apply_interface_report_mappings(struct pci_dev *pdev, bool validate);
+int cca_device_verify_and_accept(struct pci_dev *pdev);
 #endif

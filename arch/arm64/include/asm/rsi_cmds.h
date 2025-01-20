@@ -215,4 +215,15 @@ rsi_vdev_validate_mapping(unsigned long vdev_id,
 	return res.a0;
 }
 
+static inline unsigned long rsi_vdev_get_info(unsigned long vdev_id,
+					      unsigned long digest_phys)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_1_1_invoke(SMC_RSI_VDEV_GET_INFO,
+			     vdev_id, digest_phys, &res);
+
+	return res.a0;
+}
+
 #endif /* __ASM_RSI_CMDS_H */

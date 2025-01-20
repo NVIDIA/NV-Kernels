@@ -6,6 +6,7 @@
 #include <linux/pci.h>
 #include <linux/mem_encrypt.h>
 #include <asm/rsi_cmds.h>
+#include <crypto/hash.h>
 
 #include "rsi-da.h"
 #include "rhi-da.h"
@@ -148,6 +149,8 @@ static inline int rsi_invalidate_dev_mapping(phys_addr_t start_ipa, phys_addr_t 
 int cca_apply_interface_report_mappings(struct pci_dev *pdev, bool validate)
 {
 	int ret;
+	unsigned long mmio_flags = 0; /* non coherent, not limited order */
+	int vdev_id = rsi_vdev_id(pdev);
 	struct pci_tdisp_mmio_range *mmio_range;
 	struct cca_guest_dsc *dsc = to_cca_guest_dsc(pdev);
 	struct pci_tdisp_device_interface_report *interface_report;
@@ -199,10 +202,139 @@ int cca_apply_interface_report_mappings(struct pci_dev *pdev, bool validate)
 		ipa_start = r->start + bar_offset;
 		ipa_end = ipa_start + (mmio_range->num_pages << 12);
 
-		if (!validate)
+		if (validate)
+			ret = rsi_validate_dev_mapping(vdev_id, ipa_start,
+						       ipa_end, mmio_start_phys,
+						       mmio_flags,
+						       dsc->dev_info.lock_nonce,
+						       dsc->dev_info.meas_nonce,
+						       dsc->dev_info.report_nonce);
+		else
 			ret = rsi_invalidate_dev_mapping(ipa_start, ipa_end);
 		if (ret)
 			return ret;
 	}
+	return 0;
+}
+
+static int verify_digests(struct cca_guest_dsc *dsc)
+{
+	u8 digest[SHA512_DIGEST_SIZE];
+	size_t digest_size;
+	void (*digest_func)(const u8 *data, size_t len, u8 *out);
+
+	struct pci_dev *pdev = dsc->pci.base_tsm.pdev;
+	struct {
+		uint8_t *report;
+		size_t size;
+		uint8_t *digest;
+	} reports[] = {
+		{
+			dsc->interface_report,
+			dsc->interface_report_size,
+			dsc->dev_info.report_digest
+		},
+		{
+			dsc->certificate,
+			dsc->certificate_size,
+			dsc->dev_info.cert_digest
+		},
+		{
+			dsc->measurements,
+			dsc->measurements_size,
+			dsc->dev_info.meas_digest
+		}
+	};
+
+	switch (dsc->dev_info.hash_algo) {
+	case RSI_HASH_SHA_256:
+		digest_func = sha256;
+		digest_size = SHA256_DIGEST_SIZE;
+		break;
+
+	case RSI_HASH_SHA_512:
+		digest_func = sha512;
+		digest_size = SHA512_DIGEST_SIZE;
+		break;
+	default:
+		pci_err(pdev, "Unknown realm hash algorithm!\n");
+		return -EINVAL;
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(reports); i++) {
+		digest_func(reports[i].report, reports[i].size, digest);
+		if (memcmp(reports[i].digest, digest, digest_size)) {
+			pci_err(pdev, "Invalid digest\n");
+			return -EINVAL;
+		}
+	}
+
+	pci_dbg(pdev, "Successfully verified the digests\n");
+	return 0;
+}
+
+int cca_device_verify_and_accept(struct pci_dev *pdev)
+{
+	int ret;
+	int vdev_id = rsi_vdev_id(pdev);
+	struct cca_guest_dsc *dsc = to_cca_guest_dsc(pdev);
+
+	/* Now make a host call to copy the interface report to guest. */
+	ret = rhi_read_cached_object(vdev_id, RHI_DA_OBJECT_INTERFACE_REPORT,
+				     &dsc->interface_report, &dsc->interface_report_size);
+	if (ret) {
+		pci_err(pdev, "failed to get interface report from the host (%d)\n", ret);
+		return ret;
+	}
+
+	ret = rhi_read_cached_object(vdev_id, RHI_DA_OBJECT_CERTIFICATE,
+				     &dsc->certificate, &dsc->certificate_size);
+	if (ret) {
+		pci_err(pdev, "failed to get device certificate from the host (%d)\n", ret);
+		return ret;
+	}
+
+	ret = rhi_read_cached_object(vdev_id, RHI_DA_OBJECT_MEASUREMENT,
+				     &dsc->measurements, &dsc->measurements_size);
+	if (ret) {
+		pci_err(pdev, "failed to get device certificate from the host (%d)\n", ret);
+		return ret;
+	}
+
+	struct rsi_vdevice_info *dev_info __free(kfree) =
+		kmalloc(sizeof(*dev_info), GFP_KERNEL);
+	if (!dev_info)
+		return -ENOMEM;
+
+	if (rsi_vdev_get_info(vdev_id, virt_to_phys(dev_info))) {
+		pci_err(pdev, "failed to get device digests (%d)\n", ret);
+		return -EIO;
+	}
+
+	dsc->dev_info.cert_id       = dev_info->cert_id;
+	dsc->dev_info.hash_algo     = dev_info->hash_algo;
+	dsc->dev_info.lock_nonce    = dev_info->lock_nonce;
+	dsc->dev_info.meas_nonce    = dev_info->meas_nonce;
+	dsc->dev_info.report_nonce  = dev_info->report_nonce;
+	memcpy(dsc->dev_info.cert_digest, dev_info->cert_digest, SHA512_DIGEST_SIZE);
+	memcpy(dsc->dev_info.meas_digest, dev_info->meas_digest, SHA512_DIGEST_SIZE);
+	memcpy(dsc->dev_info.report_digest, dev_info->report_digest, SHA512_DIGEST_SIZE);
+
+	/*
+	 * Verify that the digests of the provided reports match with the
+	 * digests from RMM
+	 */
+	ret = verify_digests(dsc);
+	if (ret) {
+		pci_err(pdev, "device digest validation failed (%d)\n", ret);
+		return ret;
+	}
+
+	ret = cca_apply_interface_report_mappings(pdev, true);
+	if (ret) {
+		pci_err(pdev, "failed to validate the interface report\n");
+		return -EIO;
+	}
+
 	return 0;
 }
