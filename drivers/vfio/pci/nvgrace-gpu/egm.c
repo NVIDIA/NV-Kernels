@@ -311,15 +311,21 @@ static void destroy_egm_chardev(struct egm_region *region)
 	cdev_device_del(&region->cdev, &region->device);
 }
 
-void unregister_egm_node(int egm_node)
+void unregister_egm_node(struct pci_dev *pdev)
 {
 	struct egm_region *region, *temp_region;
 	struct h_node *cur_page;
 	unsigned long bkt;
 	struct hlist_node *temp_node;
+	u64 egmphys, egmlength, egmpxm;
+	int ret;
+
+	ret = nvgrace_gpu_fetch_egm_property(pdev, &egmphys, &egmlength, &egmpxm);
+	if (ret)
+		return;
 
 	list_for_each_entry_safe(region, temp_region, &egm_list, list) {
-		if (egm_node == region->egmpxm) {
+		if (egmpxm == region->egmpxm) {
 			hash_for_each_safe(region->htbl, bkt, temp_node, cur_page, node) {
 				hash_del(&cur_page->node);
 				vfree(cur_page);
