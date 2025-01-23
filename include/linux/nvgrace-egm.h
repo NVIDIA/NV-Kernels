@@ -7,6 +7,6 @@
 #define _NVGRACE_EGM_H
 
 int register_egm_node(struct pci_dev *pdev);
-void unregister_egm_node(int egm_node);
+void unregister_egm_node(struct pci_dev *pdev);
 
 #endif /* _NVGRACE_EGM_H */
