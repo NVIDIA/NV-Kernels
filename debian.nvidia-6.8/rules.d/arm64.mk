@@ -16,6 +16,7 @@ do_tools_cpupower = true
 do_tools_perf   = true
 do_tools_perf_jvmti = true
 do_tools_perf_python = true
+do_tools_perf_coresight = false
 do_tools_bpftool = true
 do_tools_rtla = false
 
