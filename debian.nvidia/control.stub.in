@@ -35,6 +35,7 @@ Build-Depends:
  uuid-dev <!stage1>,
  libnuma-dev [amd64 arm64 ppc64el s390x] <!stage1>,
  dkms <!stage1>,
+ dwarfdump <!stage1>,
  curl <!stage1>,
  zstd [amd64 s390x] <!stage1>,
  pahole [amd64 arm64 armhf ppc64el s390x riscv64] | dwarves (>= 1.21) [amd64 arm64 armhf ppc64el s390x riscv64] <!stage1>,
