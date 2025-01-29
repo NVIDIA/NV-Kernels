@@ -3113,10 +3113,18 @@ static struct file_system_type rdt_fs_type = {
 };
 
 static int mon_addfile(struct kernfs_node *parent_kn, const char *name,
-		       void *priv)
+		       struct mon_data *_priv)
 {
 	struct kernfs_node *kn;
+	struct mon_data *priv;
 	int ret = 0;
+
+	lockdep_assert_held(&rdtgroup_mutex);
+
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+	memcpy(priv, _priv, sizeof(*priv));
 
 	kn = __kernfs_create_file(parent_kn, name, 0444,
 				  GLOBAL_ROOT_UID, GLOBAL_ROOT_GID, 0,
@@ -3137,9 +3145,15 @@ static void mon_rmdir_one_subdir(struct kernfs_node *pkn, char *name, char *subn
 {
 	struct kernfs_node *kn;
 
+	lockdep_assert_held(&rdtgroup_mutex);
+
 	kn = kernfs_find_and_get(pkn, name);
 	if (!kn)
 		return;
+
+	kfree(kn->priv);
+	kn->priv = NULL;
+
 	kernfs_put(kn);
 
 	if (kn->dir.subdirs <= 1)
@@ -3180,19 +3194,19 @@ static int mon_add_all_files(struct kernfs_node *kn, struct rdt_mon_domain *d,
 			     bool do_sum)
 {
 	struct rmid_read rr = {0};
-	union mon_data_bits priv;
+	struct mon_data priv;
 	struct mon_evt *mevt;
 	int ret;
 
 	if (WARN_ON(list_empty(&r->evt_list)))
 		return -EPERM;
 
-	priv.u.rid = r->rid;
-	priv.u.domid = do_sum ? d->ci->id : d->hdr.id;
-	priv.u.sum = do_sum;
+	priv.rid = r->rid;
+	priv.domid = do_sum ? d->ci->id : d->hdr.id;
+	priv.sum = do_sum;
 	list_for_each_entry(mevt, &r->evt_list, list) {
-		priv.u.evtid = mevt->evtid;
-		ret = mon_addfile(kn, mevt->name, priv.priv);
+		priv.evtid = mevt->evtid;
+		ret = mon_addfile(kn, mevt->name, &priv);
 		if (ret)
 			return ret;
 
