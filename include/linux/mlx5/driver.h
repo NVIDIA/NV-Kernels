@@ -680,6 +680,7 @@ struct mlx5_rsvd_gids {
 };
 
 struct mlx5_clock;
+struct mlx5_clock_dev_state;
 struct mlx5_dm;
 struct mlx5_fw_tracer;
 struct mlx5_vxlan;
@@ -764,6 +765,7 @@ struct mlx5_core_dev {
 	struct mlx5_fpga_device *fpga;
 #endif
 	struct mlx5_clock       *clock;
+	struct mlx5_clock_dev_state *clock_state;
 	struct mlx5_ib_clock_info  *clock_info;
 	struct mlx5_fw_tracer   *tracer;
 	struct mlx5_rsc_dump    *rsc_dump;
