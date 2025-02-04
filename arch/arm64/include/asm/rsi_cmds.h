@@ -186,4 +186,33 @@ static inline unsigned long rsi_host_call(struct rsi_host_call *rhi_call)
 	return res.a0;
 }
 
+static inline long
+rsi_vdev_validate_mapping(unsigned long vdev_id,
+			  phys_addr_t ipa_base, phys_addr_t ipa_top,
+			  phys_addr_t pa_base, phys_addr_t *next_ipa,
+			  unsigned long flags, unsigned long lock_nonce,
+			  unsigned long meas_nonce, unsigned long report_nonce)
+{
+	struct arm_smccc_1_2_regs res;
+	struct arm_smccc_1_2_regs regs = {
+		.a0 = SMC_RSI_VDEV_VALIDATE_MAPPING,
+		.a1 = vdev_id,
+		.a2 = ipa_base,
+		.a3 = ipa_top,
+		.a4 = pa_base,
+		.a5 = flags,
+		.a6 = lock_nonce,
+		.a7 = meas_nonce,
+		.a8 = report_nonce,
+	};
+
+	arm_smccc_1_2_invoke(&regs, &res);
+	*next_ipa = res.a1;
+
+	if (res.a2 != RSI_ACCEPT)
+		return -EPERM;
+
+	return res.a0;
+}
+
 #endif /* __ASM_RSI_CMDS_H */

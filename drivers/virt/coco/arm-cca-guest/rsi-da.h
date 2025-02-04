@@ -12,6 +12,28 @@
 
 #define MAX_CACHE_OBJ_SIZE	SZ_16M
 
+struct pci_tdisp_device_interface_report {
+	u16 interface_info;
+	u16 reserved;
+	u16 msi_x_message_control;
+	u16 lnr_control;
+	u32 tph_control;
+	u32 mmio_range_count;
+} __packed;
+
+struct pci_tdisp_mmio_range {
+	u64 first_page;
+	u32 num_pages;
+	u32 range_attributes;
+} __packed;
+
+#define TSM_INTF_REPORT_MMIO_MSIX_TABLE		BIT(0)
+#define TSM_INTF_REPORT_MMIO_PBA		BIT(1)
+#define TSM_INTF_REPORT_MMIO_IS_NON_TEE		BIT(2)
+#define TSM_INTF_REPORT_MMIO_IS_UPDATABLE	BIT(3)
+#define TSM_INTF_REPORT_MMIO_RESERVED		GENMASK(15, 4)
+#define TSM_INTF_REPORT_MMIO_RANGE_ID		GENMASK(31, 16)
+
 struct cca_guest_dsc {
 	struct pci_tsm_devsec pci;
 	void *interface_report;
@@ -45,4 +67,5 @@ int cca_device_unlock(struct pci_dev *pdev);
 int cca_update_device_object_cache(struct pci_dev *pdev, struct cca_guest_dsc *dsc);
 struct page *alloc_shared_pages(int nid, gfp_t gfp_mask, unsigned long min_size);
 int free_shared_pages(struct page *page, unsigned long min_size);
+int cca_apply_interface_report_mappings(struct pci_dev *pdev, bool validate);
 #endif

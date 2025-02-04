@@ -117,3 +117,92 @@ int cca_update_device_object_cache(struct pci_dev *pdev, struct cca_guest_dsc *d
 	}
 	return 0;
 }
+
+static inline int
+rsi_validate_dev_mapping(unsigned long vdev_id, phys_addr_t start_ipa,
+			 phys_addr_t end_ipa, phys_addr_t io_pa,
+			 unsigned long flags, unsigned long lock_nonce,
+			 unsigned long meas_nonce, unsigned long report_nonce)
+{
+	unsigned long ret;
+	phys_addr_t next_ipa;
+
+	while (start_ipa < end_ipa) {
+		ret = rsi_vdev_validate_mapping(vdev_id, start_ipa, end_ipa,
+						io_pa, &next_ipa, flags,
+						lock_nonce, meas_nonce, report_nonce);
+		if (ret || next_ipa <= start_ipa || next_ipa > end_ipa)
+			return -EINVAL;
+		io_pa += next_ipa - start_ipa;
+		start_ipa = next_ipa;
+	}
+	return 0;
+}
+
+static inline int rsi_invalidate_dev_mapping(phys_addr_t start_ipa, phys_addr_t end_ipa)
+{
+	return rsi_set_memory_range(start_ipa, end_ipa, RSI_RIPAS_EMPTY,
+				    RSI_CHANGE_DESTROYED);
+}
+
+int cca_apply_interface_report_mappings(struct pci_dev *pdev, bool validate)
+{
+	int ret;
+	struct pci_tdisp_mmio_range *mmio_range;
+	struct cca_guest_dsc *dsc = to_cca_guest_dsc(pdev);
+	struct pci_tdisp_device_interface_report *interface_report;
+
+	interface_report = (struct pci_tdisp_device_interface_report *)dsc->interface_report;
+	mmio_range = (struct pci_tdisp_mmio_range *)(interface_report + 1);
+
+
+	for (int i = 0; i < interface_report->mmio_range_count; i++, mmio_range++) {
+		struct resource *r;
+		unsigned int range_id;
+		phys_addr_t mmio_start_phys;
+		phys_addr_t ipa_start, ipa_end, bar_offset;
+
+		range_id = FIELD_GET(TSM_INTF_REPORT_MMIO_RANGE_ID, mmio_range->range_attributes);
+		if (range_id >= PCI_NUM_RESOURCES) {
+			pci_warn(pdev, "Skipping broken range [%d] #%d %d\n",
+				 i, range_id, mmio_range->num_pages);
+			continue;
+		}
+
+		r = pci_resource_n(pdev, range_id);
+		if (r->end == r->start || resource_size(r) & ~PAGE_MASK ||
+		    !mmio_range->num_pages) {
+			pci_warn(pdev, "Skipping broken range [%d] #%d %d pages, %llx..%llx\n",
+				i, range_id, mmio_range->num_pages, r->start, r->end);
+			continue;
+		}
+
+		if (FIELD_GET(TSM_INTF_REPORT_MMIO_IS_NON_TEE, mmio_range->range_attributes)) {
+			pci_info(pdev, "Skipping non-TEE range [%d] #%d %d pages, %llx..%llx\n",
+				 i, range_id, mmio_range->num_pages, r->start, r->end);
+			continue;
+		}
+
+		/* No secure interrupts, we should not find this set, ignore for now. */
+		if (FIELD_GET(TSM_INTF_REPORT_MMIO_MSIX_TABLE, mmio_range->range_attributes) ||
+		    FIELD_GET(TSM_INTF_REPORT_MMIO_PBA, mmio_range->range_attributes)) {
+			pci_info(pdev, "Skipping MSIX (%ld/%ld) range [%d] #%d %d pages, %llx..%llx\n",
+				 FIELD_GET(TSM_INTF_REPORT_MMIO_MSIX_TABLE, mmio_range->range_attributes),
+				 FIELD_GET(TSM_INTF_REPORT_MMIO_PBA, mmio_range->range_attributes),
+				 i, range_id, mmio_range->num_pages, r->start, r->end);
+			continue;
+		}
+
+		/* units in 4K size*/
+		mmio_start_phys = mmio_range->first_page << 12;
+		bar_offset = mmio_start_phys & (pci_resource_len(pdev, range_id) - 1);
+		ipa_start = r->start + bar_offset;
+		ipa_end = ipa_start + (mmio_range->num_pages << 12);
+
+		if (!validate)
+			ret = rsi_invalidate_dev_mapping(ipa_start, ipa_end);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}

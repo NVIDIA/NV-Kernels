@@ -226,10 +226,19 @@ static struct pci_tsm *cca_tsm_lock(struct tsm_dev *tsm_dev, struct pci_dev *pde
 
 static void cca_tsm_unlock(struct pci_tsm *tsm)
 {
+	long ret;
 	struct cca_guest_dsc *cca_dsc = to_cca_guest_dsc(tsm->pdev);
+
+	/* invalidate dev mapping based on interface report */
+	ret = cca_apply_interface_report_mappings(tsm->pdev, false);
+	if (ret) {
+		pci_err(tsm->pdev, "failed to invalidate the interface report\n");
+		goto err_out;
+	}
 
 	cca_device_unlock(tsm->pdev);
 
+err_out:
 	kfree(cca_dsc);
 }
 
