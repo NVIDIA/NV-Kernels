@@ -170,6 +170,133 @@ __ATTR(_name, 0644, show_##_name, store_##_name)
 	}								\
 	define_one_cppc(member_name, mode)
 
+static ssize_t store_min_perf(struct kobject *kobj, struct kobj_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct cpc_desc *cpc_ptr = to_cpc_desc(kobj);
+	struct cpufreq_policy *policy;
+	struct cppc_cpudata *cpu_data;
+	u32 min_perf, input;
+	int ret;
+
+	policy = cpufreq_cpu_get(cpc_ptr->cpu_id);
+	cpu_data = policy->driver_data;
+
+	if (kstrtouint(buf, 10, &input))
+		return -EINVAL;
+
+	if (input > cpu_data->perf_ctrls.max_perf)
+		return -EINVAL;
+
+	input = clamp(input, cpu_data->perf_caps.lowest_perf, cpu_data->perf_caps.highest_perf);
+
+	min_perf = cpu_data->perf_ctrls.min_perf;
+	cpu_data->perf_ctrls.min_perf = input;
+
+	ret = cppc_set_perf_ctrls(cpc_ptr->cpu_id, &cpu_data->perf_ctrls);
+	if (ret) {
+		pr_debug("Err writing CPU%d perf ctrls: ret:%d\n", cpc_ptr->cpu_id, ret);
+		cpu_data->perf_ctrls.min_perf = min_perf;
+		return ret;
+	}
+	cpufreq_cpu_put(policy);
+
+	return count;
+}
+
+static ssize_t store_max_perf(struct kobject *kobj, struct kobj_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct cpc_desc *cpc_ptr = to_cpc_desc(kobj);
+	struct cpufreq_policy *policy;
+	struct cppc_cpudata *cpu_data;
+	u32 max_perf, input;
+	int ret;
+
+	policy = cpufreq_cpu_get(cpc_ptr->cpu_id);
+	cpu_data = policy->driver_data;
+
+	if (kstrtouint(buf, 10, &input))
+		return -EINVAL;
+
+	if (input < cpu_data->perf_ctrls.min_perf)
+		return -EINVAL;
+
+	input = clamp(input, cpu_data->perf_caps.lowest_perf, cpu_data->perf_caps.highest_perf);
+
+	max_perf = cpu_data->perf_ctrls.max_perf;
+	cpu_data->perf_ctrls.max_perf = input;
+
+	ret = cppc_set_perf_ctrls(cpc_ptr->cpu_id, &cpu_data->perf_ctrls);
+	if (ret) {
+		pr_debug("Err writing CPU%d perf ctrls: ret:%d\n", cpc_ptr->cpu_id, ret);
+		cpu_data->perf_ctrls.max_perf = max_perf;
+		return ret;
+	}
+	cpufreq_cpu_put(policy);
+
+	return count;
+}
+
+static ssize_t store_energy_perf(struct kobject *kobj, struct kobj_attribute *attr,
+				 const char *buf, size_t count)
+{
+	struct cpc_desc *cpc_ptr = to_cpc_desc(kobj);
+	struct cpufreq_policy *policy;
+	struct cppc_cpudata *cpu_data;
+	u32 epp, input;
+	int ret;
+
+	policy = cpufreq_cpu_get(cpc_ptr->cpu_id);
+	cpu_data = policy->driver_data;
+
+	if (kstrtouint(buf, 10, &input))
+		return -EINVAL;
+
+	input = clamp(input, CPPC_EPP_PERFORMANCE_PREF, CPPC_EPP_ENERGY_EFFICIENCY_PREF);
+
+	epp = cpu_data->perf_ctrls.energy_perf;
+	cpu_data->perf_ctrls.energy_perf = input;
+
+	ret = cppc_set_epp_perf(cpc_ptr->cpu_id, &cpu_data->perf_ctrls,
+				cpu_data->perf_caps.auto_sel);
+	if (ret) {
+		pr_debug("failed to set energy perf value (%d)\n", ret);
+		cpu_data->perf_ctrls.energy_perf = epp;
+		return ret;
+	}
+	cpufreq_cpu_put(policy);
+
+	return count;
+}
+
+static ssize_t store_auto_sel(struct kobject *kobj, struct kobj_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct cpc_desc *cpc_ptr = to_cpc_desc(kobj);
+	struct cpufreq_policy *policy;
+	struct cppc_cpudata *cpu_data;
+	bool input = false;
+	int ret;
+
+	policy = cpufreq_cpu_get(cpc_ptr->cpu_id);
+	cpu_data = policy->driver_data;
+
+	if (kstrtobool(buf, &input))
+		return -EINVAL;
+
+	ret = cppc_set_auto_sel(cpc_ptr->cpu_id, input);
+	if (ret) {
+		pr_info("failed to set autonomous selection (%d)\n", ret);
+		return ret;
+	}
+	cpu_data->perf_caps.auto_sel = input;
+
+	cpufreq_cpu_put(policy);
+
+	return count;
+}
+
 sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, highest_perf, ro);
 sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_perf, ro);
 sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, nominal_perf, ro);
@@ -177,9 +304,16 @@ sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_nonlinear_perf, ro);
 sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, guaranteed_perf, ro);
 sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_freq, ro);
 sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, nominal_freq, ro);
+sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, auto_sel, rw);
 
 sysfs_cppc_data(cppc_get_perf_fb_ctrs, cppc_perf_fb_ctrs, reference_perf, ro);
 sysfs_cppc_data(cppc_get_perf_fb_ctrs, cppc_perf_fb_ctrs, wraparound_time, ro);
+sysfs_cppc_data(cppc_get_perf_fb_ctrs, cppc_perf_fb_ctrs, perf_limited, ro);
+
+sysfs_cppc_data(cppc_get_perf_ctrls, cppc_perf_ctrls, min_perf, rw);
+sysfs_cppc_data(cppc_get_perf_ctrls, cppc_perf_ctrls, max_perf, rw);
+sysfs_cppc_data(cppc_get_perf_ctrls, cppc_perf_ctrls, energy_perf, rw);
+sysfs_cppc_data(cppc_get_perf_ctrls, cppc_perf_ctrls, auto_activity_window, ro);
 
 /* Check for valid access_width, otherwise, fallback to using bit_width */
 #define GET_BIT_WIDTH(reg) ((reg)->access_width ? (8 << ((reg)->access_width - 1)) : (reg)->bit_width)
@@ -218,6 +352,12 @@ static struct attribute *cppc_attrs[] = {
 	&nominal_perf.attr,
 	&nominal_freq.attr,
 	&lowest_freq.attr,
+	&auto_sel.attr,
+	&max_perf.attr,
+	&min_perf.attr,
+	&perf_limited.attr,
+	&auto_activity_window.attr,
+	&energy_perf.attr,
 	NULL
 };
 ATTRIBUTE_GROUPS(cppc);
@@ -1290,8 +1430,8 @@ int cppc_get_perf_caps(int cpunum, struct cppc_perf_caps *perf_caps)
 	struct cpc_desc *cpc_desc = per_cpu(cpc_desc_ptr, cpunum);
 	struct cpc_register_resource *highest_reg, *lowest_reg,
 		*lowest_non_linear_reg, *nominal_reg, *guaranteed_reg,
-		*low_freq_reg = NULL, *nom_freq_reg = NULL;
-	u64 high, low, guaranteed, nom, min_nonlinear, low_f = 0, nom_f = 0;
+		*low_freq_reg = NULL, *nom_freq_reg = NULL, *auto_sel_reg = NULL;
+	u64 high, low, guaranteed, nom, min_nonlinear, low_f = 0, nom_f = 0, auto_sel = 0;
 	int pcc_ss_id = per_cpu(cpu_pcc_subspace_idx, cpunum);
 	struct cppc_pcc_data *pcc_ss_data = NULL;
 	int ret = 0, regs_in_pcc = 0;
@@ -1308,11 +1448,12 @@ int cppc_get_perf_caps(int cpunum, struct cppc_perf_caps *perf_caps)
 	low_freq_reg = &cpc_desc->cpc_regs[LOWEST_FREQ];
 	nom_freq_reg = &cpc_desc->cpc_regs[NOMINAL_FREQ];
 	guaranteed_reg = &cpc_desc->cpc_regs[GUARANTEED_PERF];
+	auto_sel_reg = &cpc_desc->cpc_regs[AUTO_SEL_ENABLE];
 
 	/* Are any of the regs PCC ?*/
 	if (CPC_IN_PCC(highest_reg) || CPC_IN_PCC(lowest_reg) ||
 		CPC_IN_PCC(lowest_non_linear_reg) || CPC_IN_PCC(nominal_reg) ||
-		CPC_IN_PCC(low_freq_reg) || CPC_IN_PCC(nom_freq_reg)) {
+		CPC_IN_PCC(low_freq_reg) || CPC_IN_PCC(nom_freq_reg) || CPC_IN_PCC(auto_sel_reg)) {
 		if (pcc_ss_id < 0) {
 			pr_debug("Invalid pcc_ss_id\n");
 			return -ENODEV;
@@ -1360,6 +1501,9 @@ int cppc_get_perf_caps(int cpunum, struct cppc_perf_caps *perf_caps)
 	perf_caps->lowest_freq = low_f;
 	perf_caps->nominal_freq = nom_f;
 
+	if (CPC_SUPPORTED(auto_sel_reg))
+		cpc_read(cpunum, auto_sel_reg, &auto_sel);
+	perf_caps->auto_sel = (bool)auto_sel;
 
 out_err:
 	if (regs_in_pcc)
@@ -1421,10 +1565,10 @@ int cppc_get_perf_fb_ctrs(int cpunum, struct cppc_perf_fb_ctrs *perf_fb_ctrs)
 {
 	struct cpc_desc *cpc_desc = per_cpu(cpc_desc_ptr, cpunum);
 	struct cpc_register_resource *delivered_reg, *reference_reg,
-		*ref_perf_reg, *ctr_wrap_reg;
+		*ref_perf_reg, *ctr_wrap_reg, *perf_lim_reg;
 	int pcc_ss_id = per_cpu(cpu_pcc_subspace_idx, cpunum);
 	struct cppc_pcc_data *pcc_ss_data = NULL;
-	u64 delivered, reference, ref_perf, ctr_wrap_time;
+	u64 delivered, reference, ref_perf, ctr_wrap_time, perf_lim;
 	int ret = 0, regs_in_pcc = 0;
 
 	if (!cpc_desc) {
@@ -1436,6 +1580,7 @@ int cppc_get_perf_fb_ctrs(int cpunum, struct cppc_perf_fb_ctrs *perf_fb_ctrs)
 	reference_reg = &cpc_desc->cpc_regs[REFERENCE_CTR];
 	ref_perf_reg = &cpc_desc->cpc_regs[REFERENCE_PERF];
 	ctr_wrap_reg = &cpc_desc->cpc_regs[CTR_WRAP_TIME];
+	perf_lim_reg = &cpc_desc->cpc_regs[PERF_LIMITED];
 
 	/*
 	 * If reference perf register is not supported then we should
@@ -1446,7 +1591,8 @@ int cppc_get_perf_fb_ctrs(int cpunum, struct cppc_perf_fb_ctrs *perf_fb_ctrs)
 
 	/* Are any of the regs PCC ?*/
 	if (CPC_IN_PCC(delivered_reg) || CPC_IN_PCC(reference_reg) ||
-		CPC_IN_PCC(ctr_wrap_reg) || CPC_IN_PCC(ref_perf_reg)) {
+		CPC_IN_PCC(ctr_wrap_reg) || CPC_IN_PCC(ref_perf_reg) ||
+		CPC_IN_PCC(perf_lim_reg)) {
 		if (pcc_ss_id < 0) {
 			pr_debug("Invalid pcc_ss_id\n");
 			return -ENODEV;
@@ -1464,6 +1610,7 @@ int cppc_get_perf_fb_ctrs(int cpunum, struct cppc_perf_fb_ctrs *perf_fb_ctrs)
 	cpc_read(cpunum, delivered_reg, &delivered);
 	cpc_read(cpunum, reference_reg, &reference);
 	cpc_read(cpunum, ref_perf_reg, &ref_perf);
+	cpc_read(cpunum, perf_lim_reg, &perf_lim);
 
 	/*
 	 * Per spec, if ctr_wrap_time optional register is unsupported, then the
@@ -1483,6 +1630,7 @@ int cppc_get_perf_fb_ctrs(int cpunum, struct cppc_perf_fb_ctrs *perf_fb_ctrs)
 	perf_fb_ctrs->reference = reference;
 	perf_fb_ctrs->reference_perf = ref_perf;
 	perf_fb_ctrs->wraparound_time = ctr_wrap_time;
+	perf_fb_ctrs->perf_limited = perf_lim;
 out_err:
 	if (regs_in_pcc)
 		up_write(&pcc_ss_data->pcc_lock);
@@ -1539,8 +1687,22 @@ int cppc_set_epp_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls, bool enable)
 		   CPC_SUPPORTED(epp_set_reg) && CPC_IN_FFH(epp_set_reg)) {
 		ret = cpc_write(cpu, epp_set_reg, perf_ctrls->energy_perf);
 	} else {
-		ret = -ENOTSUPP;
-		pr_debug("_CPC in PCC and _CPC in FFH are not supported\n");
+		if (CPC_SUPPORTED(auto_sel_reg) && CPC_SUPPORTED(epp_set_reg)) {
+			ret = cpc_write(cpu, auto_sel_reg, enable);
+			if (ret) {
+				pr_debug("Error in writing auto_sel for CPU:%d\n", cpu);
+				return ret;
+			}
+
+			ret = cpc_write(cpu, epp_set_reg, perf_ctrls->energy_perf);
+			if (ret) {
+				pr_debug("Error in writing energy_perf for CPU:%d\n", cpu);
+				return ret;
+			}
+		} else {
+			ret = -EOPNOTSUPP;
+			pr_debug("_CPC in PCC is not supported\n");
+		}
 	}
 
 	return ret;
@@ -1557,6 +1719,7 @@ int cppc_get_auto_sel_caps(int cpunum, struct cppc_perf_caps *perf_caps)
 	struct cpc_desc *cpc_desc = per_cpu(cpc_desc_ptr, cpunum);
 	struct cpc_register_resource *auto_sel_reg;
 	u64  auto_sel;
+	int ret = 0;
 
 	if (!cpc_desc) {
 		pr_debug("No CPC descriptor for CPU:%d\n", cpunum);
@@ -1565,13 +1728,9 @@ int cppc_get_auto_sel_caps(int cpunum, struct cppc_perf_caps *perf_caps)
 
 	auto_sel_reg = &cpc_desc->cpc_regs[AUTO_SEL_ENABLE];
 
-	if (!CPC_SUPPORTED(auto_sel_reg))
-		pr_warn_once("Autonomous mode is not unsupported!\n");
-
-	if (CPC_IN_PCC(auto_sel_reg)) {
+	if (CPC_IN_PCC(auto_sel_reg) && CPC_SUPPORTED(auto_sel_reg)) {
 		int pcc_ss_id = per_cpu(cpu_pcc_subspace_idx, cpunum);
 		struct cppc_pcc_data *pcc_ss_data = NULL;
-		int ret = 0;
 
 		if (pcc_ss_id < 0)
 			return -ENODEV;
@@ -1592,7 +1751,15 @@ int cppc_get_auto_sel_caps(int cpunum, struct cppc_perf_caps *perf_caps)
 		return ret;
 	}
 
-	return 0;
+	if (CPC_SUPPORTED(auto_sel_reg)) {
+		cpc_read(cpunum, auto_sel_reg, &auto_sel);
+	} else {
+		pr_debug("Autonomous mode is not unsupported!\n");
+		ret = -EOPNOTSUPP;
+	}
+	perf_caps->auto_sel = (bool)auto_sel;
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(cppc_get_auto_sel_caps);
 
@@ -1634,10 +1801,12 @@ int cppc_set_auto_sel(int cpu, bool enable)
 		/* after writing CPC, transfer the ownership of PCC to platform */
 		ret = send_pcc_cmd(pcc_ss_id, CMD_WRITE);
 		up_write(&pcc_ss_data->pcc_lock);
-	} else {
-		ret = -ENOTSUPP;
-		pr_debug("_CPC in PCC is not supported\n");
+
+		return ret;
 	}
+
+	if (CPC_SUPPORTED(auto_sel_reg))
+		ret = cpc_write(cpu, auto_sel_reg, enable);
 
 	return ret;
 }
@@ -1699,8 +1868,8 @@ int cppc_get_perf_ctrls(int cpu, struct cppc_perf_ctrls *perf_ctrls)
 {
 	struct cpc_desc *cpc_desc = per_cpu(cpc_desc_ptr, cpu);
 	struct cpc_register_resource *desired_perf_reg, *min_perf_reg, *max_perf_reg,
-				     *energy_perf_reg;
-	u64 max, min, desired_perf, energy_perf;
+				     *energy_perf_reg, *auto_act_window_reg;
+	u64 max, min, desired_perf, energy_perf, auto_act_window;
 	int pcc_ss_id = per_cpu(cpu_pcc_subspace_idx, cpu);
 	struct cppc_pcc_data *pcc_ss_data = NULL;
 	int ret = 0, regs_in_pcc = 0;
@@ -1714,10 +1883,12 @@ int cppc_get_perf_ctrls(int cpu, struct cppc_perf_ctrls *perf_ctrls)
 	min_perf_reg = &cpc_desc->cpc_regs[MIN_PERF];
 	max_perf_reg = &cpc_desc->cpc_regs[MAX_PERF];
 	energy_perf_reg = &cpc_desc->cpc_regs[ENERGY_PERF];
+	auto_act_window_reg = &cpc_desc->cpc_regs[AUTO_ACT_WINDOW];
 
 	/* Are any of the regs PCC ?*/
 	if (CPC_IN_PCC(desired_perf_reg) || CPC_IN_PCC(min_perf_reg) ||
-	    CPC_IN_PCC(max_perf_reg) || CPC_IN_PCC(energy_perf_reg)) {
+	    CPC_IN_PCC(max_perf_reg) || CPC_IN_PCC(energy_perf_reg) ||
+	    CPC_IN_PCC(auto_act_window_reg)) {
 		if (pcc_ss_id < 0) {
 			pr_debug("Invalid pcc_ss_id\n");
 			return -ENODEV;
@@ -1748,6 +1919,10 @@ int cppc_get_perf_ctrls(int cpu, struct cppc_perf_ctrls *perf_ctrls)
 	if (CPC_SUPPORTED(energy_perf_reg))
 		cpc_read(cpu, energy_perf_reg, &energy_perf);
 	perf_ctrls->energy_perf = energy_perf;
+
+	if (CPC_SUPPORTED(auto_act_window_reg))
+		cpc_read(cpu, auto_act_window_reg, &auto_act_window);
+	perf_ctrls->auto_activity_window = auto_act_window;
 
 out_err:
 	if (regs_in_pcc)

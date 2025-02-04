@@ -32,6 +32,9 @@
 #define	CMD_READ 0
 #define	CMD_WRITE 1
 
+#define CPPC_EPP_PERFORMANCE_PREF			0x00
+#define CPPC_EPP_ENERGY_EFFICIENCY_PREF			0xFF
+
 /* Each register has the folowing format. */
 struct cpc_reg {
 	u8 descriptor;
@@ -119,6 +122,7 @@ struct cppc_perf_ctrls {
 	u32 min_perf;
 	u32 desired_perf;
 	u32 energy_perf;
+	u32 auto_activity_window;
 };
 
 struct cppc_perf_fb_ctrs {
@@ -126,6 +130,7 @@ struct cppc_perf_fb_ctrs {
 	u64 delivered;
 	u64 reference_perf;
 	u64 wraparound_time;
+	u32 perf_limited;
 };
 
 /* Per CPU container for runtime CPPC management. */
