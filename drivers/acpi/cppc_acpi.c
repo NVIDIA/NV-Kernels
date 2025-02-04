@@ -139,12 +139,21 @@ static DEFINE_PER_CPU(struct cpc_desc *, cpc_desc_ptr);
 #define OVER_16BTS_MASK ~0xFFFFULL
 
 #define define_one_cppc_ro(_name)		\
-static struct kobj_attribute _name =		\
+	static struct kobj_attribute _name =	\
 __ATTR(_name, 0444, show_##_name, NULL)
+
+#define define_one_cppc_rw(_name)		\
+	static struct kobj_attribute _name =	\
+__ATTR(_name, 0644, show_##_name, store_##_name)
 
 #define to_cpc_desc(a) container_of(a, struct cpc_desc, kobj)
 
-#define show_cppc_data(access_fn, struct_name, member_name)		\
+#define define_one_cppc(member_name, mode)       define_one_cppc_attr(mode, member_name)
+#define define_one_cppc_attr(mode, member_name)  define_one_cppc_attr_##mode(member_name)
+#define define_one_cppc_attr_ro(member_name)     define_one_cppc_ro(member_name)
+#define define_one_cppc_attr_rw(member_name)     define_one_cppc_rw(member_name)
+
+#define sysfs_cppc_data(access_fn, struct_name, member_name, mode)	\
 	static ssize_t show_##member_name(struct kobject *kobj,		\
 				struct kobj_attribute *attr, char *buf)	\
 	{								\
@@ -159,18 +168,18 @@ __ATTR(_name, 0444, show_##_name, NULL)
 		return sysfs_emit(buf, "%llu\n",		\
 				(u64)st_name.member_name);		\
 	}								\
-	define_one_cppc_ro(member_name)
+	define_one_cppc(member_name, mode)
 
-show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, highest_perf);
-show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_perf);
-show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, nominal_perf);
-show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_nonlinear_perf);
-show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, guaranteed_perf);
-show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_freq);
-show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, nominal_freq);
+sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, highest_perf, ro);
+sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_perf, ro);
+sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, nominal_perf, ro);
+sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_nonlinear_perf, ro);
+sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, guaranteed_perf, ro);
+sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_freq, ro);
+sysfs_cppc_data(cppc_get_perf_caps, cppc_perf_caps, nominal_freq, ro);
 
-show_cppc_data(cppc_get_perf_fb_ctrs, cppc_perf_fb_ctrs, reference_perf);
-show_cppc_data(cppc_get_perf_fb_ctrs, cppc_perf_fb_ctrs, wraparound_time);
+sysfs_cppc_data(cppc_get_perf_fb_ctrs, cppc_perf_fb_ctrs, reference_perf, ro);
+sysfs_cppc_data(cppc_get_perf_fb_ctrs, cppc_perf_fb_ctrs, wraparound_time, ro);
 
 /* Check for valid access_width, otherwise, fallback to using bit_width */
 #define GET_BIT_WIDTH(reg) ((reg)->access_width ? (8 << ((reg)->access_width - 1)) : (reg)->bit_width)
