@@ -526,6 +526,15 @@ struct sev_data_attestation_report {
 #ifdef CONFIG_CRYPTO_DEV_SP_PSP
 
 /**
+ * sev_module_init - perform PSP SEV module initialization
+ *
+ * Returns:
+ * 0 if the PSP module is successfully initialized
+ * negative value if the PSP module initialization fails
+ */
+int sev_module_init(void);
+
+/**
  * sev_platform_init - perform SEV INIT command
  *
  * @error: SEV command return code
