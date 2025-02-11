@@ -1475,6 +1475,8 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 
 	ep_ctx->tx_info = cpu_to_le32(EP_MAX_ESIT_PAYLOAD_LO(max_esit_payload) |
 				      EP_AVG_TRB_LENGTH(avg_trb_len));
+	ep_ctx->reserved[0] = cpu_to_le32(0x1 | (0x1 << 11)); //mtk's bpks & bm
+		pr_err("%s rsv %#x\n", __func__, ep_ctx->reserved[0]);
 
 	return 0;
 }
@@ -1581,10 +1583,12 @@ void xhci_endpoint_copy(struct xhci_hcd *xhci,
 	in_ep_ctx->ep_info2 = out_ep_ctx->ep_info2;
 	in_ep_ctx->deq = out_ep_ctx->deq;
 	in_ep_ctx->tx_info = out_ep_ctx->tx_info;
+#if 0
 	if (xhci->quirks & XHCI_MTK_HOST) {
 		in_ep_ctx->reserved[0] = out_ep_ctx->reserved[0];
 		in_ep_ctx->reserved[1] = out_ep_ctx->reserved[1];
 	}
+#endif
 }
 
 /* Copy output xhci_slot_ctx to the input xhci_slot_ctx.
