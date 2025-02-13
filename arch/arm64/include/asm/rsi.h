@@ -67,4 +67,7 @@ static inline int rsi_set_memory_range_shared(phys_addr_t start,
 	return rsi_set_memory_range(start, end, RSI_RIPAS_EMPTY,
 				    RSI_CHANGE_DESTROYED);
 }
+
+bool rsi_has_da_feature(void);
+
 #endif /* __ASM_RSI_H_ */
