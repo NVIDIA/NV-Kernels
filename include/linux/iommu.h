@@ -1510,7 +1510,6 @@ static inline void iommu_debugfs_setup(void) {}
 int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base);
 
 int iommu_dma_prepare_msi(struct msi_desc *desc, phys_addr_t msi_addr);
-void iommu_dma_compose_msi_msg(struct msi_desc *desc, struct msi_msg *msg);
 
 #else /* CONFIG_IOMMU_DMA */
 
@@ -1526,11 +1525,6 @@ static inline int iommu_dma_prepare_msi(struct msi_desc *desc, phys_addr_t msi_a
 {
 	return 0;
 }
-
-static inline void iommu_dma_compose_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
-{
-}
-
 #endif	/* CONFIG_IOMMU_DMA */
 
 /*
