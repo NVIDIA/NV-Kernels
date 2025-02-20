@@ -4043,6 +4043,7 @@ CONFIG_DMA_OF                                   policy<{'arm64': 'y', 'armhf': '
 CONFIG_DMA_OMAP                                 policy<{'armhf': 'y'}>
 CONFIG_DMA_OPS                                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_DMA_OPS_BYPASS                           policy<{'ppc64el': 'y'}>
+CONFIG_DMA_OPS_HELPERS                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_DMA_RESTRICTED_POOL                      policy<{'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_DMA_SHARED_BUFFER                        policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_DMA_SUN6I                                policy<{'arm64': 'm', 'armhf': '-', 'riscv64': 'm'}>
