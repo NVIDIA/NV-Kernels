@@ -633,12 +633,11 @@ struct ethtool_rxfh_param {
 
 /**
  * struct ethtool_ops - optional netdev operations
+ * @supported_input_xfrm: supported types of input xfrm from %RXH_XFRM_*.
  * @cap_link_lanes_supported: indicates if the driver supports lanes
  *	parameter.
  * @cap_rss_ctx_supported: indicates if the driver supports RSS
  *	contexts.
- * @cap_rss_sym_xor_supported: indicates if the driver supports symmetric-xor
- *	RSS.
  * @cap_rss_rxnfc_adds: device supports nonzero ring_cookie in filters with
  *	%FLOW_RSS flag; the queue ID from the filter is added to the value from
  *	the indirection table to determine the delivery queue.
@@ -819,9 +818,9 @@ struct ethtool_rxfh_param {
  * of the generic netdev features interface.
  */
 struct ethtool_ops {
+	u32     supported_input_xfrm:8;
 	u32     cap_link_lanes_supported:1;
 	u32     cap_rss_ctx_supported:1;
-	u32	cap_rss_sym_xor_supported:1;
 	u32	cap_rss_rxnfc_adds:1;
 	u32	supported_coalesce_params;
 	u32	supported_ring_params;
