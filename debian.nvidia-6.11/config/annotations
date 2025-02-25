@@ -198,3 +198,4 @@ CONFIG_TEGRA241_CMDQV                           policy<{'arm64': 'n'}>
 CONFIG_TOOLS_SUPPORT_RELR                       policy<{'amd64': 'y', 'arm64': '-'}>
 CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'n'}>
 CONFIG_VFIO_IOMMU_TYPE1                         policy<{'amd64': 'm', 'arm64': '-'}>
+CONFIG_CPUFREQ_ARCH_CUR_FREQ                    policy<{'amd64': 'y'}>
