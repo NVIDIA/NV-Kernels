@@ -633,7 +633,7 @@ void hsr_dev_setup(struct net_device *dev)
 	/* Not sure about this. Taken from bridge code. netdev_features.h says
 	 * it means "Does not change network namespaces".
 	 */
-	dev->features |= NETIF_F_NETNS_LOCAL;
+	dev->features |= NETIF_F_NETNS_IMMUTABLE;
 }
 
 /* Return true if dev is a HSR master; return false otherwise.

@@ -149,7 +149,7 @@ own locking, don't use it for new (hardware) drivers.
 
  * netns-local device
 
-NETIF_F_NETNS_LOCAL is set for devices that are not allowed to move between
+NETIF_F_NETNS_IMMUTABLE is set for devices that are not allowed to move between
 network namespaces (e.g. loopback).
 
 Don't use it in drivers.

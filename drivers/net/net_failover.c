@@ -734,7 +734,7 @@ struct failover *net_failover_create(struct net_device *standby_dev)
 	failover_dev->features |= NETIF_F_LLTX;
 
 	/* Don't allow failover devices to change network namespaces. */
-	failover_dev->features |= NETIF_F_NETNS_LOCAL;
+	failover_dev->features |= NETIF_F_NETNS_IMMUTABLE;
 
 	failover_dev->hw_features = FAILOVER_VLAN_FEATURES |
 				    NETIF_F_HW_VLAN_CTAG_TX |

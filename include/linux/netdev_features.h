@@ -26,7 +26,7 @@ enum {
 	NETIF_F_GSO_BIT,		/* Enable software GSO. */
 	NETIF_F_LLTX_BIT,		/* LockLess TX - deprecated. Please */
 					/* do not use LLTX in new drivers */
-	NETIF_F_NETNS_LOCAL_BIT,	/* Does not change network namespaces */
+	NETIF_F_NETNS_IMMUTABLE_BIT,	/* Does not change network namespaces */
 	NETIF_F_GRO_BIT,		/* Generic receive offload */
 	NETIF_F_LRO_BIT,		/* large receive offload */
 
@@ -123,7 +123,9 @@ enum {
 #define NETIF_F_LLTX		__NETIF_F(LLTX)
 #define NETIF_F_LOOPBACK	__NETIF_F(LOOPBACK)
 #define NETIF_F_LRO		__NETIF_F(LRO)
-#define NETIF_F_NETNS_LOCAL	__NETIF_F(NETNS_LOCAL)
+#define NETIF_F_NETNS_IMMUTABLE	__NETIF_F(NETNS_IMMUTABLE)
+/* Keep source compatibility with external modules. */
+#define NETIF_F_NETNS_LOCAL	NETIF_F_NETNS_IMMUTABLE
 #define NETIF_F_NOCACHE_COPY	__NETIF_F(NOCACHE_COPY)
 #define NETIF_F_NTUPLE		__NETIF_F(NTUPLE)
 #define NETIF_F_RXCSUM		__NETIF_F(RXCSUM)
@@ -193,7 +195,7 @@ static inline int find_next_netdev_feature(u64 feature, unsigned long start)
 /* Features valid for ethtool to change */
 /* = all defined minus driver/device-class-related */
 #define NETIF_F_NEVER_CHANGE	(NETIF_F_VLAN_CHALLENGED | \
-				 NETIF_F_LLTX | NETIF_F_NETNS_LOCAL)
+				 NETIF_F_LLTX | NETIF_F_NETNS_IMMUTABLE)
 
 /* remember that ((t)1 << t_BITS) is undefined in C99 */
 #define NETIF_F_ETHTOOL_BITS	((__NETIF_F_BIT(NETDEV_FEATURE_COUNT - 1) | \

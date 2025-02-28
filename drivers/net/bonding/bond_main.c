@@ -6022,7 +6022,7 @@ void bond_setup(struct net_device *bond_dev)
 	 */
 
 	/* Don't allow bond devices to change network namespaces. */
-	bond_dev->features |= NETIF_F_NETNS_LOCAL;
+	bond_dev->features |= NETIF_F_NETNS_IMMUTABLE;
 
 	bond_dev->hw_features = MASTER_UPPER_DEV_VLAN_FEATURES |
 				NETIF_F_HW_VLAN_CTAG_RX |

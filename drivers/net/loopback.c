@@ -184,7 +184,7 @@ static void gen_lo_setup(struct net_device *dev,
 		| NETIF_F_SCTP_CRC
 		| NETIF_F_HIGHDMA
 		| NETIF_F_LLTX
-		| NETIF_F_NETNS_LOCAL
+		| NETIF_F_NETNS_IMMUTABLE
 		| NETIF_F_VLAN_CHALLENGED
 		| NETIF_F_LOOPBACK;
 	dev->ethtool_ops	= eth_ops;

@@ -3128,7 +3128,7 @@ static void amt_link_setup(struct net_device *dev)
 	dev->priv_flags		|= IFF_NO_QUEUE;
 	dev->features		|= NETIF_F_LLTX;
 	dev->features		|= NETIF_F_GSO_SOFTWARE;
-	dev->features		|= NETIF_F_NETNS_LOCAL;
+	dev->features		|= NETIF_F_NETNS_IMMUTABLE;
 	dev->hw_features	|= NETIF_F_SG | NETIF_F_HW_CSUM;
 	dev->hw_features	|= NETIF_F_FRAGLIST | NETIF_F_RXCSUM;
 	dev->hw_features	|= NETIF_F_GSO_SOFTWARE;

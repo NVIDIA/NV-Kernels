@@ -1600,7 +1600,7 @@ static int adin1110_probe_netdevs(struct adin1110_priv *priv)
 		netdev->netdev_ops = &adin1110_netdev_ops;
 		netdev->ethtool_ops = &adin1110_ethtool_ops;
 		netdev->priv_flags |= IFF_UNICAST_FLT;
-		netdev->features |= NETIF_F_NETNS_LOCAL;
+		netdev->features |= NETIF_F_NETNS_IMMUTABLE;
 
 		port_priv->phydev = get_phy_device(priv->mii_bus, i + 1, false);
 		if (IS_ERR(port_priv->phydev)) {

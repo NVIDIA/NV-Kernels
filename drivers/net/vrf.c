@@ -1653,7 +1653,7 @@ static void vrf_setup(struct net_device *dev)
 	dev->features |= NETIF_F_LLTX;
 
 	/* don't allow vrf devices to change network namespaces. */
-	dev->features |= NETIF_F_NETNS_LOCAL;
+	dev->features |= NETIF_F_NETNS_IMMUTABLE;
 
 	/* does not make sense for a VLAN to be added to a vrf device */
 	dev->features   |= NETIF_F_VLAN_CHALLENGED;
