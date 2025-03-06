@@ -13,7 +13,9 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/module.h>
+#include <linux/of_address.h>
 #include <linux/of_irq.h>
+#include <linux/acpi.h>
 
 #include "mtk-eint.h"
 #include "pinctrl-mtk-common-v2.h"
@@ -364,46 +366,147 @@ static const struct mtk_eint_xt mtk_eint_xt = {
 	.set_gpio_as_eint = mtk_xt_set_gpio_as_eint,
 };
 
-int mtk_build_eint(struct mtk_pinctrl *hw, struct platform_device *pdev)
+static int mtk_of_build_eint(struct mtk_pinctrl *hw, struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
-	int ret;
+	int ret = 0, i, j, count_reg_names;
 
-	if (!IS_ENABLED(CONFIG_EINT_MTK))
-		return 0;
+	count_reg_names = of_property_count_strings(np, "reg-names");
+	if (count_reg_names < hw->soc->nbase_names) {
+		ret = -EINVAL;
+		goto fail_of_build_eint;
+	}
 
-	if (!of_property_read_bool(np, "interrupt-controller"))
-		return -ENODEV;
 
-	hw->eint = devm_kzalloc(hw->dev, sizeof(*hw->eint), GFP_KERNEL);
-	if (!hw->eint)
-		return -ENOMEM;
+	hw->eint->nbase = count_reg_names - hw->soc->nbase_names;
+	hw->eint->base = devm_kmalloc_array(&pdev->dev, hw->eint->nbase,
+						sizeof(*hw->eint->base), GFP_KERNEL | __GFP_ZERO);
+	if (!(hw->eint->base)) {
+		ret = -ENOMEM;
+		goto fail_of_build_eint;
+	}
 
-	hw->eint->base = devm_platform_ioremap_resource_byname(pdev, "eint");
-	if (IS_ERR(hw->eint->base)) {
-		ret = PTR_ERR(hw->eint->base);
-		goto err_free_eint;
+	for (i = hw->soc->nbase_names, j = 0; i < count_reg_names; i++, j++) {
+		hw->eint->base[j] = of_iomap(np, i);
+		if (IS_ERR(hw->eint->base[j])) {
+			ret = PTR_ERR(hw->eint->base[j]);
+			goto fail_of_build_eint;
+		}
+	}
+
+	if (!of_property_read_bool(np, "interrupt-controller")) {
+		ret = -ENODEV;
+		goto fail_of_build_eint;
 	}
 
 	hw->eint->irq = irq_of_parse_and_map(np, 0);
 	if (!hw->eint->irq) {
 		ret = -EINVAL;
+		goto fail_of_build_eint;
+	}
+
+	return 0;
+
+fail_of_build_eint:
+	return ret;
+}
+
+static int mtk_acpi_build_eint(struct mtk_pinctrl *hw, struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct resource *res;
+	int ret = 0;
+	int i, start, count_eint_reg_names;
+
+	if (!hw->soc->nbase_names) {
+		dev_err(dev, "SoC should be assigned at least one gpio register base\n");
+		return -EINVAL;
+	}
+	start = hw->soc->nbase_names;
+
+	if (!hw->soc->eint_hw->nbase_names) {
+		dev_err(dev, "SoC should be assigned at least one eint_hw register base\n");
+		return -EINVAL;
+	}
+	count_eint_reg_names = hw->soc->eint_hw->nbase_names;
+
+	hw->eint->nbase = count_eint_reg_names;
+	hw->eint->base = devm_kmalloc_array(&pdev->dev, hw->eint->nbase,
+						sizeof(*hw->eint->base), GFP_KERNEL | __GFP_ZERO);
+	for (i = 0; i < count_eint_reg_names; i++) {
+		res = platform_get_resource(pdev, IORESOURCE_MEM, start + i);
+		if (!res) {
+			dev_err(dev, "Get io base error, index:%d\n", start + i);
+			ret = -EINVAL;
+			goto fail_acpi_build_eint;
+		}
+
+		hw->eint->base[i] = devm_ioremap_resource(dev, res);
+		dev_dbg(dev, "[%s] res start:0x%llx, end:0x%llx, mapping:0x%p\n",
+				__func__, res->start, res->end, hw->eint->base[i]);
+		if (IS_ERR(hw->eint->base[i])) {
+			ret = PTR_ERR(hw->eint->base[i]);
+			goto fail_acpi_build_eint;
+		}
+	}
+
+	hw->eint->irq = platform_get_irq(pdev, 0);
+	if (hw->eint->irq < 0) {
+		ret = hw->eint->irq;
+		goto fail_acpi_build_eint;
+	}
+	dev_info(&pdev->dev, "hw->eint->irq:%d\n", hw->eint->irq);
+
+	return 0;
+
+fail_acpi_build_eint:
+	return ret;
+}
+
+int mtk_build_eint(struct mtk_pinctrl *hw, struct platform_device *pdev)
+{
+	int ret, j;
+
+	if (!IS_ENABLED(CONFIG_EINT_MTK))
+		return 0;
+
+	if (!hw->soc->eint_hw) {
+		return -ENODEV;
+	}
+
+	hw->eint = devm_kzalloc(hw->dev, sizeof(*hw->eint), GFP_KERNEL);
+	if (!hw->eint)
+		return -ENOMEM;
+
+	ret = -ENODEV;
+	if (ACPI_HANDLE(&pdev->dev))
+		ret = mtk_acpi_build_eint(hw, pdev);
+	else if (pdev->dev.of_node)
+		ret = mtk_of_build_eint(hw, pdev);
+
+	if (ret < 0) {
+		dev_err(hw->dev, "Fail to build eint\n");
 		goto err_free_eint;
 	}
 
-	if (!hw->soc->eint_hw) {
-		ret = -ENODEV;
-		goto err_free_eint;
-	}
 
 	hw->eint->dev = &pdev->dev;
 	hw->eint->hw = hw->soc->eint_hw;
 	hw->eint->pctl = hw;
 	hw->eint->gpio_xlate = &mtk_eint_xt;
 
-	return mtk_eint_do_init(hw->eint);
+	ret = mtk_eint_do_init(hw->eint);
+	if (ret)
+		goto err_free_eint;
+
+	return 0;
 
 err_free_eint:
+	for (j = 0; j < hw->eint->nbase; j++) {
+		if (hw->eint->base[j])
+			iounmap(hw->eint->base[j]);
+	}
+	devm_kfree(hw->dev, hw->eint->base);
 	devm_kfree(hw->dev, hw->eint);
 	hw->eint = NULL;
 	return ret;

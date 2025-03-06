@@ -16,7 +16,7 @@
 #include <linux/pinctrl/consumer.h>
 
 #include <dt-bindings/pinctrl/mt65xx.h>
-
+#include <linux/acpi.h>
 #include "pinctrl-paris.h"
 
 #define PINCTRL_PINCTRL_DEV	KBUILD_MODNAME
@@ -834,6 +834,15 @@ static struct pinctrl_desc mtk_desc = {
 	.owner = THIS_MODULE,
 };
 
+static struct pinctrl_gpio_range mtk_pinctrl_gpio_range =  {
+	.name = "mtk_pinctrl_gpio_range",
+	.id = 0,
+	.base = 0,
+	.pin_base = 0,
+	.npins = 0,
+};
+
+
 static int mtk_gpio_get_direction(struct gpio_chip *chip, unsigned int gpio)
 {
 	struct mtk_pinctrl *hw = gpiochip_get_data(chip);
@@ -971,6 +980,8 @@ static int mtk_build_gpiochip(struct mtk_pinctrl *hw)
 	chip->ngpio		= hw->soc->npins;
 
 	ret = gpiochip_add_data(chip, hw);
+
+	mtk_pinctrl_gpio_range.base = chip->base;
 	if (ret < 0)
 		return ret;
 
@@ -1012,6 +1023,7 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct pinctrl_pin_desc *pins;
 	struct mtk_pinctrl *hw;
+	struct resource *res;
 	int err, i;
 
 	hw = devm_kzalloc(&pdev->dev, sizeof(*hw), GFP_KERNEL);
@@ -1035,20 +1047,37 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 	if (!hw->base)
 		return -ENOMEM;
 
-	for (i = 0; i < hw->soc->nbase_names; i++) {
-		hw->base[i] = devm_platform_ioremap_resource_byname(pdev,
-					hw->soc->base_names[i]);
-		if (IS_ERR(hw->base[i]))
-			return PTR_ERR(hw->base[i]);
-	}
-
 	hw->nbase = hw->soc->nbase_names;
+	mtk_pinctrl_gpio_range.npins = hw->soc->npins;
 
-	if (of_find_property(hw->dev->of_node,
-			     "mediatek,rsel-resistance-in-si-unit", NULL))
-		hw->rsel_si_unit = true;
-	else
+	if (ACPI_HANDLE(&pdev->dev)) {
+		for (i = 0; i < hw->soc->nbase_names; i++) {
+			res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+			hw->base[i] = devm_ioremap_resource(&pdev->dev, res);
+			dev_dbg(dev, "[%s] res start:0x%llx, end:0x%llx, mapping:0x%p\n",
+					__func__, res->start, res->end, hw->base[i]);
+			if (IS_ERR(hw->base[i]))
+				return PTR_ERR(hw->base[i]);
+		}
+
 		hw->rsel_si_unit = false;
+	} else if (pdev->dev.of_node) {
+		for (i = 0; i < hw->soc->nbase_names; i++) {
+			hw->base[i] = devm_platform_ioremap_resource_byname(pdev,
+						hw->soc->base_names[i]);
+			if (IS_ERR(hw->base[i]))
+				return PTR_ERR(hw->base[i]);
+		}
+
+		if (of_find_property(hw->dev->of_node,
+				     "mediatek,rsel-resistance-in-si-unit", NULL))
+			hw->rsel_si_unit = true;
+		else
+			hw->rsel_si_unit = false;
+	} else {
+		return dev_err_probe(dev, -EINVAL,
+			"No device tree or acpi info\n");
+	}
 
 	spin_lock_init(&hw->lock);
 
@@ -1095,7 +1124,10 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 	if (err)
 		return dev_err_probe(dev, err, "Failed to add gpio_chip\n");
 
+	pinctrl_add_gpio_range(hw->pctrl, &mtk_pinctrl_gpio_range);
 	platform_set_drvdata(pdev, hw);
+
+	dev_dbg(dev, "[%s] success\n", __func__);
 
 	return 0;
 }

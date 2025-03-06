@@ -4,6 +4,8 @@
  *
  * Author: Maoguang Meng <maoguang.meng@mediatek.com>
  *	   Sean Wang <sean.wang@mediatek.com>
+ *	   Hao Chang <ot_chhao.chang@mediatek.com>
+ *	   Qingliang Li <qingliang.li@mediatek.com>
  *
  */
 #ifndef __MTK_EINT_H
@@ -38,11 +40,23 @@ struct mtk_eint_hw {
 	unsigned int	ap_num;
 	unsigned int	db_cnt;
 	const unsigned int *db_time;
+
+	const char * const		*base_names;
+	unsigned int			nbase_names;
+};
+
+struct mtk_eint_pin {
+	u16 number;		/* sequence number in overall eint */
+	u8 instance;		/* distinguish hardware modules */
+	u8 index;		/* index inside one instance (index inside one hardware module) */
+	bool debounce;		/* flag to indicate support hardware debounce or not */
+	bool dual_edge;		/* flag to indicate both rising & falling edge trigger type */
 };
 
 extern const unsigned int debounce_time_mt2701[];
 extern const unsigned int debounce_time_mt6765[];
 extern const unsigned int debounce_time_mt6795[];
+extern const unsigned int debounce_time_mt8901[];
 
 struct mtk_eint;
 
@@ -56,17 +70,20 @@ struct mtk_eint_xt {
 
 struct mtk_eint {
 	struct device *dev;
-	void __iomem *base;
+	void __iomem **base;
+	u8 nbase;
+	u16 *base_pin_num;
 	struct irq_domain *domain;
 	int irq;
 
 	int *dual_edge;
-	u32 *wake_mask;
-	u32 *cur_mask;
+	u32 **wake_mask;
+	u32 **cur_mask;
 
 	/* Used to fit into various EINT device */
 	const struct mtk_eint_hw *hw;
 	const struct mtk_eint_regs *regs;
+	struct mtk_eint_pin *pins;
 	u16 num_db_time;
 
 	/* Used to fit into various pinctrl device */

@@ -241,10 +241,13 @@ struct mtk_pin_soc {
 	unsigned int			nfuncs;
 	const struct mtk_eint_regs	*eint_regs;
 	const struct mtk_eint_hw	*eint_hw;
+	struct mtk_eint_pin	*eint_pin;
 
 	/* Specific parameters per SoC */
 	u8				gpio_m;
 	bool				ies_present;
+	const unsigned int		*base;
+	unsigned int			nbase;
 	const char * const		*base_names;
 	unsigned int			nbase_names;
 	const unsigned int		*pull_type;
