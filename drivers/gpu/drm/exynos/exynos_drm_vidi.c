@@ -355,10 +355,6 @@ static int vidi_get_modes(struct drm_connector *connector)
 
 	edid_len = (1 + ctx->raw_edid->extensions) * EDID_LENGTH;
 	edid = kmemdup(ctx->raw_edid, edid_len, GFP_KERNEL);
-	if (!edid) {
-		DRM_DEV_DEBUG_KMS(ctx->dev, "failed to allocate edid\n");
-		goto fail;
-	}
 
 	drm_connector_update_edid_property(connector, edid);
 
