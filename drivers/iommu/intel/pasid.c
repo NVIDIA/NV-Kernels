@@ -670,11 +670,31 @@ int intel_pasid_setup_nested(struct intel_iommu *iommu, struct device *dev,
  * context table entry:
  */
 
+/*
+ * Cache invalidations after change in a scalable-mode context table entry
+ * when all PASID table entries of the device are known to be non-present.
+ */
+static void intel_context_flush_no_pasid(struct device_domain_info *info,
+					 struct context_entry *context, u16 did)
+{
+	struct intel_iommu *iommu = info->iommu;
+
+	/*
+	 * The Domain-ID field is ignored for scalable-mode device-selective
+	 * context-cache invalidations.
+	 */
+	iommu->flush.flush_context(iommu, did,
+				   PCI_DEVID(info->bus, info->devfn),
+				   DMA_CCMD_MASK_NOBIT, DMA_CCMD_DEVICE_INVL);
+	devtlb_invalidation_with_pasid(iommu, info->dev, IOMMU_NO_PASID);
+}
+
 static void device_pasid_table_teardown(struct device *dev, u8 bus, u8 devfn)
 {
 	struct device_domain_info *info = dev_iommu_priv_get(dev);
 	struct intel_iommu *iommu = info->iommu;
 	struct context_entry *context;
+	u16 did;
 
 	spin_lock(&iommu->lock);
 	context = iommu_context_addr(iommu, bus, devfn, false);
@@ -683,28 +703,11 @@ static void device_pasid_table_teardown(struct device *dev, u8 bus, u8 devfn)
 		return;
 	}
 
+	did = context_domain_id(context);
 	context_clear_entry(context);
 	__iommu_flush_cache(iommu, context, sizeof(*context));
 	spin_unlock(&iommu->lock);
-
-	/*
-	 * Cache invalidation for changes to a scalable-mode context table
-	 * entry.
-	 *
-	 * Section 6.5.3.3 of the VT-d spec:
-	 * - Device-selective context-cache invalidation;
-	 * - Domain-selective PASID-cache invalidation to affected domains
-	 *   (can be skipped if all PASID entries were not-present);
-	 * - Domain-selective IOTLB invalidation to affected domains;
-	 * - Global Device-TLB invalidation to affected functions.
-	 *
-	 * The iommu has been parked in the blocking state. All domains have
-	 * been detached from the device or PASID. The PASID and IOTLB caches
-	 * have been invalidated during the domain detach path.
-	 */
-	iommu->flush.flush_context(iommu, 0, PCI_DEVID(bus, devfn),
-				   DMA_CCMD_MASK_NOBIT, DMA_CCMD_DEVICE_INVL);
-	devtlb_invalidation_with_pasid(iommu, dev, IOMMU_NO_PASID);
+	intel_context_flush_no_pasid(info, context, did);
 }
 
 static int pci_pasid_table_teardown(struct pci_dev *pdev, u16 alias, void *data)
