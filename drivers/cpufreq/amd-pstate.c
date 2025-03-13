@@ -355,7 +355,7 @@ static int cppc_enable(bool enable)
 		if (cppc_state == AMD_PSTATE_ACTIVE) {
 			/* Set desired perf as zero to allow EPP firmware control */
 			perf_ctrls.desired_perf = 0;
-			ret = cppc_set_perf(cpu, &perf_ctrls);
+			ret = cppc_set_perf_ctrls(cpu, &perf_ctrls);
 			if (ret)
 				return ret;
 		}
@@ -475,7 +475,7 @@ static void cppc_update_perf(struct amd_cpudata *cpudata,
 	perf_ctrls.min_perf = min_perf;
 	perf_ctrls.desired_perf = des_perf;
 
-	cppc_set_perf(cpudata->cpu, &perf_ctrls);
+	cppc_set_perf_ctrls(cpudata->cpu, &perf_ctrls);
 }
 
 static inline bool amd_pstate_sample(struct amd_cpudata *cpudata)
