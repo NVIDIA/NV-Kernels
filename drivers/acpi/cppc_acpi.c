@@ -59,7 +59,7 @@ struct cppc_pcc_data {
 	/*
 	 * Lock to provide controlled access to the PCC channel.
 	 *
-	 * For performance critical usecases(currently cppc_set_perf)
+	 * For performance critical usecases(currently cppc_set_perf_ctrls)
 	 *	We need to take read_lock and check if channel belongs to OSPM
 	 * before reading or writing to PCC subspace
 	 *	We need to take write_lock before transferring the channel
@@ -169,8 +169,8 @@ show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, guaranteed_perf);
 show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, lowest_freq);
 show_cppc_data(cppc_get_perf_caps, cppc_perf_caps, nominal_freq);
 
-show_cppc_data(cppc_get_perf_ctrs, cppc_perf_fb_ctrs, reference_perf);
-show_cppc_data(cppc_get_perf_ctrs, cppc_perf_fb_ctrs, wraparound_time);
+show_cppc_data(cppc_get_perf_fb_ctrs, cppc_perf_fb_ctrs, reference_perf);
+show_cppc_data(cppc_get_perf_fb_ctrs, cppc_perf_fb_ctrs, wraparound_time);
 
 /* Check for valid access_width, otherwise, fallback to using bit_width */
 #define GET_BIT_WIDTH(reg) ((reg)->access_width ? (8 << ((reg)->access_width - 1)) : (reg)->bit_width)
@@ -189,7 +189,7 @@ static ssize_t show_feedback_ctrs(struct kobject *kobj,
 	struct cppc_perf_fb_ctrs fb_ctrs = {0};
 	int ret;
 
-	ret = cppc_get_perf_ctrs(cpc_ptr->cpu_id, &fb_ctrs);
+	ret = cppc_get_perf_fb_ctrs(cpc_ptr->cpu_id, &fb_ctrs);
 	if (ret)
 		return ret;
 
@@ -1360,7 +1360,7 @@ EXPORT_SYMBOL_GPL(cppc_get_perf_caps);
  *
  * CPPC has flexibility about how CPU performance counters are accessed.
  * One of the choices is PCC regions, which can have a high access latency. This
- * routine allows callers of cppc_get_perf_ctrs() to know this ahead of time.
+ * routine allows callers of cppc_get_perf_fb_ctrs() to know this ahead of time.
  *
  * Return: true if any of the counters are in PCC regions, false otherwise
  */
@@ -1398,13 +1398,13 @@ bool cppc_perf_ctrs_in_pcc(void)
 EXPORT_SYMBOL_GPL(cppc_perf_ctrs_in_pcc);
 
 /**
- * cppc_get_perf_ctrs - Read a CPU's performance feedback counters.
+ * cppc_get_perf_fb_ctrs - Read a CPU's performance feedback counters.
  * @cpunum: CPU from which to read counters.
  * @perf_fb_ctrs: ptr to cppc_perf_fb_ctrs. See cppc_acpi.h
  *
  * Return: 0 for success with perf_fb_ctrs populated else -ERRNO.
  */
-int cppc_get_perf_ctrs(int cpunum, struct cppc_perf_fb_ctrs *perf_fb_ctrs)
+int cppc_get_perf_fb_ctrs(int cpunum, struct cppc_perf_fb_ctrs *perf_fb_ctrs)
 {
 	struct cpc_desc *cpc_desc = per_cpu(cpc_desc_ptr, cpunum);
 	struct cpc_register_resource *delivered_reg, *reference_reg,
@@ -1475,7 +1475,7 @@ out_err:
 		up_write(&pcc_ss_data->pcc_lock);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(cppc_get_perf_ctrs);
+EXPORT_SYMBOL_GPL(cppc_get_perf_fb_ctrs);
 
 /*
  * Set Energy Performance Preference Register value through
@@ -1676,13 +1676,13 @@ int cppc_set_enable(int cpu, bool enable)
 EXPORT_SYMBOL_GPL(cppc_set_enable);
 
 /**
- * cppc_set_perf - Set a CPU's performance controls.
+ * cppc_set_perf_ctrls - Set a CPU's performance controls.
  * @cpu: CPU for which to set performance controls.
  * @perf_ctrls: ptr to cppc_perf_ctrls. See cppc_acpi.h
  *
  * Return: 0 for success, -ERRNO otherwise.
  */
-int cppc_set_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls)
+int cppc_set_perf_ctrls(int cpu, struct cppc_perf_ctrls *perf_ctrls)
 {
 	struct cpc_desc *cpc_desc = per_cpu(cpc_desc_ptr, cpu);
 	struct cpc_register_resource *desired_reg, *min_perf_reg, *max_perf_reg;
@@ -1746,7 +1746,7 @@ int cppc_set_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls)
 	/*
 	 * This is Phase-II where we transfer the ownership of PCC to Platform
 	 *
-	 * Short Summary: Basically if we think of a group of cppc_set_perf
+	 * Short Summary: Basically if we think of a group of cppc_set_perf_ctrls
 	 * requests that happened in short overlapping interval. The last CPU to
 	 * come out of Phase-I will enter Phase-II and ring the doorbell.
 	 *
@@ -1805,7 +1805,7 @@ int cppc_set_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls)
 	}
 	return ret;
 }
-EXPORT_SYMBOL_GPL(cppc_set_perf);
+EXPORT_SYMBOL_GPL(cppc_set_perf_ctrls);
 
 /**
  * cppc_get_transition_latency - returns frequency transition latency in ns
