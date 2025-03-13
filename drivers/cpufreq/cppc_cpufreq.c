@@ -92,7 +92,7 @@ static void cppc_scale_freq_workfn(struct kthread_work *work)
 	cppc_fi = container_of(work, struct cppc_freq_invariance, work);
 	cpu_data = cppc_fi->cpu_data;
 
-	if (cppc_get_perf_ctrs(cppc_fi->cpu, &fb_ctrs)) {
+	if (cppc_get_perf_fb_ctrs(cppc_fi->cpu, &fb_ctrs)) {
 		pr_warn("%s: failed to read perf counters\n", __func__);
 		return;
 	}
@@ -127,7 +127,7 @@ static void cppc_scale_freq_tick(void)
 	struct cppc_freq_invariance *cppc_fi = &per_cpu(cppc_freq_inv, smp_processor_id());
 
 	/*
-	 * cppc_get_perf_ctrs() can potentially sleep, call that from the right
+	 * cppc_get_perf_fb_ctrs() can potentially sleep, call that from the right
 	 * context.
 	 */
 	irq_work_queue(&cppc_fi->irq_work);
@@ -153,7 +153,7 @@ static void cppc_cpufreq_cpu_fie_init(struct cpufreq_policy *policy)
 		kthread_init_work(&cppc_fi->work, cppc_scale_freq_workfn);
 		init_irq_work(&cppc_fi->irq_work, cppc_irq_work);
 
-		ret = cppc_get_perf_ctrs(cpu, &cppc_fi->prev_perf_fb_ctrs);
+		ret = cppc_get_perf_fb_ctrs(cpu, &cppc_fi->prev_perf_fb_ctrs);
 		if (ret) {
 			pr_warn("%s: failed to read perf counters for cpu:%d: %d\n",
 				__func__, cpu, ret);
@@ -283,7 +283,7 @@ static int cppc_cpufreq_set_target(struct cpufreq_policy *policy,
 	freqs.new = target_freq;
 
 	cpufreq_freq_transition_begin(policy, &freqs);
-	ret = cppc_set_perf(cpu, &cpu_data->perf_ctrls);
+	ret = cppc_set_perf_ctrls(cpu, &cpu_data->perf_ctrls);
 	cpufreq_freq_transition_end(policy, &freqs, ret != 0);
 
 	if (ret)
@@ -303,7 +303,7 @@ static unsigned int cppc_cpufreq_fast_switch(struct cpufreq_policy *policy,
 
 	desired_perf = cppc_khz_to_perf(&cpu_data->perf_caps, target_freq);
 	cpu_data->perf_ctrls.desired_perf = desired_perf;
-	ret = cppc_set_perf(cpu, &cpu_data->perf_ctrls);
+	ret = cppc_set_perf_ctrls(cpu, &cpu_data->perf_ctrls);
 
 	if (ret) {
 		pr_debug("Failed to set target on CPU:%d. ret:%d\n",
@@ -658,7 +658,7 @@ static int cppc_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	policy->cur = cppc_perf_to_khz(caps, caps->highest_perf);
 	cpu_data->perf_ctrls.desired_perf =  caps->highest_perf;
 
-	ret = cppc_set_perf(cpu, &cpu_data->perf_ctrls);
+	ret = cppc_set_perf_ctrls(cpu, &cpu_data->perf_ctrls);
 	if (ret) {
 		pr_debug("Err setting perf value:%d on CPU:%d. ret:%d\n",
 			 caps->highest_perf, cpu, ret);
@@ -684,7 +684,7 @@ static void cppc_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 
 	cpu_data->perf_ctrls.desired_perf = caps->lowest_perf;
 
-	ret = cppc_set_perf(cpu, &cpu_data->perf_ctrls);
+	ret = cppc_set_perf_ctrls(cpu, &cpu_data->perf_ctrls);
 	if (ret)
 		pr_debug("Err setting perf value:%d on CPU:%d. ret:%d\n",
 			 caps->lowest_perf, cpu, ret);
@@ -724,19 +724,19 @@ static int cppc_perf_from_fbctrs(struct cppc_cpudata *cpu_data,
 	return (reference_perf * delta_delivered) / delta_reference;
 }
 
-static int cppc_get_perf_ctrs_sample(int cpu,
+static int cppc_get_perf_fb_ctrs_sample(int cpu,
 				     struct cppc_perf_fb_ctrs *fb_ctrs_t0,
 				     struct cppc_perf_fb_ctrs *fb_ctrs_t1)
 {
 	int ret;
 
-	ret = cppc_get_perf_ctrs(cpu, fb_ctrs_t0);
+	ret = cppc_get_perf_fb_ctrs(cpu, fb_ctrs_t0);
 	if (ret)
 		return ret;
 
 	udelay(2); /* 2usec delay between sampling */
 
-	return cppc_get_perf_ctrs(cpu, fb_ctrs_t1);
+	return cppc_get_perf_fb_ctrs(cpu, fb_ctrs_t1);
 }
 
 static unsigned int cppc_cpufreq_get_rate(unsigned int cpu)
@@ -754,7 +754,7 @@ static unsigned int cppc_cpufreq_get_rate(unsigned int cpu)
 
 	cpufreq_cpu_put(policy);
 
-	ret = cppc_get_perf_ctrs_sample(cpu, &fb_ctrs_t0, &fb_ctrs_t1);
+	ret = cppc_get_perf_fb_ctrs_sample(cpu, &fb_ctrs_t0, &fb_ctrs_t1);
 	if (ret) {
 		if (ret == -EFAULT)
 			/* Any of the associated CPPC regs is 0. */
