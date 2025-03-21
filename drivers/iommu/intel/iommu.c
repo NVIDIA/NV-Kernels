@@ -3408,7 +3408,8 @@ intel_iommu_domain_alloc_second_stage(struct device *dev,
 	struct dmar_domain *dmar_domain;
 
 	if (flags &
-	    (~(IOMMU_HWPT_ALLOC_NEST_PARENT | IOMMU_HWPT_ALLOC_DIRTY_TRACKING)))
+	    (~(IOMMU_HWPT_ALLOC_NEST_PARENT | IOMMU_HWPT_ALLOC_DIRTY_TRACKING |
+	       IOMMU_HWPT_ALLOC_PASID)))
 		return ERR_PTR(-EOPNOTSUPP);
 
 	if (((flags & IOMMU_HWPT_ALLOC_NEST_PARENT) &&
