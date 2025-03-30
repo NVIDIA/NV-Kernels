@@ -80,8 +80,7 @@ cleanup()
 {
 	online_cpus
 	cd $CGROUP2
-	rmdir A1/A2/A3 A1/A2 A1 B1 > /dev/null 2>&1
-	rmdir test > /dev/null 2>&1
+	rmdir A1/A2/A3 A1/A2 A1 B1 test/A1 test/B1 test > /dev/null 2>&1
 	[[ -n "$SCHED_DEBUG" ]] &&
 		echo "$SCHED_DEBUG" > /sys/kernel/debug/sched/verbose
 }
@@ -151,14 +150,22 @@ test_add_proc()
 #
 # Cgroup test hierarchy
 #
-# root -- A1 -- A2 -- A3
-#      +- B1
+#	      root
+#	        |
+#	 +------+------+
+#	 |             |
+#	 A1            B1
+#	 |
+#	 A2
+#	 |
+#	 A3
 #
 #  P<v> = set cpus.partition (0:member, 1:root, 2:isolated)
 #  C<l> = add cpu-list to cpuset.cpus
 #  X<l> = add cpu-list to cpuset.cpus.exclusive
 #  S<p> = use prefix in subtree_control
 #  T    = put a task into cgroup
+#  CX<l> = add cpu-list to both cpuset.cpus and cpuset.cpus.exclusive
 #  O<c>=<v> = Write <v> to CPU online file of <c>
 #
 SETUP_A123_PARTITIONS="C1-3:P1:S+ C2-3:P1:S+ C3:P1"
@@ -407,25 +414,26 @@ set_ctrl_state()
 		PFILE=$CGRP/cpuset.cpus.partition
 		CFILE=$CGRP/cpuset.cpus
 		XFILE=$CGRP/cpuset.cpus.exclusive
-		S=$(expr substr $CMD 1 1)
-		if [[ $S = S ]]
-		then
-			PREFIX=${CMD#?}
+		case $CMD in
+		    S*) PREFIX=${CMD#?}
 			COMM="echo ${PREFIX}${CTRL} > $SFILE"
 			eval $COMM $REDIRECT
-		elif [[ $S = X ]]
-		then
+			;;
+		    X*)
 			CPUS=${CMD#?}
 			COMM="echo $CPUS > $XFILE"
 			eval $COMM $REDIRECT
-		elif [[ $S = C ]]
-		then
-			CPUS=${CMD#?}
+			;;
+		    CX*)
+			CPUS=${CMD#??}
+			COMM="echo $CPUS > $CFILE; echo $CPUS > $XFILE"
+			eval $COMM $REDIRECT
+			;;
+		    C*) CPUS=${CMD#?}
 			COMM="echo $CPUS > $CFILE"
 			eval $COMM $REDIRECT
-		elif [[ $S = P ]]
-		then
-			VAL=${CMD#?}
+			;;
+		    P*) VAL=${CMD#?}
 			case $VAL in
 			0)  VAL=member
 			    ;;
@@ -440,15 +448,17 @@ set_ctrl_state()
 			esac
 			COMM="echo $VAL > $PFILE"
 			eval $COMM $REDIRECT
-		elif [[ $S = O ]]
-		then
-			VAL=${CMD#?}
+			;;
+		    O*) VAL=${CMD#?}
 			write_cpu_online $VAL
-		elif [[ $S = T ]]
-		then
-			COMM="echo 0 > $TFILE"
+			;;
+		    T*) COMM="echo 0 > $TFILE"
 			eval $COMM $REDIRECT
-		fi
+			;;
+		    *)  echo "Unknown command: $CMD"
+		        exit 1
+			;;
+		esac
 		RET=$?
 		[[ $RET -ne 0 ]] && {
 			[[ -n "$SHOWERR" ]] && {
@@ -486,21 +496,18 @@ online_cpus()
 }
 
 #
-# Return 1 if the list of effective cpus isn't the same as the initial list.
+# Remove all the test cgroup directories
 #
 reset_cgroup_states()
 {
 	echo 0 > $CGROUP2/cgroup.procs
 	online_cpus
-	rmdir A1/A2/A3 A1/A2 A1 B1 > /dev/null 2>&1
-	pause 0.02
-	set_ctrl_state . R-
-	pause 0.01
+	rmdir $RESET_LIST > /dev/null 2>&1
 }
 
 dump_states()
 {
-	for DIR in . A1 A1/A2 A1/A2/A3 B1
+	for DIR in $CGROUP_LIST
 	do
 		CPUS=$DIR/cpuset.cpus
 		ECPUS=$DIR/cpuset.cpus.effective
@@ -520,6 +527,21 @@ dump_states()
 }
 
 #
+# Set the actual cgroup directory into $CGRP_DIR
+# $1 - cgroup name
+#
+set_cgroup_dir()
+{
+	CGRP_DIR=$1
+	[[ $CGRP_DIR = A2  ]] && CGRP_DIR=A1/A2
+	[[ $CGRP_DIR = A3  ]] && CGRP_DIR=A1/A2/A3
+	[[ $CGRP_DIR = c11 ]] && CGRP_DIR=p1/c11
+	[[ $CGRP_DIR = c12 ]] && CGRP_DIR=p1/c12
+	[[ $CGRP_DIR = c21 ]] && CGRP_DIR=p2/c21
+	[[ $CGRP_DIR = c22 ]] && CGRP_DIR=p2/c22
+}
+
+#
 # Check effective cpus
 # $1 - check string, format: <cgroup>:<cpu-list>[|<cgroup>:<cpu-list>]*
 #
@@ -530,7 +552,8 @@ check_effective_cpus()
 	do
 		set -- $(echo $CHK | sed -e "s/:/ /g")
 		CGRP=$1
-		CPUS=$2
+		EXPECTED_CPUS=$2
+		ACTUAL_CPUS=
 		if [[ $CGRP = X* ]]
 		then
 			CGRP=${CGRP#X}
@@ -538,10 +561,10 @@ check_effective_cpus()
 		else
 			FILE=cpuset.cpus.effective
 		fi
-		[[ $CGRP = A2 ]] && CGRP=A1/A2
-		[[ $CGRP = A3 ]] && CGRP=A1/A2/A3
-		[[ -e $CGRP/$FILE ]] || return 1
-		[[ $CPUS = $(cat $CGRP/$FILE) ]] || return 1
+		set_cgroup_dir $CGRP
+		[[ -e $CGRP_DIR/$FILE ]] || return 1
+		ACTUAL_CPUS=$(cat $CGRP_DIR/$FILE)
+		[[ $EXPECTED_CPUS = $ACTUAL_CPUS ]] || return 1
 	done
 }
 
@@ -556,22 +579,21 @@ check_cgroup_states()
 	do
 		set -- $(echo $CHK | sed -e "s/:/ /g")
 		CGRP=$1
-		STATE=$2
+		EXPECTED_STATE=$2
 		FILE=
-		EVAL=$(expr substr $STATE 2 2)
-		[[ $CGRP = A2 ]] && CGRP=A1/A2
-		[[ $CGRP = A3 ]] && CGRP=A1/A2/A3
+		EVAL=$(expr substr $EXPECTED_STATE 2 2)
 
-		case $STATE in
-			P*) FILE=$CGRP/cpuset.cpus.partition
+		set_cgroup_dir $CGRP
+		case $EXPECTED_STATE in
+			P*) FILE=$CGRP_DIR/cpuset.cpus.partition
 			    ;;
-			*)  echo "Unknown state: $STATE!"
+			*)  echo "Unknown state: $EXPECTED_STATE!"
 			    exit 1
 			    ;;
 		esac
-		VAL=$(cat $FILE)
+		ACTUAL_STATE=$(cat $FILE)
 
-		case "$VAL" in
+		case "$ACTUAL_STATE" in
 			member) VAL=0
 				;;
 			root)	VAL=1
@@ -607,22 +629,22 @@ check_cgroup_states()
 #
 check_isolcpus()
 {
-	EXPECT_VAL=$1
+	EXPECTED_ISOLCPUS=$1
+	ISCPUS=${CGROUP2}/cpuset.cpus.isolated
 	ISOLCPUS=
 	LASTISOLCPU=
 	SCHED_DOMAINS=/sys/kernel/debug/sched/domains
-	ISCPUS=${CGROUP2}/cpuset.cpus.isolated
-	if [[ $EXPECT_VAL = . ]]
+	if [[ $EXPECTED_ISOLCPUS = . ]]
 	then
-		EXPECT_VAL=
-		EXPECT_VAL2=
-	elif [[ $(expr $EXPECT_VAL : ".*|.*") > 0 ]]
+		EXPECTED_ISOLCPUS=
+		EXPECTED_SDOMAIN=
+	elif [[ $(expr $EXPECTED_ISOLCPUS : ".*|.*") > 0 ]]
 	then
-		set -- $(echo $EXPECT_VAL | sed -e "s/|/ /g")
-		EXPECT_VAL=$1
-		EXPECT_VAL2=$2
+		set -- $(echo $EXPECTED_ISOLCPUS | sed -e "s/|/ /g")
+		EXPECTED_ISOLCPUS=$2
+		EXPECTED_SDOMAIN=$1
 	else
-		EXPECT_VAL2=$EXPECT_VAL
+		EXPECTED_SDOMAIN=$EXPECTED_ISOLCPUS
 	fi
 
 	#
@@ -630,14 +652,15 @@ check_isolcpus()
 	#
 	[[ -f $ISCPUS ]] && {
 		ISOLCPUS=$(cat $ISCPUS)
-		[[ "$EXPECT_VAL2" != "$ISOLCPUS" ]] && {
+		[[ "$EXPECTED_ISOLCPUS" != "$ISOLCPUS" ]] && {
 			# Take a 50ms pause and try again
 			pause 0.05
 			ISOLCPUS=$(cat $ISCPUS)
 		}
-		[[ "$EXPECT_VAL2" != "$ISOLCPUS" ]] && return 1
+		[[ "$EXPECTED_ISOLCPUS" != "$ISOLCPUS" ]] && return 1
 		ISOLCPUS=
 	}
+	EXPECTED_ISOLCPUS=$EXPECTED_SDOMAIN
 
 	#
 	# Use the sched domain in debugfs to check isolated CPUs, if available
@@ -670,7 +693,7 @@ check_isolcpus()
 		fi
 	done
 	[[ "$ISOLCPUS" = *- ]] && ISOLCPUS=${ISOLCPUS}$LASTISOLCPU
-	[[ "$EXPECT_VAL" = "$ISOLCPUS" ]]
+	[[ "$EXPECTED_SDOMAIN" = "$ISOLCPUS" ]]
 }
 
 test_fail()
@@ -707,6 +730,60 @@ null_isolcpus_check()
 }
 
 #
+# Check state transition test result
+#  $1 - Test number
+#  $2 - Expected effective CPU values
+#  $3 - Expected partition states
+#  $4 - Expected isolated CPUs
+#
+check_test_results()
+{
+	_NR=$1
+	_ECPUS="$2"
+	_PSTATES="$3"
+	_ISOLCPUS="$4"
+
+	[[ -n "$_ECPUS" && "$_ECPUS" != . ]] && {
+		check_effective_cpus $_ECPUS
+		[[ $? -ne 0 ]] && test_fail $_NR "effective CPU" \
+			 "Cgroup $CGRP: expected $EXPECTED_CPUS, got $ACTUAL_CPUS"
+	}
+
+	[[ -n "$_PSTATES" && "$_PSTATES" != . ]] && {
+		check_cgroup_states $_PSTATES
+		[[ $? -ne 0 ]] && test_fail $_NR states \
+			"Cgroup $CGRP: expected $EXPECTED_STATE, got $ACTUAL_STATE"
+	}
+
+	# Compare the expected isolated CPUs with the actual ones,
+	# if available
+	[[ -n "$_ISOLCPUS" ]] && {
+		check_isolcpus $_ISOLCPUS
+		[[ $? -ne 0 ]] && test_fail $_NR "isolated CPU" \
+			"Expect $_ISOLCPUS, get $ISOLCPUS instead"
+	}
+	reset_cgroup_states
+	#
+	# Check to see if effective cpu list changes
+	#
+	_NEWLIST=$(cat $CGROUP2/cpuset.cpus.effective)
+	RETRY=0
+	while [[ $_NEWLIST != $CPULIST && $RETRY -lt 8 ]]
+	do
+		# Wait a bit longer & recheck a few times
+		pause 0.01
+		((RETRY++))
+		_NEWLIST=$(cat $CGROUP2/cpuset.cpus.effective)
+	done
+	[[ $_NEWLIST != $CPULIST ]] && {
+		echo "Effective cpus changed to $_NEWLIST after test $_NR!"
+		exit 1
+	}
+	null_isolcpus_check
+	[[ $VERBOSE -gt 0 ]] && echo "Test $I done."
+}
+
+#
 # Run cpuset state transition test
 #  $1 - test matrix name
 #
@@ -718,6 +795,8 @@ run_state_test()
 {
 	TEST=$1
 	CONTROLLER=cpuset
+	CGROUP_LIST=". A1 A1/A2 A1/A2/A3 B1"
+	RESET_LIST="A1/A2/A3 A1/A2 A1 B1"
 	I=0
 	eval CNT="\${#$TEST[@]}"
 
@@ -757,42 +836,7 @@ run_state_test()
 
 		[[ $RETVAL -ne $RESULT ]] && test_fail $I result
 
-		[[ -n "$ECPUS" && "$ECPUS" != . ]] && {
-			check_effective_cpus $ECPUS
-			[[ $? -ne 0 ]] && test_fail $I "effective CPU"
-		}
-
-		[[ -n "$STATES" && "$STATES" != . ]] && {
-			check_cgroup_states $STATES
-			[[ $? -ne 0 ]] && test_fail $I states
-		}
-
-		# Compare the expected isolated CPUs with the actual ones,
-		# if available
-		[[ -n "$ICPUS" ]] && {
-			check_isolcpus $ICPUS
-			[[ $? -ne 0 ]] && test_fail $I "isolated CPU" \
-				"Expect $ICPUS, get $ISOLCPUS instead"
-		}
-		reset_cgroup_states
-		#
-		# Check to see if effective cpu list changes
-		#
-		NEWLIST=$(cat cpuset.cpus.effective)
-		RETRY=0
-		while [[ $NEWLIST != $CPULIST && $RETRY -lt 8 ]]
-		do
-			# Wait a bit longer & recheck a few times
-			pause 0.01
-			((RETRY++))
-			NEWLIST=$(cat cpuset.cpus.effective)
-		done
-		[[ $NEWLIST != $CPULIST ]] && {
-			echo "Effective cpus changed to $NEWLIST after test $I!"
-			exit 1
-		}
-		null_isolcpus_check
-		[[ $VERBOSE -gt 0 ]] && echo "Test $I done."
+		check_test_results $I "$ECPUS" "$STATES" "$ICPUS"
 		((I++))
 	done
 	echo "All $I tests of $TEST PASSED."
@@ -862,6 +906,7 @@ test_isolated()
 	echo $$ > $CGROUP2/cgroup.procs
 	[[ -d A1 ]] && rmdir A1
 	null_isolcpus_check
+	pause 0.05
 }
 
 #
@@ -927,6 +972,8 @@ test_inotify()
 	else
 		echo "Inotify test PASSED"
 	fi
+	echo member > cpuset.cpus.partition
+	echo "" > cpuset.cpus
 }
 
 trap cleanup 0 2 3 6
