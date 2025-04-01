@@ -154,7 +154,9 @@ static int check_user(struct aa_profile *profile,
 	node->data.subjtsk = current;
 	node->data.type = AUDIT_APPARMOR_USER;
 	node->data.request = ad->request;
+	node->data.tags = ad->tags;
 	node->data.denied = ad->request & ~perms->allow;
+	AA_DEBUG_PROFILE(profile, DEBUG_UPCALL, "attempting upcall\n");
 	err = aa_do_notification(APPARMOR_NOTIF_OP, node);
 	put_task_struct(node->data.subjtsk);
 
@@ -250,7 +252,8 @@ int aa_audit_file(const struct cred *subj_cred,
 				/* are there other errors we should bail on */
 				return err;
 			}
-		}
+		} else
+			AA_DEBUG_PROFILE(profile, DEBUG_UPCALL, "not prompting prompt %d, requiest 0x%x, deny 0x%x, prompt 0x%x implicit deny 0x%x", prompt, request, perms->deny, perms->prompt, implicit_deny);
 	}
 
 	if (likely(!ad.error)) {
