@@ -153,6 +153,9 @@ CONFIG_LEDS_AAEON                               note<'Disable all Ubuntu ODM dri
 CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
 CONFIG_MFD_AAEON                                note<'Disable all Ubuntu ODM drivers'>
 
+CONFIG_MTD                                      policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_MTD                                      note<'Essential for boot on ARM64'>
+
 CONFIG_MTK_PCIE_HOTPLUG                         policy<{'arm64': 'm'}>
 CONFIG_MTK_PCIE_HOTPLUG                         note<'CX7 PCIe hotplug driver for NVIDIA DGX Spark systems with GB10 SoC.'>
 
@@ -170,6 +173,9 @@ CONFIG_NOUVEAU_DEBUG_PUSH                       note<'Disable nouveau for NVIDIA
 
 CONFIG_NOUVEAU_PLATFORM_DRIVER                  policy<{'arm64': '-'}>
 CONFIG_NOUVEAU_PLATFORM_DRIVER                  note<'Disable nouveau for NVIDIA kernels'>
+
+CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
+CONFIG_NR_CPUS                                  note<'LP: #1864198'>
 
 CONFIG_NVGRACE_EGM                              policy<{'arm64': 'm'}>
 CONFIG_NVGRACE_EGM                              note<'LP: #2119656'>
@@ -192,8 +198,17 @@ CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablem
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM drivers'>
 
+CONFIG_SPI_TEGRA210_QUAD                        policy<{'arm64': 'y'}>
+CONFIG_SPI_TEGRA210_QUAD                        note<'Ensures the TPM is available before the IMA driver initializes'>
+
 CONFIG_TCG_ARM_CRB_FFA                          policy<{'arm64': 'y'}>
 CONFIG_TCG_ARM_CRB_FFA                          note<'LP: #2111511'>
+
+CONFIG_TCG_TIS_SPI                              policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_TCG_TIS_SPI                              note<'Ensures the TPM is available before the IMA driver initializes'>
+
+CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM drivers'>
 
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
@@ -207,5 +222,7 @@ CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
 # ---- Annotations without notes ----
 
 CONFIG_AS_VERSION                               policy<{'amd64': '24700', 'arm64': '24700'}>
+CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc (Ubuntu 15.3.0-4ubuntu1) 15.3.0"', 'arm64': '"aarch64-linux-gnu-gcc (Ubuntu 15.3.0-4ubuntu1) 15.3.0"'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24700', 'arm64': '24700'}>
+CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
