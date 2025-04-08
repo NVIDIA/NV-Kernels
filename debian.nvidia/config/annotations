@@ -6,9 +6,34 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            policy<{'arm64': 'n'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'required for NVIDIA workloads'>
+
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'n', 'arm64': 'y'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'required for NVIDIA workloads'>
+
+CONFIG_MTD                                      policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_MTD                                      note<'Essential for boot on ARM64'>
+
+CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
+CONFIG_NR_CPUS                                  note<'LP: #1864198'>
+
+CONFIG_SPI_TEGRA210_QUAD                        policy<{'arm64': 'y'}>
+CONFIG_SPI_TEGRA210_QUAD                        note<'Ensures the TPM is available before the IMA driver initializes'>
+
+CONFIG_TCG_TIS_SPI                              policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_TCG_TIS_SPI                              note<'Ensures the TPM is available before the IMA driver initializes'>
+
+CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM drivers'>
+
 
 # ---- Annotations without notes ----
 
-CONFIG_AS_VERSION                               policy<{'amd64': '24600', 'arm64': '24600'}>
-CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc (Ubuntu 15.2.0-14ubuntu1) 15.2.0"', 'arm64': '"aarch64-linux-gnu-gcc (Ubuntu 15.2.0-13ubuntu3) 15.2.0"'}>
-CONFIG_LD_VERSION                               policy<{'amd64': '24600', 'arm64': '24600'}>
+CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc (Ubuntu 15.2.0-15ubuntu1) 15.2.0"', 'arm64': '"aarch64-linux-gnu-gcc (Ubuntu 15.2.0-15ubuntu1) 15.2.0"'}>
+CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
+CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
+CONFIG_MFD_AAEON                                policy<{'amd64': '-'}>
+CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
