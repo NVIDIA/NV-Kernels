@@ -19,6 +19,7 @@
 #include <linux/irq.h>
 #include <linux/irqdesc.h>
 #include <linux/list.h>
+#include <linux/list_sort.h>
 #include <linux/lockdep.h>
 #include <linux/mutex.h>
 #include <linux/moduleparam.h>
@@ -2761,6 +2762,21 @@ static void mpam_enable_merge_class_features(struct mpam_component *comp)
 		__class_props_mismatch(class, vmsc);
 }
 
+
+static int mpam_component_sort_cmp(void *priv, const struct list_head *a,
+				   const struct list_head *b)
+{
+	const struct mpam_component *comp0;
+	const struct mpam_component *comp1;
+
+	lockdep_assert_held(&mpam_list_lock);
+
+	comp0 = list_entry(a, struct mpam_component, class_list);
+	comp1 = list_entry(b, struct mpam_component, class_list);
+
+	return comp0->comp_id > comp1->comp_id;
+}
+
 /*
  * Merge all the common resource features into class.
  * vmsc features are bitwise-or'd together by mpam_enable_merge_vmsc_features()
@@ -2782,6 +2798,9 @@ static void mpam_enable_merge_features(struct list_head *all_classes_list)
 	lockdep_assert_held(&mpam_list_lock);
 
 	list_for_each_entry(class, all_classes_list, classes_list) {
+
+		list_sort(NULL, &class->components, mpam_component_sort_cmp);
+
 		list_for_each_entry(comp, &class->components, class_list)
 			mpam_enable_merge_vmsc_features(comp);
 
