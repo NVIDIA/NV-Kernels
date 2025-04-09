@@ -1150,15 +1150,6 @@ exit:
 	ublk_end_request(req, res);
 }
 
-static void ublk_complete_rq(struct kref *ref)
-{
-	struct ublk_rq_data *data = container_of(ref, struct ublk_rq_data,
-			ref);
-	struct request *req = blk_mq_rq_from_pdu(data);
-
-	__ublk_complete_rq(req);
-}
-
 static void ublk_do_fail_rq(struct request *req)
 {
 	struct ublk_queue *ubq = req->mq_hctx->driver_data;
@@ -1176,6 +1167,20 @@ static void ublk_fail_rq_fn(struct kref *ref)
 	struct request *req = blk_mq_rq_from_pdu(data);
 
 	ublk_do_fail_rq(req);
+}
+
+static void ublk_complete_rq(struct kref *ref)
+{
+	struct ublk_rq_data *data = container_of(ref, struct ublk_rq_data,
+			ref);
+	struct request *req = blk_mq_rq_from_pdu(data);
+	struct ublk_queue *ubq = req->mq_hctx->driver_data;
+
+	/* the abort path's reference may be dropped by another holder last */
+	if (ubq->ios[req->tag].flags & UBLK_IO_FLAG_ABORTED)
+		ublk_do_fail_rq(req);
+	else
+		__ublk_complete_rq(req);
 }
 
 /*
