@@ -270,7 +270,7 @@ static int device_not_zone_append_capable(struct dm_target *ti,
 	return !bdev_is_zoned(dev->bdev);
 }
 
-static bool dm_table_supports_zone_append(struct dm_table *t)
+bool dm_table_supports_zone_append(struct dm_table *t)
 {
 	for (unsigned int i = 0; i < t->num_targets; i++) {
 		struct dm_target *ti = dm_table_get_target(t, i);
