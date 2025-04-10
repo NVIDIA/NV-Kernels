@@ -97,6 +97,7 @@ struct thread_struct {
 	unsigned long bad_cause;
 	u32 riscv_v_flags;
 	u32 vstate_ctrl;
+	unsigned long status;
 	struct __riscv_v_ext_state vstate;
 	unsigned long align_ctl;
 	struct __riscv_v_ext_state kernel_vstate;
