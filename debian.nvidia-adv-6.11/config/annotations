@@ -173,6 +173,7 @@ CONFIG_ARCH_SUPPORTS_PUD_PFNMAP                 policy<{'amd64': 'y'}>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_ARM64_MPAM                               policy<{'amd64': '-', 'arm64': 'y'}>
 CONFIG_ARM64_MPAM_DRIVER                        policy<{'arm64': 'y'}>
+CONFIG_ARM64_MPAM_RESCTRL_FS                    policy<{'amd64': '-', 'arm64': 'y'}>
 CONFIG_ARM_CPU_RESCTRL                          policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_AS_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
 CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-'}>
