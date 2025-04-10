@@ -22,6 +22,18 @@ int strncmp(const char *cs, const char *ct, size_t count)
 	return 0;
 }
 
+ssize_t sized_strscpy(char *dst, const char *src, size_t count)
+{
+	size_t len;
+
+	if (count == 0)
+		return -E2BIG;
+	len = strnlen(src, count - 1);
+	memcpy(dst, src, len);
+	dst[len] = '\0';
+	return src[len] ? -E2BIG : len;
+}
+
 char *skip_spaces(const char *str)
 {
 	while (isspace(*str))
