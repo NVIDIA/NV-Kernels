@@ -3763,6 +3763,14 @@ static void quirk_no_bus_reset(struct pci_dev *dev)
 }
 
 /*
+ * Root ports with Gen5x4 supported on some NVIDIA chip will
+ * encounter problems occasionally after SBR (secondary bus
+ * reset) is applied. Avoid applying SBR on these root ports.
+ */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_MT8901_GEN5_X4,
+			quirk_no_bus_reset);
+
+/*
  * Some NVIDIA GPU devices do not work with bus reset, SBR needs to be
  * prevented for those affected devices.
  */
