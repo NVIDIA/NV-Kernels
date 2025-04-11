@@ -683,17 +683,24 @@ static int tegra194_cpufreq_init(struct cpufreq_policy *policy)
 	u32 clusterid = data->cpu_data[policy->cpu].clusterid;
 	struct cpufreq_frequency_table *freq_table;
 	struct cpufreq_frequency_table *bpmp_lut;
-	u32 start_cpu, cpu;
+	u32 cpu;
 	int ret;
 
 	if (clusterid >= data->soc->num_clusters || !data->bpmp_luts[clusterid])
 		return -EINVAL;
 
-	start_cpu = rounddown(policy->cpu, maxcpus_per_clock);
-	/* set same policy for all cpus in a cluster */
-	for (cpu = start_cpu; cpu < (start_cpu + maxcpus_per_clock); cpu++) {
-		if (cpu_possible(cpu))
+	/* Set same policy for all possible cpus in a clocking cluster */
+	for_each_possible_cpu(cpu) {
+		if (data->cpu_data[cpu].clusterid == clusterid) {
 			cpumask_set_cpu(cpu, policy->cpus);
+		} else if (data->soc->clusters_per_clk > 1) {
+			u32 policy_clk_id = clusterid / data->soc->clusters_per_clk;
+			u32 clk_id = data->cpu_data[cpu].clusterid /
+				data->soc->clusters_per_clk;
+			if (policy_clk_id == clk_id) {
+				cpumask_set_cpu(cpu, policy->cpus);
+			}
+		}
 	}
 	policy->cpuinfo.transition_latency = TEGRA_CPUFREQ_TRANSITION_LATENCY;
 
