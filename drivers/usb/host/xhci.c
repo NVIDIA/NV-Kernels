@@ -3732,6 +3732,11 @@ static int xhci_alloc_streams(struct usb_hcd *hcd, struct usb_device *udev,
 	if (ret < 0)
 		goto cleanup;
 
+	if (xhci->quirks & XHCI_NVIDIA_MT8901_HOST) {
+		xhci_hub_control(hcd, SetPortFeature, USB_PORT_FEAT_U1_TIMEOUT, 0, NULL, 0);
+		xhci_hub_control(hcd, SetPortFeature, USB_PORT_FEAT_U2_TIMEOUT, 0, NULL, 0);
+	}
+
 	spin_lock_irqsave(&xhci->lock, flags);
 	for (i = 0; i < num_eps; i++) {
 		ep_index = xhci_get_endpoint_index(&eps[i]->desc);
