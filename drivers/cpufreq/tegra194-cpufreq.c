@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2020 - 2022, NVIDIA CORPORATION. All rights reserved
+ * Copyright (c) 2020 - 2025, NVIDIA CORPORATION. All rights reserved
  */
 
 #include <linux/cpu.h>
@@ -65,7 +65,7 @@ struct read_counters_work {
 
 struct tegra_cpufreq_ops {
 	void (*read_counters)(struct tegra_cpu_ctr *c);
-	void (*set_cpu_ndiv)(struct cpufreq_policy *policy, u64 ndiv);
+	int (*set_cpu_ndiv)(struct cpufreq_policy *policy, u64 ndiv);
 	void (*get_cpu_cluster_id)(u32 cpu, u32 *cpuid, u32 *clusterid);
 	int (*get_cpu_ndiv)(u32 cpu, u32 cpuid, u32 clusterid, u64 *ndiv);
 };
@@ -135,18 +135,26 @@ static int tegra234_get_cpu_ndiv(u32 cpu, u32 cpuid, u32 clusterid, u64 *ndiv)
 {
 	struct tegra194_cpufreq_data *data = cpufreq_get_driver_data();
 
+	if (!data->regs)
+		return -EINVAL;
+
 	*ndiv = readl(data->cpu_data[cpu].freq_core_reg) & NDIV_MASK;
 
 	return 0;
 }
 
-static void tegra234_set_cpu_ndiv(struct cpufreq_policy *policy, u64 ndiv)
+static int tegra234_set_cpu_ndiv(struct cpufreq_policy *policy, u64 ndiv)
 {
 	struct tegra194_cpufreq_data *data = cpufreq_get_driver_data();
 	u32 cpu;
 
-	for_each_cpu(cpu, policy->cpus)
+	if (!data->regs)
+		return -EINVAL;
+
+	for_each_cpu_and(cpu, policy->cpus, cpu_online_mask)
 		writel(ndiv, data->cpu_data[cpu].freq_core_reg);
+
+	return 0;
 }
 
 /*
@@ -163,6 +171,9 @@ static void tegra234_read_counters(struct tegra_cpu_ctr *c)
 	u32 delta_refcnt;
 	int cnt = 0;
 	u64 val;
+
+	if (!data->regs)
+		return;
 
 	actmon_reg = CORE_ACTMON_CNTR_REG(data, data->cpu_data[c->cpu].clusterid,
 					  data->cpu_data[c->cpu].cpuid);
@@ -221,6 +232,9 @@ static int tegra264_get_cpu_ndiv(u32 cpu, u32 cpuid, u32 clusterid, u64 *ndiv)
 	struct tegra194_cpufreq_data *data = cpufreq_get_driver_data();
 	void __iomem *freq_core_reg;
 
+	if (!data->regs)
+		return -EINVAL;
+
 	/* clusterid/2 gives clk_id */
 	freq_core_reg = T264_NDIV_REG_LOC(data, (clusterid/2));
 
@@ -229,12 +243,15 @@ static int tegra264_get_cpu_ndiv(u32 cpu, u32 cpuid, u32 clusterid, u64 *ndiv)
 	return 0;
 }
 
-static void tegra264_set_cpu_ndiv(struct cpufreq_policy *policy, u64 ndiv)
+static int tegra264_set_cpu_ndiv(struct cpufreq_policy *policy, u64 ndiv)
 {
 	struct tegra194_cpufreq_data *data = cpufreq_get_driver_data();
 	void __iomem *freq_core_reg;
 	u32 cpuid, clusterid;
 	u32 cpu = cpumask_first(policy->cpus);
+
+	if (!data->regs)
+		return -EINVAL;
 
 	data->soc->ops->get_cpu_cluster_id(cpu, &cpuid, &clusterid);
 
@@ -242,6 +259,8 @@ static void tegra264_set_cpu_ndiv(struct cpufreq_policy *policy, u64 ndiv)
 	freq_core_reg = T264_NDIV_REG_LOC(data, (clusterid/2));
 
 	writel(ndiv, freq_core_reg);
+
+	return 0;
 }
 
 static inline uint64_t tegra264_get_counter_delta(uint64_t max_cnt,
@@ -363,7 +382,6 @@ static struct tegra_cpufreq_ops tegra264_cpufreq_ops = {
 
 const struct tegra_cpufreq_soc tegra264_cpufreq_soc = {
 	.ops = &tegra264_cpufreq_ops,
-	.actmon_cntr_base = 0x1, /* Dummy value */
 	.maxcpus_per_cluster = 1,
 	.num_clusters = 14,
 	.clusters_per_clk = 2,
@@ -557,9 +575,11 @@ static void tegra194_set_cpu_ndiv_sysreg(void *data)
 	asm volatile("msr s3_0_c15_c0_4, %0" : : "r" (ndiv_val));
 }
 
-static void tegra194_set_cpu_ndiv(struct cpufreq_policy *policy, u64 ndiv)
+static int tegra194_set_cpu_ndiv(struct cpufreq_policy *policy, u64 ndiv)
 {
 	on_each_cpu_mask(policy->cpus, tegra194_set_cpu_ndiv_sysreg, &ndiv, true);
+
+	return 0;
 }
 
 static unsigned int tegra194_get_speed(u32 cpu)
@@ -576,7 +596,7 @@ static unsigned int tegra194_get_speed(u32 cpu)
 
 	/* get last written ndiv value */
 	ret = data->soc->ops->get_cpu_ndiv(cpu, data->cpu_data[cpu].cpuid, clusterid, &ndiv);
-	if (WARN_ON_ONCE(ret))
+	if (data->regs && WARN_ON_ONCE(ret))
 		return rate;
 
 	/*
@@ -750,16 +770,28 @@ static int tegra194_cpufreq_set_target(struct cpufreq_policy *policy,
 {
 	struct cpufreq_frequency_table *tbl = policy->freq_table + index;
 	struct tegra194_cpufreq_data *data = cpufreq_get_driver_data();
+	int ret;
 
 	/*
 	 * Each core writes frequency in per core register. Then both cores
 	 * in a cluster run at same frequency which is the maximum frequency
 	 * request out of the values requested by both cores in that cluster.
 	 */
-	data->soc->ops->set_cpu_ndiv(policy, (u64)tbl->driver_data);
+	ret = data->soc->ops->set_cpu_ndiv(policy, (u64)tbl->driver_data);
+	if (ret)
+		return ret;
 
 	if (data->icc_dram_bw_scaling)
 		tegra_cpufreq_set_bw(policy, tbl->frequency);
+
+	return ret;
+}
+
+static int tegra194_cpufreq_set_policy(struct cpufreq_policy *policy)
+{
+	pr_debug("set_policy: cpu:%d, cpuinfo.max:%u, policy->max:%u,"
+		 "cpuinfo.min:%u, policy->min:%u\n", policy->cpu,
+		 policy->cpuinfo.max_freq, policy->max, policy->cpuinfo.min_freq, policy->min);
 
 	return 0;
 }
@@ -886,6 +918,10 @@ static int tegra194_cpufreq_store_physids(unsigned int cpu, struct tegra194_cpuf
 
 	data->cpu_data[cpu].cpuid = cpuid;
 	data->cpu_data[cpu].clusterid = clusterid;
+
+	if (!data->regs)
+		return 0;
+
 	data->cpu_data[cpu].freq_core_reg = SCRATCH_FREQ_CORE_REG(data, mpidr_id);
 
 	return 0;
@@ -897,6 +933,7 @@ static int tegra194_cpufreq_probe(struct platform_device *pdev)
 	struct tegra194_cpufreq_data *data;
 	struct tegra_bpmp *bpmp;
 	struct device *cpu_dev;
+	struct resource *res;
 	int err, i;
 	u32 cpu;
 
@@ -918,11 +955,28 @@ static int tegra194_cpufreq_probe(struct platform_device *pdev)
 	if (!data->bpmp_luts)
 		return -ENOMEM;
 
-	if (soc->actmon_cntr_base) {
-		/* mmio registers are used for frequency request and re-construction */
-		data->regs = devm_platform_ioremap_resource(pdev, 0);
+	/*
+	 * If MMIO region is not present in DT, then proceed normally with probe
+	 * and data->regs will remain NULL. This field will be checked later
+	 * in ops hooks to perform action per SoC or return error.
+	 * If a SoC uses MMIO for frequency request then the register read/write
+	 * will be skipped by set/get hooks.
+	 * If it uses system registers, then the frequency request will work.
+	 * MMIO region is mandatory only when the soc->actmon_cntr_base is populated.
+	 */
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res && soc->actmon_cntr_base) {
+		dev_err(&pdev->dev, "mmio region missing in DT\n");
+		return -ENODEV;
+	}
+
+	if (res) {
+		data->regs = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(data->regs))
 			return PTR_ERR(data->regs);
+	} else if (data->soc->ref_clk_mhz) {
+		tegra194_cpufreq_driver.target_index = NULL;
+		tegra194_cpufreq_driver.setpolicy = tegra194_cpufreq_set_policy;
 	}
 
 	data->cpu_data = devm_kcalloc(&pdev->dev, data->soc->num_clusters *
