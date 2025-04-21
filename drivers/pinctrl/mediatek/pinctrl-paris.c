@@ -3,7 +3,7 @@
  * MediaTek Pinctrl Paris Driver, which implement the vendor per-pin
  * bindings for MediaTek SoC.
  *
- * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2018-2025 MediaTek Inc.
  * Author: Sean Wang <sean.wang@mediatek.com>
  *	   Zhiyong Tao <zhiyong.tao@mediatek.com>
  *	   Hongzhou.Yang <hongzhou.yang@mediatek.com>
@@ -936,6 +936,15 @@ static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
 	return mtk_eint_set_debounce(hw->eint, desc->eint.eint_n, debounce);
 }
 
+static void mtk_pinctrl_gpio_range_init(struct mtk_pinctrl *hw, struct gpio_chip *chip)
+{
+	hw->range.name = "mtk_pinctrl_gpio_range";
+	hw->range.id = 0;
+	hw->range.pin_base = 0;
+	hw->range.base = chip->base;
+	hw->range.npins = hw->soc->npins;
+}
+
 static int mtk_build_gpiochip(struct mtk_pinctrl *hw)
 {
 	struct gpio_chip *chip = &hw->chip;
@@ -958,6 +967,8 @@ static int mtk_build_gpiochip(struct mtk_pinctrl *hw)
 	ret = gpiochip_add_data(chip, hw);
 	if (ret < 0)
 		return ret;
+
+	mtk_pinctrl_gpio_range_init(hw, chip);
 
 	return 0;
 }
@@ -1076,6 +1087,8 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 	err = mtk_build_gpiochip(hw);
 	if (err)
 		return dev_err_probe(dev, err, "Failed to add gpio_chip\n");
+
+	pinctrl_add_gpio_range(hw->pctrl, &hw->range);
 
 	platform_set_drvdata(pdev, hw);
 
