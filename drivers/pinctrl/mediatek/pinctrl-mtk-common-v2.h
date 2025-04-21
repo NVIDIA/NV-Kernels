@@ -302,6 +302,7 @@ struct mtk_pinctrl {
 	spinlock_t lock;
 	/* identify rsel setting by si unit or rsel define in dts node */
 	bool rsel_si_unit;
+	struct pinctrl_gpio_range	range;
 };
 
 void mtk_rmw(struct mtk_pinctrl *pctl, u8 i, u32 reg, u32 mask, u32 set);
