@@ -47,7 +47,7 @@ Build-Depends:
  python3-setuptools,
  rsync [!i386] <!stage1>,
  rust-1.80-src [amd64 arm64],
- rustc-1.80 (>= 1.82) [amd64 arm64],
+ rustc-1.80 [amd64 arm64],
  rustfmt-1.80 [amd64 arm64],
  uuid-dev <!stage1>,
  zstd <!stage1>,
