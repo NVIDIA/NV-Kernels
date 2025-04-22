@@ -162,6 +162,9 @@ CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablem
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM drivers'>
 
+CONFIG_SND_HDA_ACPI                             policy<{'amd64': 'n', 'arm64': 'm'}>
+CONFIG_SND_HDA_ACPI                             note<'Add support for ACPI-enumerated HDA'>
+
 CONFIG_SPI_TEGRA210_QUAD                        policy<{'arm64': 'y'}>
 CONFIG_SPI_TEGRA210_QUAD                        note<'Ensures the TPM is available before the IMA driver initializes'>
 
