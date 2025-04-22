@@ -156,6 +156,9 @@ CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablem
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM drivers'>
 
+CONFIG_SND_HDA_ACPI                             policy<{'amd64': 'n', 'arm64': 'm'}>
+CONFIG_SND_HDA_ACPI                             note<'Add support for ACPI-enumerated HDA'>
+
 CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM drivers'>
 
