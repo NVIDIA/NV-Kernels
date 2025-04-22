@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2018-2025 MediaTek Inc.
  *
  * Author: Sean Wang <sean.wang@mediatek.com>
  *
@@ -369,18 +369,30 @@ int mtk_build_eint(struct mtk_pinctrl *hw, struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	int ret, i, j, count_reg_names;
+	struct fwnode_handle *fwnode = dev_fwnode(&pdev->dev);
+	struct resource *res;
 
 	if (!IS_ENABLED(CONFIG_EINT_MTK))
 		return 0;
 
-	if (!of_property_read_bool(np, "interrupt-controller"))
+	if (is_of_node(fwnode) && !of_property_read_bool(np, "interrupt-controller"))
 		return -ENODEV;
 
 	hw->eint = devm_kzalloc(hw->dev, sizeof(*hw->eint), GFP_KERNEL);
 	if (!hw->eint)
 		return -ENOMEM;
 
-	count_reg_names = of_property_count_strings(np, "reg-names");
+	if (is_of_node(fwnode)) {
+		count_reg_names = of_property_count_strings(np, "reg-names");
+	} else {
+		count_reg_names = 0;
+		for (i = 0; i < pdev->num_resources; i++) {
+			struct resource *r = &pdev->resource[i];
+
+			if (resource_type(r) == IORESOURCE_MEM)
+				count_reg_names++;
+		}
+	}
 	if (count_reg_names < 0)
 		return -EINVAL;
 
@@ -396,14 +408,18 @@ int mtk_build_eint(struct mtk_pinctrl *hw, struct platform_device *pdev)
 	}
 
 	for (i = hw->soc->nbase_names, j = 0; i < count_reg_names; i++, j++) {
-		hw->eint->base[j] = of_iomap(np, i);
+		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+		hw->eint->base[j] = is_of_node(fwnode) ? of_iomap(np, i) :
+					ioremap(res->start, resource_size(res));
 		if (IS_ERR(hw->eint->base[j])) {
 			ret = PTR_ERR(hw->eint->base[j]);
 			goto err_free_eint;
 		}
 	}
 
-	hw->eint->irq = irq_of_parse_and_map(np, 0);
+	hw->eint->irq = is_of_node(fwnode)
+			? irq_of_parse_and_map(np, 0)
+			: platform_get_irq(pdev, 0);
 	if (!hw->eint->irq) {
 		ret = -EINVAL;
 		goto err_free_eint;
