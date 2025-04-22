@@ -30,6 +30,13 @@
 #  US6,570,884, US6,115,776, and US6,327,625.
 ################################################################################
 
-ccflags-y += -DCONFIG_SOC_LAN -DCONFIG_R8127_NAPI -DCONFIG_R8127_VLAN -DCONFIG_ASPM -DENABLE_S5WOL -DENABLE_EEE -DENABLE_TX_NO_CLOSE -DENABLE_GIGA_LITE
-obj-$(CONFIG_R8127) += r8127.o
-r8127-y := r8127_n.o rtl_eeprom.o rtltool.o
+config R8127
+	tristate "RealTek RTL-8127 PCI 10 Gigabit Ethernet Adapter support"
+	depends on PCI
+	help
+	  This is a driver for the 10 Gigabit Ethernet PCI network cards based on
+	  the RTL-8127 chips. If you have one of those, say Y here.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called r8127. This is recommended.
+
