@@ -22,6 +22,8 @@
 #include <asm/setup.h>
 #include <asm/firmware.h>
 
+#define cpu_to_be_ulong __PASTE(cpu_to_be, BITS_PER_LONG)
+
 void machine_crash_shutdown(struct pt_regs *regs)
 {
 	default_machine_crash_shutdown(regs);
@@ -181,16 +183,9 @@ int __init overlaps_crashkernel(unsigned long start, unsigned long size)
 }
 
 /* Values we need to export to the second kernel via the device tree. */
-static phys_addr_t kernel_end;
 static phys_addr_t crashk_base;
 static phys_addr_t crashk_size;
 static unsigned long long mem_limit;
-
-static struct property kernel_end_prop = {
-	.name = "linux,kernel-end",
-	.length = sizeof(phys_addr_t),
-	.value = &kernel_end,
-};
 
 static struct property crashk_base_prop = {
 	.name = "linux,crashkernel-base",
@@ -209,8 +204,6 @@ static struct property memory_limit_prop = {
 	.length = sizeof(unsigned long long),
 	.value = &mem_limit,
 };
-
-#define cpu_to_be_ulong	__PASTE(cpu_to_be, BITS_PER_LONG)
 
 static void __init export_crashk_values(struct device_node *node)
 {
@@ -236,6 +229,14 @@ static void __init export_crashk_values(struct device_node *node)
 	of_update_property(node, &memory_limit_prop);
 }
 
+static phys_addr_t kernel_end;
+
+static struct property kernel_end_prop = {
+	.name = "linux,kernel-end",
+	.length = sizeof(phys_addr_t),
+	.value = &kernel_end,
+};
+
 static int __init kexec_setup(void)
 {
 	struct device_node *node;
@@ -245,7 +246,8 @@ static int __init kexec_setup(void)
 		return -ENOENT;
 
 	/* remove any stale properties so ours can be found */
-	of_remove_property(node, of_find_property(node, kernel_end_prop.name, NULL));
+	of_remove_property(node, of_find_property(node, kernel_end_prop.name,
+						  NULL));
 
 	/* information needed by userspace when using default_machine_kexec */
 	kernel_end = cpu_to_be_ulong(__pa(_end));
