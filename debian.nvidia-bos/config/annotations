@@ -156,6 +156,9 @@ CONFIG_NR_CPUS                                  note<'LP: #1864198'>
 CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
 
+CONFIG_R8127                                    policy<{'amd64': 'n', 'arm64': 'm'}>
+CONFIG_R8127                                    note<'LP: #2109730'>
+
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablement'>
 
