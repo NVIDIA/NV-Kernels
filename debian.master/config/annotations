@@ -4326,12 +4326,6 @@ CONFIG_EFI_VARS_PSTORE                          policy<{'amd64': 'm', 'arm64': '
 CONFIG_EFI_VARS_PSTORE_DEFAULT_DISABLE          policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n'}>
 CONFIG_EFS_FS                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
 CONFIG_EINT_MTK                                 policy<{'arm64': 'y', 'armhf': 'y'}>
-CONFIG_EISA                                     policy<{'amd64': 'y'}>
-CONFIG_EISA_NAMES                               policy<{'amd64': 'y'}>
-CONFIG_EISA_PCI_EISA                            policy<{'amd64': 'y'}>
-CONFIG_EISA_VIRTUAL_ROOT                        policy<{'amd64': 'y'}>
-CONFIG_EISA_VLB_PRIMING                         policy<{'amd64': 'y'}>
-CONFIG_EL3                                      policy<{'amd64': 'm'}>
 CONFIG_ELFCORE                                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_ELF_CORE                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_EMAC_ROCKCHIP                            policy<{'arm64': 'm', 'armhf': 'm'}>
@@ -5154,7 +5148,6 @@ CONFIG_HAVE_DYNAMIC_FTRACE_WITH_DIRECT_CALLS    policy<{'amd64': 'y'}>
 CONFIG_HAVE_DYNAMIC_FTRACE_WITH_REGS            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_HAVE_EBPF_JIT                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
-CONFIG_HAVE_EISA                                policy<{'amd64': 'y'}>
 CONFIG_HAVE_EXIT_THREAD                         policy<{'amd64': 'y', 'armhf': 'y'}>
 CONFIG_HAVE_FAST_GUP                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf-generic-lpae': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_HAVE_FENTRY                              policy<{'amd64': 'y', 's390x': 'y'}>
@@ -6884,7 +6877,6 @@ CONFIG_LTC2632                                  policy<{'amd64': 'm', 'arm64': '
 CONFIG_LTC2983                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_LTE_GDM724X                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_LTO_NONE                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
-CONFIG_LTPC                                     policy<{'amd64': 'm'}>
 CONFIG_LTR501                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_LV0104CS                                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_LWTUNNEL                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
@@ -8177,7 +8169,7 @@ CONFIG_NET_VENDOR_BROCADE                       policy<{'amd64': 'y', 'arm64': '
 CONFIG_NET_VENDOR_CADENCE                       policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_NET_VENDOR_CAVIUM                        policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
 CONFIG_NET_VENDOR_CHELSIO                       policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
-CONFIG_NET_VENDOR_CIRRUS                        policy<{'amd64': 'y', 'armhf': 'y'}>
+CONFIG_NET_VENDOR_CIRRUS                        policy<{'amd64': '-', 'armhf': 'y'}>
 CONFIG_NET_VENDOR_CISCO                         policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
 CONFIG_NET_VENDOR_CORTINA                       policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_NET_VENDOR_DEC                           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'n'}>
@@ -10497,7 +10489,6 @@ CONFIG_SCSI_3W_SAS                              policy<{'amd64': 'm', 'arm64': '
 CONFIG_SCSI_AACRAID                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
 CONFIG_SCSI_ACARD                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
 CONFIG_SCSI_ADVANSYS                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
-CONFIG_SCSI_AHA1740                             policy<{'amd64': 'm'}>
 CONFIG_SCSI_AIC79XX                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
 CONFIG_SCSI_AIC7XXX                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
 CONFIG_SCSI_AIC94XX                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
@@ -10578,7 +10569,6 @@ CONFIG_SCSI_SAS_ATTRS                           policy<{'amd64': 'm', 'arm64': '
 CONFIG_SCSI_SAS_HOST_SMP                        policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
 CONFIG_SCSI_SAS_LIBSAS                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
 CONFIG_SCSI_SCAN_ASYNC                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 's390x': 'y'}>
-CONFIG_SCSI_SIM710                              policy<{'amd64': 'm'}>
 CONFIG_SCSI_SMARTPQI                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_SCSI_SNIC                                policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'n'}>
 CONFIG_SCSI_SNIC_DEBUG_FS                       policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n'}>
