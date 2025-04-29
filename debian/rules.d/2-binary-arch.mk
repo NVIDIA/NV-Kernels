@@ -184,6 +184,7 @@ endif
 		>>$(pkgdir)/lib/modprobe.d/blacklist_$(src_pkg_name)_$(abi_release)-$*.conf
 	ls -1 $(pkgdir)/lib/modules/$(abi_release)-$*/kernel/drivers/watchdog/ | \
 		grep -v '^bcm2835_wdt$$' | \
+		grep -v '^sbsa_gwdt*' | \
 		sed -e 's/^/blacklist /' -e 's/.ko$$//' | \
 		sort -u \
 		>>$(pkgdir)/lib/modprobe.d/blacklist_$(src_pkg_name)_$(abi_release)-$*.conf
