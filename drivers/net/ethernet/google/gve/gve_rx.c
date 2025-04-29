@@ -281,10 +281,10 @@ static struct sk_buff *gve_rx_add_frags(struct napi_struct *napi,
 
 static void gve_rx_flip_buff(struct gve_rx_slot_page_info *page_info, __be64 *slot_addr)
 {
-	const __be64 offset = cpu_to_be64(PAGE_SIZE / 2);
+	const __be64 offset = cpu_to_be64(GVE_DEFAULT_RX_BUFFER_OFFSET);
 
 	/* "flip" to other packet buffer on this page */
-	page_info->page_offset ^= PAGE_SIZE / 2;
+	page_info->page_offset ^= GVE_DEFAULT_RX_BUFFER_OFFSET;
 	*(slot_addr) ^= offset;
 }
 

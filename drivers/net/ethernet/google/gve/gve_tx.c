@@ -607,7 +607,7 @@ netdev_tx_t gve_tx(struct sk_buff *skb, struct net_device *dev)
 	return NETDEV_TX_OK;
 }
 
-#define GVE_TX_START_THRESH	PAGE_SIZE
+#define GVE_TX_START_THRESH	4096
 
 static int gve_clean_tx_done(struct gve_priv *priv, struct gve_tx_ring *tx,
 			     u32 to_do, bool try_to_wake)

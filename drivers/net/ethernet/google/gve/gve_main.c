@@ -932,7 +932,7 @@ static int gve_open(struct net_device *dev)
 		/* Hard code this for now. This may be tuned in the future for
 		 * performance.
 		 */
-		priv->data_buffer_size_dqo = GVE_RX_BUFFER_SIZE_DQO;
+		priv->data_buffer_size_dqo = GVE_DEFAULT_RX_BUFFER_SIZE;
 	}
 	err = gve_create_rings(priv);
 	if (err)
