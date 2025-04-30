@@ -16,8 +16,6 @@
 
 #include "acrn_drv.h"
 
-static LIST_HEAD(acrn_irqfd_clients);
-
 /* Cleanup work has been queued; set via test_and_set_bit(). */
 #define HSM_IRQFD_FLAG_SHUTDOWN	0
 
