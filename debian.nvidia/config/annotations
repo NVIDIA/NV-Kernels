@@ -183,9 +183,6 @@ CONFIG_SPI_TEGRA210_QUAD                        note<'Ensures the TPM is availab
 CONFIG_TCG_TIS_SPI                              policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_TCG_TIS_SPI                              note<'Ensures the TPM is available before the IMA driver initializes'>
 
-CONFIG_TEGRA241_CMDQV                           policy<{'arm64': 'n'}>
-CONFIG_TEGRA241_CMDQV                           note<'LP: #2095028'>
-
 CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM drivers'>
 
