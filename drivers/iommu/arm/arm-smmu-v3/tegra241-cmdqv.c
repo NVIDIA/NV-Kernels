@@ -807,51 +807,6 @@ out_fallback:
 static struct dentry *cmdqv_debugfs_dir;
 #endif
 
-static int tegra241_cmdqv_init_structures(struct arm_smmu_device *smmu)
-{
-	struct tegra241_cmdqv *cmdqv =
-		container_of(smmu, struct tegra241_cmdqv, smmu);
-	struct tegra241_vintf *vintf;
-	int lidx;
-	int ret;
-
-	vintf = kzalloc(sizeof(*vintf), GFP_KERNEL);
-	if (!vintf)
-		goto out_fallback;
-
-	/* Init VINTF0 for in-kernel use */
-	ret = tegra241_cmdqv_init_vintf(cmdqv, 0, vintf);
-	if (ret) {
-		dev_err(cmdqv->dev, "failed to init vintf0: %d\n", ret);
-		goto free_vintf;
-	}
-
-	/* Preallocate logical VCMDQs to VINTF0 */
-	for (lidx = 0; lidx < cmdqv->num_lvcmdqs_per_vintf; lidx++) {
-		struct tegra241_vcmdq *vcmdq;
-
-		vcmdq = tegra241_vintf_alloc_lvcmdq(vintf, lidx);
-		if (IS_ERR(vcmdq))
-			goto free_lvcmdq;
-	}
-
-	/* Now, we are ready to run all the impl ops */
-	smmu->impl_ops = &tegra241_cmdqv_impl_ops;
-	return 0;
-
-free_lvcmdq:
-	for (lidx--; lidx >= 0; lidx--)
-		tegra241_vintf_free_lvcmdq(vintf, lidx);
-	tegra241_cmdqv_deinit_vintf(cmdqv, vintf->idx);
-free_vintf:
-	kfree(vintf);
-out_fallback:
-	dev_info(smmu->impl_dev, "Falling back to standard SMMU CMDQ\n");
-	smmu->options &= ~ARM_SMMU_OPT_TEGRA241_CMDQV;
-	tegra241_cmdqv_remove(smmu);
-	return 0;
-}
-
 static struct arm_smmu_device *
 __tegra241_cmdqv_probe(struct arm_smmu_device *smmu, struct resource *res,
 		       int irq)
@@ -860,8 +815,8 @@ __tegra241_cmdqv_probe(struct arm_smmu_device *smmu, struct resource *res,
 		.init_structures = tegra241_cmdqv_init_structures,
 		.device_remove = tegra241_cmdqv_remove,
 	};
-	static struct arm_smmu_device *new_smmu;
 	struct tegra241_cmdqv *cmdqv = NULL;
+	struct arm_smmu_device *new_smmu;
 	void __iomem *base;
 	u32 regval;
 	int ret;
