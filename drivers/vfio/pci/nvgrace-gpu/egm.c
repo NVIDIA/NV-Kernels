@@ -16,6 +16,11 @@
 
 #define MAX_EGM_NODES 256
 
+struct gpu_node {
+       struct list_head list;
+       struct pci_dev *pdev;
+};
+
 struct egm_region {
 	struct list_head list;
 	int egmpxm;
@@ -24,6 +29,7 @@ struct egm_region {
 	size_t egmlength;
 	struct device device;
 	struct cdev cdev;
+	struct list_head gpus;
 	DECLARE_HASHTABLE(htbl, 0x10);
 #ifdef CONFIG_MEMORY_FAILURE
 	struct pfn_address_space pfn_address_space;
@@ -268,6 +274,11 @@ static int setup_egm_chardev(struct egm_region *region)
 	return ret;
 }
 
+static void destroy_egm_chardev(struct egm_region *region)
+{
+	cdev_device_del(&region->cdev, &region->device);
+}
+
 static int
 nvgrace_gpu_fetch_egm_property(struct pci_dev *pdev, u64 *pegmphys,
 			       u64 *pegmlength, u64 *pegmpxm)
@@ -346,6 +357,32 @@ static void nvgrace_egm_fetch_bad_pages(struct pci_dev *pdev,
 	memunmap(memaddr);
 }
 
+static int add_gpu(struct egm_region *region, struct pci_dev *pdev)
+{
+       struct gpu_node *node;
+
+       node = kvzalloc(sizeof(*node), GFP_KERNEL);
+       if (!node)
+               return -ENOMEM;
+
+       node->pdev = pdev;
+
+       list_add_tail(&node->list, &region->gpus);
+       return 0;
+}
+
+static void remove_gpu(struct egm_region *region, struct pci_dev *pdev)
+{
+       struct gpu_node *node, *tmp;
+
+       list_for_each_entry_safe(node, tmp, &region->gpus, list) {
+               if (node->pdev == pdev) {
+                       list_del(&node->list);
+                       kvfree(node);
+               }
+       }
+}
+
 int register_egm_node(struct pci_dev *pdev)
 {
 	struct egm_region *region = NULL;
@@ -356,11 +393,15 @@ int register_egm_node(struct pci_dev *pdev)
 	if (ret)
 		return ret;
 
+	/* Check if region already exists */
 	list_for_each_entry(region, &egm_list, list) {
-		if (region->egmphys == egmphys)
-			return 0;
+		if (region->egmphys == egmphys) {
+			/* Add GPU to existing region */
+			return add_gpu(region, pdev);
+		}
 	}
 
+	/* Create new region */
 	region = kvzalloc(sizeof(*region), GFP_KERNEL);
 	if (!region)
 		return -ENOMEM;
@@ -370,27 +411,32 @@ int register_egm_node(struct pci_dev *pdev)
 	region->egmpxm = egmpxm;
 
 	hash_init(region->htbl);
+	INIT_LIST_HEAD(&region->gpus);
+
 	atomic_set(&region->open_count, 0);
 
 	nvgrace_egm_fetch_bad_pages(pdev, region);
 
 	ret = setup_egm_chardev(region);
 	if (ret)
-		goto err;
+		goto err_free_region;
 
 	list_add_tail(&region->list, &egm_list);
 
+	ret = add_gpu(region, pdev);
+	if (ret)
+		goto err_remove_from_list;
+
 	return 0;
-err:
+
+err_remove_from_list:
+	list_del(&region->list);
+	destroy_egm_chardev(region);
+err_free_region:
 	kfree(region);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(register_egm_node);
-
-static void destroy_egm_chardev(struct egm_region *region)
-{
-	cdev_device_del(&region->cdev, &region->device);
-}
 
 void unregister_egm_node(struct pci_dev *pdev)
 {
@@ -407,6 +453,10 @@ void unregister_egm_node(struct pci_dev *pdev)
 
 	list_for_each_entry_safe(region, temp_region, &egm_list, list) {
 		if (egmpxm == region->egmpxm) {
+			remove_gpu(region, pdev);
+			if (!list_empty(&region->gpus))
+				break;
+
 			hash_for_each_safe(region->htbl, bkt, temp_node, cur_page, node) {
 				hash_del(&cur_page->node);
 				vfree(cur_page);
