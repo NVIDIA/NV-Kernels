@@ -380,8 +380,19 @@ static ssize_t gpu_devices_show(struct device *dev, struct device_attribute *att
 
 static DEVICE_ATTR_RO(gpu_devices);
 
+static ssize_t egm_size_show(struct device *dev, struct device_attribute *attr,
+                            char *buf)
+{
+       struct egm_region *region =
+               container_of(dev, struct egm_region, device);
+       return sysfs_emit(buf, "0x%lx\n", region->egmlength);
+}
+
+static DEVICE_ATTR_RO(egm_size);
+
 static struct attribute *attrs[] = {
        &dev_attr_gpu_devices.attr,
+       &dev_attr_egm_size.attr,
        NULL,
 };
 
