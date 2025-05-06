@@ -357,6 +357,38 @@ static void nvgrace_egm_fetch_bad_pages(struct pci_dev *pdev,
 	memunmap(memaddr);
 }
 
+static ssize_t gpu_devices_show(struct device *dev, struct device_attribute *attr,
+                               char *buf)
+{
+       struct egm_region *region =
+               container_of(dev, struct egm_region, device);
+       struct gpu_node *node, *temp_node;
+       int len = 0;
+
+       list_for_each_entry_safe(node, temp_node, &region->gpus, list) {
+               struct pci_dev *pdev = node->pdev;
+
+               len += sysfs_emit_at(buf, len, "%04x:%02x:%02x.%x\n",
+                                    pci_domain_nr(pdev->bus),
+                                    pdev->bus->number,
+                                    PCI_SLOT(pdev->devfn),
+                                    PCI_FUNC(pdev->devfn));
+       }
+
+       return len;
+}
+
+static DEVICE_ATTR_RO(gpu_devices);
+
+static struct attribute *attrs[] = {
+       &dev_attr_gpu_devices.attr,
+       NULL,
+};
+
+static struct attribute_group attr_group = {
+       .attrs = attrs,
+};
+
 static int add_gpu(struct egm_region *region, struct pci_dev *pdev)
 {
        struct gpu_node *node;
@@ -423,12 +455,18 @@ int register_egm_node(struct pci_dev *pdev)
 
 	list_add_tail(&region->list, &egm_list);
 
-	ret = add_gpu(region, pdev);
+	ret = sysfs_create_group(&region->device.kobj, &attr_group);
 	if (ret)
 		goto err_remove_from_list;
 
+	ret = add_gpu(region, pdev);
+	if (ret)
+		goto err_remove_sysfs;
+
 	return 0;
 
+err_remove_sysfs:
+        sysfs_remove_group(&region->device.kobj, &attr_group);
 err_remove_from_list:
 	list_del(&region->list);
 	destroy_egm_chardev(region);
@@ -462,6 +500,7 @@ void unregister_egm_node(struct pci_dev *pdev)
 				vfree(cur_page);
 			}
 
+			sysfs_remove_group(&region->device.kobj, &attr_group);
 			destroy_egm_chardev(region);
 			list_del(&region->list);
 			kfree(region);
