@@ -2718,6 +2718,7 @@ struct device_node;
 struct irq_domain;
 struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus);
 bool pci_host_of_has_msi_map(struct device *dev);
+bool pci_host_of_has_iommu_map(struct device *dev);
 
 /* Arch may override this (weak) */
 struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus);
@@ -2726,6 +2727,7 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus);
 static inline struct irq_domain *
 pci_host_bridge_of_msi_domain(struct pci_bus *bus) { return NULL; }
 static inline bool pci_host_of_has_msi_map(struct device *dev) { return false; }
+static inline bool pci_host_of_has_iommu_map(struct device *dev) { return false; }
 #endif  /* CONFIG_OF */
 
 static inline struct device_node *

@@ -983,6 +983,7 @@ static bool pci_preserve_config(struct pci_host_bridge *host_bridge)
 	return false;
 }
 
+bool pci_host_of_has_iommu(struct device *dev);
 static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 {
 	struct device *parent = bridge->dev.parent;
@@ -1044,6 +1045,9 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 	if (bridge->msi_domain && !dev_get_msi_domain(&bus->dev) &&
 	    !pci_host_of_has_msi_map(parent))
 		bus->bus_flags |= PCI_BUS_FLAGS_NO_MSI;
+
+	if (pci_host_of_has_iommu_map(parent))
+		pci_request_acs();
 
 	if (!parent)
 		set_dev_node(bus->bridge, pcibus_to_node(bus));

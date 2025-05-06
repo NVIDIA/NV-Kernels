@@ -123,6 +123,13 @@ bool pci_host_of_has_msi_map(struct device *dev)
 	return false;
 }
 
+bool pci_host_of_has_iommu_map(struct device *dev)
+{
+	if (dev && dev->of_node)
+		return of_get_property(dev->of_node, "iommu-map", NULL);
+	return false;
+}
+
 static inline int __of_pci_pci_compare(struct device_node *node,
 				       unsigned int data)
 {
