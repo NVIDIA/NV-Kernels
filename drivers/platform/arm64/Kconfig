@@ -82,4 +82,17 @@ config EC_LENOVO_YOGA_SLIM7X
 	  mute button, and reporting device suspend to the EC so it can take
 	  appropriate actions.
 
+config NVIDIA_FFA_EC
+       tristate "NVIDIA FFA EC services driver"
+       depends on ARM_FFA_TRANSPORT || COMPILE_TEST
+       depends on ACPI
+       depends on ACPI_FFH
+       help
+         Enable NVIDIA FFA EC services.
+	 For GB10 and other similar SOC’s, to communicate with embedded controller, a new
+	 specification is being defined. It is currently in draft stage and maintained in
+	 https://github.com/OpenDevicePartnership/documentation/blob/main/bookshelf/Shelf%204%20Specifications/EC%20Interface/src/secure-ec-services-overview.md
+
+	 Say M or Y here to include this support.
+
 endif # ARM64_PLATFORM_DEVICES
