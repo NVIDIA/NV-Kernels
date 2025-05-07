@@ -704,9 +704,9 @@ struct iommu_ops {
 			   const struct iommu_user_data *user_data);
 
 	/* Per group IOMMU features */
-	int (*get_group_qos_params)(struct iommu_group *group, u16 *partition,
+	int (*get_group_qos_params)(struct device *dev, u16 *partition,
 				    u8 *perf_mon_grp);
-	int (*set_group_qos_params)(struct iommu_group *group, u16 partition,
+	int (*set_group_qos_params)(struct device *dev, u16 partition,
 				    u8 perf_mon_grp);
 
 	const struct iommu_domain_ops *default_domain_ops;
