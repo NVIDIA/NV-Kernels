@@ -71,6 +71,35 @@ static uuid_t nvidia_get_uuid_from_aml_buf(const u8 *buf)
 			   buf[12], buf[13], buf[14], buf[15] }};
 }
 
+static int nvidia_ffa_rescan_acpi_device(struct device *dev, void *data)
+{
+	struct acpi_device *adev = to_acpi_device(dev);
+
+	if (acpi_dev_hid_uid_match(adev, data, NULL)) {
+		acpi_bus_scan(adev->handle);
+		return 1;
+	}
+
+	return 0;
+}
+
+static const char *nvidia_get_acpi_id_from_uuid(uuid_t *uuid)
+{
+	if (uuid_equal(uuid, &nvidia_ec_battery_service_uuid))
+		return "PNP0C0A";
+
+	if (uuid_equal(uuid, &nvidia_ec_time_alarm_service_uuid))
+		return "ACPI000E";
+
+	if (uuid_equal(uuid, &nvidia_ec_fan_service_uuid))
+		return "PNP0C0B";
+
+	if (uuid_equal(uuid, &nvidia_ec_ucsi_service_uuid))
+		return "PNP0CA0";
+
+	return NULL;
+}
+
 /*
  * Handler function for FFH operation region offset 4.
  * When ACPI interpreter runs code with FFH operation region offset 4,
@@ -161,6 +190,7 @@ static int nvidia_ffh_handler(struct acpi_ffh_info *info, acpi_integer *value, v
 static int nvidia_ffa_ec_service_probe(struct ffa_device *ffa_dev)
 {
 	struct nvidia_ec_ffa_device *nvidia_ec_ffa_dev;
+	const char *acpi_id = NULL;
 
 	if (!ffa_pdev) {
 		dev_err(&ffa_dev->dev, "nvidia ffa device not available\n");
@@ -181,6 +211,18 @@ static int nvidia_ffa_ec_service_probe(struct ffa_device *ffa_dev)
 	mutex_lock(&nvidia_ffa_lock);
 	list_add(&nvidia_ec_ffa_dev->list, &nvidia_ec_ffa_dev_head);
 	mutex_unlock(&nvidia_ffa_lock);
+
+	/*
+	 * When acpi subsystem probe all ACPI devices, then it execute _STA
+	 * method for each device. The _STA method fails at that time since
+	 * custom FFA driver won't be ready. Get ACPI ID from UUID and
+	 * rescan the device again.
+	 */
+	acpi_id = nvidia_get_acpi_id_from_uuid(&ffa_dev->uuid);
+	if (acpi_id) {
+		acpi_bus_for_each_dev(nvidia_ffa_rescan_acpi_device,
+				      (void *)acpi_id);
+	}
 
 	return 0;
 }
