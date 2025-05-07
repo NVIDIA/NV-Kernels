@@ -19,6 +19,9 @@ struct acpi_ffh_data {
 				struct arm_smccc_1_2_regs *res);
 };
 
+static int (*ffh_custom_handler)(struct acpi_ffh_info *info,
+				 acpi_integer *value, void *region_context);
+
 int acpi_ffh_address_space_arch_setup(void *handler_ctxt, void **region_ctxt)
 {
 	enum arm_smccc_conduit conduit;
@@ -99,9 +102,38 @@ int acpi_ffh_address_space_arch_handler(acpi_integer *value, void *region_contex
 			ffh_ctxt->invoke_ffh64_fn(r, r);
 			memcpy(value, r, ffh_ctxt->info.length);
 		}
+	} else if (ffh_custom_handler) {
+		int err = ffh_custom_handler(&ffh_ctxt->info, value,
+					     region_context);
+		if (err) {
+			pr_err("ARM FFH custom offset handler returned error=%d\n",
+			       err);
+			ret = AE_ERROR;
+		}
 	} else {
 		ret = AE_ERROR;
 	}
 
 	return ret;
 }
+
+int acpi_arm64_ffh_update_custom_offset_handler(
+	int (*handler)(struct acpi_ffh_info *info, acpi_integer *value,
+		       void *region_context))
+{
+	if (!handler) {
+		pr_debug("ARM FFH custom offset handler unregistered\n");
+		ffh_custom_handler = NULL;
+		return 0;
+	}
+
+	if (ffh_custom_handler)
+		pr_debug("ARM FFH custom offset handler updated\n");
+	else
+		pr_debug("ARM FFH custom offset handler registered\n");
+
+	ffh_custom_handler = handler;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(acpi_arm64_ffh_update_custom_offset_handler);
