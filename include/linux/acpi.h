@@ -1578,8 +1578,24 @@ extern int acpi_ffh_address_space_arch_setup(void *handler_ctxt,
 					     void **region_ctxt);
 extern int acpi_ffh_address_space_arch_handler(acpi_integer *value,
 					       void *region_context);
+int acpi_ffh_address_space_arch_update_custom_offset_handler(
+	int (*handler)(struct acpi_ffh_info *info, acpi_integer *value,
+		       void *region_context));
 #else
 static inline void acpi_init_ffh(void) { }
+#endif
+
+#if defined(CONFIG_ACPI_FFH) && defined(CONFIG_ARM64)
+int acpi_arm64_ffh_update_custom_offset_handler(
+	int (*handler)(struct acpi_ffh_info *info, acpi_integer *value,
+		       void *region_context));
+#else
+static inline int acpi_arm64_ffh_update_custom_offset_handler(
+	int (*handler)(struct acpi_ffh_info *info, acpi_integer *value,
+		       void *region_context))
+{
+	return -EOPNOTSUPP;
+}
 #endif
 
 #ifdef CONFIG_ACPI
