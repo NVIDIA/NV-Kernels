@@ -51,6 +51,113 @@ static LIST_HEAD(nvidia_ec_ffa_dev_head);
 /* Lock to serialize EC services FFA device list access */
 static DEFINE_MUTEX(nvidia_ffa_lock);
 
+/* EC secure services FFA packet structure sent via ACPI */
+struct nvidia_ec_ffa_packet {
+	u8 status;
+	u8 length;
+	u8 uuid[UUID_SIZE];
+	u8 rawdata[];
+} __packed;
+
+/*
+ * ACPI ASL code uses ToUUID() macro which encodes it in mixed-endian format.
+ * Convert the AML UUID buffer into FFA UUID format.
+ */
+static uuid_t nvidia_get_uuid_from_aml_buf(const u8 *buf)
+{
+	return (uuid_t) {{ buf[3], buf[2], buf[1], buf[0],
+			   buf[5], buf[4], buf[7], buf[6],
+			   buf[8], buf[9], buf[10], buf[11],
+			   buf[12], buf[13], buf[14], buf[15] }};
+}
+
+/*
+ * Handler function for FFH operation region offset 4.
+ * When ACPI interpreter runs code with FFH operation region offset 4,
+ * then this data is meant for EC secure services. The FFH buffer has
+ * data in 'struct nvidia_ec_ffa_packet' format. In this packet, it has UUID
+ * for EC secure service and then the service specific raw data.
+ *
+ * 1. Extract the UUID from this packet and get ffa_device for it.
+ * 2. Fill raw data in 'struct ffa_send_direct_data2' and
+ *    invoke sync_send_receive2() routine for the ffa_device.
+ * 3. From response, fill the data in 'struct ffa_send_direct_data2'
+ *    and return.
+ */
+static int nvidia_ffh_handler(struct acpi_ffh_info *info, acpi_integer *value, void *region_context)
+{
+	struct ffa_send_direct_data2 ffa_data = { 0 };
+	struct nvidia_ec_ffa_packet *ffa_packet = (struct nvidia_ec_ffa_packet *)value;
+	struct nvidia_ec_ffa_device *cur, *ec_dev =  NULL;
+	int ret;
+	uuid_t uuid;
+
+	/* Only offset 4 is supported */
+	if (info->offset != 4)
+		return -EOPNOTSUPP;
+
+	/* Length should not be less than header length */
+	if (info->length < offsetof(struct nvidia_ec_ffa_packet, rawdata))
+		return -EINVAL;
+
+	/* Length should not be less than actual packet length */
+	if (info->length <
+	    ffa_packet->length + offsetof(struct nvidia_ec_ffa_packet, rawdata)) {
+		ffa_packet->status = 1;
+		return -EINVAL;
+	}
+
+	/* Packet length should not greater than FFA supported data length */
+	if (ffa_packet->length > sizeof(ffa_data.data)) {
+		ffa_packet->status = 1;
+		return -EINVAL;
+	}
+
+	/* Convert AML UUID to FFA UUID */
+	uuid = nvidia_get_uuid_from_aml_buf((u8 *)ffa_packet->uuid);
+
+	mutex_lock(&nvidia_ffa_lock);
+	/* Get nvidia_ec_ffa_device for the current UUID */
+	list_for_each_entry(cur, &nvidia_ec_ffa_dev_head, list) {
+		if (uuid_equal(&uuid, &cur->ffa_dev->uuid)) {
+			ec_dev = cur;
+			break;
+		}
+	}
+	mutex_unlock(&nvidia_ffa_lock);
+
+	if (!ec_dev) {
+		ffa_packet->status = 1;
+		return -EINVAL;
+	}
+
+	/* Copy the ACPI FFH packet data into FFA data */
+	memcpy(ffa_data.data, ffa_packet->rawdata, ffa_packet->length);
+
+	if (!ec_dev->ffa_dev->ops ||
+	    !ec_dev->ffa_dev->ops->msg_ops ||
+	    !ec_dev->ffa_dev->ops->msg_ops->sync_send_receive2) {
+		return -EINVAL;
+	}
+
+	ret = ec_dev->ffa_dev->ops->msg_ops->sync_send_receive2(ec_dev->ffa_dev,
+								&ffa_data);
+	if (ret) {
+		dev_err(&ec_dev->ffa_dev->dev,
+			"Failed to send FFA messages error=%d\n", ret);
+		ffa_packet->status = 1;
+		return ret;
+	}
+
+	/* Set the status as success */
+	ffa_packet->status = 0;
+
+	/* Copy the ACPI FFA data back into ACPI FFH packet */
+	memcpy(ffa_packet->rawdata, ffa_data.data, ffa_packet->length);
+
+	return 0;
+}
+
 static int nvidia_ffa_ec_service_probe(struct ffa_device *ffa_dev)
 {
 	struct nvidia_ec_ffa_device *nvidia_ec_ffa_dev;
@@ -155,6 +262,13 @@ static int nvidia_ffa_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	ret = acpi_arm64_ffh_update_custom_offset_handler(nvidia_ffh_handler);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"Failed to register custom offset handler error=%d\n", ret);
+		return ret;
+	}
+
 	ffa_pdev = pdev;
 
 	ret = ffa_driver_register(&nvidia_ffa_ec_service_driver, THIS_MODULE, DRV_NAME);
@@ -172,6 +286,7 @@ static void nvidia_ffa_remove(struct platform_device *pdev)
 {
 	ffa_driver_unregister(&nvidia_ffa_ec_service_driver);
 	ffa_pdev = NULL;
+	acpi_arm64_ffh_update_custom_offset_handler(NULL);
 }
 
 static struct platform_driver nvidia_ffa_driver = {
