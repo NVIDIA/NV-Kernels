@@ -3914,25 +3914,19 @@ int iommu_group_set_qos_params(struct iommu_group *group,
 {
 	const struct iommu_ops *ops;
 	struct group_device *device;
-	int ret;
+	int ret = -ENODEV;
 
 	mutex_lock(&group->mutex);
-	device = list_first_entry_or_null(&group->devices, typeof(*device),
-					  list);
-	if (!device) {
-		ret = -ENODEV;
-		goto out_unlock;
+	for_each_group_device(group, device) {
+		ops = dev_iommu_ops(device->dev);
+		if (!ops->set_group_qos_params) {
+			ret = -EOPNOTSUPP;
+			break;
+		}
+		ret = ops->set_group_qos_params(device->dev, partition, perf_mon_grp);
+		if (ret < 0)
+			break;
 	}
-
-	ops = dev_iommu_ops(device->dev);
-	if (!ops->set_group_qos_params) {
-		ret = -EOPNOTSUPP;
-		goto out_unlock;
-	}
-
-	ret = ops->set_group_qos_params(group, partition, perf_mon_grp);
-
-out_unlock:
 	mutex_unlock(&group->mutex);
 
 	return ret;
@@ -3952,25 +3946,19 @@ int iommu_group_get_qos_params(struct iommu_group *group,
 {
 	const struct iommu_ops *ops;
 	struct group_device *device;
-	int ret;
+	int ret = -ENODEV;
 
 	mutex_lock(&group->mutex);
-	device = list_first_entry_or_null(&group->devices, typeof(*device),
-					  list);
-	if (!device) {
-		ret = -ENODEV;
-		goto out_unlock;
+	for_each_group_device(group, device) {
+		ops = dev_iommu_ops(device->dev);
+		if (!ops->get_group_qos_params) {
+			ret = -EOPNOTSUPP;
+			break;
+		}
+		ret = ops->get_group_qos_params(device->dev, partition, perf_mon_grp);
+		if (!ret)
+			break;
 	}
-
-	ops = dev_iommu_ops(device->dev);
-	if (!ops->get_group_qos_params) {
-		ret = -EOPNOTSUPP;
-		goto out_unlock;
-	}
-
-	ret = ops->get_group_qos_params(group, partition, perf_mon_grp);
-
-out_unlock:
 	mutex_unlock(&group->mutex);
 
 	return ret;
