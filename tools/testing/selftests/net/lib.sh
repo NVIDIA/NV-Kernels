@@ -199,6 +199,8 @@ setup_ns()
 			return $ksft_skip
 		fi
 		ip -n "$ns" link set lo up
+		ip netns exec "${!ns_name}" sysctl -wq net.ipv4.conf.all.rp_filter=0
+		ip netns exec "${!ns_name}" sysctl -wq net.ipv4.conf.default.rp_filter=0
 		! $ns_exist && ns_list+=("$ns")
 	done
 	NS_LIST+=("${ns_list[@]}")
