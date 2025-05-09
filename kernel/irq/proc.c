@@ -312,7 +312,7 @@ static bool name_unique(unsigned int irq, struct irqaction *new_action)
 
 void register_handler_proc(unsigned int irq, struct irqaction *action)
 {
-	char name [MAX_NAMELEN];
+	char name[MAX_NAMELEN];
 	struct irq_desc *desc = irq_to_desc(irq);
 
 	if (!desc->dir || action->dir || !action->name || !name_unique(irq, action))
