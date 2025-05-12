@@ -97,6 +97,8 @@ static const struct ipu_sensor_config ipu_supported_sensors[] = {
 	IPU_SENSOR_CONFIG("SONY471A", 1, 200000000),
 	/* Toshiba T4KA3 */
 	IPU_SENSOR_CONFIG("XMCC0003", 1, 321468000),
+	/* Sony IMX471 */
+	IPU_SENSOR_CONFIG("SONY471A", 1, 200000000),
 };
 
 /*
