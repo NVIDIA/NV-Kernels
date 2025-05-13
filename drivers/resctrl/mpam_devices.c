@@ -723,6 +723,10 @@ static int mpam_ris_get_affinity(struct mpam_msc *msc, cpumask_t *affinity,
 	case MPAM_CLASS_MEMORY:
 		get_cpumask_from_node_id(comp->comp_id, affinity);
 		/* affinity may be empty for CPU-less memory nodes */
+		if (cpumask_empty(affinity)) {
+			dev_warn_once(&msc->pdev->dev, "CPU-less numa node");
+			cpumask_copy(affinity, cpu_possible_mask);
+		}
 		break;
 	case MPAM_CLASS_UNKNOWN:
 		return 0;
