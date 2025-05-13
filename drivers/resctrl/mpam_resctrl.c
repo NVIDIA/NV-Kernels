@@ -734,6 +734,12 @@ static bool mba_class_use_mbw_max(struct mpam_props *cprops)
 		cprops->bwa_wd);
 }
 
+static bool class_has_usable_mbw_min(struct mpam_props *cprops)
+{
+	return (mpam_has_feature(mpam_feat_mbw_min, cprops) &&
+		cprops->bwa_wd);
+}
+
 static bool class_has_usable_mba(struct mpam_props *cprops)
 {
 	return mba_class_use_mbw_part(cprops) || mba_class_use_mbw_max(cprops);
@@ -843,14 +849,7 @@ static u32 percent_to_mbw_pbm(u8 pc, struct mpam_props *cprops)
  */
 static u32 fract16_to_percent(u16 fract, u8 wd)
 {
-	u32 val = fract;
-
-	val >>= 16 - wd;
-	val += 1;
-	val *= MAX_MBA_BW;
-	val = DIV_ROUND_CLOSEST(val, 1 << wd);
-
-	return val;
+	return DIV_ROUND_CLOSEST((fract + 1) * 100, 65536);
 }
 
 /*
@@ -865,29 +864,12 @@ static u32 fract16_to_percent(u16 fract, u8 wd)
  */
 static u16 percent_to_fract16(u8 pc, u8 wd)
 {
-	u32 val = pc;
-
-	val <<= wd;
-	val = DIV_ROUND_CLOSEST(val, MAX_MBA_BW);
-	val = max(val, 1) - 1;
-	val <<= 16 - wd;
-
-	return val;
+	return pc ? (((pc * 65536) / 100) - 1) : 0;
 }
 
 static u32 mbw_max_to_percent(u16 mbw_max, struct mpam_props *cprops)
 {
 	return fract16_to_percent(mbw_max, cprops->bwa_wd);
-}
-
-static u16 percent_to_mbw_max(u8 pc, struct mpam_props *cprops)
-{
-	return percent_to_fract16(pc, cprops->bwa_wd);
-}
-
-static u16 percent_to_cmax(u8 pc, struct mpam_props *cprops)
-{
-	return percent_to_fract16(pc, cprops->cmax_wd);
 }
 
 static u32 get_mba_min(struct mpam_props *cprops)
@@ -1117,6 +1099,10 @@ static void mpam_resctrl_pick_mba(void)
 		res = &mpam_resctrl_controls[RDT_RESOURCE_MBA];
 		res->class = candidate_class;
 		exposed_alloc_capable = true;
+		if (class_has_usable_mbw_min(&candidate_class->props)) {
+			res = &mpam_resctrl_controls[RDT_RESOURCE_MBA_MIN];
+			res->class = candidate_class;
+		}
 	}
 }
 
@@ -1501,6 +1487,28 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 
 		r->name = "MB";
 
+		/* Round up to at least 1% */
+		if (!r->membw.bw_gran)
+			r->membw.bw_gran = 1;
+
+		break;
+	case RDT_RESOURCE_MBA_MIN:
+		r->alloc_capable = true;
+		r->schema_fmt = RESCTRL_SCHEMA_PERCENT;
+		r->ctrl_scope = RESCTRL_L3_CACHE;
+
+		r->mba.delay_linear = true;
+		r->mba.throttle_mode = THREAD_THROTTLE_UNDEFINED;
+		r->membw.min_bw = get_mba_granularity(cprops);
+		r->membw.max_bw = MAX_MBA_BW;
+		r->membw.bw_gran = get_mba_granularity(cprops);
+
+		r->name = "MB_MIN";
+
+		/* Round up to at least 1% */
+		if (!r->membw.bw_gran)
+			r->membw.bw_gran = 1;
+
 		break;
 	default:
 		break;
@@ -1724,6 +1732,12 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	case RDT_RESOURCE_L3_MAX:
 		configured_by = mpam_feat_cmax_cmax;
 		break;
+	case RDT_RESOURCE_MBA_MIN:
+		if (mpam_has_feature(mpam_feat_mbw_min, cprops)) {
+			configured_by = mpam_feat_mbw_min;
+			break;
+		}
+		return -EINVAL;
 	case RDT_RESOURCE_MBA:
 		if (mba_class_use_mbw_part(cprops)) {
 			configured_by = mpam_feat_mbw_part;
@@ -1738,8 +1752,11 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	}
 
 	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r) ||
-	    !mpam_has_feature(configured_by, cfg))
-		goto err;
+	    !mpam_has_feature(configured_by, cfg)) {
+		if (configured_by == mpam_feat_mbw_min)
+			return 0;
+		return resctrl_get_resource_default_ctrl(r);
+	}
 
 	switch (configured_by) {
 	case mpam_feat_cpor_part:
@@ -1752,6 +1769,8 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		return mbw_pbm_to_percent(cfg->mbw_pbm, cprops);
 	case mpam_feat_mbw_max:
 		return mbw_max_to_percent(cfg->mbw_max, cprops);
+	case mpam_feat_mbw_min:
+		return fract16_to_percent(cfg->mbw_min, cprops->bwa_wd);
 	default:
 		goto err;
 	}
@@ -1805,8 +1824,12 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 		break;
 	case RDT_RESOURCE_L2_MAX:
 	case RDT_RESOURCE_L3_MAX:
-		cfg.cmax = percent_to_cmax(cfg_val, cprops);
+		cfg.cmax = percent_to_fract16(cfg_val, cprops->bwa_wd);
 		mpam_set_feature(mpam_feat_cmax_cmax, &cfg);
+		break;
+	case RDT_RESOURCE_MBA_MIN:
+		cfg.mbw_min = percent_to_fract16(cfg_val, cprops->bwa_wd);
+		mpam_set_feature(mpam_feat_mbw_min, &cfg);
 		break;
 	case RDT_RESOURCE_MBA:
 		if (mba_class_use_mbw_part(cprops)) {
@@ -1814,7 +1837,7 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 			mpam_set_feature(mpam_feat_mbw_part, &cfg);
 			break;
 		} else if (mpam_has_feature(mpam_feat_mbw_max, cprops)) {
-			cfg.mbw_max = percent_to_mbw_max(cfg_val, cprops);
+			cfg.mbw_max = percent_to_fract16(cfg_val, cprops->bwa_wd);
 			mpam_set_feature(mpam_feat_mbw_max, &cfg);
 			break;
 		}

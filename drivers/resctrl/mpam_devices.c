@@ -3455,8 +3455,8 @@ static bool mpam_update_config(struct mpam_config *cfg,
 static void mpam_extend_config(struct mpam_class *class, struct mpam_config *cfg)
 {
 	struct mpam_props *cprops = &class->props;
-	u16 min, min_hw_granule, delta;
 	u16 max_hw_value, res0_bits;
+	u16 min_hw_granule;
 
 	/*
 	 * Calculate the values the 'min' control can hold.
@@ -3469,25 +3469,6 @@ static void mpam_extend_config(struct mpam_class *class, struct mpam_config *cfg
 	res0_bits = 16 - cprops->bwa_wd;
 	max_hw_value = ((1 << cprops->bwa_wd) - 1) << res0_bits;
 	min_hw_granule = ~max_hw_value;
-
-	/*
-	 * MAX and MIN should be set together. If only one is provided,
-	 * generate a configuration for the other. If only one control
-	 * type is supported, the other value will be ignored.
-	 *
-	 * Resctrl can only configure the MAX.
-	 */
-	if (mpam_has_feature(mpam_feat_mbw_max, cfg) &&
-	    !mpam_has_feature(mpam_feat_mbw_min, cfg)) {
-		delta = ((5 * MPAMCFG_MBW_MAX_MAX) / 100) - 1;
-		if (cfg->mbw_max > delta)
-			min = cfg->mbw_max - delta;
-		else
-			min = 0;
-
-		cfg->mbw_min = max(min, min_hw_granule);
-		mpam_set_feature(mpam_feat_mbw_min, cfg);
-	}
 
 	if (mpam_has_quirk(T241_FORCE_MBW_MIN_TO_ONE, class) &&
 	    cfg->mbw_min <= min_hw_granule) {
