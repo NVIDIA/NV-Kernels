@@ -1553,7 +1553,7 @@ static int realm_map_ipa(struct kvm *kvm, phys_addr_t ipa,
 
 	ipa = ALIGN_DOWN(ipa, PAGE_SIZE);
 	if (!kvm_realm_is_private_address(realm, ipa))
-		return realm_map_non_secure(realm, ipa, pfn, map_size,
+		return realm_map_non_secure(realm, ipa, pfn, map_size, prot,
 					    memcache);
 
 	return realm_map_protected(realm, ipa, pfn, map_size, memcache);

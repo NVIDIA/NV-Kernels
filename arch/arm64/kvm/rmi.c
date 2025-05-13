@@ -1040,6 +1040,10 @@ int realm_map_non_secure(struct realm *realm,
 			 unsigned long ipa,
 			 kvm_pfn_t pfn,
 			 unsigned long size,
+			 /* TODO: Use enum kvm_pgtable_prot.
+			  * There is a circular depedency in the headers that
+			  * should be solved first. */
+			 unsigned int prot,
 			 struct kvm_mmu_memory_cache *memcache)
 {
 	phys_addr_t rd = virt_to_phys(realm->rd);
@@ -1048,19 +1052,27 @@ int realm_map_non_secure(struct realm *realm,
 	/* TODO: Support block mappings */
 	int map_level = RMM_RTT_MAX_LEVEL;
 	int map_size = rmi_rtt_level_mapsize(map_level);
+	unsigned long memattr;
 	int ret = 0;
 
 	if (WARN_ON(!IS_ALIGNED(size, RMM_PAGE_SIZE) ||
 		    !IS_ALIGNED(ipa, size)))
 		return -EINVAL;
 
+	/* Determine the memory attributes */
+	if (prot & KVM_PGTABLE_PROT_NORMAL_NC)
+		memattr = PTE_S2_MEMATTR(MT_S2_FWB_NORMAL_NC);
+	else if (prot & KVM_PGTABLE_PROT_DEVICE)
+		memattr = PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE);
+	else
+		memattr = PTE_S2_MEMATTR(MT_S2_FWB_NORMAL);
+
 	for (offset = 0; offset < size; offset += map_size) {
 		/*
 		 * realm_map_ipa() enforces that the memory is writable,
 		 * so for now we permit both read and write.
 		 */
-		unsigned long desc = phys |
-				     PTE_S2_MEMATTR(MT_S2_FWB_NORMAL) |
+		unsigned long desc = phys | memattr |
 				     KVM_PTE_LEAF_ATTR_LO_S2_S2AP_R |
 				     KVM_PTE_LEAF_ATTR_LO_S2_S2AP_W;
 		ret = rmi_rtt_map_unprotected(rd, ipa, map_level, desc);
