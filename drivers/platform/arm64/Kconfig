@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 #
+source "drivers/platform/arm64/mpam/Kconfig"
 # EC-like Drivers for aarch64 based devices.
 #
 
