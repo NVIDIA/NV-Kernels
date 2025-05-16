@@ -28,7 +28,7 @@ Core
 ACPI support
 ============
 
-.. kernel-doc:: drivers/gpio/gpiolib-acpi.c
+.. kernel-doc:: drivers/gpio/gpiolib-acpi-core.c
    :export:
 
 Device tree support
