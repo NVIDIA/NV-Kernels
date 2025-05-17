@@ -446,7 +446,7 @@ class Annotation(Config):
 
                 # Write out the policy (and note) line(s)
                 val = dict(sorted(new_val["policy"].items()))
-                line = f"{conf : <47} policy<{val}>"
+                line = f"{conf: <47} policy<{val}>"
                 if "note" in new_val:
                     val = new_val["note"]
                     if new_val.get("oneline", False):
@@ -455,7 +455,7 @@ class Annotation(Config):
                     else:
                         # Separate policy and note lines,
                         # followed by an empty line
-                        line += f"\n{conf : <47} note<{val}>\n"
+                        line += f"\n{conf: <47} note<{val}>\n"
                 elif not marker:
                     # Write out a marker indicating the start of annotations
                     # without notes
