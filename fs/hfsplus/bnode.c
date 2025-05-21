@@ -56,7 +56,7 @@ u8 hfs_bnode_read_u8(struct hfs_bnode *node, int off)
 	return data;
 }
 
-int hfs_bnode_read_key(struct hfs_bnode *node, void *key, int off)
+void hfs_bnode_read_key(struct hfs_bnode *node, void *key, int off)
 {
 	struct hfs_btree *tree;
 	int key_len;
@@ -69,13 +69,7 @@ int hfs_bnode_read_key(struct hfs_bnode *node, void *key, int off)
 	else
 		key_len = tree->max_key_len + 2;
 
-	if (key_len > tree->max_key_len + 2) {
-		pr_err("key_len %d too large\n", key_len);
-		return -EINVAL;
-	}
-
 	hfs_bnode_read(node, key, off, key_len);
-	return 0;
 }
 
 void hfs_bnode_write(struct hfs_bnode *node, void *buf, int off, int len)

@@ -97,7 +97,7 @@ extern void hfs_bmap_free(struct hfs_bnode *node);
 extern void hfs_bnode_read(struct hfs_bnode *, void *, int, int);
 extern u16 hfs_bnode_read_u16(struct hfs_bnode *, int);
 extern u8 hfs_bnode_read_u8(struct hfs_bnode *, int);
-extern int hfs_bnode_read_key(struct hfs_bnode *, void *, int);
+extern void hfs_bnode_read_key(struct hfs_bnode *, void *, int);
 extern void hfs_bnode_write(struct hfs_bnode *, void *, int, int);
 extern void hfs_bnode_write_u16(struct hfs_bnode *, int, u16);
 extern void hfs_bnode_write_u8(struct hfs_bnode *, int, u8);

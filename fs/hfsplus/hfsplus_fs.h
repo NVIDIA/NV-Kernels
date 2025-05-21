@@ -396,7 +396,7 @@ void hfs_bmap_free(struct hfs_bnode *node);
 void hfs_bnode_read(struct hfs_bnode *node, void *buf, int off, int len);
 u16 hfs_bnode_read_u16(struct hfs_bnode *node, int off);
 u8 hfs_bnode_read_u8(struct hfs_bnode *node, int off);
-int hfs_bnode_read_key(struct hfs_bnode *node, void *key, int off);
+void hfs_bnode_read_key(struct hfs_bnode *node, void *key, int off);
 void hfs_bnode_write(struct hfs_bnode *node, void *buf, int off, int len);
 void hfs_bnode_write_u16(struct hfs_bnode *node, int off, u16 data);
 void hfs_bnode_clear(struct hfs_bnode *node, int off, int len);
