@@ -75,6 +75,7 @@
 
 #define ARM_LPAE_PTE_NSTABLE		(((arm_lpae_iopte)1) << 63)
 #define ARM_LPAE_PTE_XN			(((arm_lpae_iopte)3) << 53)
+#define ARM_LPAE_PTE_CONT		(((arm_lpae_iopte)1) << 52)
 #define ARM_LPAE_PTE_DBM		(((arm_lpae_iopte)1) << 51)
 #define ARM_LPAE_PTE_AF			(((arm_lpae_iopte)1) << 10)
 #define ARM_LPAE_PTE_SH_NS		(((arm_lpae_iopte)0) << 8)
@@ -320,6 +321,27 @@ static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep, int num_entries,
 				   sizeof(*ptep) * num_entries, DMA_TO_DEVICE);
 }
 
+static int arm_lpae_cont_ptes(int lvl, struct arm_lpae_io_pgtable *data)
+{
+	switch (ARM_LPAE_GRANULE(data)) {
+	case SZ_4K:
+		if (lvl >= 1)
+			return 16;
+		break;
+	case SZ_16K:
+		if (lvl == 2)
+			return 32;
+		else if (lvl == 3)
+			return 128;
+		break;
+	case SZ_64K:
+		if (lvl >= 2)
+			return 32;
+		break;
+	}
+	return 1;
+}
+
 static void __arm_lpae_clear_pte(arm_lpae_iopte *ptep, struct io_pgtable_cfg *cfg, int num_entries)
 {
 	for (int i = 0; i < num_entries; i++)
@@ -329,13 +351,35 @@ static void __arm_lpae_clear_pte(arm_lpae_iopte *ptep, struct io_pgtable_cfg *cf
 		__arm_lpae_sync_pte(ptep, num_entries, cfg);
 }
 
+static bool arm_lpae_use_contpte(struct arm_lpae_io_pgtable *data,
+				 unsigned long iova, phys_addr_t paddr,
+				 int lvl, int num_entries, int i)
+{
+	size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
+	int cont_ptes = arm_lpae_cont_ptes(lvl, data);
+	int contmask = cont_ptes - 1;
+	int contpte_addr_mask = sz * cont_ptes - 1;
+	int map_idx_start, tbl_idx;
+
+	if ((paddr & contpte_addr_mask) != (iova & contpte_addr_mask))
+		return false;
+
+	map_idx_start = ARM_LPAE_LVL_IDX(iova, lvl, data);
+	tbl_idx = map_idx_start + i;
+	if (((tbl_idx & contmask) <= i) &&
+	    (tbl_idx < ((map_idx_start + num_entries) & ~contmask)))
+		return true;
+
+	return false;
+}
+
 static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
 			       struct iommu_iotlb_gather *gather,
 			       unsigned long iova, size_t size, size_t pgcount,
 			       int lvl, arm_lpae_iopte *ptep);
 
 static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
-				phys_addr_t paddr, arm_lpae_iopte prot,
+				unsigned long iova, phys_addr_t paddr, arm_lpae_iopte prot,
 				int lvl, int num_entries, arm_lpae_iopte *ptep)
 {
 	arm_lpae_iopte pte = prot;
@@ -349,7 +393,9 @@ static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
 		pte |= ARM_LPAE_PTE_TYPE_BLOCK;
 
 	for (i = 0; i < num_entries; i++)
-		ptep[i] = pte | paddr_to_iopte(paddr + i * sz, data);
+		ptep[i] = pte | paddr_to_iopte(paddr + i * sz, data) |
+			  (arm_lpae_use_contpte(data, iova, paddr, lvl, num_entries, i) ?
+			  ARM_LPAE_PTE_CONT : 0);
 
 	if (!cfg->coherent_walk)
 		__arm_lpae_sync_pte(ptep, num_entries, cfg);
@@ -383,7 +429,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
 			}
 		}
 
-	__arm_lpae_init_pte(data, paddr, prot, lvl, num_entries, ptep);
+	__arm_lpae_init_pte(data, iova, paddr, prot, lvl, num_entries, ptep);
 	return 0;
 }
 
