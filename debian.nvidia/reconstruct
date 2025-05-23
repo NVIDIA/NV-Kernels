@@ -33,6 +33,7 @@ chmod +x 'debian/tests-build/check-aliases'
 chmod +x 'debian/tests/rebuild'
 chmod +x 'debian/tests/ubuntu-regression-suite'
 chmod +x 'drivers/watchdog/f71808e_wdt.c'
+chmod +x 'tools/testing/selftests/gpio/gpio-aggregator.sh'
 chmod +x 'tools/testing/selftests/net/ipv6_route_update_soft_lockup.sh'
 # Remove any files deleted from the orig.
 rm -f 'arch/arm/kernel/pj4-cp0.c'
