@@ -360,6 +360,8 @@ static void nvgrace_egm_fetch_bad_pages(struct pci_dev *pdev,
 		 * apps.
 		 */
 		retired_page = (struct h_node *)(vzalloc(sizeof(struct h_node)));
+		if (!retired_page)
+			continue;  /* Skip this entry on allocation failure */
 		retired_page->mem_offset = *((u64 *)memaddr + index + 1) -
 					   region->egmphys;
 		hash_add(region->htbl, &retired_page->node, retired_page->mem_offset);
