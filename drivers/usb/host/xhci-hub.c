@@ -1290,6 +1290,17 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			}
 			port_li = readl(&port->port_reg->portli);
 			status = xhci_get_ext_port_status(temp, port_li);
+
+			/*
+			 * In MT8901 USB host controller, the lane count can be wrongly set
+			 * to 2 instead of 1 for USB Gen2x1 devices due to a HW Bug. As a SW
+			 * WAR, check if port speed is 0x5 (SuperSpeedPlus Gen2x1) in
+			 * PORTSC register and update the lane count as 1.
+			 */
+			if ((xhci->quirks & XHCI_NVIDIA_MT8901_HOST) &&
+			    DEV_SUPERSPEEDPLUS(temp))
+				status &= ~0xff00;
+
 			put_unaligned_le32(status, &buf[4]);
 		}
 		break;
