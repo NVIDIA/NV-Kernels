@@ -1033,6 +1033,17 @@ struct iommu_viommu_tegra241_cmdqv {
 };
 
 /**
+ * define IOMMU_VIOMMU_KVM_FD - Flag indicating a valid KVM VM file descriptor
+ *
+ * This flag must be set when allocating a viommu instance that will be
+ * associated with a specific KVM VM. When allocating a viommu instance for a
+ * KVM VM, this flag must be set to inform the initialization logic that
+ * @iommu_viommu_alloc::kvm_vm_fd is properly initialized. If this flag is not
+ * provided @iommu_viommu_alloc::kvm_vm_fd field will be ignored.
+ */
+#define IOMMU_VIOMMU_KVM_FD	BIT(0)
+
+/**
  * struct iommu_viommu_alloc - ioctl(IOMMU_VIOMMU_ALLOC)
  * @size: sizeof(struct iommu_viommu_alloc)
  * @flags: Must be 0
@@ -1066,6 +1077,7 @@ struct iommu_viommu_alloc {
 	__u32 data_len;
 	__u32 __reserved;
 	__aligned_u64 data_uptr;
+	__s32 kvm_vm_fd;
 };
 #define IOMMU_VIOMMU_ALLOC _IO(IOMMUFD_TYPE, IOMMUFD_CMD_VIOMMU_ALLOC)
 
