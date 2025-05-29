@@ -1280,6 +1280,8 @@ struct vma_prepare {
 	struct vm_area_struct *insert;
 	struct vm_area_struct *remove;
 	struct vm_area_struct *remove2;
+
+	bool skip_vma_uprobe :1;
 };
 
 void __meminit __init_single_page(struct page *page, unsigned long pfn,
