@@ -10,6 +10,15 @@ config EINT_MTK
 	default y if PINCTRL_MTK || PINCTRL_MTK_MOORE
 	default PINCTRL_MTK_PARIS
 
+config EINT_MTK_HP
+	tristate "MediaTek HP Driver"
+	depends on EINT_MTK
+	help
+	  Say yes here to support NICs cable plug in/out test.
+	  It will disable pcie link when plug out and enable
+	  pcie link after plug in cable.
+	  This is particularly useful for MediaTek MT8901 SoC.
+
 config PINCTRL_MTK
 	bool
 	depends on OF
