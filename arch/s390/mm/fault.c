@@ -527,6 +527,8 @@ void do_secure_storage_access(struct pt_regs *regs)
 			return handle_fault_error_nolock(regs, SEGV_MAPERR);
 		fallthrough;
 	case USER_FAULT:
+		if (faulthandler_disabled())
+			return handle_fault_error_nolock(regs, 0);
 		mm = current->mm;
 		mmap_read_lock(mm);
 		vma = find_vma(mm, addr);
