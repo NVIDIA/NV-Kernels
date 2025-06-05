@@ -7357,6 +7357,7 @@ CONFIG_MISDN_NETJET                             policy<{'amd64': 'm', 'arm64': '
 CONFIG_MISDN_SPEEDFAX                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_MISDN_W6692                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_MITIGATE_SPECTRE_BRANCH_HISTORY          policy<{'arm64': 'y'}>
+CONFIG_MITIGATION_ITS                           policy<{'amd64': 'y'}>
 CONFIG_MITIGATION_RFDS                          policy<{'amd64': 'y'}>
 CONFIG_MITIGATION_SPECTRE_BHI                   policy<{'amd64': 'y'}>
 CONFIG_MK8                                      policy<{'amd64': 'n'}>
