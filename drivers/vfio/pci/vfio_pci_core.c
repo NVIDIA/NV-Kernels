@@ -735,6 +735,16 @@ void vfio_pci_core_close_device(struct vfio_device *core_vdev)
 #if IS_ENABLED(CONFIG_EEH)
 	eeh_dev_release(vdev->pdev);
 #endif
+
+#if 0
+	/*
+	 * destroy vdevice which involves tsm unbind before we disable pci disable
+	 * A MSE/BME clear will transition the device to error state.
+	 */
+	if (core_vdev->iommufd_device)
+		iommufd_device_tombstone_vdevice(core_vdev->iommufd_device);
+#endif
+
 	vfio_pci_core_disable(vdev);
 
 	vfio_pci_dma_buf_cleanup(vdev);
