@@ -183,7 +183,7 @@ acpi_find_cache_level(struct acpi_table_header *table_hdr,
  * @cpu_node: processor node we wish to count caches for
  * @levels: Number of levels if success.
  * @split_levels:	Number of split cache levels (data/instruction) if
- *			success. Can by NULL.
+ *			success. Can be NULL.
  *
  * Given a processor node containing a processing unit, walk into it and count
  * how many levels exist solely for it, and then walk up each level until we hit
@@ -196,6 +196,8 @@ static void acpi_count_levels(struct acpi_table_header *table_hdr,
 			      struct acpi_pptt_processor *cpu_node,
 			      unsigned int *levels, unsigned int *split_levels)
 {
+	*levels = 0;
+
 	do {
 		acpi_find_cache_level(table_hdr, cpu_node, levels, split_levels, 0, 0);
 		cpu_node = fetch_pptt_node(table_hdr, cpu_node->parent);
