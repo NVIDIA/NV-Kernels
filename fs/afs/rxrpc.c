@@ -217,7 +217,6 @@ static void afs_deferred_free_worker(struct work_struct *work)
 void afs_deferred_put_call(struct afs_call *call)
 {
 	struct afs_net *net = call->net;
-	unsigned int debug_id = call->debug_id;
 	bool zero;
 	int r, o;
 
