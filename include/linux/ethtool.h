@@ -638,6 +638,8 @@ struct ethtool_rxfh_param {
  *	parameter.
  * @cap_rss_ctx_supported: indicates if the driver supports RSS
  *	contexts.
+ * @rxfh_per_ctx_fields: device supports selecting different header fields
+ *	for Rx hash calculation and RSS for each additional context.
  * @cap_rss_rxnfc_adds: device supports nonzero ring_cookie in filters with
  *	%FLOW_RSS flag; the queue ID from the filter is added to the value from
  *	the indirection table to determine the delivery queue.
@@ -821,6 +823,7 @@ struct ethtool_ops {
 	u32     supported_input_xfrm:8;
 	u32     cap_link_lanes_supported:1;
 	u32     cap_rss_ctx_supported:1;
+	u32	rxfh_per_ctx_fields:1;
 	u32	cap_rss_rxnfc_adds:1;
 	u32	supported_coalesce_params;
 	u32	supported_ring_params;
