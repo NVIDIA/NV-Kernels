@@ -1,0 +1,45 @@
+name: Kernel Build
+
+on:
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  build:
+    name: ${{ matrix.arch == 'amd64' && 'x86_64' || 'ARM64' }} - ${{ matrix.flavour }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        include:
+          - runs-on: ubuntu-latest
+            arch: amd64
+            flavour: nvidia
+          - runs-on: ubuntu-24.04-arm
+            arch: arm64
+            flavour: nvidia
+          - runs-on: ubuntu-24.04-arm
+            arch: arm64
+            flavour: nvidia-64k
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev python3
+
+      - name: Configure Kernel
+        run: |
+          debian/scripts/misc/annotations --arch ${{ matrix.arch }} --flavour ${{ matrix.flavour }} --export > .config
+          make oldconfig
+          # Ensure WERROR is disabled
+          ./scripts/config --disable CONFIG_WERROR
+          # Disable certificate verification
+          ./scripts/config --disable SYSTEM_TRUSTED_KEYS
+          ./scripts/config --disable SYSTEM_REVOCATION_KEYS ""
+
+      - name: Build Kernel
+        run: |
+          make -j$(nproc)
