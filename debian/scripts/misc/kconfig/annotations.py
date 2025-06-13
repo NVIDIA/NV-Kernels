@@ -6,10 +6,9 @@ import json
 import re
 import shutil
 import tempfile
-
 from abc import abstractmethod
 from ast import literal_eval
-from os.path import dirname, abspath
+from os.path import abspath, dirname
 
 from kconfig.version import ANNOTATIONS_FORMAT_VERSION
 
