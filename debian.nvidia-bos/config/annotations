@@ -156,6 +156,9 @@ CONFIG_NOUVEAU_PLATFORM_DRIVER                  note<'Disable nouveau for NVIDIA
 CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
 CONFIG_NR_CPUS                                  note<'LP: #1864198'>
 
+CONFIG_NVIDIA_FFA_EC                            policy<{'arm64': 'y'}>
+CONFIG_NVIDIA_FFA_EC                            note<'LP: #2114230'>
+
 CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
 
