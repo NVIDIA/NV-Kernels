@@ -198,6 +198,7 @@ CONFIG_HAVE_RUST                                policy<{'amd64': 'y', 'arm64': '
 CONFIG_IOMMUFD_VFIO_CONTAINER                   policy<{'arm64': 'y'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_NVIDIA_FFA_EC                            policy<{'arm64': 'y'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125'}>
 CONFIG_R8127                                    policy<{'amd64': 'n', 'arm64': 'm'}>
 CONFIG_RELR                                     policy<{'arm64': '-'}>
