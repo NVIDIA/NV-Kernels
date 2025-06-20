@@ -42,5 +42,7 @@ chmod +x 'drivers/net/ethernet/realtek/r8127/rtl_eeprom.h'
 chmod +x 'drivers/net/ethernet/realtek/r8127/rtltool.c'
 chmod +x 'drivers/net/ethernet/realtek/r8127/rtltool.h'
 chmod +x 'tools/testing/selftests/gpio/gpio-aggregator.sh'
+chmod +x 'tools/testing/selftests/ublk/test_stripe_04.sh'
 # Remove any files deleted from the orig.
+rm -f 'arch/um/kernel/maccess.c'
 exit 0
