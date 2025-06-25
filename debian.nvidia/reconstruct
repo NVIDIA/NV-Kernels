@@ -38,6 +38,7 @@ chmod +x 'tools/testing/selftests/net/ipv6_route_update_soft_lockup.sh'
 # Remove any files deleted from the orig.
 rm -f 'arch/arm/kernel/pj4-cp0.c'
 rm -f 'arch/arm64/boot/dts/qcom/pm2250.dtsi'
+rm -f 'arch/arm64/boot/dts/qcom/sdm845-db845c-navigation-mezzanine.dts'
 rm -f 'arch/loongarch/include/asm/dma-direct.h'
 rm -f 'arch/loongarch/include/asm/qspinlock.h'
 rm -f 'arch/s390/kernel/earlypgm.S'
