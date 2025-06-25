@@ -49,6 +49,7 @@ chmod +x 'scripts/pahole-version.sh'
 chmod +x 'tools/testing/selftests/net/fib_nexthop_nongw.sh'
 chmod -x 'tools/testing/selftests/net/setup_loopback.sh'
 chmod +x 'tools/testing/selftests/netfilter/conntrack_vrf.sh'
+chmod +x 'tools/testing/selftests/ublk/test_stripe_04.sh'
 # Remove any files deleted from the orig.
 rm -f 'Documentation/devicetree/bindings/ata/ahci-ceva.txt'
 rm -f 'Documentation/devicetree/bindings/phy/amlogic,meson-g12a-usb2-phy.yaml'
