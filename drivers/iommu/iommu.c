@@ -1380,85 +1380,6 @@ int iommu_group_id(struct iommu_group *group)
 }
 EXPORT_SYMBOL_GPL(iommu_group_id);
 
-static struct iommu_group *get_pci_alias_group(struct pci_dev *pdev,
-					       unsigned long *devfns);
-
-/*
- * For multifunction devices which are not isolated from each other, find
- * all the other non-isolated functions and look for existing groups.  For
- * each function, we also need to look for aliases to or from other devices
- * that may already have a group.
- */
-static struct iommu_group *get_pci_function_alias_group(struct pci_dev *pdev,
-							unsigned long *devfns)
-{
-	struct pci_dev *tmp = NULL;
-	struct iommu_group *group;
-
-	if (!pdev->multifunction || pci_acs_enabled(pdev, PCI_ACS_ISOLATED))
-		return NULL;
-
-	for_each_pci_dev(tmp) {
-		if (tmp == pdev || tmp->bus != pdev->bus ||
-		    PCI_SLOT(tmp->devfn) != PCI_SLOT(pdev->devfn) ||
-		    pci_acs_enabled(tmp, PCI_ACS_ISOLATED))
-			continue;
-
-		group = get_pci_alias_group(tmp, devfns);
-		if (group) {
-			pci_dev_put(tmp);
-			return group;
-		}
-	}
-
-	return NULL;
-}
-
-/*
- * Look for aliases to or from the given device for existing groups. DMA
- * aliases are only supported on the same bus, therefore the search
- * space is quite small (especially since we're really only looking at pcie
- * device, and therefore only expect multiple slots on the root complex or
- * downstream switch ports).  It's conceivable though that a pair of
- * multifunction devices could have aliases between them that would cause a
- * loop.  To prevent this, we use a bitmap to track where we've been.
- */
-static struct iommu_group *get_pci_alias_group(struct pci_dev *pdev,
-					       unsigned long *devfns)
-{
-	struct pci_dev *tmp = NULL;
-	struct iommu_group *group;
-
-	if (test_and_set_bit(pdev->devfn & 0xff, devfns))
-		return NULL;
-
-	group = iommu_group_get(&pdev->dev);
-	if (group)
-		return group;
-
-	for_each_pci_dev(tmp) {
-		if (tmp == pdev || tmp->bus != pdev->bus)
-			continue;
-
-		/* We alias them or they alias us */
-		if (pci_devs_are_dma_aliases(pdev, tmp)) {
-			group = get_pci_alias_group(tmp, devfns);
-			if (group) {
-				pci_dev_put(tmp);
-				return group;
-			}
-
-			group = get_pci_function_alias_group(tmp, devfns);
-			if (group) {
-				pci_dev_put(tmp);
-				return group;
-			}
-		}
-	}
-
-	return NULL;
-}
-
 /*
  * Generic device_group call-back function. It just allocates one
  * iommu-group per device.
@@ -1501,40 +1422,88 @@ static struct iommu_group *pci_group_alloc_non_isolated(void)
 	return group;
 }
 
+/*
+ * Ignoring quirks, all functions in the MFD need to be isolated from each other
+ * and get their own groups, otherwise the whole MFD will share a group. Any
+ * function that lacks explicit ACS isolation is assumed to be able to P2P
+ * access any other function in the MFD.
+ */
+static bool pci_mfds_are_same_group(struct pci_dev *deva, struct pci_dev *devb)
+{
+	/* Are deva/devb functions in the same MFD? */
+	if (PCI_SLOT(deva->devfn) != PCI_SLOT(devb->devfn))
+		return false;
+	/* Don't understand what is happening, be conservative */
+	if (deva->multifunction != devb->multifunction)
+		return true;
+	if (!deva->multifunction)
+		return false;
+
+	/* Quirks can inhibit single MFD functions from combining into groups */
+	if (pci_mfd_isolated(deva) || pci_mfd_isolated(devb))
+		return false;
+
+	/* Can they reach each other's MMIO through P2P? */
+	return !pci_acs_enabled(deva, PCI_ACS_ISOLATED) ||
+	       !pci_acs_enabled(devb, PCI_ACS_ISOLATED);
+}
+
+static bool pci_devs_are_same_group(struct pci_dev *deva, struct pci_dev *devb)
+{
+	/*
+	 * This is allowed to return cycles: a,b -> b,c -> c,a can be aliases.
+	 */
+	if (pci_devs_are_dma_aliases(deva, devb))
+		return true;
+
+	return pci_mfds_are_same_group(deva, devb);
+}
+
 static struct iommu_group *pci_get_alias_group(struct pci_dev *pdev)
 {
-	struct iommu_group *group;
-	DECLARE_BITMAP(devfns, 256) = {};
+	struct pci_reachable_set devfns;
+	const unsigned int NR_DEVFNS = sizeof(devfns.devfns) * BITS_PER_BYTE;
+	unsigned int devfn;
 
 	/*
-	 * Look for existing groups on device aliases.  If we alias another
-	 * device or another device aliases us, use the same group.
+	 * Look for existing groups on device aliases and multi-function ACS. If
+	 * we alias another device or another device aliases us, use the same
+	 * group.
+	 *
+	 * pci_reachable_set() should return the same bitmap if called for any
+	 * device in the set and we want all devices in the set to have the same
+	 * group.
 	 */
-	group = get_pci_alias_group(pdev, devfns);
-	if (group)
-		return group;
+	pci_reachable_set(pdev, &devfns, pci_devs_are_same_group);
+	/* start is known to have iommu_group_get() == NULL */
+	__clear_bit(pdev->devfn, devfns.devfns);
 
 	/*
-	 * Look for existing groups on non-isolated functions on the same
-	 * slot and aliases of those funcions, if any.  No need to clear
-	 * the search bitmap, the tested devfns are still valid.
-	 */
-	group = get_pci_function_alias_group(pdev, devfns);
-	if (group)
-		return group;
-
-	/*
-	 * When MFD's are included in the set due to ACS we assume that if ACS
-	 * permits an internal loopback between functions it also permits the
-	 * loopback to go downstream if a function is a bridge.
+	 * When MFD functions are included in the set due to ACS we assume that
+	 * if ACS permits an internal loopback between functions it also permits
+	 * the loopback to go downstream if any function is a bridge.
 	 *
 	 * It is less clear what aliases mean when applied to a bridge. For now
 	 * be conservative and also propagate the group downstream.
 	 */
-	__clear_bit(pdev->devfn & 0xFF, devfns);
-	if (!bitmap_empty(devfns, sizeof(devfns) * BITS_PER_BYTE))
-		return pci_group_alloc_non_isolated();
-	return NULL;
+	if (bitmap_empty(devfns.devfns, NR_DEVFNS))
+		return NULL;
+
+	for_each_set_bit(devfn, devfns.devfns, NR_DEVFNS) {
+		struct iommu_group *group;
+		struct pci_dev *pdev_slot;
+
+		pdev_slot = pci_get_slot(pdev->bus, devfn);
+		group = iommu_group_get(&pdev_slot->dev);
+		pci_dev_put(pdev_slot);
+		if (group) {
+			if (WARN_ON(!(group->bus_data &
+				      BUS_DATA_PCI_NON_ISOLATED)))
+				group->bus_data |= BUS_DATA_PCI_NON_ISOLATED;
+			return group;
+		}
+	}
+	return pci_group_alloc_non_isolated();
 }
 
 static struct iommu_group *pci_hierarchy_group(struct pci_dev *pdev)
