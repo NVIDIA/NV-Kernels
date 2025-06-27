@@ -54,13 +54,13 @@ struct iommu_group {
 	void *iommu_data;
 	void (*iommu_data_release)(void *iommu_data);
 	char *name;
-	int id;
 	struct iommu_domain *default_domain;
 	struct iommu_domain *blocking_domain;
 	struct iommu_domain *domain;
 	struct list_head entry;
-	unsigned int owner_cnt;
 	void *owner;
+	unsigned int owner_cnt;
+	int id;
 
 	/* Used by the device_group() callbacks */
 	u32 bus_data;
