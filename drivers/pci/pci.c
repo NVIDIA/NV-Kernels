@@ -957,6 +957,7 @@ static void __pci_config_acs(struct pci_dev *dev, struct pci_acs *caps,
 			     const char *p, const u16 acs_mask, const u16 acs_flags)
 {
 	u16 flags = acs_flags;
+	u16 supported_flags;
 	u16 mask = acs_mask;
 	char *delimit;
 	int ret = 0;
@@ -1001,8 +1002,14 @@ static void __pci_config_acs(struct pci_dev *dev, struct pci_acs *caps,
 			}
 		}
 
-		if (mask & ~(PCI_ACS_SV | PCI_ACS_TB | PCI_ACS_RR | PCI_ACS_CR |
-			    PCI_ACS_UF | PCI_ACS_EC | PCI_ACS_DT)) {
+		supported_flags = PCI_ACS_SV | PCI_ACS_TB | PCI_ACS_RR |
+				  PCI_ACS_CR | PCI_ACS_UF | PCI_ACS_EC |
+				  PCI_ACS_DT;
+		if (caps->cap & PCI_ACS_ENHANCED)
+			supported_flags |= PCI_ACS_USP_MT_RR |
+					   PCI_ACS_DSP_MT_RR |
+					   PCI_ACS_UNCLAIMED_RR;
+		if (mask & ~supported_flags) {
 			pci_err(dev, "Invalid ACS flags specified\n");
 			return;
 		}
@@ -1061,6 +1068,14 @@ static void pci_std_enable_acs(struct pci_dev *dev, struct pci_acs *caps)
 
 	/* Upstream Forwarding */
 	caps->ctrl |= (caps->cap & PCI_ACS_UF);
+
+	/*
+	 * USP/DSP Memory Target Access Control and Unclaimed Request Redirect
+	 */
+	if (caps->cap & PCI_ACS_ENHANCED) {
+		caps->ctrl |= PCI_ACS_USP_MT_RR | PCI_ACS_DSP_MT_RR |
+			      PCI_ACS_UNCLAIMED_RR;
+	}
 
 	/* Enable Translation Blocking for external devices and noats */
 	if (pci_ats_disabled() || dev->external_facing || dev->untrusted)
