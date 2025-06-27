@@ -836,6 +836,32 @@ struct pci_dynids {
 	struct list_head	list;	/* For IDs added at runtime */
 };
 
+enum pci_bus_isolation {
+	/*
+	 * The bus is off a root port and the root port has isolated ACS flags
+	 * or the bus is part of a PCIe switch and the switch has isolated ACS
+	 * flags.
+	 */
+	PCIE_ISOLATED,
+	/*
+	 * The switch's DSP's are not isolated from each other but are isolated
+	 * from the USP.
+	 */
+	PCIE_SWITCH_DSP_NON_ISOLATED,
+	/* The above and the USP's MMIO is not isolated. */
+	PCIE_NON_ISOLATED,
+	/*
+	 * A PCI/PCI-X bus, no isolation. This is like
+	 * PCIE_SWITCH_DSP_NON_ISOLATED in that the upstream bridge is isolated
+	 * from the bus. The bus itself may also have a shared alias of devfn=0.
+	 */
+	PCI_BUS_NON_ISOLATED,
+	/*
+	 * The above and the bridge's MMIO is not isolated and the bridge's RID
+	 * may be an alias.
+	 */
+	PCI_BRIDGE_NON_ISOLATED,
+};
 
 /*
  * PCI Error Recovery System (PCI-ERS).  If a PCI device driver provides
@@ -1226,6 +1252,8 @@ struct pci_dev *pci_get_domain_bus_and_slot(int domain, unsigned int bus,
 					    unsigned int devfn);
 struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from);
 struct pci_dev *pci_get_base_class(unsigned int class, struct pci_dev *from);
+
+enum pci_bus_isolation pci_bus_isolated(struct pci_bus *bus);
 
 int pci_dev_present(const struct pci_device_id *ids);
 
@@ -1998,6 +2026,9 @@ static inline struct pci_dev *pci_get_class(unsigned int class,
 static inline struct pci_dev *pci_get_base_class(unsigned int class,
 						 struct pci_dev *from)
 { return NULL; }
+
+static inline enum pci_bus_isolation pci_bus_isolated(struct pci_bus *bus)
+{ return PCIE_NON_ISOLATED; }
 
 static inline int pci_dev_present(const struct pci_device_id *ids)
 { return 0; }
