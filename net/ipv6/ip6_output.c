@@ -60,7 +60,7 @@
 static int ip6_finish_output2(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
-	struct net_device *dev = dst->dev;
+	struct net_device *dev = dst_dev(dst);
 	struct inet6_dev *idev = ip6_dst_idev(dst);
 	unsigned int hh_len = LL_RESERVED_SPACE(dev);
 	const struct in6_addr *daddr, *nexthop;
@@ -513,7 +513,8 @@ int ip6_forward(struct sk_buff *skb)
 	struct dst_entry *dst = skb_dst(skb);
 	struct ipv6hdr *hdr = ipv6_hdr(skb);
 	struct inet6_skb_parm *opt = IP6CB(skb);
-	struct net *net = dev_net(dst->dev);
+	struct net *net = dev_net(dst_dev(dst));
+	struct net_device *dev;
 	struct inet6_dev *idev;
 	SKB_DR(reason);
 	u32 mtu;
@@ -604,12 +605,12 @@ int ip6_forward(struct sk_buff *skb)
 		goto drop;
 	}
 	dst = skb_dst(skb);
-
+	dev = dst_dev(dst);
 	/* IPv6 specs say nothing about it, but it is clear that we cannot
 	   send redirects to source routed frames.
 	   We don't send redirects to frames decapsulated from IPsec.
 	 */
-	if (IP6CB(skb)->iif == dst->dev->ifindex &&
+	if (IP6CB(skb)->iif == dev->ifindex &&
 	    opt->srcrt == 0 && !skb_sec_path(skb)) {
 		struct in6_addr *target = NULL;
 		struct inet_peer *peer;
@@ -657,7 +658,7 @@ int ip6_forward(struct sk_buff *skb)
 
 	if (unlikely(ip6_pkt_too_big(skb, mtu))) {
 		/* Again, force OUTPUT device used as source address */
-		skb->dev = dst->dev;
+		skb->dev = dev;
 		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu);
 		__IP6_INC_STATS(net, idev, IPSTATS_MIB_INTOOBIGERRORS);
 		__IP6_INC_STATS(net, ip6_dst_idev(dst),
@@ -666,7 +667,7 @@ int ip6_forward(struct sk_buff *skb)
 		return -EMSGSIZE;
 	}
 
-	if (skb_cow(skb, dst->dev->hard_header_len)) {
+	if (skb_cow(skb, dev->hard_header_len)) {
 		__IP6_INC_STATS(net, ip6_dst_idev(dst),
 				IPSTATS_MIB_OUTDISCARDS);
 		goto drop;
@@ -679,7 +680,7 @@ int ip6_forward(struct sk_buff *skb)
 	hdr->hop_limit--;
 
 	return NF_HOOK(NFPROTO_IPV6, NF_INET_FORWARD,
-		       net, NULL, skb, skb->dev, dst->dev,
+		       net, NULL, skb, skb->dev, dev,
 		       ip6_forward_finish);
 
 error:
@@ -1106,7 +1107,7 @@ static struct dst_entry *ip6_sk_dst_check(struct sock *sk,
 #ifdef CONFIG_IPV6_SUBTREES
 	    ip6_rt_check(&rt->rt6i_src, &fl6->saddr, np->saddr_cache) ||
 #endif
-	   (fl6->flowi6_oif && fl6->flowi6_oif != dst->dev->ifindex)) {
+	   (fl6->flowi6_oif && fl6->flowi6_oif != dst_dev(dst)->ifindex)) {
 		dst_release(dst);
 		dst = NULL;
 	}
