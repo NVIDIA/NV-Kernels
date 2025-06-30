@@ -1573,7 +1573,7 @@ static struct iommu_group *pci_hierarchy_group(struct pci_dev *pdev)
  *     Once a PCI bus becomes non isolating the entire downstream hierarchy of
  *     that bus becomes a single group.
  */
-struct iommu_group *pci_device_group(struct device *dev)
+static struct iommu_group *__pci_device_group(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct iommu_group *group;
@@ -1679,6 +1679,77 @@ struct iommu_group *pci_device_group(struct device *dev)
 	}
 	WARN_ON(true);
 	return ERR_PTR(-EINVAL);
+}
+
+struct check_group_aliases_data {
+	struct pci_dev *pdev;
+	struct iommu_group *group;
+};
+
+static void pci_check_group(const struct check_group_aliases_data *data,
+			    u16 alias, struct pci_dev *pdev)
+{
+	struct iommu_group *group;
+
+	group = iommu_group_get(&pdev->dev);
+	if (!group)
+		return;
+
+	if (group != data->group)
+		dev_err(&data->pdev->dev,
+			"During group construction alias processing needed dev %s alias %x to have the same group but %u != %u\n",
+			pci_name(pdev), alias, data->group->id, group->id);
+	iommu_group_put(group);
+}
+
+static int pci_check_group_aliases(struct pci_dev *pdev, u16 alias,
+				   void *opaque)
+{
+	const struct check_group_aliases_data *data = opaque;
+
+	/*
+	 * Sometimes when a PCIe-PCI bridge is performing transactions on behalf
+	 * of its subordinate bus it uses devfn=0 on the subordinate bus as the
+	 * alias. This means that 0 will alias with all devfns on the
+	 * subordinate bus and so we expect to see those in the same group. pdev
+	 * in this case is the bridge itself and pdev->bus is the primary bus of
+	 * the bridge.
+	 */
+	if (pdev->bus->number != PCI_BUS_NUM(alias)) {
+		struct pci_dev *piter = NULL;
+
+		for_each_pci_dev(piter) {
+			if (pci_domain_nr(pdev->bus) ==
+				    pci_domain_nr(piter->bus) &&
+			    PCI_BUS_NUM(alias) == pdev->bus->number)
+				pci_check_group(data, alias, piter);
+		}
+	} else {
+		pci_check_group(data, alias, pdev);
+	}
+
+	return 0;
+}
+
+struct iommu_group *pci_device_group(struct device *dev)
+{
+	struct iommu_group *group = __pci_device_group(dev);
+
+	if (!IS_ERR(group)) {
+		struct check_group_aliases_data data = {
+			.pdev = to_pci_dev(dev), .group = group
+		};
+
+		/*
+		 * The IOMMU driver should use pci_for_each_dma_alias() to
+		 * figure out what RIDs to program and the core requires all the
+		 * RIDs to fall within the same group. Validate that everything
+		 * worked properly.
+		 */
+		pci_for_each_dma_alias(data.pdev, pci_check_group_aliases,
+				       &data);
+	}
+	return group;
 }
 EXPORT_SYMBOL_GPL(pci_device_group);
 
