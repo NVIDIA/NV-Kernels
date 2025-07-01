@@ -9,6 +9,7 @@
 #include <linux/bitfield.h>
 #include <linux/bitmap.h>
 #include <linux/cacheinfo.h>
+#include <linux/cleanup.h>
 #include <linux/cpu.h>
 #include <linux/cpumask.h>
 #include <linux/device.h>
@@ -30,6 +31,7 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>
+#include <linux/xarray.h>
 
 #include "mpam_internal.h"
 
@@ -697,6 +699,9 @@ int mpam_ris_create(struct mpam_msc *msc, u8 ris_idx,
 		    enum mpam_class_types type, u8 class_id, int component_id)
 {
 	int err;
+
+	if (mpam_force_unknown_msc_test(msc))
+		type = MPAM_CLASS_UNKNOWN;
 
 	mutex_lock(&mpam_list_lock);
 	err = mpam_ris_create_locked(msc, ris_idx, type, class_id,
@@ -3454,6 +3459,65 @@ static const struct kernel_param_ops mpam_cmdline_partid_max_ops = {
 };
 module_param_cb(partid_max, &mpam_cmdline_partid_max_ops, NULL, 0644);
 MODULE_PARM_DESC(partid_max, "Override for reducing the number of PARTID.");
+
+static DEFINE_XARRAY(mpam_force_unkown_msc);
+
+static void mpam_force_unknown_msc_add(u32 msc_id, gfp_t gfp)
+{
+	xa_store(&mpam_force_unkown_msc, msc_id, xa_mk_value(msc_id), gfp);
+}
+
+bool mpam_force_unknown_msc_test(struct mpam_msc *msc)
+{
+	return !!xa_load(&mpam_force_unkown_msc, msc->pdev->id);
+}
+
+static int mpam_force_unknown_msc_set(const char *_str,
+				       const struct kernel_param *kp)
+{
+	int err;
+	u32 val;
+	char *tok, *iter;
+	char *str __free(kfree) = kstrdup(_str, GFP_KERNEL);
+
+	iter = str;
+	do {
+		tok = strsep(&iter, ",");
+		err = kstrtou32(tok, 10, &val);
+		if (err) {
+			pr_err("Failed to parse commandline: %d\n", err);
+			break;
+		}
+		mpam_force_unknown_msc_add(val, GFP_KERNEL);
+	} while (iter);
+
+	return 0;
+}
+static int mpam_force_unknown_msc_get(char *buffer,
+				      const struct kernel_param *kp)
+{
+	unsigned long index, count = 0;
+	int result = 0;
+	void *entry;
+
+	xa_for_each(&mpam_force_unkown_msc, index, entry) {
+		if (count)
+			result += sprintf(buffer + result, ",");
+
+		result += sprintf(buffer + result, "%lu", index);
+		count += 1;
+	}
+
+	result += sprintf(buffer + result, "\n");
+
+	return result;
+}
+static const struct kernel_param_ops mpam_force_unknown_msc_ops = {
+	.set = mpam_force_unknown_msc_set,
+	.get = mpam_force_unknown_msc_get,
+};
+subsys_param_cb(force_unknown_msc, &mpam_force_unknown_msc_ops, NULL, 0644);
+MODULE_PARM_DESC(force_unknown_msc, "Disabling a set of probed MSC.");
 
 #ifdef CONFIG_MPAM_KUNIT_TEST
 #include "test_mpam_devices.c"
