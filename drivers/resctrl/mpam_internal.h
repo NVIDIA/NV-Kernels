@@ -536,6 +536,8 @@ void mpam_msmon_reset_all_mbwu(struct mpam_component *comp);
 int mpam_get_cpumask_from_cache_id(unsigned long cache_id, u32 cache_level,
 				   cpumask_t *affinity);
 
+bool mpam_force_unknown_msc_test(struct mpam_msc *msc);
+
 #ifdef CONFIG_RESCTRL_FS
 int mpam_resctrl_setup(void);
 void mpam_resctrl_exit(void);
