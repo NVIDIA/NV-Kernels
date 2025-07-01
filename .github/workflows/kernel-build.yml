@@ -1,0 +1,77 @@
+name: Kernel Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: ${{ matrix.runs-on == 'ubuntu-latest' && 'x86_64' || 'ARM64' }} - ${{ matrix.config }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        include:
+          - runs-on: ubuntu-latest
+            config: defconfig
+          - runs-on: ubuntu-24.04-arm
+            config: config_4k
+          - runs-on: ubuntu-24.04-arm
+            config: config_64k
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y build-essential flex bison libssl-dev bc \
+            busybox-static cmake coreutils virtme-ng cpio elfutils file gcc \
+            git iproute2 jq kbd kmod libcap-dev libelf-dev libunwind-dev \
+            libvirt-clients libzstd-dev libasound2-dev libdrm-dev \
+            linux-headers-generic linux-tools-common linux-tools-generic \
+            make ninja-build pahole pkg-config python3-dev python3-pip \
+            python3-requests qemu-kvm qemu-system-arm rsync stress-ng udev zstd \
+            libseccomp-dev libcap-ng-dev llvm-19 clang-19 python3-full curl \
+            bpftrace dwarves gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            bash-completion ccache debhelper devscripts docbook-utils \
+            fakeroot gawk kernel-wedge libncurses5-dev makedumpfile python3-git \
+            python3-requests python3-ruamel.yaml sharutils transfig ubuntu-dev-tools \
+            libnuma-dev xmlto
+
+      - name: Install virtme-ng
+        run: |
+          git clone https://github.com/arighi/virtme-ng.git
+          cd virtme-ng
+          VNG_PACKAGE=1 BUILD_VIRTME_NG_INIT=1 pip install --break-system-packages .
+          cd -
+
+      - name: Configure Kernel
+        run: |
+          if [ "${{ matrix.config }}" = "defconfig" ]; then
+            vng -vb --kconfig
+          else
+            vng -vb --kconfig --config .github/workflows/${{ matrix.config }}
+          fi
+          # Ensure WERROR is disabled
+          ./scripts/config --disable CONFIG_WERROR
+          # Disable certificate verification
+          ./scripts/config --disable SYSTEM_TRUSTED_KEYS
+          ./scripts/config --disable SYSTEM_REVOCATION_KEYS ""
+
+      - name: Build Kernel
+        run: |
+          vng -vb
+
+      - name: Boot test
+        run: |
+          vng -v -m 4G -- uname -a
+
+      - name: Run kselftests
+        run: |
+          make headers_install
+          make -j$(nproc) -C tools/testing/selftests \
+            TARGETS="mm dma iommu locking" \
+            INSTALL_PATH=$(pwd)/tests \
+            all install
+          vng -v -m 4G -- ./tests/run_kselftest.sh --summary
