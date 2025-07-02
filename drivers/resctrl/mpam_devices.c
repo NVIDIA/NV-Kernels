@@ -521,11 +521,9 @@ static void mpam_free_garbage(void)
 	}
 }
 
-static LIST_HEAD(mpam_pcc_channels);
+static DEFINE_XARRAY(mpam_pcc_channels);
 
 struct mpam_pcc_chan {
-	struct list_head	pcc_channels_list;
-
 	u32			refs;
 	u32			subspace_id;
 	struct pcc_mbox_chan	*channel;
@@ -534,17 +532,15 @@ struct mpam_pcc_chan {
 	struct mpam_garbage	garbage;
 };
 
-static struct pcc_mbox_chan *mpam_pcc_alloc(u8 subspace_id, gfp_t gfp)
+static struct mpam_pcc_chan *__mpam_pcc_alloc(u8 subspace_id, gfp_t gfp)
 {
-	struct mpam_pcc_chan *chan;
+	struct mpam_pcc_chan *chan __free(kfree) = kzalloc(sizeof(*chan), gfp);
 
 	lockdep_assert_held(&mpam_list_lock);
 
-	chan = kzalloc(sizeof(*chan), gfp);
 	if (!chan)
 		return ERR_PTR(-ENOMEM);
 
-	INIT_LIST_HEAD_RCU(&chan->pcc_channels_list);
 	chan->refs = 1;
 	chan->subspace_id = subspace_id;
 	/*
@@ -557,31 +553,29 @@ static struct pcc_mbox_chan *mpam_pcc_alloc(u8 subspace_id, gfp_t gfp)
 	chan->pcc_cl.knows_txdone = false;
 
 	chan->channel = pcc_mbox_request_channel(&chan->pcc_cl, subspace_id);
-	if (IS_ERR(chan->channel)) {
-		kfree(chan);
-		return NULL;
-	}
+	if (IS_ERR(chan->channel))
+		return ERR_CAST(chan->channel);
 
 	init_garbage(&chan->garbage);
-	list_add(&chan->pcc_channels_list, &mpam_pcc_channels);
-	return chan->channel;
+	xa_store(&mpam_pcc_channels, subspace_id, chan, gfp);
+
+	return_ptr(chan);
+}
+
+static struct pcc_mbox_chan *mpam_pcc_alloc(u8 subspace_id, gfp_t gfp)
+{
+	struct mpam_pcc_chan *chan = __mpam_pcc_alloc(subspace_id, gfp);
+	return IS_ERR(chan) ? ERR_CAST(chan) : chan->channel;
 }
 
 static struct pcc_mbox_chan *mpam_pcc_get(u8 subspace_id, bool alloc, gfp_t gfp)
 {
-	bool found = false;
 	struct mpam_pcc_chan *chan;
 
 	lockdep_assert_held(&mpam_list_lock);
 
-	list_for_each_entry(chan, &mpam_pcc_channels, pcc_channels_list) {
-		if (chan->subspace_id == subspace_id) {
-			found = true;
-			break;
-		}
-	}
-
-	if (found) {
+	chan = xa_load(&mpam_pcc_channels, subspace_id);
+	if (chan) {
 		chan->refs++;
 		return chan->channel;
 	}
@@ -594,24 +588,17 @@ static struct pcc_mbox_chan *mpam_pcc_get(u8 subspace_id, bool alloc, gfp_t gfp)
 
 static void mpam_pcc_put(u8 subspace_id)
 {
-	bool found = false;
 	struct mpam_pcc_chan *chan;
 
 	lockdep_assert_held(&mpam_list_lock);
 
-	list_for_each_entry(chan, &mpam_pcc_channels, pcc_channels_list) {
-		if (chan->subspace_id == subspace_id) {
-			found = true;
-			break;
-		}
-	}
-
-	if (!found)
+	chan = xa_load(&mpam_pcc_channels, subspace_id);
+	if (!chan)
 		return;
 
 	chan->refs--;
 	if (!chan->refs) {
-		list_del(&chan->pcc_channels_list);
+		xa_erase(&mpam_pcc_channels, subspace_id);
 		pcc_mbox_free_channel(chan->channel);
 		add_to_garbage(chan);
 	}
