@@ -2768,6 +2768,7 @@ static void rdt_disable_ctx(void)
 {
 	resctrl_arch_set_cdp_enabled(RDT_RESOURCE_L3, false);
 	resctrl_arch_set_cdp_enabled(RDT_RESOURCE_L2, false);
+	resctrl_arch_set_mb_uses_numa_nid(false);
 	set_mba_sc(false);
 
 	resctrl_debug = false;
@@ -2798,8 +2799,17 @@ static int rdt_enable_ctx(struct rdt_fs_context *ctx)
 	if (ctx->enable_debug)
 		resctrl_debug = true;
 
+	if (ctx->mb_uses_numa_nid) {
+		ret = resctrl_arch_set_mb_uses_numa_nid(true);
+		if (ret)
+			goto out_debug;
+	}
+
 	return 0;
 
+out_debug:
+	resctrl_debug = false;
+	set_mba_sc(false);
 out_cdpl3:
 	resctrl_arch_set_cdp_enabled(RDT_RESOURCE_L3, false);
 out_cdpl2:
@@ -3088,15 +3098,17 @@ enum rdt_param {
 	Opt_cdpl2,
 	Opt_mba_mbps,
 	Opt_debug,
+	Opt_mb_uses_numa_nid,
 	Opt_not_abi_playground,
 	nr__rdt_params
 };
 
 static const struct fs_parameter_spec rdt_fs_parameters[] = {
-	fsparam_flag("cdp",		Opt_cdp),
-	fsparam_flag("cdpl2",		Opt_cdpl2),
-	fsparam_flag("mba_MBps",	Opt_mba_mbps),
-	fsparam_flag("debug",		Opt_debug),
+	fsparam_flag("cdp",			Opt_cdp),
+	fsparam_flag("cdpl2",			Opt_cdpl2),
+	fsparam_flag("mba_MBps",		Opt_mba_mbps),
+	fsparam_flag("debug",			Opt_debug),
+	fsparam_flag("mb_uses_numa_nid",	Opt_mb_uses_numa_nid),
 
 	/*
 	 * Some of MPAM's out of tree code exposes things through resctrl
@@ -3133,6 +3145,9 @@ static int rdt_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		return 0;
 	case Opt_debug:
 		ctx->enable_debug = true;
+		return 0;
+	case Opt_mb_uses_numa_nid:
+		ctx->mb_uses_numa_nid = true;
 		return 0;
 	case Opt_not_abi_playground:
 		ctx->enable_abi_playground = true;
@@ -4390,6 +4405,9 @@ static int rdtgroup_show_options(struct seq_file *seq, struct kernfs_root *kf)
 
 	if (resctrl_debug)
 		seq_puts(seq, ",debug");
+
+	if (resctrl_arch_get_mb_uses_numa_nid())
+		seq_puts(seq, ",mb_uses_numa_nid");
 
 	if (static_branch_unlikely(&resctrl_abi_playground))
 		seq_puts(seq, ",this_is_not_abi");
