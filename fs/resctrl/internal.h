@@ -42,6 +42,7 @@ struct rdt_fs_context {
 	bool				enable_cdpl3;
 	bool				enable_mba_mbps;
 	bool				enable_debug;
+	bool				mb_uses_numa_nid;
 	bool				enable_abi_playground;
 };
 
