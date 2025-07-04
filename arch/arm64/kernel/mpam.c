@@ -41,10 +41,10 @@ static struct notifier_block mpam_pm_nb = {
 static int __init arm64_mpam_register_cpus(void)
 {
 	u64 mpamidr = read_sanitised_ftr_reg(SYS_MPAMIDR_EL1);
-	u16 partid_max = FIELD_GET(MPAMIDR_EL1_PARTID_MAX, mpamidr);
-	u8 pmg_max = FIELD_GET(MPAMIDR_EL1_PMG_MAX, mpamidr);
+	u16 partid_max =  FIELD_GET(MPAMIDR_EL1_PARTID_MAX, mpamidr);
+	u8 pmg_max =  FIELD_GET(MPAMIDR_EL1_PMG_MAX, mpamidr);
 
 	cpu_pm_register_notifier(&mpam_pm_nb);
-	return mpam_register_requestor(partid_max, pmg_max);
+	return  mpam_register_requestor(partid_max, pmg_max);
 }
 arch_initcall(arm64_mpam_register_cpus)
