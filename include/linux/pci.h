@@ -1261,6 +1261,7 @@ void pci_reachable_set(struct pci_dev *start, struct pci_reachable_set *devfns,
 		       bool (*reachable)(struct pci_dev *deva,
 					 struct pci_dev *devb));
 enum pci_bus_isolation pci_bus_isolated(struct pci_bus *bus);
+bool pci_mfd_isolated(struct pci_dev *dev);
 
 int pci_dev_present(const struct pci_device_id *ids);
 
@@ -2041,6 +2042,9 @@ pci_reachable_set(struct pci_dev *start, struct pci_reachable_set *devfns,
 
 static inline enum pci_bus_isolation pci_bus_isolated(struct pci_bus *bus)
 { return PCIE_NON_ISOLATED; }
+
+static inline bool pci_mfd_isolated(struct pci_dev *dev)
+{ return false; }
 
 static inline int pci_dev_present(const struct pci_device_id *ids)
 { return 0; }
