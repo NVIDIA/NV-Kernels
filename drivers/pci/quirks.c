@@ -4890,9 +4890,7 @@ static int pci_quirk_al_acs(struct pci_dev *dev, u16 acs_flags)
 	 *
 	 * Additionally, the root ports cannot send traffic to each other.
 	 */
-	acs_flags &= ~(PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
-
-	return acs_flags ? 0 : 1;
+	return pci_acs_ctrl_isolated(acs_flags);
 }
 
 /*
