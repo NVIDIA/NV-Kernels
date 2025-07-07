@@ -709,7 +709,7 @@ static int amd_pstate_cpu_boost_update(struct cpufreq_policy *policy, bool on)
 		wrmsrl_on_cpu(cpudata->cpu, MSR_AMD_CPPC_REQ, value);
 	} else {
 		perf_ctrls.max_perf = on ? highest_perf : nominal_perf;
-		ret = cppc_set_perf(cpudata->cpu, &perf_ctrls);
+		ret = cppc_set_perf_ctrls(cpudata->cpu, &perf_ctrls);
 		if (ret) {
 			cpufreq_cpu_release(policy);
 			pr_debug("Failed to set max perf on CPU:%d. ret:%d\n",
@@ -1662,7 +1662,7 @@ static void amd_pstate_epp_reenable(struct amd_cpudata *cpudata)
 	} else {
 		perf_ctrls.max_perf = max_perf;
 		perf_ctrls.energy_perf = AMD_CPPC_ENERGY_PERF_PREF(cpudata->epp_cached);
-		cppc_set_perf(cpudata->cpu, &perf_ctrls);
+		cppc_set_perf_ctrls(cpudata->cpu, &perf_ctrls);
 	}
 }
 
@@ -1704,7 +1704,7 @@ static void amd_pstate_epp_offline(struct cpufreq_policy *policy)
 		perf_ctrls.desired_perf = 0;
 		perf_ctrls.max_perf = min_perf;
 		perf_ctrls.energy_perf = AMD_CPPC_ENERGY_PERF_PREF(HWP_EPP_BALANCE_POWERSAVE);
-		cppc_set_perf(cpudata->cpu, &perf_ctrls);
+		cppc_set_perf_ctrls(cpudata->cpu, &perf_ctrls);
 	}
 	mutex_unlock(&amd_pstate_limits_lock);
 }
