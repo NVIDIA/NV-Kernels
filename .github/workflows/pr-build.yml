@@ -23,7 +23,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+
+      - name: Free Disk Space
+        # Reference: https://github.com/actions/runner-images/issues/2840
+        run: |
+          echo "Available disk space before cleanup:"
+          df -h
+          # Remove unnecessary packages
+          sudo apt-get remove -y '^aspnetcore-.*' || true
+          sudo apt-get remove -y '^dotnet-.*' || true
+          sudo apt-get remove -y '^llvm-.*' || true
+          sudo apt-get remove -y azure-cli google-cloud-sdk hhvm google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri || true
+          # Remove Docker images and containers
+          docker rmi $(docker images -q) || true
+          docker system prune -a -f || true
+          # Remove large directories
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          # Clean package cache
+          sudo apt-get autoremove -y
+          sudo apt-get autoclean
+          sudo apt-get clean
+          echo "Available disk space after cleanup:"
+          df -h
 
       - name: Install Dependencies
         run: |
