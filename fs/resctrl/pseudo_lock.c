@@ -16,6 +16,7 @@
 #include <linux/cpumask.h>
 #include <linux/debugfs.h>
 #include <linux/kthread.h>
+#include <linux/memory_hotplug.h>
 #include <linux/mman.h>
 #include <linux/pm_qos.h>
 #include <linux/resctrl.h>
@@ -694,6 +695,7 @@ static int pseudo_lock_measure_cycles(struct rdtgroup *rdtgrp, int sel)
 	int ret = -1;
 
 	cpus_read_lock();
+	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 
 	if (rdtgrp->flags & RDT_DELETED) {
@@ -741,6 +743,7 @@ static int pseudo_lock_measure_cycles(struct rdtgroup *rdtgrp, int sel)
 
 out:
 	mutex_unlock(&rdtgroup_mutex);
+	put_online_mems();
 	cpus_read_unlock();
 	return ret;
 }
