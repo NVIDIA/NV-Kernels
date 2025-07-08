@@ -55,6 +55,14 @@ static bool exposed_mon_capable;
 static bool cdp_enabled;
 
 /*
+ * To support CPU-less NUMA nodes, user-space needs to opt in to the MB
+ * domain IDs being the NUMA nid instead of the corresponding CPU's L3
+ * cache-id.
+ */
+static bool mb_uses_numa_nid;
+static bool mb_numa_nid_possible;
+static bool mb_l3_cache_id_possible;
+/*
  * If resctrl_init() succeeded, resctrl_exit() can be used to remove support
  * for the filesystem in the event of an error.
  */
@@ -972,6 +980,15 @@ static bool topology_matches_l3(struct mpam_class *victim)
 	return true;
 }
 
+static bool topology_matches_numa(struct mpam_class *victim)
+{
+	/*
+	 * For now, check this is a memory class, in which case component
+	 * id are already NUMA nid.
+	 */
+	return (victim->type == MPAM_CLASS_MEMORY);
+}
+
 /* Test whether we can export MPAM_CLASS_CACHE:{2,3}? */
 static void mpam_resctrl_pick_caches(void)
 {
@@ -1041,6 +1058,8 @@ static void mpam_resctrl_pick_mba(void)
 	list_for_each_entry_srcu(class, &mpam_classes, classes_list,
 				 srcu_read_lock_held(&mpam_srcu)) {
 		struct mpam_props *cprops = &class->props;
+		bool l3_cache_id_possible = false;
+		bool numa_nid_possible = false;
 
 		if (class->level < 3) {
 			pr_debug("class %u is before L3\n", class->level);
@@ -1057,8 +1076,18 @@ static void mpam_resctrl_pick_mba(void)
 			continue;
 		}
 
-		if (!topology_matches_l3(class)) {
-			pr_debug("class %u topology doesn't match L3\n", class->level);
+		if (topology_matches_numa(class)) {
+			pr_debug("class %u topology matches NUMA domains\n", class->level);
+			numa_nid_possible = true;
+		}
+
+		if (topology_matches_l3(class)) {
+			pr_debug("class %u topology matches L3\n", class->level);
+			l3_cache_id_possible = true;
+		}
+
+		if (!l3_cache_id_possible && !numa_nid_possible) {
+			pr_debug("class %u has no matching topology for MB\n", class->level);
 			continue;
 		}
 
@@ -1067,8 +1096,17 @@ static void mpam_resctrl_pick_mba(void)
 		 * mbm_local is implicitly part of the L3, pick a resource to be MBA
 		 * that as close as possible to the L3.
 		 */
-		if (!candidate_class || class->level < candidate_class->level)
-			candidate_class = class;
+		if (!candidate_class || class->level < candidate_class->level) {
+			/*
+			 * Refuse to pick a closer class if it would prevent cache-id
+			 * being used as domain-id by default.
+			 */
+			if (!candidate_class || l3_cache_id_possible) {
+				candidate_class = class;
+				mb_l3_cache_id_possible = l3_cache_id_possible;
+				mb_numa_nid_possible = numa_nid_possible;
+			}
+		}
 	}
 
 	if (candidate_class) {
@@ -1445,7 +1483,10 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 
 		break;
 	case RDT_RESOURCE_MBA:
-		r->alloc_capable = true;
+		/* Domain ID is the L3 cache-id by default */
+		if (mb_l3_cache_id_possible)
+			r->alloc_capable = true;
+
 		r->schema_fmt = RESCTRL_SCHEMA_PERCENT;
 		r->ctrl_scope = RESCTRL_L3_CACHE;
 
@@ -1467,7 +1508,13 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 
 static int mpam_resctrl_pick_domain_id(int cpu, struct mpam_component *comp)
 {
+	bool is_mb;
 	struct mpam_class *class = comp->class;
+
+	is_mb = (mpam_resctrl_controls[RDT_RESOURCE_MBA].class == class);
+
+	if (is_mb && mb_uses_numa_nid && topology_matches_numa(class))
+		return comp->comp_id;
 
 	if (class->type == MPAM_CLASS_CACHE)
 		return comp->comp_id;
