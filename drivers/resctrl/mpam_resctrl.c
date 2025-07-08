@@ -13,6 +13,7 @@
 #include <linux/list.h>
 #include <linux/math.h>
 #include <linux/memory.h>
+#include <linux/memory_hotplug.h>
 #include <linux/node.h>
 #include <linux/printk.h>
 #include <linux/rculist.h>
@@ -1569,6 +1570,54 @@ static int mpam_resctrl_monitor_init_abmc(struct mpam_resctrl_mon *mon)
 	mon->mbwu_idx_to_mon = no_free_ptr(rmid_array);
 
 	mpam_resctrl_monitor_sync_abmc_vals(l3);
+
+	return 0;
+}
+
+bool resctrl_arch_get_mb_uses_numa_nid(void)
+{
+	return mb_uses_numa_nid;
+}
+
+int resctrl_arch_set_mb_uses_numa_nid(bool enabled)
+{
+	struct rdt_resource *r;
+	struct mpam_resctrl_res *res;
+	struct mpam_resctrl_dom *dom;
+	struct rdt_ctrl_domain *ctrl_d;
+
+	lockdep_assert_cpus_held();
+	lockdep_assert_mems_held();
+
+	if (!mb_numa_nid_possible)
+		return -EOPNOTSUPP;
+
+	if (mb_uses_numa_nid == enabled)
+		return 0;
+
+	/* Domain IDs as NUMA nid is only defined for MBA */
+	res = &mpam_resctrl_controls[RDT_RESOURCE_MBA];
+	if (!res->class)
+		return -EOPNOTSUPP;
+	r = &res->resctrl_res;
+
+	/* repaint the domain IDs */
+	mb_uses_numa_nid = enabled;
+	list_for_each_entry(ctrl_d, &r->ctrl_domains, hdr.list) {
+		int cpu = cpumask_any(&ctrl_d->hdr.cpu_mask);
+
+		dom = container_of(ctrl_d, struct mpam_resctrl_dom, resctrl_ctrl_dom);
+		ctrl_d->hdr.id = mpam_resctrl_pick_domain_id(cpu, dom->ctrl_comp);
+	}
+
+	/* monitor domains are unaffected and should continue to use the L3 */
+
+	if (!enabled && mb_l3_cache_id_possible)
+		r->alloc_capable = true;
+	else if (enabled && mb_numa_nid_possible)
+		r->alloc_capable = true;
+	else
+		r->alloc_capable = false;
 
 	return 0;
 }
