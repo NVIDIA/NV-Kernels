@@ -7,6 +7,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <crypto/aes.h>
+#include <crypto/hash.h>
 #include <crypto/krb5.h>
 #include <crypto/skcipher.h>
 #include <linux/key-type.h>
@@ -75,15 +76,77 @@ out_flag:
 	return ret;
 }
 
+/* HMAC (a hash-based message authentication code) is a keyed hash: the
+ * same key and data produce the same digest, without encrypting the data.
+ * Upstream uses the HMAC-SHA256 library API added in 6.17, which Noble
+ * does not have.
+ *
+ * A crypto_shash transform ("tfm") is an algorithm object holding the
+ * prepared key. Allocate one hmac(sha256) transform per Ceph key and
+ * reuse it for challenge proofs and message signatures. This is the
+ * same crypto API used by Noble's existing messenger-v2 signing code.
+ */
+static int set_hmac_tfm(struct ceph_crypto_key *key)
+{
+	struct crypto_shash *tfm;
+	unsigned int noio_flag;
+	int ret;
+
+	/* crypto_alloc_shash() may allocate memory internally. Memory
+	 * reclaim for a storage client's allocations must not start
+	 * filesystem or block I/O: it could re-enter Ceph and wait on
+	 * the operation whose key we are preparing.
+	 *
+	 * The type/mask arguments select the crypto implementation, not
+	 * allocation flags. Use a task-wide scope for internal allocations:
+	 * memalloc_noio_save() makes this task's nested allocations drop
+	 * __GFP_IO and __GFP_FS. It still permits sleeping. Restore the
+	 * saved state immediately after allocation, even on failure,
+	 * so an outer caller's NOIO scope is preserved.
+	 */
+	noio_flag = memalloc_noio_save();
+	tfm = crypto_alloc_shash("hmac(sha256)", 0, 0);
+	memalloc_noio_restore(noio_flag);
+	if (IS_ERR(tfm))
+		return PTR_ERR(tfm);
+
+	/* Use the raw Ceph key, as upstream does. Kerberos encryption
+	 * keys are derived separately; they must not replace this HMAC
+	 * key or the peer would compute a different digest.
+	 *
+	 * Keep tfm local until setkey succeeds. The key's destructor
+	 * cannot free an unpublished transform, so failure here frees
+	 * it directly rather than relying on caller cleanup.
+	 */
+	ret = crypto_shash_setkey(tfm, key->key, key->len);
+	if (ret) {
+		crypto_free_shash(tfm);
+		return ret;
+	}
+
+	/* Transfer ownership: ceph_crypto_key_destroy() now frees tfm. */
+	key->hmac_tfm = tfm;
+	return 0;
+}
+
 int ceph_crypto_key_prepare(struct ceph_crypto_key *key,
 			    const u32 *key_usages, int key_usage_cnt)
 {
+	int ret;
+
 	switch (key->type) {
 	case CEPH_CRYPTO_NONE:
 		return 0; /* nothing to do */
 	case CEPH_CRYPTO_AES:
 		return set_aes_tfm(key);
 	case CEPH_CRYPTO_AES256KRB5:
+		ret = set_hmac_tfm(key);
+		if (ret)
+			return ret;
+		/* The key now owns hmac_tfm. If Kerberos setup fails,
+		 * callers destroy the partially prepared key, releasing
+		 * this transform and any encryption transforms already made.
+		 */
 		return set_krb5_tfms(key, key_usages, key_usage_cnt);
 	default:
 		return -ENOTSUPP;
@@ -190,6 +253,14 @@ void ceph_crypto_key_destroy(struct ceph_crypto_key *key)
 			key->aes_tfm = NULL;
 		}
 	} else if (key->type == CEPH_CRYPTO_AES256KRB5) {
+		/* Unlike upstream's embedded HMAC key, this is an allocated,
+		 * keyed crypto object. Free it on normal teardown and after
+		 * any later failure in key preparation.
+		 */
+		if (key->hmac_tfm) {
+			crypto_free_shash(key->hmac_tfm);
+			key->hmac_tfm = NULL;
+		}
 		for (i = 0; i < ARRAY_SIZE(key->krb5_tfms); i++) {
 			if (key->krb5_tfms[i]) {
 				crypto_free_aead(key->krb5_tfms[i]);
@@ -443,6 +514,35 @@ int ceph_crypt_buflen(const struct ceph_crypto_key *key, int data_len)
 	case CEPH_CRYPTO_AES256KRB5:
 		/* confounder at the beginning and 192-bit HMAC at the end */
 		return AES_BLOCK_SIZE + data_len + 24;
+	default:
+		BUG();
+	}
+}
+
+/* Compute HMAC-SHA256 for a challenge or a messenger-v1 signature.
+ * It does not encrypt data; aes256k's encryption and its SHA-384-based
+ * integrity check are handled by the Kerberos transforms.
+ *
+ * Reuse the transform prepared with the raw Ceph key. The shash helper
+ * keeps per-request scratch state on the stack, separate from the
+ * reusable keyed transform; it does not allocate a new transform here.
+ *
+ * Upstream's library helper returns void. The shash API instead returns
+ * 0 when all SHA256_DIGEST_SIZE output bytes are valid, or a negative
+ * error. Callers must not use @hmac after an error. Preserve upstream's
+ * zero-filled result for NONE and legacy AES keys.
+ */
+int ceph_hmac_sha256(const struct ceph_crypto_key *key, const void *buf,
+		     int buf_len, u8 hmac[SHA256_DIGEST_SIZE])
+{
+	switch (key->type) {
+	case CEPH_CRYPTO_NONE:
+	case CEPH_CRYPTO_AES:
+		memset(hmac, 0, SHA256_DIGEST_SIZE);
+		return 0;
+	case CEPH_CRYPTO_AES256KRB5:
+		return crypto_shash_tfm_digest(key->hmac_tfm, buf, buf_len,
+					      hmac);
 	default:
 		BUG();
 	}
