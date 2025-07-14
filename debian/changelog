@@ -1,3 +1,9 @@
+linux-meta-nvidia-adv-6.11 (6.14.0-2000.0) noble; urgency=medium
+
+  * Initialize meta for noble:linux-nvidia-adv-6.14.
+
+ -- Matthew R. Ochs <mochs@nvidia.com>  Mon, 14 Jul 2025 12:12:18 -0800
+
 linux-meta-nvidia-adv-6.11 (6.11.0-2003.3) noble; urgency=medium
 
   * Main version: 6.11.0-2003.3
