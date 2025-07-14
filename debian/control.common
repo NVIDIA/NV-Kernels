@@ -7,4 +7,4 @@ Build-Depends: dpkg (>= 1.13.19), debhelper (>= 9), gawk
 Build-Depends-Arch:
  @KERNEL_SOURCE@-headers-@KERNEL_ABI_VERSION@,
  linux-headers-@KERNEL_ABI_VERSION@-nvidia-adv,
-Vcs-Git: git://git.launchpad.net/~nvidia-kernel/+git/noble-linux-meta-nvidia-adv-6.11
+Vcs-Git: git://git.launchpad.net/~nvidia-kernel/+git/noble-linux-meta-nvidia-adv-6.14
