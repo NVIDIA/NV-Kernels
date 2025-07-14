@@ -192,12 +192,13 @@ CONFIG_CC_HAS_KASAN_SW_TAGS                     policy<{'amd64': '-', 'arm64': '
 CONFIG_CC_HAS_MIN_FUNCTION_ALIGNMENT            policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CC_HAS_SANE_FUNCTION_ALIGNMENT           policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"'}>
-CONFIG_CPUFREQ_ARCH_CUR_FREQ                    policy<{'amd64': 'y'}>
 CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_CPUFREQ_ARCH_CUR_FREQ                    policy<{'amd64': 'y'}>
 CONFIG_GCC_VERSION                              policy<{'amd64': '130300', 'arm64': '130300'}>
 CONFIG_HAVE_RUST                                policy<{'amd64': 'y', 'arm64': '-'}>
 CONFIG_IOMMUFD_VFIO_CONTAINER                   policy<{'arm64': 'y'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
+CONFIG_NVGRACE_EGM                              policy<{'arm64': 'm'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_NVIDIA_FFA_EC                            policy<{'arm64': 'y'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125'}>
