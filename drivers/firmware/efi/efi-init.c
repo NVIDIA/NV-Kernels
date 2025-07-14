@@ -62,7 +62,7 @@ extern __weak const efi_config_table_type_t efi_arch_tables[];
  */
 #if !defined(CONFIG_X86) && (defined(CONFIG_SYSFB) || defined(CONFIG_EFI_EARLYCON))
 struct screen_info screen_info __section(".data");
-EXPORT_SYMBOL_GPL(screen_info);
+EXPORT_SYMBOL(screen_info);
 #endif
 
 static void __init init_screen_info(void)
