@@ -371,7 +371,8 @@ struct mpam_resctrl_res {
 struct mpam_resctrl_mon {
 	struct mpam_class	*class;
 
-	/* per-class data that resctrl needs will live here */
+	/* Array of allocated MBWU monitors */
+	int			*allocated_mbwu;
 };
 
 static inline int mpam_alloc_csu_mon(struct mpam_class *class)

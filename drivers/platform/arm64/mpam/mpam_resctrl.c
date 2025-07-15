@@ -573,10 +573,67 @@ static void mpam_resctrl_pick_mba(void)
 	}
 }
 
+static void __free_mbwu_mon(struct mpam_class *class, int *allocated_mbwu)
+{
+	u16 num_mbwu_mon = class->props.num_mbwu_mon;
+
+	num_mbwu_mon = __mpam_monitors_free_running(num_mbwu_mon);
+
+	for (int i = 0; i < num_mbwu_mon; i++) {
+		if (allocated_mbwu[i] < 0)
+			break;
+
+		mpam_free_mbwu_mon(class, allocated_mbwu[i]);
+		allocated_mbwu[i] = ~0;
+	}
+}
+
+static int __alloc_mbwu_mon(struct mpam_resctrl_mon *mon)
+{
+	u16 num_mbwu_mon = mon->class->props.num_mbwu_mon;
+
+	num_mbwu_mon = __mpam_monitors_free_running(num_mbwu_mon);
+
+	for (int i = 0; i < num_mbwu_mon; i++) {
+		int mbwu_mon = mpam_alloc_mbwu_mon(mon->class);
+		if (mbwu_mon < 0) {
+			__free_mbwu_mon(mon->class, mon->allocated_mbwu);
+			return mbwu_mon;
+		}
+		mon->allocated_mbwu[i] = mbwu_mon;
+	}
+
+	return 0;
+}
+
+static int __alloc_mbwu_array(enum resctrl_event_id evt_id,
+			      struct mpam_class *class)
+{
+	size_t array_size;
+	u16 num_mbwu_mon = class->props.num_mbwu_mon;
+	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[evt_id];
+
+	/* Might not need all the monitors */
+	num_mbwu_mon = __mpam_monitors_free_running(num_mbwu_mon);
+	if (!num_mbwu_mon)
+		return 0;
+
+	array_size = num_mbwu_mon * sizeof(mon->allocated_mbwu[0]);
+	mon->allocated_mbwu = kmalloc(array_size, GFP_KERNEL);
+	if (!mon->allocated_mbwu)
+		return -ENOMEM;
+
+	memset(mon->allocated_mbwu, -1, array_size);
+
+	return __alloc_mbwu_mon(mon);
+}
+
 static void counter_update_class(enum resctrl_event_id evt_id,
 				 struct mpam_class *class)
 {
-	struct mpam_class *existing_class = mpam_resctrl_counters[evt_id].class;
+	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[evt_id];
+	struct mpam_class *existing_class = mon->class;
+	int *existing_array = mon->allocated_mbwu;
 
 	if (existing_class) {
 		if (class->level == 3) {
@@ -590,8 +647,26 @@ static void counter_update_class(enum resctrl_event_id evt_id,
 		}
 	}
 
-	mpam_resctrl_counters[evt_id].class = class;
+	pr_debug("Updating event %u to use class %u\n", evt_id, class->level);
+	mon->class = class;
 	exposed_mon_capable = true;
+
+	if (evt_id == QOS_L3_OCCUP_EVENT_ID)
+		return;
+
+	if (__alloc_mbwu_array(evt_id, class)) {
+		pr_debug("Failed to allocate MBWU array\n");
+		mon->class = existing_class;
+		mon->allocated_mbwu = existing_array;
+		return;
+	}
+
+	if (existing_array) {
+		pr_debug("Releasing previous class %u's monitors\n",
+			 existing_class->level);
+		__free_mbwu_mon(existing_class, existing_array);
+		kfree(existing_array);
+	}
 }
 
 static void mpam_resctrl_pick_counters(void)
