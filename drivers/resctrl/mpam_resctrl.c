@@ -615,10 +615,58 @@ static void mpam_resctrl_pick_mba(void)
 	}
 }
 
+static void __free_mbwu_mon(struct mpam_class *class, int *array,
+			    u16 num_mbwu_mon)
+{
+	for (int i = 0; i < num_mbwu_mon; i++) {
+		if (array[i] < 0)
+			continue;
+
+		mpam_free_mbwu_mon(class, array[i]);
+		array[i] = ~0;
+	}
+}
+
+static int __alloc_mbwu_mon(struct mpam_class *class, int *array,
+			     u16 num_mbwu_mon)
+{
+	for (int i = 0; i < num_mbwu_mon; i++) {
+		int mbwu_mon = mpam_alloc_mbwu_mon(class);
+
+		if (mbwu_mon < 0) {
+			__free_mbwu_mon(class, array, num_mbwu_mon);
+			return mbwu_mon;
+		}
+		array[i] = mbwu_mon;
+	}
+
+	return 0;
+}
+
+static int *__alloc_mbwu_array(struct mpam_class *class, u16 num_mbwu_mon)
+{
+	int err;
+	size_t array_size = num_mbwu_mon * sizeof(int);
+	int *array __free(kfree) = kmalloc(array_size, GFP_KERNEL);
+
+	if (!array)
+		return ERR_PTR(-ENOMEM);
+
+	memset(array, -1, array_size);
+
+	err = __alloc_mbwu_mon(class, array, num_mbwu_mon);
+	if (err)
+		return ERR_PTR(err);
+	return_ptr(array);
+}
+
 static void counter_update_class(enum resctrl_event_id evt_id,
 				 struct mpam_class *class)
 {
-	struct mpam_class *existing_class = mpam_resctrl_counters[evt_id].class;
+	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[evt_id];
+	struct mpam_class *existing_class = mon->class;
+	u16 num_mbwu_mon = class->props.num_mbwu_mon;
+	int *existing_array = mon->mbwu_idx_to_mon;
 
 	if (existing_class) {
 		if (class->level == 3) {
@@ -631,8 +679,40 @@ static void counter_update_class(enum resctrl_event_id evt_id,
 		}
 	}
 
-	mpam_resctrl_counters[evt_id].class = class;
+	pr_debug("Updating event %u to use class %u\n", evt_id, class->level);
+	mon->class = class;
 	exposed_mon_capable = true;
+
+	if (evt_id == QOS_L3_OCCUP_EVENT_ID)
+		return;
+
+	/* Might not need all the monitors */
+	num_mbwu_mon = __mpam_monitors_free_running(num_mbwu_mon);
+	if (!num_mbwu_mon) {
+		pr_debug("Not pre-allocating free-running counters\n");
+		return;
+	}
+
+	/*
+	 * This is the pre-allocated free-running monitors path. It always
+	 * allocates one monitor per PARTID * PMG.
+	 */
+	WARN_ON_ONCE(num_mbwu_mon != resctrl_arch_system_num_rmid_idx());
+
+	mon->mbwu_idx_to_mon = __alloc_mbwu_array(class, num_mbwu_mon);
+	if (IS_ERR(mon->mbwu_idx_to_mon)) {
+		pr_debug("Failed to allocate MBWU array\n");
+		mon->class = existing_class;
+		mon->mbwu_idx_to_mon = existing_array;
+		return;
+	}
+
+	if (existing_array) {
+		pr_debug("Releasing previous class %u's monitors\n",
+			 existing_class->level);
+		__free_mbwu_mon(existing_class, existing_array, num_mbwu_mon);
+		kfree(existing_array);
+	}
 }
 
 static void mpam_resctrl_pick_counters(void)
