@@ -218,6 +218,17 @@ void put_online_mems(void)
 	percpu_up_read(&mem_hotplug_lock);
 }
 
+#ifdef CONFIG_LOCKDEP
+void lockdep_assert_mems_held(void)
+{
+	/* See lockdep_assert_cpus_held() */
+	if (system_state < SYSTEM_RUNNING)
+                return;
+
+	percpu_rwsem_assert_held(&mem_hotplug_lock);
+}
+#endif
+
 bool movable_node_enabled = false;
 
 static int mhp_default_online_type = -1;
