@@ -1,0 +1,5 @@
+linux-nvidia-6.6 (6.6.0-1000.0) noble; urgency=medium
+
+  * initial changelog entry
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Thu, 03 Jul 2025 09:09:43 +0200
