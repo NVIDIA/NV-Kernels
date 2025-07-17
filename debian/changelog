@@ -1,4 +1,4 @@
-linux-meta-nvidia-adv-6.14 (6.14.0-2000.1) noble; urgency=medium
+linux-meta-nvidia-adv-6.14 (6.14.0-2000.2) noble; urgency=medium
 
   * Initialize meta for noble:linux-nvidia-adv-6.14.
 
