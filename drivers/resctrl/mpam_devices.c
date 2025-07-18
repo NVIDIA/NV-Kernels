@@ -1537,8 +1537,10 @@ static void __ris_msmon_read(void *arg)
 	case mpam_feat_msmon_csu:
 		ret = mpam_read_monsel_reg(msc, CSU, &now32);
 		if (!ret) {
-			if ((now32 & MSMON___NRDY))
+			if ((now32 & MSMON___NRDY)) {
+				msc->nrdy_retry_count++;
 				ret = -EBUSY;
+			}
 
 			if (mpam_has_quirk(IGNORE_CSU_NRDY, msc) &&
 			    m->waited_timeout)
@@ -1563,8 +1565,10 @@ static void __ris_msmon_read(void *arg)
 				now = FIELD_GET(MSMON___L_VALUE, now);
 		} else {
 			ret = mpam_read_monsel_reg(msc, MBWU, &now32);
-			if (!ret && (now32 & MSMON___NRDY))
+			if (!ret && (now32 & MSMON___NRDY)) {
+				msc->nrdy_retry_count++;
 				ret = -EBUSY;
+			}
 			if (ret)
 				goto out_unlock;
 
@@ -3220,6 +3224,7 @@ static void mpam_debugfs_setup(void)
 		debugfs_create_u32("fw_id", 0400, d, &msc->pdev->id);
 		debugfs_create_x32("iface", 0400, d, &msc->iface);
 		debugfs_create_x32("mpamf_iidr", 0400, d, &msc->iidr);
+		debugfs_create_x64("nrdy_retry_count", 0400, d, &msc->nrdy_retry_count);
 		list_for_each_entry(ris, &msc->ris, msc_list)
 			mpam_debugfs_setup_ris(ris);
 	}
