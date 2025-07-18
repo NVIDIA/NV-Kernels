@@ -67,6 +67,7 @@ struct mpam_msc {
 	struct mbox_client	pcc_cl;
 	struct pcc_mbox_chan	*pcc_chan;
 	u32			nrdy_usec;
+	u64			nrdy_retry_count;
 	cpumask_t		accessibility;
 	bool			has_extd_esr;
 
