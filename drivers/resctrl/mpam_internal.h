@@ -80,6 +80,7 @@ struct mpam_msc {
 	struct mpam_pcc_chan	*pcc_chan;
 	int			mpam_fb_msc_id;	/* in its own name space */
 	u32			nrdy_usec;
+	u64			nrdy_retry_count;
 	cpumask_t		accessibility;
 	bool			has_extd_esr;
 
