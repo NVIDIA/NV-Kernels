@@ -1572,6 +1572,8 @@ static void __ris_msmon_read(void *arg)
 		if (m->err)
 			return;
 		nrdy = now32 & MSMON___NRDY;
+		if (nrdy)
+			msc->nrdy_retry_count++;
 		now = FIELD_GET(MSMON___VALUE, now32);
 
 		if (mpam_has_quirk(IGNORE_CSU_NRDY, msc) && m->waited_timeout)
@@ -1596,6 +1598,8 @@ static void __ris_msmon_read(void *arg)
 			if (m->err)
 				return;
 			nrdy = now32 & MSMON___NRDY;
+			if (nrdy)
+				msc->nrdy_retry_count++;
 			now = FIELD_GET(MSMON___VALUE, now32);
 		}
 
@@ -3306,6 +3310,7 @@ static void mpam_debugfs_setup(void)
 		debugfs_create_u32("fw_id", 0400, d, &msc->pdev->id);
 		debugfs_create_x32("iface", 0400, d, &msc->iface);
 		debugfs_create_x32("mpamf_iidr", 0400, d, &msc->iidr);
+		debugfs_create_x64("nrdy_retry_count", 0400, d, &msc->nrdy_retry_count);
 		list_for_each_entry(ris, &msc->ris, msc_list)
 			mpam_debugfs_setup_ris(ris);
 	}
