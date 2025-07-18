@@ -79,6 +79,7 @@ struct mpam_msc {
 	enum mpam_msc_iface	iface;
 	struct mpam_pcc_chan	*pcc_chan;
 	u32			nrdy_usec;
+	u64			nrdy_retry_count;
 	cpumask_t		accessibility;
 	bool			has_extd_esr;
 
