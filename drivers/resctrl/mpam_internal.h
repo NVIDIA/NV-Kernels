@@ -76,6 +76,7 @@ struct mpam_msc {
 	/* Not modified after mpam_is_enabled() becomes true */
 	enum mpam_msc_iface	iface;
 	u32			nrdy_usec;
+	u64			nrdy_retry_count;
 	cpumask_t		accessibility;
 	bool			has_extd_esr;
 
