@@ -6,6 +6,7 @@
 #include <linux/types.h>
 #include <linux/uuid.h>
 #include <linux/device.h>
+#include <linux/sockptr.h>
 
 #define TSM_REPORT_INBLOB_MAX 64
 #define TSM_REPORT_OUTBLOB_MAX SZ_32K
@@ -129,6 +130,24 @@ struct kvm;
 int tsm_bind(struct device *dev, struct kvm *kvm, u64 tdi_id);
 int tsm_unbind(struct device *dev);
 
+/**
+ * struct tsm_guest_req_info - parameter for tsm_guest_req()
+ * @scope: scop for tsm guest request
+ * @req: request data buffer filled by guest
+ * @req_len: the size of @req filled by guest
+ * @resp: response data buffer filled by host
+ * @resp_len: for input, the size of @resp buffer filled by guest
+ *	      for output, the size of actual response data filled by host
+ */
+struct tsm_guest_req_info {
+	u32 scope;
+	sockptr_t req;
+	size_t req_len;
+	sockptr_t resp;
+	size_t resp_len;
+};
+int tsm_guest_req(struct device *dev, struct tsm_guest_req_info *info);
+
 #else
 
 static inline int tsm_bind(struct device *dev, struct kvm *kvm, u64 tdi_id)
@@ -139,6 +158,13 @@ static inline int tsm_bind(struct device *dev, struct kvm *kvm, u64 tdi_id)
 static inline int tsm_unbind(struct device *dev)
 {
 	return 0;
+}
+
+struct tsm_guest_req_info;
+static inline int tsm_guest_req(struct device *dev, struct tsm_guest_req_info *info)
+{
+	return -EINVAL;
+
 }
 #endif
 

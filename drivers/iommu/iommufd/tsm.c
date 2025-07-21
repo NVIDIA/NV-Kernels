@@ -40,3 +40,40 @@ out_put_vdev:
 	iommufd_put_object(ucmd->ictx, &vdev->obj);
 	return rc;
 }
+
+int iommufd_vdevice_tsm_guest_request_ioctl(struct iommufd_ucmd *ucmd)
+{
+	struct iommu_vdevice_tsm_guest_request *cmd = ucmd->cmd;
+	struct tsm_guest_req_info info = {
+		.scope = cmd->scope,
+		.req   = {
+			.user = u64_to_user_ptr(cmd->req_uptr),
+			.is_kernel = false,
+		},
+		.req_len = cmd->req_len,
+		.resp    =  {
+			.user = u64_to_user_ptr(cmd->resp_uptr),
+			.is_kernel = false,
+		},
+		.resp_len = cmd->resp_len,
+	};
+	struct iommufd_vdevice *vdev;
+	int rc;
+
+	vdev = container_of(iommufd_get_object(ucmd->ictx, cmd->vdevice_id,
+					       IOMMUFD_OBJ_VDEVICE),
+			    struct iommufd_vdevice, obj);
+	if (IS_ERR(vdev))
+		return PTR_ERR(vdev);
+
+	rc = tsm_guest_req(vdev->idev->dev, &info);
+	//if (rc < 0)
+	//	goto err_out;
+
+	// no inline response, so we don't need to copy
+	//cmd->resp_len = rc;
+	//iommufd_ucmd_respond(ucmd, sizeof(*cmd));
+//err_out:
+	iommufd_put_object(ucmd->ictx, &vdev->obj);
+	return rc;
+}

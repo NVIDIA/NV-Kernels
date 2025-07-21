@@ -163,6 +163,20 @@ int tsm_unbind(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(tsm_unbind);
 
+int tsm_guest_req(struct device *dev, struct tsm_guest_req_info *info)
+{
+	int ret;
+
+	if (!dev_is_pci(dev))
+		return -EINVAL;
+
+	ret = pci_tsm_guest_req(to_pci_dev(dev), info->scope,
+				info->req, info->req_len,
+				info->resp, info->resp_len, NULL);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tsm_guest_req);
+
 static void tsm_release(struct device *dev)
 {
 	struct tsm_dev *tsm_dev = container_of(dev, typeof(*tsm_dev), dev);
