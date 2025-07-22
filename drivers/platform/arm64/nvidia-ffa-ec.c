@@ -530,6 +530,7 @@ static int nvidia_ffh_handler(struct acpi_ffh_info *info, acpi_integer *value, v
 	struct nvidia_ec_ffa_packet *ffa_packet = (struct nvidia_ec_ffa_packet *)value;
 	struct nvidia_ec_ffa_device *cur, *ec_dev =  NULL;
 	int ret;
+	unsigned int ffh_copy_len;
 	uuid_t uuid;
 
 	/* Only offset 4 is supported */
@@ -592,9 +593,16 @@ static int nvidia_ffh_handler(struct acpi_ffh_info *info, acpi_integer *value, v
 	/* Set the status as success */
 	ffa_packet->status = 0;
 
-	/* Copy the ACPI FFA data back into ACPI FFH packet */
-	memcpy(ffa_packet->rawdata, ffa_data.data, ffa_packet->length);
+	/*
+	 * Copy the ACPI FFA data back into ACPI FFH packet.
+	 *
+	 * ACPI FFH packet raw data length can't be fetched here, so copy
+	 * all bytes from ffa_data.data
+	 */
+	ffh_copy_len = min(sizeof(ffa_data.data),
+			   info->length - offsetof(struct nvidia_ec_ffa_packet, rawdata));
 
+	memcpy(ffa_packet->rawdata, ffa_data.data, ffh_copy_len);
 	return 0;
 }
 
