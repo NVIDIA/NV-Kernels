@@ -200,6 +200,7 @@ CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_NVIDIA_FFA_EC                            policy<{'arm64': 'y'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125'}>
+CONFIG_PINCTRL_MT8901                           policy<{'arm64': 'y'}>
 CONFIG_R8127                                    policy<{'amd64': 'n', 'arm64': 'm'}>
 CONFIG_RELR                                     policy<{'arm64': '-'}>
 CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '-'}>
