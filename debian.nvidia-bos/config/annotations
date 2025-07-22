@@ -162,6 +162,9 @@ CONFIG_NVIDIA_FFA_EC                            note<'LP: #2114230'>
 CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
 
+CONFIG_PINCTRL_MT8901                           policy<{'arm64': 'y'}>
+CONFIG_PINCTRL_MT8901                           note<'LP: #2117784'>
+
 CONFIG_R8127                                    policy<{'amd64': 'n', 'arm64': 'm'}>
 CONFIG_R8127                                    note<'LP: #2109730'>
 
