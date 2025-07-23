@@ -180,6 +180,7 @@ CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablem
 
 # ---- Annotations without notes ----
 
+CONFIG_ARM64_BRBE                               policy<{'arm64': 'y'}>
 CONFIG_ARM_FFA_TRANSPORT                        policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_AS_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
