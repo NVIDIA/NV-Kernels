@@ -1,3 +1,13 @@
+linux-meta-nvidia-adv-6.14 (6.14.0-2001.1) noble; urgency=medium
+
+  * Main version: 6.14.0-2001.1
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+    - [Packaging] debian/dkms-versions -- resync from main package
+
+ -- Matthew R. Ochs <mochs@nvidia.com>  Tue, 29 Jul 2025 08:36:36 -0700
+
 linux-meta-nvidia-adv-6.14 (6.14.0-2000.2) noble; urgency=medium
 
   * Initialize meta for noble:linux-nvidia-adv-6.14.
