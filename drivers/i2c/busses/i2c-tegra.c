@@ -2327,8 +2327,11 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	 *
 	 * Devices with pinctrl states cannot be marked IRQ-safe as the pinctrl
 	 * state transitions during runtime PM require mutexes.
+	 *
+	 * ACPI device and RT PM case are not IRQ safe also.
 	 */
-	if (!IS_VI(i2c_dev) && !has_acpi_companion(i2c_dev->dev) && !i2c_dev->dev->pins)
+	if (!IS_VI(i2c_dev) && !has_acpi_companion(i2c_dev->dev) && !i2c_dev->dev->pins
+	    && !IS_ENABLED(CONFIG_PREEMPT_RT))
 		pm_runtime_irq_safe(i2c_dev->dev);
 
 	pm_runtime_enable(i2c_dev->dev);
