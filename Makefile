@@ -1937,6 +1937,11 @@ PHONY += modules_check
 modules_check: modules.order
 	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/modules-check.sh $<
 
+# Handle NVIDIA external module dependencies
+ifdef CONFIG_NVIDIA_FS
+export KBUILD_MODPOST_WARN := 1
+endif
+
 else # CONFIG_MODULES
 
 modules:

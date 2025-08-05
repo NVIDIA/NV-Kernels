@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# NVIDIA Driver configuration
+#
+
+menuconfig NVIDIA_DRIVERS
+	bool "NVIDIA Driver Support"
+	default n
+	help
+	  Enable support for NVIDIA drivers.
+
+	  This section contains NVIDIA-specific drivers that can be
+	  built into the kernel or as loadable modules.
+
+	  If you have NVIDIA hardware, say Y here to access the
+	  configuration options for NVIDIA drivers.
+
+if NVIDIA_DRIVERS
+
+config NVIDIA_FS
+	tristate "NVIDIA GPU Direct Storage (GDS) filesystem driver"
+	default n
+	depends on MODULES
+	help
+	  Support for NVIDIA GPU Direct Storage (GDS) filesystem driver.
+
+	  This driver enables GPU Direct Storage capabilities, allowing
+	  direct data transfers between storage and GPU memory, bypassing
+	  CPU memory for improved performance in GPU computing workloads.
+
+	  IMPORTANT: This driver requires NVIDIA proprietary driver symbols
+	  from nvidia.ko which are only available at runtime. Therefore,
+	  this driver can ONLY be built as a loadable module (=m), NOT
+	  built-in (=y).
+
+	  If you select Y (built-in), the kernel build will fail with
+	  undefined symbol errors. Always choose M (module) instead.
+
+	  If you have NVIDIA GPUs and want to enable GDS support, choose M
+	  to build as a module. The module will be called nvidia-fs.
+
+config NVIDIA_FS_STATS
+	bool "Enable NVIDIA-FS statistics support"
+	depends on NVIDIA_FS
+	default y
+	help
+	  Enable statistics collection for NVIDIA-FS operations.
+
+	  This provides detailed statistics about GDS operations
+	  which can be useful for performance monitoring and debugging.
+
+config NVIDIA_FS_RDMA
+	bool "Enable NVIDIA-FS RDMA support"
+	depends on NVIDIA_FS
+	default y
+	help
+	  Enable RDMA (Remote Direct Memory Access) support for NVIDIA-FS.
+
+	  This allows NVIDIA-FS to work with InfiniBand and other RDMA
+	  capable networks for high-performance storage access.
+
+config NVIDIA_FS_BATCH
+	bool "Enable NVIDIA-FS batch operations support"
+	depends on NVIDIA_FS
+	default n
+	help
+	  Enable batch operations support for NVIDIA-FS.
+
+	  This allows multiple I/O operations to be batched together
+	  for improved performance.
+
+config NVIDIA_FS_FAULT_INJECTION
+	bool "Enable NVIDIA-FS fault injection support"
+	depends on NVIDIA_FS && FAULT_INJECTION
+	default n
+	help
+	  Enable fault injection support for NVIDIA-FS testing.
+
+	  This is primarily useful for testing and debugging
+	  NVIDIA-FS error handling paths.
+
+endif # NVIDIA_DRIVERS
