@@ -6,6 +6,21 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_NVIDIA_DRIVERS                           policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_NVIDIA_DRIVERS                           note<'LP: #2119679'>
+
+CONFIG_NVIDIA_FS                                policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_NVIDIA_FS                                note<'LP: #2119679'>
+
+CONFIG_NVIDIA_FS_BATCH                          policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_NVIDIA_FS_BATCH                          note<'LP: #2119679'>
+
+CONFIG_NVIDIA_FS_RDMA                           policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_NVIDIA_FS_RDMA                           note<'LP: #2119679'>
+
+CONFIG_NVIDIA_FS_STATS                          policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_NVIDIA_FS_STATS                          note<'LP: #2119679'>
+
 CONFIG_ARM64_CONTPTE                            policy<{'arm64': 'y'}>
 CONFIG_ARM64_CONTPTE                            note<'LP: #2059316'>
 
