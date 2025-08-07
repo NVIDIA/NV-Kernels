@@ -272,19 +272,6 @@ static inline void __set_pte(pte_t *ptep, pte_t pte)
 	WRITE_ONCE(*ptep, pte);
 }
 
-static inline void set_pte(pte_t *ptep, pte_t pte)
-{
-	set_pte_nosync(ptep, pte);
-
-	/*
-	 * Only if the new pte is valid and kernel, otherwise TLB maintenance
-	 * or update_mmu_cache() have the necessary barriers.
-	 */
-	if (pte_valid_not_user(pte)) {
-		dsb(ishst);
-		isb();
-	}
-}
 
 static inline pte_t __ptep_get(pte_t *ptep)
 {
