@@ -1522,6 +1522,9 @@ static int mpam_resctrl_pick_domain_id(int cpu, struct mpam_component *comp)
 	if (class->type == MPAM_CLASS_CACHE)
 		return comp->comp_id;
 
+	if ((class->type == MPAM_CLASS_MEMORY) && (class->level > 3))
+		return comp->comp_id;
+
 	if (topology_matches_l3(class)) {
 		/* Use the corresponding L3 component ID as the domain ID */
 		int id = get_cpu_cacheinfo_id(cpu, 3);
@@ -2146,7 +2149,8 @@ mpam_resctrl_alloc_domain_nid(int nid, struct mpam_resctrl_res *res)
 }
 
 static struct mpam_resctrl_dom *
-mpam_resctrl_get_domain_from_cpu(int cpu, struct mpam_resctrl_res *res)
+mpam_get_ctrl_domain_from_cpu(int cpu, struct mpam_resctrl_res *res,
+			      struct mpam_component *comp)
 {
 	struct mpam_resctrl_dom *dom;
 	struct rdt_ctrl_domain *ctrl_d;
@@ -2156,6 +2160,8 @@ mpam_resctrl_get_domain_from_cpu(int cpu, struct mpam_resctrl_res *res)
 
 	list_for_each_entry(ctrl_d, &r->ctrl_domains, hdr.list) {
 		dom = container_of(ctrl_d, struct mpam_resctrl_dom, resctrl_ctrl_dom);
+		if (dom->ctrl_comp != comp)
+			continue;
 
 		if (cpumask_test_cpu(cpu, &dom->ctrl_comp->affinity))
 			return dom;
@@ -2193,6 +2199,7 @@ int mpam_resctrl_online_cpu(unsigned int cpu)
 	int i, err = 0;
 	struct mpam_resctrl_dom *dom;
 	struct mpam_resctrl_res *res;
+	struct mpam_component *comp;
 
 	mutex_lock(&domain_list_lock);
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
@@ -2200,16 +2207,19 @@ int mpam_resctrl_online_cpu(unsigned int cpu)
 		if (!res->class)
 			continue;	// dummy_resource;
 
-		dom = mpam_resctrl_get_domain_from_cpu(cpu, res);
-		if (!dom)
-			dom = mpam_resctrl_alloc_domain_cpu(cpu, res);
-		if (IS_ERR(dom)) {
-			err = PTR_ERR(dom);
-			break;
-		}
+		list_for_each_entry(comp, &res->class->components, class_list) {
+			if (!cpumask_test_cpu(cpu, &comp->affinity))
+				continue;
 
-		cpumask_set_cpu(cpu, &dom->resctrl_ctrl_dom.hdr.cpu_mask);
-		cpumask_set_cpu(cpu, &dom->resctrl_mon_dom.hdr.cpu_mask);
+			dom = mpam_get_ctrl_domain_from_cpu(cpu, res, comp);
+			if (!dom)
+				dom = mpam_resctrl_alloc_domain_cpu(cpu, res);
+			if (IS_ERR(dom))
+				return PTR_ERR(dom);
+
+			cpumask_set_cpu(cpu, &dom->resctrl_ctrl_dom.hdr.cpu_mask);
+			cpumask_set_cpu(cpu, &dom->resctrl_mon_dom.hdr.cpu_mask);
+		}
 	}
 	mutex_unlock(&domain_list_lock);
 
@@ -2227,6 +2237,7 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 	struct rdt_mon_domain *mon_d;
 	struct rdt_ctrl_domain *ctrl_d;
 	bool ctrl_dom_empty, mon_dom_empty;
+	struct mpam_component *comp;
 
 	resctrl_offline_cpu(cpu);
 
@@ -2236,32 +2247,31 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 		if (!res->class)
 			continue;	// dummy resource
 
-		dom = mpam_resctrl_get_domain_from_cpu(cpu, res);
-		if (WARN_ON_ONCE(!dom))
-			continue;
+		list_for_each_entry(comp, &res->class->components, class_list) {
+			if (!cpumask_test_cpu(cpu, &comp->affinity))
+				continue;
 
-		ctrl_dom_empty = true;
-		if (exposed_alloc_capable) {
+			dom = mpam_get_ctrl_domain_from_cpu(cpu, res, comp);
+			if (WARN_ON_ONCE(!dom))
+				continue;
+
 			mpam_reset_component_locked(dom->ctrl_comp);
 
 			ctrl_d = &dom->resctrl_ctrl_dom;
-			ctrl_dom_empty = mpam_resctrl_offline_domain_hdr(cpumask_of(cpu),
-									 &ctrl_d->hdr);
+			ctrl_dom_empty = mpam_resctrl_offline_domain_hdr(cpumask_of(cpu), &ctrl_d->hdr);
 			if (ctrl_dom_empty)
 				resctrl_offline_ctrl_domain(&res->resctrl_res, ctrl_d);
-		}
+			if (res->resctrl_res.mon_capable) {
+				mon_d = &dom->resctrl_mon_dom;
+				mon_dom_empty = mpam_resctrl_offline_domain_hdr(cpumask_of(cpu), &mon_d->hdr);
+				if (mon_dom_empty)
+					resctrl_offline_mon_domain(&res->resctrl_res, mon_d);
+			} else
+				mon_dom_empty = true;
 
-		mon_dom_empty = true;
-		if (exposed_mon_capable) {
-			mon_d = &dom->resctrl_mon_dom;
-			mon_dom_empty = mpam_resctrl_offline_domain_hdr(cpumask_of(cpu),
-									&mon_d->hdr);
-			if (mon_dom_empty)
-				resctrl_offline_mon_domain(&res->resctrl_res, mon_d);
+			if (ctrl_dom_empty && mon_dom_empty)
+				kfree(dom);
 		}
-
-		if (ctrl_dom_empty && mon_dom_empty)
-			kfree(dom);
 	}
 	mutex_unlock(&domain_list_lock);
 
