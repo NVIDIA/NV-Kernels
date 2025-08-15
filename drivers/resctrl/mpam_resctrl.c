@@ -251,8 +251,12 @@ static bool cache_has_usable_cpor(struct mpam_class *class)
 
 static bool mba_class_use_mbw_part(struct mpam_props *cprops)
 {
-	return (mpam_has_feature(mpam_feat_mbw_part, cprops) &&
-		cprops->mbw_pbm_bits);
+	if (!mpam_has_feature(mpam_feat_mbw_part, cprops) ||
+	    cprops->mbw_pbm_bits < 1)
+		return false;
+
+	/* u32 is used to represent MBW PBM bitmaps in the driver, for now: */
+	return cprops->mbw_pbm_bits <= 32;
 }
 
 static bool mba_class_use_mbw_max(struct mpam_props *cprops)
