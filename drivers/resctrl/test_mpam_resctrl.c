@@ -45,9 +45,20 @@ static void test_get_mba_granularity(struct kunit *test)
 	fake_props.bwa_wd = 4;
 	KUNIT_EXPECT_TRUE(test, mba_class_use_mbw_part(&fake_props));
 
+	/* Use MBW_MAX */
 	fake_props.features = 0;
 	fake_props.mbw_pbm_bits = 0;
 	mpam_set_feature(mpam_feat_mbw_max, &fake_props);
+
+	fake_props.bwa_wd = 0;
+	KUNIT_EXPECT_FALSE(test, mba_class_use_mbw_max(&fake_props));
+
+	fake_props.bwa_wd = 1;
+	KUNIT_EXPECT_TRUE(test, mba_class_use_mbw_max(&fake_props));
+
+	/* Architectural maximum: */
+	fake_props.bwa_wd = 16;
+	KUNIT_EXPECT_TRUE(test, mba_class_use_mbw_max(&fake_props));
 
 	/* No usable control... */
 	fake_props.bwa_wd = 0;
