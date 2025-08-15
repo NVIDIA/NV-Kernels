@@ -359,6 +359,20 @@ static u16 percent_to_mbw_max(u8 pc, struct mpam_props *cprops)
 	return val;
 }
 
+static u32 get_mba_min(struct mpam_props *cprops)
+{
+	u32 val = 0;
+
+	if (mba_class_use_mbw_part(cprops))
+		val = mbw_pbm_to_percent(val, cprops);
+	else if (mba_class_use_mbw_max(cprops))
+		val = mbw_max_to_percent(val, cprops);
+	else
+		WARN_ON_ONCE(1);
+
+	return val;
+}
+
 /* Find the L3 cache that has affinity with this CPU */
 static int find_l3_equivalent_bitmask(int cpu, cpumask_var_t tmp_cpumask)
 {
@@ -570,7 +584,7 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 
 		r->membw.delay_linear = true;
 		r->membw.throttle_mode = THREAD_THROTTLE_UNDEFINED;
-		r->membw.min_bw = get_mba_granularity(cprops);
+		r->membw.min_bw = get_mba_min(cprops);
 		r->membw.max_bw = MAX_MBA_BW;
 		r->membw.bw_gran = get_mba_granularity(cprops);
 
