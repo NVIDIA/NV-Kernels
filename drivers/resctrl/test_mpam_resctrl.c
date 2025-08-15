@@ -16,16 +16,16 @@ static void test_get_mba_granularity(struct kunit *test)
 	fake_props.mbw_pbm_bits = 0;
 	KUNIT_EXPECT_FALSE(test, mba_class_use_mbw_part(&fake_props));
 
-	fake_props.mbw_pbm_bits = 4;
+	/* Otherwise, bitmaps that fit in a u32 are supported: */
+	fake_props.mbw_pbm_bits = 1;
 	KUNIT_EXPECT_TRUE(test, mba_class_use_mbw_part(&fake_props));
 
-	/* Granularity saturates at 1% */
-	ret = get_mba_granularity(&fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 25);	/* 100% / 4 = 25% */
+	fake_props.mbw_pbm_bits = 32;
+	KUNIT_EXPECT_TRUE(test, mba_class_use_mbw_part(&fake_props));
 
-	fake_props.mbw_pbm_bits = 100;
-	ret = get_mba_granularity(&fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 1);	/* 100% / 100 = 1% */
+	/* But bigger bitmaps aren't: */
+	fake_props.mbw_pbm_bits = 33;
+	KUNIT_EXPECT_FALSE(test, mba_class_use_mbw_part(&fake_props));
 
 	fake_props.mbw_pbm_bits = 128;
 	ret = get_mba_granularity(&fake_props);
