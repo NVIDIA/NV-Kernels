@@ -63,20 +63,32 @@ static void test_get_mba_granularity(struct kunit *test)
 	/* No usable control... */
 	fake_props.bwa_wd = 0;
 	ret = get_mba_granularity(&fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0);	/* 100% / [0:0] = 0% */
+	KUNIT_EXPECT_EQ(test, ret, 0);
 
 	fake_props.bwa_wd = 1;
 	ret = get_mba_granularity(&fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 50);	/* 100% / [1:0] = 50% */
+	KUNIT_EXPECT_EQ(test, ret, 50);	/* DIV_ROUND_UP(100, 1 << 1)% = 50% */
 
 	fake_props.bwa_wd = 2;
 	ret = get_mba_granularity(&fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 25);	/* 100% / [2:0] = 25% */
+	KUNIT_EXPECT_EQ(test, ret, 25);	/* DIV_ROUND_UP(100, 1 << 2)% = 25% */
+
+	fake_props.bwa_wd = 3;
+	ret = get_mba_granularity(&fake_props);
+	KUNIT_EXPECT_EQ(test, ret, 13);	/* DIV_ROUND_UP(100, 1 << 3)% = 13% */
+
+	fake_props.bwa_wd = 6;
+	ret = get_mba_granularity(&fake_props);
+	KUNIT_EXPECT_EQ(test, ret, 2);	/* DIV_ROUND_UP(100, 1 << 6)% = 2% */
+
+	fake_props.bwa_wd = 7;
+	ret = get_mba_granularity(&fake_props);
+	KUNIT_EXPECT_EQ(test, ret, 1);	/* DIV_ROUND_UP(100, 1 << 7)% = 1% */
 
 	/* Granularity saturates at 1% */
 	fake_props.bwa_wd = 16; /* architectural maximum */
 	ret = get_mba_granularity(&fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 1);	/* 100% / [16:0] = 1% */
+	KUNIT_EXPECT_EQ(test, ret, 1);	/* DIV_ROUND_UP(100, 1 << 16)% = 1% */
 }
 
 static void test_mbw_pbm_to_percent(struct kunit *test)
