@@ -308,6 +308,41 @@ static void test_mbw_max_to_percent_limits(struct kunit *test)
 			   fake_props.bwa_wd);
 }
 
+/*
+ * Check that converting a percentage to mbw_max and back again (or, as
+ * appropriate, vice-versa) always restores the original value:
+*/
+static void test_percent_max_roundtrip_stability(struct kunit *test)
+{
+	struct mpam_props fake_props = {0};
+	unsigned int shift;
+	u32 pc, max, pc2, max2;
+
+	mpam_set_feature(mpam_feat_mbw_max, &fake_props);
+	fake_props.bwa_wd = test_get_bwa_wd(test);
+	shift = 16 - fake_props.bwa_wd;
+
+	/*
+	 * Converting a valid value from the coarser scale to the finer
+	 * scale and back again must yield the original value:
+	 */
+	if (fake_props.bwa_wd >= 7) {
+		/* More than 100 steps: only test exact pc values: */
+		for (pc = get_mba_min(&fake_props); pc <= MAX_MBA_BW; pc++) {
+			max = percent_to_mbw_max(pc, &fake_props);
+			pc2 = mbw_max_to_percent(max, &fake_props);
+			KUNIT_EXPECT_EQ(test, pc2, pc);
+		}
+	} else {
+		/* Fewer than 100 steps: only test exact mbw_max values: */
+		for (max = 0; max < 1 << 16; max += 1 << shift) {
+			pc = mbw_max_to_percent(max, &fake_props);
+			max2 = percent_to_mbw_max(pc, &fake_props);
+			KUNIT_EXPECT_EQ(test, max2, max);
+		}
+	}
+}
+
 static void test_percent_to_max_rounding(struct kunit *test)
 {
 	const struct percent_value_case *param = test->param_value;
@@ -352,6 +387,8 @@ static struct kunit_case mpam_resctrl_test_cases[] = {
 	KUNIT_CASE_PARAM(test_percent_to_mbw_max, test_percent_value_gen_params),
 	KUNIT_CASE_PARAM(test_mbw_max_to_percent_limits, test_all_bwa_wd_gen_params),
 	KUNIT_CASE(test_percent_to_max_rounding),
+	KUNIT_CASE_PARAM(test_percent_max_roundtrip_stability,
+			 test_all_bwa_wd_gen_params),
 	{}
 };
 
