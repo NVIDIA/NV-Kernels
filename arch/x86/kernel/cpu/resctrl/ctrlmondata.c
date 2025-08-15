@@ -16,8 +16,14 @@
 #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
 
 #include <linux/cpu.h>
+#include <linux/math.h>
 
 #include "internal.h"
+
+u32 resctrl_arch_round_bw(u32 val, const struct rdt_resource *r)
+{
+	return roundup(val, (unsigned long)r->membw.bw_gran);
+}
 
 int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 			    u32 closid, enum resctrl_conf_type t, u32 cfg_val)
