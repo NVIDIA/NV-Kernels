@@ -27,13 +27,18 @@ static void test_get_mba_granularity(struct kunit *test)
 	fake_props.mbw_pbm_bits = 33;
 	KUNIT_EXPECT_FALSE(test, mba_class_use_mbw_part(&fake_props));
 
-	fake_props.mbw_pbm_bits = 128;
+	fake_props.mbw_pbm_bits = 4;
 	ret = get_mba_granularity(&fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 1);	/* 100% / 128 = 1% */
+	KUNIT_EXPECT_EQ(test, ret, 25);	/* DIV_ROUND_UP(100, 4)% = 25% */
 
-	fake_props.mbw_pbm_bits = 4096;	/* architectural maximum */
+	fake_props.mbw_pbm_bits = 6;
 	ret = get_mba_granularity(&fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 1);	/* 100% / 4096 = 1% */
+	KUNIT_EXPECT_EQ(test, ret, 17);	/* DIV_ROUND_UP(100, 6)% = 7% */
+
+	/* Largest bitmap size that the drivers supports, for now: */
+	fake_props.mbw_pbm_bits = 32;
+	ret = get_mba_granularity(&fake_props);
+	KUNIT_EXPECT_EQ(test, ret, 4);	/* DIV_ROUND_UP(100, 32)% = 4% */
 
 	/* When MBW_MAX is also supported, Portions are preferred */
 	mpam_set_feature(mpam_feat_mbw_max, &fake_props);
