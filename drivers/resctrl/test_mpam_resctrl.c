@@ -22,9 +22,6 @@ struct percent_value_case {
  * format" (exact percentage entries only):
  */
 static const struct percent_value_case percent_value_cases[] = {
-	/* Minimum-value cases not specified by the architecture: */
-	{   0,  8,    0 },	{   0, 12,     0 },	{   0, 16,      0 },
-
 	/* Architectural cases: */
 	{   1,  8,    1 },	{   1, 12,  0x27 },	{   1, 16,  0x28e },
 	{  25,  8, 0x3f },	{  25, 12, 0x3ff },	{  25, 16, 0x3fff },
@@ -258,12 +255,66 @@ static void test_percent_to_mbw_max(struct kunit *test)
 		KUNIT_EXPECT_EQ(test, res.value, res.max_value << res.shift);
 }
 
+static const void *test_all_bwa_wd_gen_params(const void *prev, char *desc)
+{
+	uintptr_t param = (uintptr_t)prev;
+
+	if (param > 15)
+		return NULL;
+
+	param++;
+
+	snprintf(desc, KUNIT_PARAM_DESC_SIZE, "wd=%u\n", (unsigned int)param);
+
+	return (void *)param;
+}
+
+static unsigned int test_get_bwa_wd(struct kunit *test)
+{
+	uintptr_t param = (uintptr_t)test->param_value;
+
+	KUNIT_ASSERT_GE(test, param, 1);
+	KUNIT_ASSERT_LE(test, param, 16);
+
+	return param;
+}
+
+static void test_mbw_max_to_percent_limits(struct kunit *test)
+{
+	struct mpam_props fake_props = {0};
+	u32 max_value;
+
+	mpam_set_feature(mpam_feat_mbw_max, &fake_props);
+	fake_props.bwa_wd = test_get_bwa_wd(test);
+	max_value = GENMASK(15, 16 - fake_props.bwa_wd);
+
+	KUNIT_EXPECT_EQ(test, mbw_max_to_percent(max_value, &fake_props),
+			MAX_MBA_BW);
+	KUNIT_EXPECT_EQ(test, mbw_max_to_percent(0, &fake_props),
+			get_mba_min(&fake_props));
+
+	/*
+	 * Rounding policy dependent 0% sanity-check:
+	 * With round-to-nearest, the minimum mbw_max value really
+	 * should map to 0% if there are at least 200 steps.
+	 * (100 steps may be enough for some other rounding policies.)
+	 */
+	if (fake_props.bwa_wd >= 8)
+		KUNIT_EXPECT_EQ(test, mbw_max_to_percent(0, &fake_props), 0);
+
+	if (fake_props.bwa_wd < 8 &&
+	    mbw_max_to_percent(0, &fake_props) == 0)
+		kunit_warn(test, "wd=%d: Testsuite/driver Rounding policy mismatch?",
+			   fake_props.bwa_wd);
+}
+
 static struct kunit_case mpam_resctrl_test_cases[] = {
 	KUNIT_CASE(test_get_mba_granularity),
 	KUNIT_CASE(test_mbw_pbm_to_percent),
 	KUNIT_CASE_PARAM(test_mbw_max_to_percent, test_percent_value_gen_params),
 	KUNIT_CASE(test_percent_to_mbw_pbm),
 	KUNIT_CASE_PARAM(test_percent_to_mbw_max, test_percent_value_gen_params),
+	KUNIT_CASE_PARAM(test_mbw_max_to_percent_limits, test_all_bwa_wd_gen_params),
 	{}
 };
 
