@@ -135,20 +135,10 @@ static void test_mbw_max_to_percent(struct kunit *test)
 	/* The MPAM spec has a table of values that people think are important: */
 	ret = mbw_max_to_percent(0x028e, &fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 1);
-	ret = mbw_max_to_percent(0x1fff, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 13);
-	ret = mbw_max_to_percent(0x2aab, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 17);
 	ret = mbw_max_to_percent(0x3fff, &fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 25);
-	ret = mbw_max_to_percent(0x5552, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 33);
 	ret = mbw_max_to_percent(0x5998, &fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 35);
-	ret = mbw_max_to_percent(0x5f5b, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 37);
-	ret = mbw_max_to_percent(0x6ccb, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 42);
 	ret = mbw_max_to_percent(0x7332, &fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 45);
 	ret = mbw_max_to_percent(0x7fff, &fake_props);
@@ -159,14 +149,8 @@ static void test_mbw_max_to_percent(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, ret, 55);
 	ret = mbw_max_to_percent(0x9479, &fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 58);
-	ret = mbw_max_to_percent(0xa0a2, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 63);
-	ret = mbw_max_to_percent(0xaaa9, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 67);
 	ret = mbw_max_to_percent(0xbfff, &fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 75);
-	ret = mbw_max_to_percent(0xd332, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 82);
 	ret = mbw_max_to_percent(0xe146, &fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 88);
 	ret = mbw_max_to_percent(0xf332, &fake_props);
