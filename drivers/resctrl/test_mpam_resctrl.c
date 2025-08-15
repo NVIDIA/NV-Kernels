@@ -308,6 +308,42 @@ static void test_mbw_max_to_percent_limits(struct kunit *test)
 			   fake_props.bwa_wd);
 }
 
+static void test_percent_to_max_rounding(struct kunit *test)
+{
+	const struct percent_value_case *param = test->param_value;
+	unsigned int num_rounded_up = 0, total = 0;
+	struct percent_value_test_info res;
+
+	for (param = percent_value_cases, total = 0;
+	     param < &percent_value_cases[ARRAY_SIZE(percent_value_cases)];
+	     param++, total++) {
+
+		__prepare_percent_value_test(test, &res, param);
+		if (res.value > param->value << res.shift)
+			num_rounded_up++;
+	}
+
+	/*
+	 * The MPAM driver applies a round-to-nearest policy, whereas a
+	 * round-down policy seems to have been applied in the
+	 * reference table from which the test vectors were selected.
+	 *
+	 * For a large and well-distributed suite of test vectors,
+	 * about half should be rounded up and half down compared with
+	 * the reference table.  The actual test vectors are few in
+	 * number and probably not very well distributed however, so
+	 * tolerate a round-up rate of between 1/4 and 3/4 before
+	 * crying foul:
+	 */
+
+	kunit_info(test, "Round-up rate: %u%% (%u/%u)\n",
+		   DIV_ROUND_CLOSEST(num_rounded_up * 100, total),
+		   num_rounded_up, total);
+
+	KUNIT_EXPECT_GE(test, 4 * num_rounded_up, 1 * total);
+	KUNIT_EXPECT_LE(test, 4 * num_rounded_up, 3 * total);
+}
+
 static struct kunit_case mpam_resctrl_test_cases[] = {
 	KUNIT_CASE(test_get_mba_granularity),
 	KUNIT_CASE(test_mbw_pbm_to_percent),
@@ -315,6 +351,7 @@ static struct kunit_case mpam_resctrl_test_cases[] = {
 	KUNIT_CASE(test_percent_to_mbw_pbm),
 	KUNIT_CASE_PARAM(test_percent_to_mbw_max, test_percent_value_gen_params),
 	KUNIT_CASE_PARAM(test_mbw_max_to_percent_limits, test_all_bwa_wd_gen_params),
+	KUNIT_CASE(test_percent_to_max_rounding),
 	{}
 };
 
