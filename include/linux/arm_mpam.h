@@ -5,6 +5,7 @@
 #define __LINUX_ARM_MPAM_H
 
 #include <linux/acpi.h>
+#include <linux/compiler_attributes.h>
 #include <linux/resctrl_types.h>
 #include <linux/types.h>
 
@@ -75,6 +76,19 @@ static inline void resctrl_arch_enable_mon(void) { }
 static inline void resctrl_arch_disable_mon(void) { }
 static inline void resctrl_arch_enable_alloc(void) { }
 static inline void resctrl_arch_disable_alloc(void) { }
+
+struct resctrl_schema;
+
+struct rdt_resource;
+static inline u32 resctrl_arch_round_bw(u32 val,
+					const struct rdt_resource *r __always_unused)
+{
+	/*
+	 * Do nothing: for MPAM, resctrl_arch_update_one() has the necessary
+	 * context to round the incoming value correctly.
+	 */
+	return val;
+}
 
 static inline unsigned int resctrl_arch_round_mon_val(unsigned int val)
 {
