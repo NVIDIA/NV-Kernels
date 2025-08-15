@@ -3,6 +3,86 @@
 /* This file is intended to be included into mpam_resctrl.c */
 
 #include <kunit/test.h>
+#include <linux/array_size.h>
+#include <linux/bits.h>
+#include <linux/math.h>
+#include <linux/sprintf.h>
+
+struct percent_value_case {
+	u8	pc;
+	u8	width;
+	u16	value;
+};
+
+/*
+ * Mysterious inscriptions taken from ARM DDI 0598D.b,
+ * "Arm Architecture Reference Manual Supplement - Memory System
+ * Resource Partitioning and Monitoring (MPAM), for A-profile
+ * architecture", Section 9.8, "About the fixed-point fractional
+ * format" (exact percentage entries only):
+ */
+static const struct percent_value_case percent_value_cases[] = {
+	/* Minimum-value cases not specified by the architecture: */
+	{   0,  8,    0 },	{   0, 12,     0 },	{   0, 16,      0 },
+
+	/* Architectural cases: */
+	{   1,  8,    1 },	{   1, 12,  0x27 },	{   1, 16,  0x28e },
+	{  25,  8, 0x3f },	{  25, 12, 0x3ff },	{  25, 16, 0x3fff },
+	{  35,  8, 0x58 },	{  35, 12, 0x598 },	{  35, 16, 0x5998 },
+	{  45,  8, 0x72 },	{  45, 12, 0x732 },	{  45, 16, 0x7332 },
+	{  50,  8, 0x7f },	{  50, 12, 0x7ff },	{  50, 16, 0x7fff },
+	{  52,  8, 0x84 },	{  52, 12, 0x850 },	{  52, 16, 0x851d },
+	{  55,  8, 0x8b },	{  55, 12, 0x8cb },	{  55, 16, 0x8ccb },
+	{  58,  8, 0x93 },	{  58, 12, 0x946 },	{  58, 16, 0x9479 },
+	{  75,  8, 0xbf },	{  75, 12, 0xbff },	{  75, 16, 0xbfff },
+	{  88,  8, 0xe0 },	{  88, 12, 0xe13 },	{  88, 16, 0xe146 },
+	{  95,  8, 0xf2 },	{  95, 12, 0xf32 },	{  95, 16, 0xf332 },
+	{ 100,  8, 0xff },	{ 100, 12, 0xfff },	{ 100, 16, 0xffff },
+
+};
+
+static void test_percent_value_desc(const struct percent_value_case *param,
+				char *desc)
+{
+	snprintf(desc, KUNIT_PARAM_DESC_SIZE,
+		 "pc=%d, width=%d, value=0x%.*x\n",
+		 param->pc, param->width,
+		 DIV_ROUND_UP(param->width, 4), param->value);
+}
+KUNIT_ARRAY_PARAM(test_percent_value, percent_value_cases,
+		  test_percent_value_desc);
+
+struct percent_value_test_info {
+	u32 pc;			/* result of value-to-percent conversion */
+	u32 value;		/* result of percent-to-value conversion */
+	u32 max_value;		/* maximum raw value allowed by test params */
+	unsigned int shift;	/* promotes raw testcase value to 16 bits */
+};
+
+/*
+ * Convert a reference percentage to a fixed-point MAX value and
+ * vice-versa, based on param (not test->param_value!)
+ */
+static void __prepare_percent_value_test(
+	struct kunit *test,
+	struct percent_value_test_info *res,
+	const struct percent_value_case *param)
+{
+	struct mpam_props fake_props = {0};
+
+	/* Reject bogus test parameters that would break the tests: */
+	KUNIT_ASSERT_GE(test, param->width, 1);
+	KUNIT_ASSERT_LE(test, param->width, 16);
+	KUNIT_ASSERT_LT(test, param->value, 1 << param->width);
+
+	mpam_set_feature(mpam_feat_mbw_max, &fake_props);
+	fake_props.bwa_wd = param->width;
+
+	res->shift = 16 - param->width;
+	res->max_value = GENMASK_U32(param->width - 1, 0);
+	res->value = percent_to_mbw_max(param->pc, &fake_props);
+	res->pc = mbw_max_to_percent(param->value << res->shift, &fake_props);
+}
 
 static void test_get_mba_granularity(struct kunit *test)
 {
@@ -119,44 +199,21 @@ static void test_mbw_pbm_to_percent(struct kunit *test)
 
 static void test_mbw_max_to_percent(struct kunit *test)
 {
-	u32 ret;
-	struct mpam_props fake_props = {0};
+	const struct percent_value_case *param = test->param_value;
+	struct percent_value_test_info res;
 
-	mpam_set_feature(mpam_feat_mbw_max, &fake_props);
-	fake_props.bwa_wd = 8;
-
-	ret = mbw_max_to_percent(0xff00, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 100);
-
-	ret = mbw_max_to_percent(0x0000, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0);
-
-	fake_props.bwa_wd = 16; /* architectural maximum */
-	/* The MPAM spec has a table of values that people think are important: */
-	ret = mbw_max_to_percent(0x028e, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 1);
-	ret = mbw_max_to_percent(0x3fff, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 25);
-	ret = mbw_max_to_percent(0x5998, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 35);
-	ret = mbw_max_to_percent(0x7332, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 45);
-	ret = mbw_max_to_percent(0x7fff, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 50);
-	ret = mbw_max_to_percent(0x851d, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 52);
-	ret = mbw_max_to_percent(0x8ccb, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 55);
-	ret = mbw_max_to_percent(0x9479, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 58);
-	ret = mbw_max_to_percent(0xbfff, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 75);
-	ret = mbw_max_to_percent(0xe146, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 88);
-	ret = mbw_max_to_percent(0xf332, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 95);
-	ret = mbw_max_to_percent(0xffff, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 100);
+	/*
+	 * Since the reference values in percent_value_cases[] all
+	 * correspond to exact percentages, round-to-nearest will
+	 * always give the exact percentage back when the MPAM max
+	 * value has precision of 0.5% or finer.  (Always true for the
+	 * reference data, since they all specify 8 bits or more of
+	 * precision.
+	 *
+	 * So, keep it simple and demand an exact match:
+	 */
+	__prepare_percent_value_test(test, &res, param);
+	KUNIT_EXPECT_EQ(test, res.pc, param->pc);
 }
 
 static void test_percent_to_mbw_pbm(struct kunit *test)
@@ -183,44 +240,30 @@ static void test_percent_to_mbw_pbm(struct kunit *test)
 
 static void test_percent_to_mbw_max(struct kunit *test)
 {
-	u32 ret;
-	struct mpam_props fake_props = {0};
+	const struct percent_value_case *param = test->param_value;
+	struct percent_value_test_info res;
 
-	mpam_set_feature(mpam_feat_mbw_max, &fake_props);
-	fake_props.bwa_wd = 4;
+	__prepare_percent_value_test(test, &res, param);
 
-	ret = percent_to_mbw_max(100, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0xf000);
+	KUNIT_EXPECT_GE(test, res.value, param->value << res.shift);
+	KUNIT_EXPECT_LE(test, res.value, (param->value + 1) << res.shift);
+	KUNIT_EXPECT_LE(test, res.value, res.max_value << res.shift);
 
-	ret = percent_to_mbw_max(50, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0x7000);
+	/* No flexibility allowed for 0% and 100%! */
 
-	ret = percent_to_mbw_max(0, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0x0000);
+	if (param->pc == 0)
+		KUNIT_EXPECT_EQ(test, res.value, 0);
 
-	fake_props.bwa_wd = 16; /* architectural maximum */
-	ret = percent_to_mbw_max(1, &fake_props);
-	KUNIT_ASSERT_EQ(test, ret, 0x028e);
-	ret = percent_to_mbw_max(25, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0x3fff);
-	ret = percent_to_mbw_max(45, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0x7332);
-	ret = percent_to_mbw_max(50, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0x7fff);
-	ret = percent_to_mbw_max(75, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0xbfff);
-	ret = percent_to_mbw_max(95, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0xf332);
-	ret = percent_to_mbw_max(100, &fake_props);
-	KUNIT_EXPECT_EQ(test, ret, 0xffff);
+	if (param->pc == 100)
+		KUNIT_EXPECT_EQ(test, res.value, res.max_value << res.shift);
 }
 
 static struct kunit_case mpam_resctrl_test_cases[] = {
 	KUNIT_CASE(test_get_mba_granularity),
 	KUNIT_CASE(test_mbw_pbm_to_percent),
-	KUNIT_CASE(test_mbw_max_to_percent),
+	KUNIT_CASE_PARAM(test_mbw_max_to_percent, test_percent_value_gen_params),
 	KUNIT_CASE(test_percent_to_mbw_pbm),
-	KUNIT_CASE(test_percent_to_mbw_max),
+	KUNIT_CASE_PARAM(test_percent_to_mbw_max, test_percent_value_gen_params),
 	{}
 };
 
