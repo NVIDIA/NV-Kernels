@@ -108,7 +108,7 @@ static void test_mbw_pbm_to_percent(struct kunit *test)
 	ret = mbw_pbm_to_percent(0x7, &fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 75);
 
-	fake_props.mbw_pbm_bits = 16; /* architectural maximum */
+	fake_props.mbw_pbm_bits = 16;
 	ret = mbw_pbm_to_percent(0xffff, &fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 100);
 
@@ -192,7 +192,7 @@ static void test_percent_to_mbw_pbm(struct kunit *test)
 	ret = percent_to_mbw_pbm(0, &fake_props);
 	KUNIT_EXPECT_EQ(test, bitmap_weight(&ret, fake_props.mbw_pbm_bits), 0);
 
-	fake_props.mbw_pbm_bits = 16; /* architectural maximum */
+	fake_props.mbw_pbm_bits = 16;
 	ret = percent_to_mbw_pbm(100, &fake_props);
 	KUNIT_EXPECT_EQ(test, bitmap_weight(&ret, fake_props.mbw_pbm_bits), 16);
 }
