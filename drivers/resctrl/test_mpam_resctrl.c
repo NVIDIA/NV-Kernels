@@ -117,11 +117,6 @@ static void test_get_mba_granularity(struct kunit *test)
 	ret = get_mba_granularity(&fake_props);
 	KUNIT_EXPECT_EQ(test, ret, 4);	/* DIV_ROUND_UP(100, 32)% = 4% */
 
-	/* When MBW_MAX is also supported, Portions are preferred */
-	mpam_set_feature(mpam_feat_mbw_max, &fake_props);
-	fake_props.bwa_wd = 4;
-	KUNIT_EXPECT_TRUE(test, mba_class_use_mbw_part(&fake_props));
-
 	/* Use MBW_MAX */
 	fake_props.features = 0;
 	fake_props.mbw_pbm_bits = 0;
