@@ -1431,12 +1431,17 @@ static void mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 		/*
 		 * Unfortunately, num_rmid doesn't mean anything for
 		 * mpam, and its exposed to user-space!
-		 * num-rmid is supposed to mean the number of groups
-		 * that can be created, both control or monitor groups.
-		 * For mpam, each control group has its own pmg/rmid
-		 * space.
+		 *
+		 * num-rmid is supposed to mean the minimum number of
+		 * monitoring groups that can exist simultaneously, including
+		 * the default monitoring group for each control group.
+		 *
+		 * For mpam, each control group has its own pmg/rmid space, so
+		 * it is not appropriate to advertise the whole rmid_idx space
+		 * here.  But the pmgs corresponding to the parent control
+		 * group can be allocated freely:
 		 */
-		l3->mon.num_rmid = 1;
+		l3->mon.num_rmid = mpam_pmg_max + 1;;
 
 		switch (type) {
 		case QOS_L3_MBM_LOCAL_EVENT_ID:
