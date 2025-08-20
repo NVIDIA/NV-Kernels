@@ -242,14 +242,19 @@ struct ap_list_summary {
 	unsigned int	nr_sgi;		/* any SGI */
 };
 
-#define irqs_outside_lrs(s)						\
-	 (((s)->nr_pend + (s)->nr_act) > kvm_vgic_global_state.nr_lr)
+static inline int kvm_vcpu_vgic_nr_lr(struct kvm_vcpu *vcpu)
+{
+	return kvm_vgic_global_state.nr_lr;
+}
 
-#define irqs_pending_outside_lrs(s)			\
-	((s)->nr_pend > kvm_vgic_global_state.nr_lr)
+#define irqs_outside_lrs(s, vcpu)						\
+	 (((s)->nr_pend + (s)->nr_act) > kvm_vcpu_vgic_nr_lr((vcpu)))
 
-#define irqs_active_outside_lrs(s)		\
-	((s)->nr_act &&	irqs_outside_lrs(s))
+#define irqs_pending_outside_lrs(s, vcpu)			\
+	((s)->nr_pend > kvm_vcpu_vgic_nr_lr((vcpu)))
+
+#define irqs_active_outside_lrs(s, vcpu)		\
+	((s)->nr_act &&	irqs_outside_lrs(s, (vcpu)))
 
 int vgic_v3_parse_attr(struct kvm_device *dev, struct kvm_device_attr *attr,
 		       struct vgic_reg_attr *reg_attr);
