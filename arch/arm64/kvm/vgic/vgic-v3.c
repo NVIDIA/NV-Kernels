@@ -31,11 +31,11 @@ void vgic_v3_configure_hcr(struct kvm_vcpu *vcpu,
 
 	cpuif->vgic_hcr = ICH_HCR_EL2_En;
 
-	if (irqs_pending_outside_lrs(als))
+	if (irqs_pending_outside_lrs(als, vcpu))
 		cpuif->vgic_hcr |= ICH_HCR_EL2_NPIE;
-	if (irqs_active_outside_lrs(als))
+	if (irqs_active_outside_lrs(als, vcpu))
 		cpuif->vgic_hcr |= ICH_HCR_EL2_LRENPIE;
-	if (irqs_outside_lrs(als))
+	if (irqs_outside_lrs(als, vcpu))
 		cpuif->vgic_hcr |= ICH_HCR_EL2_UIE;
 
 	if (!als->nr_sgi)
@@ -60,7 +60,7 @@ void vgic_v3_configure_hcr(struct kvm_vcpu *vcpu,
 	 * can change behind our back without any warning...
 	 */
 	if (!cpus_have_final_cap(ARM64_HAS_ICH_HCR_EL2_TDIR) ||
-	    irqs_active_outside_lrs(als)		     ||
+	    irqs_active_outside_lrs(als, vcpu)		     ||
 	    atomic_read(&vcpu->kvm->arch.vgic.active_spis))
 		cpuif->vgic_hcr |= ICH_HCR_EL2_TDIR;
 }
