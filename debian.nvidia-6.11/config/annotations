@@ -93,6 +93,12 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'Required for NVIDIA worklo
 CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'n', 'arm64': 'y'}>
 CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'Required for NVIDIA workloads'>
 
+CONFIG_DRM_CLIENT_SELECTION                     policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DRM_CLIENT_SELECTION                     note<'Required for nvidia-drm framebuffer console support'>
+
+CONFIG_DRM_CLIENT_SETUP                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DRM_CLIENT_SETUP                         note<'Required for nvidia-drm framebuffer console support'>
+
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
 
