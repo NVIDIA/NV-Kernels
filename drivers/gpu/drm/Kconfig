@@ -180,9 +180,10 @@ config DRM_DEBUG_MODESET_LOCK
 	  If in doubt, say "N".
 
 config DRM_CLIENT_SELECTION
-	bool
+	bool "Enable in-kernel DRM clients"
 	depends on DRM
 	select DRM_CLIENT_SETUP if DRM_FBDEV_EMULATION
+	default n
 	help
 	  Drivers that support in-kernel DRM clients have to select this
 	  option.
