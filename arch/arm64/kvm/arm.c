@@ -39,6 +39,7 @@
 #include <asm/kvm_nested.h>
 #include <asm/kvm_pkvm.h>
 #include <asm/kvm_ptrauth.h>
+#include <asm/kvm_rme.h>
 #include <asm/sections.h>
 #include <asm/stacktrace/nvhe.h>
 
@@ -103,6 +104,8 @@ long kvm_get_cap_for_kvm_ioctl(unsigned int ioctl, long *ext)
 
 	return -EINVAL;
 }
+
+DEFINE_STATIC_KEY_FALSE(kvm_rme_is_available);
 
 DECLARE_KVM_HYP_PER_CPU(unsigned long, kvm_hyp_vector);
 
@@ -2919,6 +2922,8 @@ static __init int kvm_arm_init(void)
 	}
 
 	in_hyp_mode = is_kernel_in_hyp_mode();
+
+	kvm_init_rme();
 
 	if (cpus_have_final_cap(ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE) ||
 	    cpus_have_final_cap(ARM64_WORKAROUND_1508412))
