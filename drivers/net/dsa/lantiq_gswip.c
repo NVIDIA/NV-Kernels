@@ -251,7 +251,7 @@
 
 struct gswip_hw_info {
 	int max_ports;
-	int cpu_port;
+	unsigned int allowed_cpu_ports;
 	void (*phylink_get_caps)(struct dsa_switch *ds, int port,
 				 struct phylink_config *config);
 };
@@ -653,7 +653,6 @@ static int gswip_add_single_port_br(struct gswip_priv *priv, int port, bool add)
 {
 	struct gswip_pce_table_entry vlan_active = {0,};
 	struct gswip_pce_table_entry vlan_mapping = {0,};
-	unsigned int cpu_port = priv->hw_info->cpu_port;
 	int err;
 
 	vlan_active.index = port + 1;
@@ -673,7 +672,7 @@ static int gswip_add_single_port_br(struct gswip_priv *priv, int port, bool add)
 	vlan_mapping.index = port + 1;
 	vlan_mapping.table = GSWIP_TABLE_VLAN_MAPPING;
 	vlan_mapping.val[0] = 0 /* vid */;
-	vlan_mapping.val[1] = BIT(port) | BIT(cpu_port);
+	vlan_mapping.val[1] = BIT(port) | dsa_cpu_ports(priv->ds);
 	vlan_mapping.val[2] = 0;
 	err = gswip_pce_table_entry_write(priv, &vlan_mapping);
 	if (err) {
@@ -812,10 +811,10 @@ static int gswip_port_vlan_filtering(struct dsa_switch *ds, int port,
 
 static int gswip_setup(struct dsa_switch *ds)
 {
+	unsigned int cpu_ports = dsa_cpu_ports(ds);
 	struct gswip_priv *priv = ds->priv;
-	unsigned int cpu_port = priv->hw_info->cpu_port;
-	int i;
-	int err;
+	struct dsa_port *cpu_dp;
+	int err, i;
 
 	gswip_switch_w(priv, GSWIP_SWRES_R0, GSWIP_SWRES);
 	usleep_range(5000, 10000);
@@ -837,9 +836,9 @@ static int gswip_setup(struct dsa_switch *ds)
 	}
 
 	/* Default unknown Broadcast/Multicast/Unicast port maps */
-	gswip_switch_w(priv, BIT(cpu_port), GSWIP_PCE_PMAP1);
-	gswip_switch_w(priv, BIT(cpu_port), GSWIP_PCE_PMAP2);
-	gswip_switch_w(priv, BIT(cpu_port), GSWIP_PCE_PMAP3);
+	gswip_switch_w(priv, cpu_ports, GSWIP_PCE_PMAP1);
+	gswip_switch_w(priv, cpu_ports, GSWIP_PCE_PMAP2);
+	gswip_switch_w(priv, cpu_ports, GSWIP_PCE_PMAP3);
 
 	/* Deactivate MDIO PHY auto polling. Some PHYs as the AR8030 have an
 	 * interoperability problem with this auto polling mechanism because
@@ -868,13 +867,15 @@ static int gswip_setup(struct dsa_switch *ds)
 				   GSWIP_MII_CFG_EN | GSWIP_MII_CFG_ISOLATE,
 				   0, i);
 
-	/* enable special tag insertion on cpu port */
-	gswip_switch_mask(priv, 0, GSWIP_FDMA_PCTRL_STEN,
-			  GSWIP_FDMA_PCTRLp(cpu_port));
+	dsa_switch_for_each_cpu_port(cpu_dp, ds) {
+		/* enable special tag insertion on cpu port */
+		gswip_switch_mask(priv, 0, GSWIP_FDMA_PCTRL_STEN,
+				  GSWIP_FDMA_PCTRLp(cpu_dp->index));
 
-	/* accept special tag in ingress direction */
-	gswip_switch_mask(priv, 0, GSWIP_PCE_PCTRL_0_INGRESS,
-			  GSWIP_PCE_PCTRL_0p(cpu_port));
+		/* accept special tag in ingress direction */
+		gswip_switch_mask(priv, 0, GSWIP_PCE_PCTRL_0_INGRESS,
+				  GSWIP_PCE_PCTRL_0p(cpu_dp->index));
+	}
 
 	gswip_switch_mask(priv, 0, GSWIP_BM_QUEUE_GCTRL_GL_MOD,
 			  GSWIP_BM_QUEUE_GCTRL);
@@ -970,7 +971,6 @@ static int gswip_vlan_add_unaware(struct gswip_priv *priv,
 {
 	struct gswip_pce_table_entry vlan_mapping = {0,};
 	unsigned int max_ports = priv->hw_info->max_ports;
-	unsigned int cpu_port = priv->hw_info->cpu_port;
 	bool active_vlan_created = false;
 	int idx = -1;
 	int i;
@@ -1010,7 +1010,7 @@ static int gswip_vlan_add_unaware(struct gswip_priv *priv,
 	}
 
 	/* Update the VLAN mapping entry and write it to the switch */
-	vlan_mapping.val[1] |= BIT(cpu_port);
+	vlan_mapping.val[1] |= dsa_cpu_ports(priv->ds);
 	vlan_mapping.val[1] |= BIT(port);
 	err = gswip_pce_table_entry_write(priv, &vlan_mapping);
 	if (err) {
@@ -1032,7 +1032,7 @@ static int gswip_vlan_add_aware(struct gswip_priv *priv,
 {
 	struct gswip_pce_table_entry vlan_mapping = {0,};
 	unsigned int max_ports = priv->hw_info->max_ports;
-	unsigned int cpu_port = priv->hw_info->cpu_port;
+	unsigned int cpu_ports = dsa_cpu_ports(priv->ds);
 	bool active_vlan_created = false;
 	int idx = -1;
 	int fid = -1;
@@ -1079,8 +1079,8 @@ static int gswip_vlan_add_aware(struct gswip_priv *priv,
 
 	vlan_mapping.val[0] = vid;
 	/* Update the VLAN mapping entry and write it to the switch */
-	vlan_mapping.val[1] |= BIT(cpu_port);
-	vlan_mapping.val[2] |= BIT(cpu_port);
+	vlan_mapping.val[1] |= cpu_ports;
+	vlan_mapping.val[2] |= cpu_ports;
 	vlan_mapping.val[1] |= BIT(port);
 	if (untagged)
 		vlan_mapping.val[2] &= ~BIT(port);
@@ -1107,7 +1107,6 @@ static int gswip_vlan_remove(struct gswip_priv *priv,
 {
 	struct gswip_pce_table_entry vlan_mapping = {0,};
 	unsigned int max_ports = priv->hw_info->max_ports;
-	unsigned int cpu_port = priv->hw_info->cpu_port;
 	int idx = -1;
 	int i;
 	int err;
@@ -1143,7 +1142,7 @@ static int gswip_vlan_remove(struct gswip_priv *priv,
 	}
 
 	/* In case all ports are removed from the bridge, remove the VLAN */
-	if ((vlan_mapping.val[1] & ~BIT(cpu_port)) == 0) {
+	if (!(vlan_mapping.val[1] & ~dsa_cpu_ports(priv->ds))) {
 		err = gswip_vlan_active_remove(priv, idx);
 		if (err) {
 			dev_err(priv->dev, "failed to write active VLAN: %d\n",
@@ -2074,6 +2073,30 @@ remove_gphy:
 	return err;
 }
 
+static int gswip_validate_cpu_port(struct dsa_switch *ds)
+{
+	struct gswip_priv *priv = ds->priv;
+	struct dsa_port *cpu_dp;
+	int cpu_port = -1;
+
+	dsa_switch_for_each_cpu_port(cpu_dp, ds) {
+		if (cpu_port != -1)
+			return dev_err_probe(ds->dev, -EINVAL,
+					     "only a single CPU port is supported\n");
+
+		cpu_port = cpu_dp->index;
+	}
+
+	if (cpu_port == -1)
+		return dev_err_probe(ds->dev, -EINVAL, "no CPU port defined\n");
+
+	if (BIT(cpu_port) & ~priv->hw_info->allowed_cpu_ports)
+		return dev_err_probe(ds->dev, -EINVAL,
+				     "unsupported CPU port defined\n");
+
+	return 0;
+}
+
 static int gswip_probe(struct platform_device *pdev)
 {
 	struct device_node *np, *gphy_fw_np;
@@ -2155,12 +2178,10 @@ static int gswip_probe(struct platform_device *pdev)
 		dev_err_probe(dev, err, "dsa switch registration failed\n");
 		goto gphy_fw_remove;
 	}
-	if (!dsa_is_cpu_port(priv->ds, priv->hw_info->cpu_port)) {
-		err = dev_err_probe(dev, -EINVAL,
-				    "wrong CPU port defined, HW only supports port: %i\n",
-				    priv->hw_info->cpu_port);
+
+	err = gswip_validate_cpu_port(priv->ds);
+	if (err)
 		goto disable_switch;
-	}
 
 	platform_set_drvdata(pdev, priv);
 
@@ -2209,13 +2230,13 @@ static void gswip_shutdown(struct platform_device *pdev)
 
 static const struct gswip_hw_info gswip_xrx200 = {
 	.max_ports = 7,
-	.cpu_port = 6,
+	.allowed_cpu_ports = BIT(6),
 	.phylink_get_caps = gswip_xrx200_phylink_get_caps,
 };
 
 static const struct gswip_hw_info gswip_xrx300 = {
 	.max_ports = 7,
-	.cpu_port = 6,
+	.allowed_cpu_ports = BIT(6),
 	.phylink_get_caps = gswip_xrx300_phylink_get_caps,
 };
 
