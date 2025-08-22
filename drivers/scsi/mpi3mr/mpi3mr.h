@@ -788,6 +788,8 @@ struct scmd_priv {
  * @pel_seqnum_dma: PEL sequence number DMA address
  * @pel_seqnum_sz: PEL sequenece number size
  * @op_reply_q_offset: Operational reply queue offset with MSIx
+ * @adm_req_q_bar_writeq_lock: Admin request queue lock
+ * @adm_reply_q_bar_writeq_lock: Admin reply queue lock
  * @default_qcount: Total Default queues
  * @active_poll_qcount: Currently active poll queue count
  * @requested_poll_qcount: User requested poll queue count
@@ -951,6 +953,8 @@ struct mpi3mr_ioc {
 	u32 pel_seqnum_sz;
 
 	u16 op_reply_q_offset;
+	spinlock_t adm_req_q_bar_writeq_lock;
+	spinlock_t adm_reply_q_bar_writeq_lock;
 	u16 default_qcount;
 	u16 active_poll_qcount;
 	u16 requested_poll_qcount;
