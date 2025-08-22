@@ -15,5 +15,5 @@ do_tools_perf_python = true
 do_tools_bpftool = true
 do_tools_x86	= true
 do_tools_rtla = true
-do_extras_package = true
+do_extras_package = false
 do_tools_acpidbg = true
