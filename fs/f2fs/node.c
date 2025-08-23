@@ -27,6 +27,10 @@ static struct kmem_cache *free_nid_slab;
 static struct kmem_cache *nat_entry_set_slab;
 static struct kmem_cache *fsync_node_entry_slab;
 
+static struct page *__get_node_page(struct f2fs_sb_info *sbi, pgoff_t nid,
+					struct page *parent, int start,
+					enum node_type ntype);
+
 static inline bool is_invalid_nid(struct f2fs_sb_info *sbi, nid_t nid)
 {
 	return nid < F2FS_ROOT_INO(sbi) || nid >= NM_I(sbi)->max_nid;
@@ -850,7 +854,8 @@ int f2fs_get_dnode_of_data(struct dnode_of_data *dn, pgoff_t index, int mode)
 		}
 
 		if (!done) {
-			npage[i] = f2fs_get_node_page(sbi, nids[i]);
+			npage[i] = __get_node_page(sbi, nids[i], NULL, 0,
+						NODE_TYPE_NON_INODE);
 			if (IS_ERR(npage[i])) {
 				err = PTR_ERR(npage[i]);
 				f2fs_put_page(npage[0], 0);
@@ -968,7 +973,7 @@ static int truncate_dnode(struct dnode_of_data *dn)
 		return 1;
 
 	/* get direct node */
-	page = f2fs_get_node_page(sbi, dn->nid);
+	page = __get_node_page(sbi, dn->nid, NULL, 0, NODE_TYPE_NON_INODE);
 	if (PTR_ERR(page) == -ENOENT)
 		return 1;
 	else if (IS_ERR(page))
@@ -1012,7 +1017,8 @@ static int truncate_nodes(struct dnode_of_data *dn, unsigned int nofs,
 
 	trace_f2fs_truncate_nodes_enter(dn->inode, dn->nid, dn->data_blkaddr);
 
-	page = f2fs_get_node_page(F2FS_I_SB(dn->inode), dn->nid);
+	page = __get_node_page(F2FS_I_SB(dn->inode), dn->nid, NULL, 0,
+						NODE_TYPE_NON_INODE);
 	if (IS_ERR(page)) {
 		trace_f2fs_truncate_nodes_exit(dn->inode, PTR_ERR(page));
 		return PTR_ERR(page);
@@ -1090,7 +1096,8 @@ static int truncate_partial_nodes(struct dnode_of_data *dn,
 	/* get indirect nodes in the path */
 	for (i = 0; i < idx + 1; i++) {
 		/* reference count'll be increased */
-		pages[i] = f2fs_get_node_page(F2FS_I_SB(dn->inode), nid[i]);
+		pages[i] = __get_node_page(F2FS_I_SB(dn->inode), nid[i], NULL, 0,
+							NODE_TYPE_NON_INODE);
 		if (IS_ERR(pages[i])) {
 			err = PTR_ERR(pages[i]);
 			idx = i - 1;
@@ -1474,7 +1481,8 @@ void f2fs_ra_node_page(struct f2fs_sb_info *sbi, nid_t nid)
 }
 
 static struct page *__get_node_page(struct f2fs_sb_info *sbi, pgoff_t nid,
-					struct page *parent, int start)
+					struct page *parent, int start,
+					enum node_type ntype)
 {
 	struct page *page;
 	struct folio *folio;
@@ -1518,11 +1526,20 @@ repeat:
 		goto out_err;
 	}
 page_hit:
-	if (likely(nid == nid_of_node(page)))
+	if (likely(nid == nid_of_node(page))) {
+		/*
+		 * a non-inode dnode must not carry the same footer.ino and
+		 * footer.nid as an inode; otherwise it would be parsed as an
+		 * inode and cause inconsistent truncation range.
+		 */
+		if (ntype == NODE_TYPE_NON_INODE && unlikely(IS_INODE(page)))
+			goto inconsistent;
 		return page;
+	}
 
-	f2fs_warn(sbi, "inconsistent node block, nid:%lu, node_footer[nid:%u,ino:%u,ofs:%u,cpver:%llu,blkaddr:%u]",
-			  nid, nid_of_node(page), ino_of_node(page),
+inconsistent:
+	f2fs_warn(sbi, "inconsistent node block, node_type:%d, nid:%lu, node_footer[nid:%u,ino:%u,ofs:%u,cpver:%llu,blkaddr:%u]",
+			  ntype, nid, nid_of_node(page), ino_of_node(page),
 			  ofs_of_node(page), cpver_of_node(page),
 			  next_blkaddr_of_node(page));
 	set_sbi_flag(sbi, SBI_NEED_FSCK);
@@ -1540,7 +1557,7 @@ out_put_err:
 
 struct page *f2fs_get_node_page(struct f2fs_sb_info *sbi, pgoff_t nid)
 {
-	return __get_node_page(sbi, nid, NULL, 0);
+	return __get_node_page(sbi, nid, NULL, 0, NODE_TYPE_REGULAR);
 }
 
 struct page *f2fs_get_node_page_ra(struct page *parent, int start)
@@ -1548,7 +1565,7 @@ struct page *f2fs_get_node_page_ra(struct page *parent, int start)
 	struct f2fs_sb_info *sbi = F2FS_P_SB(parent);
 	nid_t nid = get_nid(parent, start, false);
 
-	return __get_node_page(sbi, nid, parent, start);
+	return __get_node_page(sbi, nid, parent, start, NODE_TYPE_REGULAR);
 }
 
 static void flush_inline_data(struct f2fs_sb_info *sbi, nid_t ino)

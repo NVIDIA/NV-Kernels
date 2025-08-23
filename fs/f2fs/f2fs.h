@@ -3723,6 +3723,7 @@ void f2fs_hash_filename(const struct inode *dir, struct f2fs_filename *fname);
  * node.c
  */
 struct node_info;
+enum node_type;
 
 int f2fs_check_nid_range(struct f2fs_sb_info *sbi, nid_t nid);
 bool f2fs_available_free_memory(struct f2fs_sb_info *sbi, int type);
