@@ -277,36 +277,6 @@ enum pci_bus_isolation pci_bus_isolated(struct pci_bus *bus)
 	}
 }
 
-/*
- * pci_mfd_isolated- check whether a MFD function is isolated
- * @dev:	PCI device
- *
- * True if the dev function on a MFD should be considered isolated from all
- * other functions in the MFD. This is used to override ACS checks that might
- * otherwise indicate the MFD function participates in an internal loopback.
- *
- * Returns:
- *   false:	No override, use normal PCI defined mechanisms
- *   true:	Function is isolated from P2P to other functions in the device
- */
-bool pci_mfd_isolated(struct pci_dev *dev)
-{
-	/*
-	 * For some reason AMD likes to put "dummy functions" in their PCI
-	 * hierarchy as part of a multi function device. These are notable
-	 * because they can't do anything. No BARs and no downstream bus. Since
-	 * they cannot accept P2P or initiate any MMIO we consider them to be
-	 * isolated from the rest of MFD. Since they often accompany a real PCI
-	 * bridge with downstream devices it is important that the MFD be
-	 * considered isolated. Annoyingly there is no ACS capability reported
-	 * so we assume that a host bridge in a MFD with no MMIO has the special
-	 * property of never accepting or initiating P2P operations.
-	 */
-	if (dev->class >> 8 == PCI_CLASS_BRIDGE_HOST && !pci_has_mmio(dev))
-		return true;
-	return pci_dev_specific_mfd_isolated(dev);
-}
-
 static struct pci_bus *pci_do_find_bus(struct pci_bus *bus, unsigned char busnr)
 {
 	struct pci_bus *child;
