@@ -836,10 +836,6 @@ struct pci_dynids {
 	struct list_head	list;	/* For IDs added at runtime */
 };
 
-struct pci_reachable_set {
-	DECLARE_BITMAP(devfns, 256);
-};
-
 enum pci_bus_isolation {
 	/*
 	 * The bus is off a root port and the root port has isolated ACS flags
@@ -1257,9 +1253,6 @@ struct pci_dev *pci_get_domain_bus_and_slot(int domain, unsigned int bus,
 struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from);
 struct pci_dev *pci_get_base_class(unsigned int class, struct pci_dev *from);
 
-void pci_reachable_set(struct pci_dev *start, struct pci_reachable_set *devfns,
-		       bool (*reachable)(struct pci_dev *deva,
-					 struct pci_dev *devb));
 enum pci_bus_isolation pci_bus_isolated(struct pci_bus *bus);
 
 int pci_dev_present(const struct pci_device_id *ids);
@@ -2033,11 +2026,6 @@ static inline struct pci_dev *pci_get_class(unsigned int class,
 static inline struct pci_dev *pci_get_base_class(unsigned int class,
 						 struct pci_dev *from)
 { return NULL; }
-
-static inline void
-pci_reachable_set(struct pci_dev *start, struct pci_reachable_set *devfns,
-		  bool (*reachable)(struct pci_dev *deva, struct pci_dev *devb))
-{ }
 
 static inline enum pci_bus_isolation pci_bus_isolated(struct pci_bus *bus)
 { return PCIE_NON_ISOLATED; }
