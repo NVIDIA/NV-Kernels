@@ -4646,8 +4646,6 @@ static void quirk_chelsio_T5_disable_root_port_attributes(struct pci_dev *pdev)
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_CHELSIO, PCI_ANY_ID,
 			 quirk_chelsio_T5_disable_root_port_attributes);
 
-#define PCI_ACS_QUIRK_ACS_ISOLATED BIT(16)
-
 /*
  * pci_acs_ctrl_enabled - compare desired ACS controls with those provided
  *			  by a device
@@ -4981,13 +4979,6 @@ static int pci_quirk_intel_spt_pch_acs(struct pci_dev *dev, u32 acs_flags)
 static int pci_quirk_mf_endpoint_acs(struct pci_dev *dev, u32 acs_flags)
 {
 	/*
-	 * The function cannot get P2P MMIO from the other functions in the MFD
-	 * either even if the other functions do not have ACS or ACS quirks.
-	 */
-	if (acs_flags & PCI_ACS_QUIRK_ACS_ISOLATED)
-		return 1;
-
-	/*
 	 * SV, TB, and UF are not relevant to multifunction endpoints.
 	 *
 	 * Multifunction devices are only required to implement RR, CR, and DT
@@ -5203,7 +5194,18 @@ static const struct pci_dev_acs_enabled {
 	{ 0 }
 };
 
-static int pci_dev_call_acs_enabled(struct pci_dev *dev, u32 acs_flags)
+/*
+ * pci_dev_specific_acs_enabled - check whether device provides ACS controls
+ * @dev:	PCI device
+ * @acs_flags:	Bitmask of desired ACS controls
+ *
+ * Returns:
+ *   -ENOTTY:	No quirk applies to this device; we can't tell whether the
+ *		device provides the desired controls
+ *   0:		Device does not provide all the desired controls
+ *   >0:	Device provides all the controls in @acs_flags
+ */
+int pci_dev_specific_acs_enabled(struct pci_dev *dev, u16 acs_flags)
 {
 	const struct pci_dev_acs_enabled *i;
 	int ret;
@@ -5226,42 +5228,6 @@ static int pci_dev_call_acs_enabled(struct pci_dev *dev, u32 acs_flags)
 	}
 
 	return -ENOTTY;
-}
-
-/*
- * pci_dev_specific_acs_enabled - check whether device provides ACS controls
- * @dev:	PCI device
- * @acs_flags:	Bitmask of desired ACS controls
- *
- * Returns:
- *   -ENOTTY:	No quirk applies to this device; we can't tell whether the
- *		device provides the desired controls
- *   0:		Device does not provide all the desired controls
- *   >0:	Device provides all the controls in @acs_flags
- */
-int pci_dev_specific_acs_enabled(struct pci_dev *dev, u16 acs_flags)
-{
-	return pci_dev_call_acs_enabled(dev, acs_flags);
-}
-
-/*
- * pci_dev_specific_mfd_isolated- check whether a MFD function is isolated
- * @dev:	PCI device
- *
- * pci_dev_specific_acs_enabled() emulates the ACS flags using a quirk however
- * historically Linux has not quirked every function in a MFD.
- * pci_dev_specific_mfd_isolated() overrides the other function MFD checks and
- * can consider a single function fully isolated from all other functions both
- * for egress and ingress directions.
- *
- * Returns:
- *   false:	No override, use normal PCI defined mechanisms
- *   true:	Function is isolated from P2P to other functions in the device
- */
-bool pci_dev_specific_mfd_isolated(struct pci_dev *dev)
-{
-	return pci_dev_call_acs_enabled(dev, PCI_ACS_QUIRK_ACS_ISOLATED |
-						     PCI_ACS_ISOLATED) > 0;
 }
 
 /* Config space offset of Root Complex Base Address register */
