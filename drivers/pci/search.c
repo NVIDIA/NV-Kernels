@@ -127,8 +127,6 @@ static enum pci_bus_isolation pcie_switch_isolated(struct pci_bus *bus)
 	 * traffic flowing upstream back downstream through another DSP.
 	 *
 	 * Thus any non-permissive DSP spoils the whole bus.
-	 * PCI_ACS_UNCLAIMED_RR is not required since rejecting requests with
-	 * error is still isolation.
 	 */
 	guard(rwsem_read)(&pci_bus_sem);
 	list_for_each_entry(pdev, &bus->devices, bus_list) {
@@ -138,14 +136,8 @@ static enum pci_bus_isolation pcie_switch_isolated(struct pci_bus *bus)
 		    pdev->dma_alias_mask)
 			return PCIE_NON_ISOLATED;
 
-		if (!pci_acs_enabled(pdev, PCI_ACS_ISOLATED |
-						   PCI_ACS_DSP_MT_RR |
-						   PCI_ACS_USP_MT_RR)) {
-			/* The USP is isolated from the DSP */
-			if (!pci_acs_enabled(pdev, PCI_ACS_USP_MT_RR))
-				return PCIE_NON_ISOLATED;
+		if (!pci_acs_enabled(pdev, PCI_ACS_ISOLATED))
 			return PCIE_SWITCH_DSP_NON_ISOLATED;
-		}
 	}
 	return PCIE_ISOLATED;
 }
@@ -239,13 +231,11 @@ enum pci_bus_isolation pci_bus_isolated(struct pci_bus *bus)
 	switch (type) {
 	/*
 	 * Since PCIe links are point to point root and downstream ports are
-	 * isolated if their own MMIO cannot be reached. The root port
-	 * uses DSP_MT_RR for its own MMIO.
+	 * isolated if their own MMIO cannot be reached.
 	 */
 	case PCI_EXP_TYPE_ROOT_PORT:
 	case PCI_EXP_TYPE_DOWNSTREAM:
-		if (!pci_acs_enabled(bridge,
-				     PCI_ACS_ISOLATED | PCI_ACS_DSP_MT_RR))
+		if (!pci_acs_enabled(bridge, PCI_ACS_ISOLATED))
 			return PCIE_NON_ISOLATED;
 		return PCIE_ISOLATED;
 
