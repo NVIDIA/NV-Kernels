@@ -4664,12 +4664,6 @@ static int pci_acs_ctrl_enabled(u16 acs_ctrl_req, u16 acs_ctrl_ena)
 	return 0;
 }
 
-static int pci_acs_ctrl_isolated(u16 acs_flags)
-{
-	return pci_acs_ctrl_enabled(acs_flags,
-		PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
-}
-
 /*
  * AMD has indicated that the devices below do not support peer-to-peer
  * in any system where they are found in the southbridge with an AMD
@@ -4753,7 +4747,8 @@ static int pci_quirk_cavium_acs(struct pci_dev *dev, u16 acs_flags)
 	 * hardware implements and enables equivalent ACS functionality for
 	 * these flags.
 	 */
-	return pci_acs_ctrl_isolated(acs_flags);
+	return pci_acs_ctrl_enabled(acs_flags,
+		PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
 }
 
 static int pci_quirk_xgene_acs(struct pci_dev *dev, u16 acs_flags)
@@ -4763,7 +4758,8 @@ static int pci_quirk_xgene_acs(struct pci_dev *dev, u16 acs_flags)
 	 * transactions with others, allowing masking out these bits as if they
 	 * were unimplemented in the ACS capability.
 	 */
-	return pci_acs_ctrl_isolated(acs_flags);
+	return pci_acs_ctrl_enabled(acs_flags,
+		PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
 }
 
 /*
@@ -4786,7 +4782,8 @@ static int pci_quirk_zhaoxin_pcie_ports_acs(struct pci_dev *dev, u16 acs_flags)
 	case 0x0710 ... 0x071e:
 	case 0x0721:
 	case 0x0723 ... 0x0752:
-		return pci_acs_ctrl_isolated(acs_flags);
+		return pci_acs_ctrl_enabled(acs_flags,
+			PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
 	}
 
 	return false;
@@ -4847,7 +4844,8 @@ static int pci_quirk_intel_pch_acs(struct pci_dev *dev, u16 acs_flags)
 		return -ENOTTY;
 
 	if (dev->dev_flags & PCI_DEV_FLAGS_ACS_ENABLED_QUIRK)
-		return pci_acs_ctrl_isolated(acs_flags);
+		return pci_acs_ctrl_enabled(acs_flags,
+			PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
 
 	return pci_acs_ctrl_enabled(acs_flags, 0);
 }
@@ -4864,7 +4862,8 @@ static int pci_quirk_intel_pch_acs(struct pci_dev *dev, u16 acs_flags)
  */
 static int pci_quirk_qcom_rp_acs(struct pci_dev *dev, u16 acs_flags)
 {
-	return pci_acs_ctrl_isolated(acs_flags);
+	return pci_acs_ctrl_enabled(acs_flags,
+		PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
 }
 
 /*
@@ -4875,7 +4874,8 @@ static int pci_quirk_qcom_rp_acs(struct pci_dev *dev, u16 acs_flags)
  */
 static int pci_quirk_nxp_rp_acs(struct pci_dev *dev, u16 acs_flags)
 {
-	return pci_acs_ctrl_isolated(acs_flags);
+	return pci_acs_ctrl_enabled(acs_flags,
+		PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
 }
 
 static int pci_quirk_al_acs(struct pci_dev *dev, u16 acs_flags)
@@ -5005,7 +5005,8 @@ static int pci_quirk_rciep_acs(struct pci_dev *dev, u16 acs_flags)
 	if (pci_pcie_type(dev) != PCI_EXP_TYPE_RC_END)
 		return -ENOTTY;
 
-	return pci_acs_ctrl_isolated(acs_flags);
+	return pci_acs_ctrl_enabled(acs_flags,
+		PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
 }
 
 static int pci_quirk_brcm_acs(struct pci_dev *dev, u16 acs_flags)
@@ -5016,7 +5017,8 @@ static int pci_quirk_brcm_acs(struct pci_dev *dev, u16 acs_flags)
 	 * Allow each Root Port to be in a separate IOMMU group by masking
 	 * SV/RR/CR/UF bits.
 	 */
-	return pci_acs_ctrl_isolated(acs_flags);
+	return pci_acs_ctrl_enabled(acs_flags,
+		PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
 }
 
 /*
@@ -5035,7 +5037,8 @@ static int  pci_quirk_wangxun_nic_acs(struct pci_dev *dev, u16 acs_flags)
 	case 0x1001: case 0x2001: /* SP */
 	case 0x5010: case 0x5025: case 0x5040: /* AML */
 	case 0x5110: case 0x5125: case 0x5140: /* AML */
-		return pci_acs_ctrl_isolated(acs_flags);
+		return pci_acs_ctrl_enabled(acs_flags,
+			PCI_ACS_SV | PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF);
 	}
 
 	return false;
