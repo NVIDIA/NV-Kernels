@@ -65,15 +65,7 @@ struct iommu_group {
 	struct list_head entry;
 	unsigned int owner_cnt;
 	void *owner;
-
-	/* Used by the device_group() callbacks */
-	u32 bus_data;
 };
-
-/*
- * Everything downstream of this group should share it.
- */
-#define BUS_DATA_PCI_NON_ISOLATED BIT(0)
 
 struct group_device {
 	struct list_head list;
@@ -1470,6 +1462,25 @@ static struct iommu_group *get_pci_alias_group(struct pci_dev *pdev,
 	return NULL;
 }
 
+struct group_for_pci_data {
+	struct pci_dev *pdev;
+	struct iommu_group *group;
+};
+
+/*
+ * DMA alias iterator callback, return the last seen device.  Stop and return
+ * the IOMMU group if we find one along the way.
+ */
+static int get_pci_alias_or_group(struct pci_dev *pdev, u16 alias, void *opaque)
+{
+	struct group_for_pci_data *data = opaque;
+
+	data->pdev = pdev;
+	data->group = iommu_group_get(&pdev->dev);
+
+	return data->group != NULL;
+}
+
 /*
  * Generic device_group call-back function. It just allocates one
  * iommu-group per device.
@@ -1501,27 +1512,57 @@ struct iommu_group *generic_single_device_group(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(generic_single_device_group);
 
-static struct iommu_group *pci_group_alloc_non_isolated(void)
+/*
+ * Use standard PCI bus topology, isolation features, and DMA alias quirks
+ * to find or create an IOMMU group for a device.
+ */
+struct iommu_group *pci_device_group(struct device *dev)
 {
-	struct iommu_group *group;
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct group_for_pci_data data;
+	struct pci_bus *bus;
+	struct iommu_group *group = NULL;
+	u64 devfns[4] = { 0 };
 
-	group = iommu_group_alloc();
-	if (IS_ERR(group))
-		return group;
-	group->bus_data |= BUS_DATA_PCI_NON_ISOLATED;
-	return group;
-}
+	if (WARN_ON(!dev_is_pci(dev)))
+		return ERR_PTR(-EINVAL);
 
-static struct iommu_group *pci_get_alias_group(struct pci_dev *pdev)
-{
-	struct iommu_group *group;
-	DECLARE_BITMAP(devfns, 256) = {};
+	/*
+	 * Find the upstream DMA alias for the device.  A device must not
+	 * be aliased due to topology in order to have its own IOMMU group.
+	 * If we find an alias along the way that already belongs to a
+	 * group, use it.
+	 */
+	if (pci_for_each_dma_alias(pdev, get_pci_alias_or_group, &data))
+		return data.group;
+
+	pdev = data.pdev;
+
+	/*
+	 * Continue upstream from the point of minimum IOMMU granularity
+	 * due to aliases to the point where devices are protected from
+	 * peer-to-peer DMA by PCI ACS.  Again, if we find an existing
+	 * group, use it.
+	 */
+	for (bus = pdev->bus; !pci_is_root_bus(bus); bus = bus->parent) {
+		if (!bus->self)
+			continue;
+
+		if (pci_acs_path_enabled(bus->self, NULL, PCI_ACS_ISOLATED))
+			break;
+
+		pdev = bus->self;
+
+		group = iommu_group_get(&pdev->dev);
+		if (group)
+			return group;
+	}
 
 	/*
 	 * Look for existing groups on device aliases.  If we alias another
 	 * device or another device aliases us, use the same group.
 	 */
-	group = get_pci_alias_group(pdev, devfns);
+	group = get_pci_alias_group(pdev, (unsigned long *)devfns);
 	if (group)
 		return group;
 
@@ -1530,197 +1571,12 @@ static struct iommu_group *pci_get_alias_group(struct pci_dev *pdev)
 	 * slot and aliases of those funcions, if any.  No need to clear
 	 * the search bitmap, the tested devfns are still valid.
 	 */
-	group = get_pci_function_alias_group(pdev, devfns);
+	group = get_pci_function_alias_group(pdev, (unsigned long *)devfns);
 	if (group)
 		return group;
 
-	/*
-	 * When MFD's are included in the set due to ACS we assume that if ACS
-	 * permits an internal loopback between functions it also permits the
-	 * loopback to go downstream if a function is a bridge.
-	 *
-	 * It is less clear what aliases mean when applied to a bridge. For now
-	 * be conservative and also propagate the group downstream.
-	 */
-	__clear_bit(pdev->devfn & 0xFF, devfns);
-	if (!bitmap_empty(devfns, sizeof(devfns) * BITS_PER_BYTE))
-		return pci_group_alloc_non_isolated();
-	return NULL;
-}
-
-static struct iommu_group *pci_hierarchy_group(struct pci_dev *pdev)
-{
-	/*
-	 * SRIOV functions may resid on a virtual bus, jump directly to the PFs
-	 * bus in all cases.
-	 */
-	struct pci_bus *bus = pci_physfn(pdev)->bus;
-	struct iommu_group *group;
-
-	/* Nothing upstream of this */
-	if (pci_is_root_bus(bus))
-		return NULL;
-
-	/*
-	 * !self is only for SRIOV virtual busses which should have been
-	 * excluded above.
-	 */
-	if (WARN_ON(!bus->self))
-		return ERR_PTR(-EINVAL);
-
-	group = iommu_group_get(&bus->self->dev);
-	if (!group) {
-		/*
-		 * If the upstream bridge needs the same group as pdev then
-		 * there is no way for it's pci_device_group() to discover it.
-		 */
-		dev_err(&pdev->dev,
-			"PCI device is probing out of order, upstream bridge device of %s is not probed yet\n",
-			pci_name(bus->self));
-		return ERR_PTR(-EPROBE_DEFER);
-	}
-	if (group->bus_data & BUS_DATA_PCI_NON_ISOLATED)
-		return group;
-	iommu_group_put(group);
-	return NULL;
-}
-
-/*
- * For legacy PCI we have two main considerations when forming groups:
- *
- *  1) In PCI we can loose the RID inside the fabric, or some devices will use
- *     the wrong RID. The PCI core calls this aliasing, but from an IOMMU
- *     perspective it means that a PCI device may have multiple RIDs and a
- *     single RID may represent many PCI devices. This effectively means all the
- *     aliases must share a translation, thus group, because the IOMMU cannot
- *     tell devices apart.
- *
- *  2) PCI permits a bus segment to claim an address even if the transaction
- *     originates from an end point not the CPU. When it happens it is called
- *     peer to peer. Claiming a transaction in the middle of the bus hierarchy
- *     bypasses the IOMMU translation. The IOMMU subsystem rules require these
- *     devices to be placed in the same group because they lack isolation from
- *     each other. In PCI Express the ACS system can be used to inhibit this and
- *     force transactions to go to the IOMMU.
- *
- *     From a PCI perspective any given PCI bus is either isolating or
- *     non-isolating. Isolating means downstream originated transactions always
- *     progress toward the CPU and do not go to other devices on the bus
- *     segment, while non-isolating means downstream originated transactions can
- *     progress back downstream through another device on the bus segment.
- *
- *     Beyond buses a multi-function device or bridge can also allow
- *     transactions to loop back internally from one function to another.
- *
- *     Once a PCI bus becomes non isolating the entire downstream hierarchy of
- *     that bus becomes a single group.
- */
-struct iommu_group *pci_device_group(struct device *dev)
-{
-	struct pci_dev *pdev = to_pci_dev(dev);
-	struct iommu_group *group;
-	struct pci_dev *real_pdev;
-
-	if (WARN_ON(!dev_is_pci(dev)))
-		return ERR_PTR(-EINVAL);
-
-	/*
-	 * Arches can supply a completely different PCI device that actually
-	 * does DMA.
-	 */
-	real_pdev = pci_real_dma_dev(pdev);
-	if (real_pdev != pdev) {
-		group = iommu_group_get(&real_pdev->dev);
-		if (!group) {
-			/*
-			 * The real_pdev has not had an iommu probed to it. We
-			 * can't create a new group here because there is no way
-			 * for pci_device_group(real_pdev) to pick it up.
-			 */
-			dev_err(dev,
-				"PCI device is probing out of order, real device of %s is not probed yet\n",
-				pci_name(real_pdev));
-			return ERR_PTR(-EPROBE_DEFER);
-		}
-		return group;
-	}
-
-	if (pdev->dev_flags & PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT)
-		return iommu_group_alloc();
-
-	/* Anything upstream of this enforcing non-isolated? */
-	group = pci_hierarchy_group(pdev);
-	if (group)
-		return group;
-
-	switch (pci_bus_isolated(pci_physfn(pdev)->bus)) {
-	case PCIE_ISOLATED:
-		/* Check multi-function groups and same-bus devfn aliases */
-		group = pci_get_alias_group(pdev);
-		if (group)
-			return group;
-
-		/* No shared group found, allocate new */
-		return iommu_group_alloc();
-
-	/*
-	 * On legacy PCI there is no RID at an electrical level. On PCI-X the
-	 * RID of the bridge may be used in some cases instead of the
-	 * downstream's RID. This creates aliasing problems. PCI/PCI-X doesn't
-	 * provide isolation either. The end result is that as soon as we hit a
-	 * PCI/PCI-X bus we switch to non-isolated for the whole downstream for
-	 * both aliasing and isolation reasons. The bridge has to be included in
-	 * the group because of the aliasing.
-	 */
-	case PCI_BRIDGE_NON_ISOLATED:
-	/* A PCIe switch where the USP has MMIO and is not isolated. */
-	case PCIE_NON_ISOLATED:
-		group = iommu_group_get(&pdev->bus->self->dev);
-		if (WARN_ON(!group))
-			return ERR_PTR(-EINVAL);
-		/*
-		 * No need to be concerned with aliases here since we are going
-		 * to put the entire downstream tree in the bridge/USP's group.
-		 */
-		group->bus_data |= BUS_DATA_PCI_NON_ISOLATED;
-		return group;
-
-	/*
-	 * It is a PCI bus and the upstream bridge/port does not alias or allow
-	 * P2P.
-	 */
-	case PCI_BUS_NON_ISOLATED:
-	/*
-	 * It is a PCIe switch and the DSP cannot reach the USP. The DSP's
-	 * are not isolated from each other and share a group.
-	 */
-	case PCIE_SWITCH_DSP_NON_ISOLATED: {
-		struct pci_dev *piter = NULL;
-
-		/*
-		 * All the downstream devices on the bus share a group. If this
-		 * is a PCIe switch then they will all be DSPs
-		 */
-		for_each_pci_dev(piter) {
-			if (piter->bus != pdev->bus)
-				continue;
-			group = iommu_group_get(&piter->dev);
-			if (group) {
-				pci_dev_put(piter);
-				if (WARN_ON(!(group->bus_data &
-					      BUS_DATA_PCI_NON_ISOLATED)))
-					group->bus_data |=
-						BUS_DATA_PCI_NON_ISOLATED;
-				return group;
-			}
-		}
-		return pci_group_alloc_non_isolated();
-	}
-	default:
-		break;
-	}
-	WARN_ON(true);
-	return ERR_PTR(-EINVAL);
+	/* No shared group found, allocate new */
+	return iommu_group_alloc();
 }
 EXPORT_SYMBOL_GPL(pci_device_group);
 
