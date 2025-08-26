@@ -1,0 +1,58 @@
+name: Update and Rebase
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-rebase-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Add upstream remote (if not exists)
+        run: |
+          if ! git remote | grep -q upstream; then
+            git remote add upstream https://github.com/gregkh/linux.git
+          fi
+
+      - name: Fetch upstream tags
+        run: git fetch upstream --tags
+
+      - name: Find latest stable tag for branch
+        id: latest_tag
+        run: |
+          version=$(echo ${{ github.ref_name }} | sed 's/^linux-nvidia-//')
+          tag=$(git describe --abbrev=0 --tags upstream/linux-${version}.y)
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+
+      - name: Fetch patch branch
+        run: git fetch origin ${{ github.ref_name }}
+
+      - name: Find merge base between patch branch and updated LTS
+        id: merge_base
+        run: |
+          base=$(git merge-base origin/${{ github.ref_name }} ${{ steps.latest_tag.outputs.tag }})
+          echo "base=$base" >> $GITHUB_OUTPUT
+
+      - name: Create new branch for rebased patches
+        run: |
+          git checkout -b ${{ github.ref_name }}-${{ steps.latest_tag.outputs.tag }} origin/${{ github.ref_name }}
+
+      - name: Set git user identity
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebase patch branch onto updated LTS
+        run: |
+          git rebase --onto ${{ steps.latest_tag.outputs.tag }} ${{ steps.merge_base.outputs.base }}
+
+      - name: Push rebased patch branch
+        run: |
+          git push --force origin HEAD:${{ github.ref_name }}-${{ steps.latest_tag.outputs.tag }}
