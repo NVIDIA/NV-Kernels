@@ -304,8 +304,28 @@ void unix_gc(void)
 
 #if IS_ENABLED(CONFIG_AF_UNIX_OOB)
 		if (u->oob_skb) {
-			kfree_skb(u->oob_skb);
-			u->oob_skb = NULL;
+			/* WARNING: UBUNTU 6.8 SPECIFIC IMPLEMENTATION
+			 *
+			 * This is specific to our 6.8 and its derivatives only.
+			 * Please take extra caution modifying this part.
+			 *
+			 * If Noble ever gets commit 4090fa373f0e ("af_unix: 
+			 * Replace garbage collection algorithm.") and its
+			 * prerequisites backported, this whole SAUCE section
+			 * should be modified to adhere to upstream standards.
+			 *
+			 * The Problem:
+			 *
+			 * With upstream commit ae8a1cdeada7, OOB skbs no longer
+			 * have an extra reference. The SKB is only referenced
+			 * by being in the queue, so we just clear the pointer.
+			 * The SKB will be freed when purged from the queue.
+			 *
+			 * Also note that we're doing a WRITE_ONCE as a
+			 * defensive approach since there are multiple ways to
+			 * access to ->oob_skb and they'are not homogenous.
+			 */
+			WRITE_ONCE(u->oob_skb, NULL);
 		}
 #endif
 	}
