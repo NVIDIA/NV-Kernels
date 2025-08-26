@@ -39,6 +39,7 @@ struct v3d_queue_state {
 
 	u64 fence_context;
 	u64 emit_seqno;
+	spinlock_t queue_lock;
 
 	u64 start_ns;
 	u64 enabled_ns;
@@ -134,11 +135,6 @@ struct v3d_dev {
 	struct v3d_cpu_job *cpu_job;
 
 	struct v3d_queue_state queue[V3D_MAX_QUEUES];
-
-	/* Spinlock used to synchronize the overflow memory
-	 * management against bin job submission.
-	 */
-	spinlock_t job_lock;
 
 	/* Used to track the active perfmon if any. */
 	struct v3d_perfmon *active_perfmon;
@@ -516,7 +512,7 @@ void v3d_debugfs_init(struct drm_minor *minor);
 
 /* v3d_fence.c */
 extern const struct dma_fence_ops v3d_fence_ops;
-struct dma_fence *v3d_fence_create(struct v3d_dev *v3d, enum v3d_queue queue);
+struct dma_fence *v3d_fence_create(struct v3d_dev *v3d, enum v3d_queue q);
 
 /* v3d_gem.c */
 int v3d_gem_init(struct drm_device *dev);

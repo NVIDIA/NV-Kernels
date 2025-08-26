@@ -253,10 +253,10 @@ v3d_gem_init(struct drm_device *dev)
 		v3d->queue[i].start_ns = 0;
 		v3d->queue[i].enabled_ns = 0;
 		v3d->queue[i].jobs_sent = 0;
+		spin_lock_init(&v3d->queue[i].queue_lock);
 	}
 
 	spin_lock_init(&v3d->mm_lock);
-	spin_lock_init(&v3d->job_lock);
 	ret = drmm_mutex_init(dev, &v3d->bo_lock);
 	if (ret)
 		return ret;
