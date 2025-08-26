@@ -5,6 +5,12 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'y'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'LP: #2028576: Perf governor required for NVIDIA workloads'>
+
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           policy<{'amd64': 'n'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           note<'LP: #2028576: Perf governor required for NVIDIA workloads'>
+
 CONFIG_LATENCYTOP                               policy<{'amd64': 'n', 'amd64-nvidia-lowlatency': 'y'}>
 CONFIG_LATENCYTOP                               note<'https://lists.ubuntu.com/archives/kernel-team/2014-July/045006.html, LP#1655986'>
 
