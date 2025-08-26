@@ -43,6 +43,7 @@ v3d_overflow_mem_work(struct work_struct *work)
 	struct v3d_queue_state *queue = &v3d->queue[V3D_BIN];
 	struct drm_device *dev = &v3d->drm;
 	struct v3d_bo *bo = v3d_bo_create(dev, NULL /* XXX: GMP */, 256 * 1024);
+	struct v3d_bin_job *bin_job;
 	struct drm_gem_object *obj;
 	unsigned long irqflags;
 
@@ -62,13 +63,15 @@ v3d_overflow_mem_work(struct work_struct *work)
 	 * some binner pool anyway.
 	 */
 	spin_lock_irqsave(&queue->queue_lock, irqflags);
-	if (!v3d->bin_job) {
+	bin_job = (struct v3d_bin_job *)queue->active_job;
+
+	if (!bin_job) {
 		spin_unlock_irqrestore(&queue->queue_lock, irqflags);
 		goto out;
 	}
 
 	drm_gem_object_get(obj);
-	list_add_tail(&bo->unref_head, &v3d->bin_job->render->unref_list);
+	list_add_tail(&bo->unref_head, &bin_job->render->unref_list);
 	spin_unlock_irqrestore(&queue->queue_lock, irqflags);
 
 	v3d_mmu_flush_all(v3d);
@@ -78,6 +81,28 @@ v3d_overflow_mem_work(struct work_struct *work)
 
 out:
 	drm_gem_object_put(obj);
+}
+
+static void
+v3d_irq_signal_fence(struct v3d_dev *v3d, enum v3d_queue q,
+		     void (*trace_irq)(struct drm_device *, uint64_t))
+{
+	struct v3d_queue_state *queue = &v3d->queue[q];
+	struct v3d_job *job = queue->active_job;
+	struct v3d_file_priv *file = job->file->driver_priv;
+	struct v3d_fence *fence = to_v3d_fence(job->irq_fence);
+	u64 runtime = local_clock() - file->start_ns[q];
+
+	file->jobs_sent[q]++;
+	queue->jobs_sent++;
+	file->start_ns[q] = 0;
+	queue->start_ns = 0;
+	file->enabled_ns[q] += runtime;
+	queue->enabled_ns += runtime;
+	trace_irq(&v3d->drm, fence->seqno);
+
+	queue->active_job = NULL;
+	dma_fence_signal(&fence->base);
 }
 
 static irqreturn_t
@@ -103,71 +128,17 @@ v3d_irq(int irq, void *arg)
 	}
 
 	if (intsts & V3D_INT_FLDONE) {
-		struct v3d_fence *fence =
-			to_v3d_fence(v3d->bin_job->base.irq_fence);
-		struct v3d_file_priv *file = v3d->bin_job->base.file->driver_priv;
-		u64 runtime = local_clock() - file->start_ns[V3D_BIN];
-
-		file->jobs_sent[V3D_BIN]++;
-		v3d->queue[V3D_BIN].jobs_sent++;
-
-		file->start_ns[V3D_BIN] = 0;
-		v3d->queue[V3D_BIN].start_ns = 0;
-
-		file->enabled_ns[V3D_BIN] += runtime;
-		v3d->queue[V3D_BIN].enabled_ns += runtime;
-
-		trace_v3d_bcl_irq(&v3d->drm, fence->seqno);
-
-		v3d->bin_job = NULL;
-		dma_fence_signal(&fence->base);
-
+		v3d_irq_signal_fence(v3d, V3D_BIN, trace_v3d_bcl_irq);
 		status = IRQ_HANDLED;
 	}
 
 	if (intsts & V3D_INT_FRDONE) {
-		struct v3d_fence *fence =
-			to_v3d_fence(v3d->render_job->base.irq_fence);
-		struct v3d_file_priv *file = v3d->render_job->base.file->driver_priv;
-		u64 runtime = local_clock() - file->start_ns[V3D_RENDER];
-
-		file->jobs_sent[V3D_RENDER]++;
-		v3d->queue[V3D_RENDER].jobs_sent++;
-
-		file->start_ns[V3D_RENDER] = 0;
-		v3d->queue[V3D_RENDER].start_ns = 0;
-
-		file->enabled_ns[V3D_RENDER] += runtime;
-		v3d->queue[V3D_RENDER].enabled_ns += runtime;
-
-		trace_v3d_rcl_irq(&v3d->drm, fence->seqno);
-
-		v3d->render_job = NULL;
-		dma_fence_signal(&fence->base);
-
+		v3d_irq_signal_fence(v3d, V3D_RENDER, trace_v3d_rcl_irq);
 		status = IRQ_HANDLED;
 	}
 
 	if (intsts & V3D_INT_CSDDONE(v3d->ver)) {
-		struct v3d_fence *fence =
-			to_v3d_fence(v3d->csd_job->base.irq_fence);
-		struct v3d_file_priv *file = v3d->csd_job->base.file->driver_priv;
-		u64 runtime = local_clock() - file->start_ns[V3D_CSD];
-
-		file->jobs_sent[V3D_CSD]++;
-		v3d->queue[V3D_CSD].jobs_sent++;
-
-		file->start_ns[V3D_CSD] = 0;
-		v3d->queue[V3D_CSD].start_ns = 0;
-
-		file->enabled_ns[V3D_CSD] += runtime;
-		v3d->queue[V3D_CSD].enabled_ns += runtime;
-
-		trace_v3d_csd_irq(&v3d->drm, fence->seqno);
-
-		v3d->csd_job = NULL;
-		dma_fence_signal(&fence->base);
-
+		v3d_irq_signal_fence(v3d, V3D_CSD, trace_v3d_csd_irq);
 		status = IRQ_HANDLED;
 	}
 
@@ -199,25 +170,7 @@ v3d_hub_irq(int irq, void *arg)
 	V3D_WRITE(V3D_HUB_INT_CLR, intsts);
 
 	if (intsts & V3D_HUB_INT_TFUC) {
-		struct v3d_fence *fence =
-			to_v3d_fence(v3d->tfu_job->base.irq_fence);
-		struct v3d_file_priv *file = v3d->tfu_job->base.file->driver_priv;
-		u64 runtime = local_clock() - file->start_ns[V3D_TFU];
-
-		file->jobs_sent[V3D_TFU]++;
-		v3d->queue[V3D_TFU].jobs_sent++;
-
-		file->start_ns[V3D_TFU] = 0;
-		v3d->queue[V3D_TFU].start_ns = 0;
-
-		file->enabled_ns[V3D_TFU] += runtime;
-		v3d->queue[V3D_TFU].enabled_ns += runtime;
-
-		trace_v3d_tfu_irq(&v3d->drm, fence->seqno);
-
-		v3d->tfu_job = NULL;
-		dma_fence_signal(&fence->base);
-
+		v3d_irq_signal_fence(v3d, V3D_TFU, trace_v3d_tfu_irq);
 		status = IRQ_HANDLED;
 	}
 

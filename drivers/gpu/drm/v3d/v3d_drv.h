@@ -44,6 +44,9 @@ struct v3d_queue_state {
 	u64 start_ns;
 	u64 enabled_ns;
 	u64 jobs_sent;
+
+	/* Currently active job for this queue */
+	struct v3d_job *active_job;
 };
 
 /* Performance monitor object. The perform lifetime is controlled by userspace
@@ -128,10 +131,6 @@ struct v3d_dev {
 
 	struct work_struct overflow_mem_work;
 
-	struct v3d_bin_job *bin_job;
-	struct v3d_render_job *render_job;
-	struct v3d_tfu_job *tfu_job;
-	struct v3d_csd_job *csd_job;
 	struct v3d_cpu_job *cpu_job;
 
 	struct v3d_queue_state queue[V3D_MAX_QUEUES];
