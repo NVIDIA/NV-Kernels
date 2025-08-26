@@ -97,10 +97,13 @@ CONFIG_CORESIGHT_TRBE                           policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT_TRBE                           note<'Required for Grace enablement'>
 
 CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            policy<{'arm64': 'n'}>
-CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'required for NVIDIA workloads'>
+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND            note<'LP: #2028576: Perf governor required for NVIDIA workloads'>
 
-CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'n', 'arm64': 'y'}>
-CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'required for NVIDIA workloads'>
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'LP: #2028576: Perf governor required for NVIDIA workloads'>
+
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           note<'LP: #2028576: Perf governor required for NVIDIA workloads'>
 
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
