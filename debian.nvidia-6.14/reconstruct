@@ -45,4 +45,5 @@ chmod +x 'tools/testing/selftests/gpio/gpio-aggregator.sh'
 chmod +x 'tools/testing/selftests/ublk/test_stripe_04.sh'
 # Remove any files deleted from the orig.
 rm -f 'arch/um/kernel/maccess.c'
+rm -f 'drivers/iommu/iommufd/fault.c'
 exit 0
