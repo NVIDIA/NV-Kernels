@@ -8879,6 +8879,39 @@ void md_allow_write(struct mddev *mddev)
 }
 EXPORT_SYMBOL_GPL(md_allow_write);
 
+/*
+ * If lazy recovery is requested and all rdevs are in sync, select the rdev with
+ * the higest index to perfore recovery to build initial xor data, this is the
+ * same as old bitmap.
+ */
+static bool mddev_select_lazy_recover_rdev(struct mddev *mddev)
+{
+	struct md_rdev *recover_rdev = NULL;
+	struct md_rdev *rdev;
+	bool ret = false;
+
+	rcu_read_lock();
+	rdev_for_each_rcu(rdev, mddev) {
+		if (rdev->raid_disk < 0)
+			continue;
+
+		if (test_bit(Faulty, &rdev->flags) ||
+		    !test_bit(In_sync, &rdev->flags))
+			break;
+
+		if (!recover_rdev || recover_rdev->raid_disk < rdev->raid_disk)
+			recover_rdev = rdev;
+	}
+
+	if (recover_rdev) {
+		clear_bit(In_sync, &recover_rdev->flags);
+		ret = true;
+	}
+
+	rcu_read_unlock();
+	return ret;
+}
+
 #define SYNC_MARKS	10
 #define	SYNC_MARK_STEP	(3*HZ)
 #define UPDATE_FREQUENCY (5*60*HZ)
@@ -9044,6 +9077,14 @@ void md_do_sync(struct md_thread *thread)
 			    rdev->recovery_offset < j)
 				j = rdev->recovery_offset;
 		rcu_read_unlock();
+
+		/*
+		 * If there are no spares, and raid456 lazy initial recover is
+		 * requested.
+		 */
+		if (test_bit(MD_RECOVERY_LAZY_RECOVER, &mddev->recovery) &&
+		    j == MaxSector && mddev_select_lazy_recover_rdev(mddev))
+			j = 0;
 
 		/* If there is a bitmap, we need to make sure all
 		 * writes that started before we added a spare
@@ -9465,6 +9506,7 @@ static bool md_choose_sync_action(struct mddev *mddev, int *spares)
 
 		set_bit(MD_RECOVERY_RESHAPE, &mddev->recovery);
 		clear_bit(MD_RECOVERY_RECOVER, &mddev->recovery);
+		clear_bit(MD_RECOVERY_LAZY_RECOVER, &mddev->recovery);
 		return true;
 	}
 
@@ -9473,6 +9515,7 @@ static bool md_choose_sync_action(struct mddev *mddev, int *spares)
 		remove_spares(mddev, NULL);
 		set_bit(MD_RECOVERY_SYNC, &mddev->recovery);
 		clear_bit(MD_RECOVERY_RECOVER, &mddev->recovery);
+		clear_bit(MD_RECOVERY_LAZY_RECOVER, &mddev->recovery);
 		return true;
 	}
 
@@ -9482,7 +9525,7 @@ static bool md_choose_sync_action(struct mddev *mddev, int *spares)
 	 * re-add.
 	 */
 	*spares = remove_and_add_spares(mddev, NULL);
-	if (*spares) {
+	if (*spares || test_bit(MD_RECOVERY_LAZY_RECOVER, &mddev->recovery)) {
 		clear_bit(MD_RECOVERY_SYNC, &mddev->recovery);
 		clear_bit(MD_RECOVERY_CHECK, &mddev->recovery);
 		clear_bit(MD_RECOVERY_REQUESTED, &mddev->recovery);
@@ -9695,6 +9738,7 @@ void md_check_recovery(struct mddev *mddev)
 			}
 
 			clear_bit(MD_RECOVERY_RECOVER, &mddev->recovery);
+			clear_bit(MD_RECOVERY_LAZY_RECOVER, &mddev->recovery);
 			clear_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 			clear_bit(MD_SB_CHANGE_PENDING, &mddev->sb_flags);
 
@@ -9805,6 +9849,7 @@ void md_reap_sync_thread(struct mddev *mddev)
 	clear_bit(MD_RECOVERY_RESHAPE, &mddev->recovery);
 	clear_bit(MD_RECOVERY_REQUESTED, &mddev->recovery);
 	clear_bit(MD_RECOVERY_CHECK, &mddev->recovery);
+	clear_bit(MD_RECOVERY_LAZY_RECOVER, &mddev->recovery);
 	/*
 	 * We call md_cluster_ops->update_size here because sync_size could
 	 * be changed by md_update_sb, and MD_RECOVERY_RESHAPE is cleared,

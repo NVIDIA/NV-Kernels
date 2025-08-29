@@ -557,6 +557,8 @@ enum recovery_flags {
 	MD_RECOVERY_ERROR,	/* sync-action interrupted because io-error */
 	MD_RECOVERY_WAIT,	/* waiting for pers->start() to finish */
 	MD_RESYNCING_REMOTE,	/* remote node is running resync thread */
+	/* raid456 lazy initial recover */
+	MD_RECOVERY_LAZY_RECOVER,
 };
 
 enum md_ro_state {
