@@ -128,6 +128,13 @@ static void primelockdep(struct xe_guc_ct *ct)
 	fs_reclaim_release(GFP_KERNEL);
 }
 
+static void guc_action_disable_ct(void *arg)
+{
+	struct xe_guc_ct *ct = arg;
+
+	xe_guc_ct_disable(ct);
+}
+
 int xe_guc_ct_init(struct xe_guc_ct *ct)
 {
 	struct xe_device *xe = ct_to_xe(ct);
@@ -159,7 +166,7 @@ int xe_guc_ct_init(struct xe_guc_ct *ct)
 	if (err)
 		return err;
 
-	return 0;
+	return devm_add_action_or_reset(xe->drm.dev, guc_action_disable_ct, ct);
 }
 
 #define desc_read(xe_, guc_ctb__, field_)			\
