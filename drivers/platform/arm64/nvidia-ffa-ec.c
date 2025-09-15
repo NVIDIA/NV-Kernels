@@ -617,7 +617,7 @@ static int nvidia_ffa_ec_service_probe(struct ffa_device *ffa_dev)
 		return -ENODEV;
 	}
 
-	nvidia_ec_ffa_dev = devm_kmalloc(&ffa_dev->dev,
+	nvidia_ec_ffa_dev = devm_kzalloc(&ffa_dev->dev,
 					 sizeof(*nvidia_ec_ffa_dev),
 					 GFP_KERNEL);
 	if (!nvidia_ec_ffa_dev) {
