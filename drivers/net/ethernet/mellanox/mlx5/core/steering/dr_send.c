@@ -1088,7 +1088,6 @@ static struct mlx5dr_cq *dr_create_cq(struct mlx5_core_dev *mdev,
 	cq->mcq.arm_db = cq->wq_ctrl.db.db + 1;
 	*cq->mcq.set_ci_db = 0;
 	cq->mcq.vector = 0;
-	cq->mcq.uar = uar;
 	cq->mdev = mdev;
 
 	inlen = MLX5_ST_SZ_BYTES(create_cq_in) +
