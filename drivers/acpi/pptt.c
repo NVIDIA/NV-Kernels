@@ -21,6 +21,15 @@
 #include <linux/cacheinfo.h>
 #include <acpi/processor.h>
 
+#define for_each_acpi_pptt_entry(table, entry)				\
+	for ((entry = ACPI_ADD_PTR(struct acpi_subtable_header, table,	\
+				  sizeof(struct acpi_table_pptt)));       \
+	     ((unsigned long)entry + sizeof(struct acpi_subtable_header)) \
+	     <= ((unsigned long)table + table->length);                   \
+	     (entry = ACPI_ADD_PTR(struct acpi_subtable_header, entry,    \
+				  (entry)->length)))
+
+
 static struct acpi_subtable_header *fetch_pptt_subtable(struct acpi_table_header *table_hdr,
 							u32 pptt_ref)
 {
@@ -221,22 +230,16 @@ static int acpi_pptt_leaf_node(struct acpi_table_header *table_hdr,
 			       struct acpi_pptt_processor *node)
 {
 	struct acpi_subtable_header *entry;
-	unsigned long table_end;
 	u32 node_entry;
 	struct acpi_pptt_processor *cpu_node;
-	u32 proc_sz;
 
 	if (table_hdr->revision > 1)
 		return (node->flags & ACPI_PPTT_ACPI_LEAF_NODE);
 
-	table_end = (unsigned long)table_hdr + table_hdr->length;
 	node_entry = ACPI_PTR_DIFF(node, table_hdr);
-	entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
-			     sizeof(struct acpi_table_pptt));
-	proc_sz = sizeof(struct acpi_pptt_processor);
 
 	/* ignore subtable types that are smaller than a processor node */
-	while ((unsigned long)entry + proc_sz <= table_end) {
+	for_each_acpi_pptt_entry(table_hdr, entry) {
 		cpu_node = (struct acpi_pptt_processor *)entry;
 
 		if (entry->type == ACPI_PPTT_TYPE_PROCESSOR &&
@@ -244,9 +247,6 @@ static int acpi_pptt_leaf_node(struct acpi_table_header *table_hdr,
 			return 0;
 		if (entry->length == 0)
 			return 0;
-
-		entry = ACPI_ADD_PTR(struct acpi_subtable_header, entry,
-				     entry->length);
 	}
 	return 1;
 }
@@ -274,12 +274,10 @@ static struct acpi_pptt_processor *acpi_find_processor_node(struct acpi_table_he
 	u32 proc_sz;
 
 	table_end = (unsigned long)table_hdr + table_hdr->length;
-	entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
-			     sizeof(struct acpi_table_pptt));
 	proc_sz = sizeof(struct acpi_pptt_processor);
 
 	/* find the processor structure associated with this cpuid */
-	while ((unsigned long)entry + proc_sz <= table_end) {
+	for_each_acpi_pptt_entry(table_hdr, entry) {
 		cpu_node = (struct acpi_pptt_processor *)entry;
 
 		if (entry->length == 0) {
@@ -294,9 +292,6 @@ static struct acpi_pptt_processor *acpi_find_processor_node(struct acpi_table_he
 		     acpi_pptt_leaf_node(table_hdr, cpu_node)) {
 			return (struct acpi_pptt_processor *)entry;
 		}
-
-		entry = ACPI_ADD_PTR(struct acpi_subtable_header, entry,
-				     entry->length);
 	}
 
 	return NULL;
@@ -894,8 +889,6 @@ void acpi_pptt_get_cpus_from_container(u32 acpi_cpu_id, cpumask_t *cpus)
 {
 	struct acpi_table_header *table_hdr;
 	struct acpi_subtable_header *entry;
-	unsigned long table_end;
-	u32 proc_sz;
 
 	cpumask_clear(cpus);
 
@@ -903,12 +896,7 @@ void acpi_pptt_get_cpus_from_container(u32 acpi_cpu_id, cpumask_t *cpus)
 	if (!table_hdr)
 		return;
 
-	table_end = (unsigned long)table_hdr + table_hdr->length;
-	entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
-			     sizeof(struct acpi_table_pptt));
-	proc_sz = sizeof(struct acpi_pptt_processor);
-	while ((unsigned long)entry + proc_sz <= table_end) {
-
+	for_each_acpi_pptt_entry(table_hdr, entry) {
 		if (entry->type == ACPI_PPTT_TYPE_PROCESSOR) {
 			struct acpi_pptt_processor *cpu_node;
 
@@ -920,8 +908,6 @@ void acpi_pptt_get_cpus_from_container(u32 acpi_cpu_id, cpumask_t *cpus)
 					break;
 			}
 		}
-		entry = ACPI_ADD_PTR(struct acpi_subtable_header, entry,
-				     entry->length);
 	}
 }
 
