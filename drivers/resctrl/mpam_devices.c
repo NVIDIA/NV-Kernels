@@ -1113,7 +1113,7 @@ static void __ris_msmon_read(void *arg)
 
 static int _msmon_read(struct mpam_component *comp, struct mon_read *arg)
 {
-	int err;
+	int err,  any_err = 0;
 	struct mpam_vmsc *vmsc;
 
 	guard(srcu)(&mpam_srcu);
@@ -1131,12 +1131,18 @@ static int _msmon_read(struct mpam_component *comp, struct mon_read *arg)
 						    true);
 			if (!err && arg->err)
 				err = arg->err;
+
+			/*
+			 * Save one error to be returned to the caller, but
+			 * keep reading counters so that get reprogrammed. On
+			 * platforms with NRDY this lets us wait once.
+			 */
 			if (err)
-				return err;
+				any_err = err;
 		}
 	}
 
-	return 0;
+	return any_err;
 }
 
 int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
