@@ -43,6 +43,25 @@
 #define RHI_DA_VDEV_CONTINUE		SMC_RHI_CALL(0x0051)
 #define RHI_DA_VDEV_GET_INTERFACE_REPORT SMC_RHI_CALL(0x0052)
 
+#define RHI_VDEV_MEASURE_SIGNED		BIT(0)
+#define RHI_VDEV_MEASURE_RAW		BIT(1)
+#define RHI_VDEV_MEASURE_EXCHANGE	BIT(2)
+struct rhi_vdev_measurement_params {
+	union {
+		u64 flags;
+		u8 padding0[256];
+	};
+	union {
+		u8 indices[32];
+		u8 padding1[256];
+	};
+	union {
+		u8 nonce[32];
+		u8 padding2[256];
+	};
+};
+#define RHI_DA_VDEV_GET_MEASUREMENTS	SMC_RHI_CALL(0x0053)
+
 enum rhi_tdi_state {
 	RHI_DA_TDI_CONFIG_UNLOCKED,
 	RHI_DA_TDI_CONFIG_LOCKED,
