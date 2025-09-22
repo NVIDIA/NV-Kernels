@@ -61,7 +61,6 @@
 #include <linux/pagewalk.h>
 #include <linux/shmem_fs.h>
 #include <linux/sysctl.h>
-#include <linux/pfn_t.h>
 #include "swap.h"
 #include "internal.h"
 #include "ras/ras_event.h"
@@ -473,7 +472,7 @@ static void __add_to_kill(struct task_struct *tsk, const struct page *p,
 	}
 
 	/* Check for pgoff not backed by struct page */
-	if (!(pfn_valid(pgoff)) && (vma->vm_flags | PFN_MAP)) {
+	if (!(pfn_valid(pgoff)) && (vma->vm_flags & VM_PFNMAP)) {
 		tk->addr = vma_address(vma, pgoff, 1);
 		tk->size_shift = PAGE_SHIFT;
 	} else {
