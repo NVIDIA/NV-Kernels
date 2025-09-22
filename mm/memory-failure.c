@@ -473,7 +473,7 @@ static void __add_to_kill(struct task_struct *tsk, const struct page *p,
 	}
 
 	/* Check for pgoff not backed by struct page */
-	if (!(pfn_valid(pgoff)) && (vma->vm_flags | PFN_MAP)) {
+	if (!(pfn_valid(pgoff)) && (vma->vm_flags & VM_PFNMAP)) {
 		tk->addr = vma_address(vma, pgoff, 1);
 		tk->size_shift = PAGE_SHIFT;
 	} else {
