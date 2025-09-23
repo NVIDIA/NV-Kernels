@@ -33,7 +33,10 @@
 #include <linux/workqueue.h>
 #include <linux/xarray.h>
 
+#include <acpi/pcc.h>
+
 #include "mpam_internal.h"
+#include "mpam_fb.h"
 
 /* Values for the T241 errata workaround */
 #define T241_CHIPS_MAX			4
@@ -159,6 +162,16 @@ static u32 __mpam_read_reg(struct mpam_msc *msc, u16 reg)
 {
 	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
 
+	if (msc->iface == MPAM_IFACE_SCMI) {
+		u32 ret;
+
+		mpam_fb_send_read_request(&msc->mpam_fb_chan,
+					  msc->mpam_fb_msc_id, reg, &ret);
+		return ret;
+	}
+
+	WARN_ON_ONCE(reg + sizeof(u32) > msc->mapped_hwpage_sz);
+
 	return readl_relaxed(msc->mapped_hwpage + reg);
 }
 
@@ -172,10 +185,15 @@ static inline u32 _mpam_read_partsel_reg(struct mpam_msc *msc, u16 reg)
 
 static void __mpam_write_reg(struct mpam_msc *msc, u16 reg, u32 val)
 {
-	WARN_ON_ONCE(reg + sizeof(u32) >= msc->mapped_hwpage_sz);
 	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
 
-	writel_relaxed(val, msc->mapped_hwpage + reg);
+	if (msc->iface == MPAM_IFACE_SCMI) {
+		mpam_fb_send_write_request(&msc->mpam_fb_chan,
+					   msc->mpam_fb_msc_id, reg, val);
+	} else {
+		WARN_ON_ONCE(reg + sizeof(u32) >= msc->mapped_hwpage_sz);
+		writel_relaxed(val, msc->mapped_hwpage + reg);
+	}
 }
 
 static inline void _mpam_write_partsel_reg(struct mpam_msc *msc, u16 reg, u32 val)
@@ -2246,6 +2264,11 @@ static void mpam_msc_destroy(struct mpam_msc *msc)
 	add_to_garbage(msc);
 }
 
+static void mpam_pcc_rx_callback(struct mbox_client *cl, void *msg)
+{
+	/* TODO: wake up tasks blocked on this MSC's PCC channel */
+}
+
 static void mpam_msc_drv_remove(struct platform_device *pdev)
 {
 	struct mpam_msc *msc = platform_get_drvdata(pdev);
@@ -2263,9 +2286,9 @@ static void mpam_msc_drv_remove(struct platform_device *pdev)
 static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 {
 	int err;
-	u32 tmp;
 	char name[20];
 	struct mpam_msc *msc;
+	struct of_phandle_args of_args;
 	struct device *dev = &pdev->dev;
 
 	lockdep_assert_held(&mpam_list_lock);
@@ -2297,10 +2320,16 @@ static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 	if (err)
 		return ERR_PTR(err);
 
-	if (device_property_read_u32(&pdev->dev, "pcc-channel", &tmp))
-		msc->iface = MPAM_IFACE_MMIO;
-	else
+	if (!device_property_read_u32(&pdev->dev, "pcc-channel",
+				      &msc->pcc_subspace_id)) {
 		msc->iface = MPAM_IFACE_PCC;
+	} else if (!of_parse_phandle_with_fixed_args(pdev->dev.of_node,
+						     "mpam-fb", 1, 0,
+						     &of_args)) {
+		msc->iface = MPAM_IFACE_SCMI;
+	} else {
+		msc->iface = MPAM_IFACE_MMIO;
+	}
 
 	if (msc->iface == MPAM_IFACE_MMIO) {
 		void __iomem *io;
@@ -2314,6 +2343,29 @@ static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 		}
 		msc->mapped_hwpage_sz = msc_res->end - msc_res->start;
 		msc->mapped_hwpage = io;
+	} else if (msc->iface == MPAM_IFACE_PCC) {
+		msc->pcc_cl.dev = &pdev->dev;
+		msc->pcc_cl.rx_callback = mpam_pcc_rx_callback;
+		msc->pcc_cl.tx_block = false;
+		msc->pcc_cl.tx_tout = 1000; /* 1s */
+		msc->pcc_cl.knows_txdone = false;
+
+		msc->pcc_chan = pcc_mbox_request_channel(&msc->pcc_cl,
+							 msc->pcc_subspace_id);
+		if (IS_ERR(msc->pcc_chan)) {
+			pr_err("Failed to request MSC PCC channel\n");
+			return (void *)msc->pcc_chan;
+		}
+	} else if (msc->iface == MPAM_IFACE_SCMI) {
+		err = mpam_fb_connect_channel(of_args.np,
+					      &msc->mpam_fb_chan);
+		if (err < 0)
+			return ERR_PTR(err);
+
+		if (of_args.args_count > 0)
+			msc->mpam_fb_msc_id = of_args.args[0];
+		else
+			msc->mpam_fb_msc_id = 0;
 	}
 
 	list_add_rcu(&msc->all_msc_list, &mpam_all_msc);
