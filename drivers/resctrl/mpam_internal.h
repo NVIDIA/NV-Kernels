@@ -12,6 +12,7 @@
 #include <linux/io.h>
 #include <linux/jump_label.h>
 #include <linux/llist.h>
+#include <linux/mailbox_client.h>
 #include <linux/mutex.h>
 #include <linux/resctrl.h>
 #include <linux/spinlock.h>
@@ -19,6 +20,8 @@
 #include <linux/types.h>
 
 #include <asm/mpam.h>
+
+#include "mpam_fb.h"
 
 #define MPAM_MSC_MAX_NUM_RIS	16
 
@@ -75,6 +78,11 @@ struct mpam_msc {
 
 	/* Not modified after mpam_is_enabled() becomes true */
 	enum mpam_msc_iface	iface;
+	u32			pcc_subspace_id;
+	struct mbox_client	pcc_cl;
+	struct pcc_mbox_chan	*pcc_chan;
+	struct mpam_fb_channel	mpam_fb_chan;
+	int			mpam_fb_msc_id;	/* in its own name space */
 	u32			nrdy_usec;
 	u64			nrdy_retry_count;
 	cpumask_t		accessibility;
