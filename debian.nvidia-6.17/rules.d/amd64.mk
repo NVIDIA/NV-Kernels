@@ -1,0 +1,25 @@
+build_arch	= x86
+defconfig	= defconfig
+flavours	= nvidia
+build_image	= bzImage
+kernel_file	= arch/$(build_arch)/boot/bzImage
+install_file	= vmlinuz
+vdso		= vdso_install
+no_dumpfile	= true
+uefi_signed     = true
+do_tools_usbip  = true
+do_tools_cpupower = true
+do_tools_perf   = true
+do_tools_perf_jvmti = true
+do_tools_perf_python = true
+do_tools_bpftool = true
+do_tools_x86	= true
+do_tools_rtla = true
+do_extras_package = false
+do_tools_acpidbg = true
+
+do_lib_rust             = true
+gcc                     = gcc-13
+rustc                   = rustc-1.80
+rustfmt                 = /usr/lib/rust-1.80/bin/rustfmt
+bindgen                 = bindgen-0.65
