@@ -40,7 +40,9 @@
  * cares about its entry, so it's OK if another processor is modifying its
  * entry.
  */
-struct cpu_task cpu_tasks[NR_CPUS] = { [0 ... NR_CPUS - 1] = { -1, NULL } };
+struct cpu_task cpu_tasks[NR_CPUS] = {
+	[0 ... NR_CPUS - 1] = { -1, &init_task },
+};
 
 static inline int external_pid(void)
 {
