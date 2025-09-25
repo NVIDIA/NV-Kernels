@@ -27,4 +27,6 @@ void iommu_device_unregister_bus(struct iommu_device *iommu,
 				 struct bus_type *bus,
 				 struct notifier_block *nb);
 
+int iommu_mock_device_add(struct device *dev, struct iommu_device *iommu);
+
 #endif /* __LINUX_IOMMU_PRIV_H */
