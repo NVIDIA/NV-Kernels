@@ -7120,10 +7120,10 @@ CONFIG_INTERCONNECT_MTK_MT8183                  policy<{'arm64': 'm', 'armhf': '
 CONFIG_INTERCONNECT_MTK_MT8195                  policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_MTK_MT8196                  policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM                        policy<{'arm64': 'y', 'armhf': 'y'}>
-CONFIG_INTERCONNECT_QCOM_BCM_VOTER              policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_INTERCONNECT_QCOM_BCM_VOTER              policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_INTERCONNECT_QCOM_GLYMUR                 policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_KAANAPALI              policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_INTERCONNECT_QCOM_MILOS                  policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_INTERCONNECT_QCOM_MILOS                  policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_INTERCONNECT_QCOM_MSM8909                policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_MSM8916                policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_MSM8937                policy<{'arm64': 'm', 'armhf': 'm'}>
@@ -7138,14 +7138,14 @@ CONFIG_INTERCONNECT_QCOM_QCS404                 policy<{'arm64': 'm', 'armhf': '
 CONFIG_INTERCONNECT_QCOM_QCS615                 policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_QCS8300                policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_QDU1000                policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_INTERCONNECT_QCOM_RPMH                   policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_INTERCONNECT_QCOM_RPMH                   policy<{'arm64': 'y', 'armhf': 'y'}>
 CONFIG_INTERCONNECT_QCOM_RPMH_POSSIBLE          policy<{'arm64': 'y', 'armhf': 'y'}>
-CONFIG_INTERCONNECT_QCOM_SA8775P                policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_INTERCONNECT_QCOM_SA8775P                policy<{'arm64': 'y', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_SAR2130P               policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_INTERCONNECT_QCOM_SC7180                 policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_INTERCONNECT_QCOM_SC7280                 policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_INTERCONNECT_QCOM_SC8180X                policy<{'arm64': 'm', 'armhf': 'm'}>
-CONFIG_INTERCONNECT_QCOM_SC8280XP               policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_INTERCONNECT_QCOM_SC7180                 policy<{'arm64': 'y', 'armhf': 'm'}>
+CONFIG_INTERCONNECT_QCOM_SC7280                 policy<{'arm64': 'y', 'armhf': 'm'}>
+CONFIG_INTERCONNECT_QCOM_SC8180X                policy<{'arm64': 'y', 'armhf': 'm'}>
+CONFIG_INTERCONNECT_QCOM_SC8280XP               policy<{'arm64': 'y', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_SDM660                 policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_SDM670                 policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_SDM845                 policy<{'arm64': 'm', 'armhf': 'm'}>
@@ -10791,14 +10791,14 @@ CONFIG_PINCTRL_S32G2                            policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_S500                             policy<{'armhf': 'y'}>
 CONFIG_PINCTRL_S700                             policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_S900                             policy<{'arm64': 'y'}>
-CONFIG_PINCTRL_SA8775P                          policy<{'arm64': 'm'}>
+CONFIG_PINCTRL_SA8775P                          policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_SAMSUNG                          policy<{'armhf': 'y'}>
 CONFIG_PINCTRL_SAR2130P                         policy<{'arm64': 'm'}>
-CONFIG_PINCTRL_SC7180                           policy<{'arm64': 'm'}>
-CONFIG_PINCTRL_SC7280                           policy<{'arm64': 'm'}>
+CONFIG_PINCTRL_SC7180                           policy<{'arm64': 'y'}>
+CONFIG_PINCTRL_SC7280                           policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_SC7280_LPASS_LPI                 policy<{'arm64': 'm'}>
-CONFIG_PINCTRL_SC8180X                          policy<{'arm64': 'm'}>
-CONFIG_PINCTRL_SC8280XP                         policy<{'arm64': 'm'}>
+CONFIG_PINCTRL_SC8180X                          policy<{'arm64': 'y'}>
+CONFIG_PINCTRL_SC8280XP                         policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_SC8280XP_LPASS_LPI               policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SCMI                             policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_PINCTRL_SDM660                           policy<{'arm64': 'm'}>
@@ -12382,7 +12382,7 @@ CONFIG_SATA_VITESSE                             policy<{'amd64': 'm', 'arm64': '
 CONFIG_SATA_ZPODD                               policy<{'amd64': 'y', 'arm64': 'y', 'riscv64': 'y'}>
 CONFIG_SA_CAMCC_8775P                           policy<{'arm64': 'm'}>
 CONFIG_SA_DISPCC_8775P                          policy<{'arm64': 'm'}>
-CONFIG_SA_GCC_8775P                             policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_SA_GCC_8775P                             policy<{'arm64': 'y', 'armhf': 'm'}>
 CONFIG_SA_GPUCC_8775P                           policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_SA_VIDEOCC_8775P                         policy<{'arm64': 'm'}>
 CONFIG_SBC_EPX_C3_WATCHDOG                      policy<{'amd64': 'm'}>
@@ -12547,10 +12547,10 @@ CONFIG_SC_CAMCC_8280XP                          policy<{'arm64': 'm', 'armhf': '
 CONFIG_SC_DISPCC_7180                           policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_DISPCC_7280                           policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_DISPCC_8280XP                         policy<{'arm64': 'm', 'armhf': '-'}>
-CONFIG_SC_GCC_7180                              policy<{'arm64': 'm', 'armhf': '-'}>
+CONFIG_SC_GCC_7180                              policy<{'arm64': 'y', 'armhf': '-'}>
 CONFIG_SC_GCC_7280                              policy<{'arm64': 'y', 'armhf': '-'}>
-CONFIG_SC_GCC_8180X                             policy<{'arm64': 'm', 'armhf': '-'}>
-CONFIG_SC_GCC_8280XP                            policy<{'arm64': 'm', 'armhf': '-'}>
+CONFIG_SC_GCC_8180X                             policy<{'arm64': 'y', 'armhf': '-'}>
+CONFIG_SC_GCC_8280XP                            policy<{'arm64': 'y', 'armhf': '-'}>
 CONFIG_SC_GPUCC_7180                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_GPUCC_7280                            policy<{'arm64': 'm', 'armhf': '-'}>
 CONFIG_SC_GPUCC_8280XP                          policy<{'arm64': 'm', 'armhf': '-'}>
