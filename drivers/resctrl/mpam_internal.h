@@ -123,16 +123,20 @@ struct mpam_msc {
 	/*
 	 * mon_sel_lock protects access to the MSC hardware registers that are
 	 * affected by MPAMCFG_MON_SEL, and the mbwu_state.
-	 * Access to mon_sel is needed from both process and interrupt contexts,
-	 * but is complicated by firmware-backed platforms that can't make any
-	 * access unless they can sleep.
-	 * Always use the mpam_mon_sel_lock() helpers.
-	 * Accesses to mon_sel need to be able to fail if they occur in the wrong
-	 * context.
+	 * Both the 'inner' and 'outer' must be taken.
+	 * For real MMIO MSC, the outer lock is unnecessary - but keeps the
+	 * code common with:
+	 * Firmware backed MSC need to sleep when accessing the MSC, which
+	 * means some code-paths will always fail. For these MSC the outer
+	 * lock is providing the protection, and the inner lock fails to
+	 * be taken if the task is unable to sleep.
+	 *
 	 * If needed, take msc->probe_lock first.
 	 */
-	raw_spinlock_t		_mon_sel_lock;
-	unsigned long		_mon_sel_flags;
+	struct mutex		outer_mon_sel_lock;
+	bool			outer_lock_held;
+	raw_spinlock_t		inner_mon_sel_lock;
+	unsigned long		inner_mon_sel_flags;
 
 	void __iomem		*mapped_hwpage;
 	size_t			mapped_hwpage_sz;
@@ -145,28 +149,56 @@ struct mpam_msc {
 	struct mpam_garbage	garbage;
 };
 
-/* Returning false here means accesses to mon_sel must fail and report an error. */
-static inline bool __must_check mpam_mon_sel_lock(struct mpam_msc *msc)
+static inline bool __must_check mpam_mon_sel_inner_lock(struct mpam_msc *msc)
 {
-	WARN_ON_ONCE(msc->iface != MPAM_IFACE_MMIO);
+	/*
+	 * The outer lock may be taken by a CPU that then issues an IPI to run
+	 * a helper that takes the inner lock. lockdep can't help us here.
+	 */
+	WARN_ON_ONCE(!READ_ONCE(msc->outer_lock_held));
 
-	raw_spin_lock_irqsave(&msc->_mon_sel_lock, msc->_mon_sel_flags);
-	return true;
+	if (msc->iface == MPAM_IFACE_MMIO) {
+		raw_spin_lock_irqsave(&msc->inner_mon_sel_lock, msc->inner_mon_sel_flags);
+		return true;
+	}
+
+	/* Accesses must fail if we are not pre-emptible */
+	return !!preemptible();
 }
 
-static inline void mpam_mon_sel_unlock(struct mpam_msc *msc)
+static inline void mpam_mon_sel_inner_unlock(struct mpam_msc *msc)
 {
-	raw_spin_unlock_irqrestore(&msc->_mon_sel_lock, msc->_mon_sel_flags);
+	WARN_ON_ONCE(!READ_ONCE(msc->outer_lock_held));
+
+	if (msc->iface == MPAM_IFACE_MMIO)
+		raw_spin_unlock_irqrestore(&msc->inner_mon_sel_lock, msc->inner_mon_sel_flags);
+}
+
+static inline void mpam_mon_sel_outer_lock(struct mpam_msc *msc)
+{
+	mutex_lock(&msc->outer_mon_sel_lock);
+	msc->outer_lock_held = true;
+}
+
+static inline void mpam_mon_sel_outer_unlock(struct mpam_msc *msc)
+{
+	msc->outer_lock_held = false;
+	mutex_unlock(&msc->outer_mon_sel_lock);
 }
 
 static inline void mpam_mon_sel_lock_held(struct mpam_msc *msc)
 {
-	lockdep_assert_held_once(&msc->_mon_sel_lock);
+	WARN_ON_ONCE(!READ_ONCE(msc->outer_lock_held));
+	if (msc->iface == MPAM_IFACE_MMIO)
+		lockdep_assert_held_once(&msc->inner_mon_sel_lock);
+	else
+		lockdep_assert_preemption_enabled();
 }
 
 static inline void mpam_mon_sel_lock_init(struct mpam_msc *msc)
 {
-	raw_spin_lock_init(&msc->_mon_sel_lock);
+	raw_spin_lock_init(&msc->inner_mon_sel_lock);
+	mutex_init(&msc->outer_mon_sel_lock);
 }
 
 /* Bits for mpam features bitmaps */
