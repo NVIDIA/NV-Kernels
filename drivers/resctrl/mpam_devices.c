@@ -750,7 +750,7 @@ static bool mpam_ris_hw_probe_csu_nrdy(struct mpam_msc_ris *ris)
 	bool can_set, can_clear;
 	struct mpam_msc *msc = ris->vmsc->msc;
 
-	if (WARN_ON_ONCE(!mpam_mon_sel_lock(msc)))
+	if (WARN_ON_ONCE(!mpam_mon_sel_inner_lock(msc)))
 		return false;
 
 	mon_sel = FIELD_PREP(MSMON_CFG_MON_SEL_MON_SEL, 0) |
@@ -774,7 +774,7 @@ static bool mpam_ris_hw_probe_csu_nrdy(struct mpam_msc_ris *ris)
 	mpam_write_monsel_reg(msc, CFG_CSU_FLT, 0x1);
 	now = _mpam_read_monsel_reg(msc, MSMON_CSU);
 	can_clear = !(now & MSMON___NRDY);
-	mpam_mon_sel_unlock(msc);
+	mpam_mon_sel_inner_unlock(msc);
 
 	return (!can_set || !can_clear);
 }
@@ -895,7 +895,9 @@ static void mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 					mpam_set_feature(mpam_feat_msmon_csu_xcl, props);
 
 				/* Is NRDY hardware managed? */
+				mpam_mon_sel_outer_lock(msc);
 				hw_managed = mpam_ris_hw_probe_csu_nrdy(ris);
+				mpam_mon_sel_outer_unlock(msc);
 
 				/*
 				 * Accept the missing firmware property if NRDY appears
@@ -1210,7 +1212,7 @@ static void __ris_msmon_read(void *arg)
 	struct mpam_msc *msc = m->ris->vmsc->msc;
 	u32 mon_sel, ctl_val, flt_val, cur_ctl, cur_flt;
 
-	if (!mpam_mon_sel_lock(msc)) {
+	if (!mpam_mon_sel_inner_lock(msc)) {
 		m->err = -EIO;
 		return;
 	}
@@ -1307,7 +1309,7 @@ static void __ris_msmon_read(void *arg)
 	default:
 		m->err = -EINVAL;
 	}
-	mpam_mon_sel_unlock(msc);
+	mpam_mon_sel_inner_unlock(msc);
 
 	if (nrdy) {
 		msc->nrdy_retry_count++;
@@ -1331,6 +1333,7 @@ static int _msmon_read(struct mpam_component *comp, struct mon_read *arg)
 		struct mpam_msc *msc = vmsc->msc;
 		struct mpam_msc_ris *ris;
 
+		mpam_mon_sel_outer_lock(msc);
 		list_for_each_entry_srcu(ris, &vmsc->ris, vmsc_list,
 					 srcu_read_lock_held(&mpam_srcu)) {
 			arg->ris = ris;
@@ -1349,6 +1352,7 @@ static int _msmon_read(struct mpam_component *comp, struct mon_read *arg)
 			if (err)
 				any_err = err;
 		}
+		mpam_mon_sel_outer_unlock(msc);
 	}
 
 	return any_err;
@@ -1431,18 +1435,20 @@ void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx)
 			continue;
 
 		msc = vmsc->msc;
+		mpam_mon_sel_outer_lock(msc);
 		list_for_each_entry_srcu(ris, &vmsc->ris, vmsc_list,
 					 srcu_read_lock_held(&mpam_srcu)) {
 			if (!mpam_has_feature(mpam_feat_msmon_mbwu, &ris->props))
 				continue;
 
-			if (WARN_ON_ONCE(!mpam_mon_sel_lock(msc)))
+			if (WARN_ON_ONCE(!mpam_mon_sel_inner_lock(msc)))
 				continue;
 
 			ris->mbwu_state[ctx->mon].correction = 0;
 			ris->mbwu_state[ctx->mon].reset_on_next_read = true;
-			mpam_mon_sel_unlock(msc);
+			mpam_mon_sel_inner_unlock(msc);
 		}
+		mpam_mon_sel_outer_unlock(msc);
 	}
 }
 
@@ -1643,7 +1649,10 @@ static int mpam_restore_mbwu_state(void *_ris)
 	u64 val;
 	struct mon_read mwbu_arg;
 	struct mpam_msc_ris *ris = _ris;
+	struct mpam_msc *msc = ris->vmsc->msc;
 	struct mpam_class *class = ris->vmsc->comp->class;
+
+	mpam_mon_sel_outer_lock(msc);
 
 	for (i = 0; i < ris->props.num_mbwu_mon; i++) {
 		if (ris->mbwu_state[i].enabled) {
@@ -1656,10 +1665,12 @@ static int mpam_restore_mbwu_state(void *_ris)
 		}
 	}
 
+	mpam_mon_sel_outer_unlock(msc);
+
 	return 0;
 }
 
-/* Call with MSC cfg_lock held */
+/* Call with MSC lock and outer mon_sel lock held */
 static int mpam_save_mbwu_state(void *arg)
 {
 	int i;
@@ -1674,7 +1685,7 @@ static int mpam_save_mbwu_state(void *arg)
 		mbwu_state = &ris->mbwu_state[i];
 		cfg = &mbwu_state->cfg;
 
-		if (WARN_ON_ONCE(!mpam_mon_sel_lock(msc)))
+		if (WARN_ON_ONCE(!mpam_mon_sel_inner_lock(msc)))
 			return -EIO;
 
 		mon_sel = FIELD_PREP(MSMON_CFG_MON_SEL_MON_SEL, i) |
@@ -1699,7 +1710,7 @@ static int mpam_save_mbwu_state(void *arg)
 		cfg->partid = FIELD_GET(MSMON_CFG_x_FLT_PARTID, cur_flt);
 		mbwu_state->correction += val;
 		mbwu_state->enabled = FIELD_GET(MSMON_CFG_x_CTL_EN, cur_ctl);
-		mpam_mon_sel_unlock(msc);
+		mpam_mon_sel_inner_unlock(msc);
 	}
 
 	return 0;
@@ -1894,6 +1905,7 @@ static int mpam_cpu_offline(unsigned int cpu)
 			struct mpam_msc_ris *ris;
 
 			mutex_lock(&msc->cfg_lock);
+			mpam_mon_sel_outer_lock(msc);
 			list_for_each_entry_srcu(ris, &msc->ris, msc_list,
 						 srcu_read_lock_held(&mpam_srcu)) {
 				mpam_touch_msc(msc, &mpam_reset_ris, ris);
@@ -1907,6 +1919,7 @@ static int mpam_cpu_offline(unsigned int cpu)
 				if (mpam_is_enabled())
 					mpam_touch_msc(msc, &mpam_save_mbwu_state, ris);
 			}
+			mpam_mon_sel_outer_unlock(msc);
 			mutex_unlock(&msc->cfg_lock);
 		}
 	}
@@ -2608,11 +2621,13 @@ static void __destroy_component_cfg(struct mpam_component *comp)
 	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
 		msc = vmsc->msc;
 
-		if (mpam_mon_sel_lock(msc)) {
+		mpam_mon_sel_outer_lock(msc);
+		if (mpam_mon_sel_inner_lock(msc)) {
 			list_for_each_entry(ris, &vmsc->ris, vmsc_list)
 				add_to_garbage(ris->mbwu_state);
-			mpam_mon_sel_unlock(msc);
+			mpam_mon_sel_inner_unlock(msc);
 		}
+		mpam_mon_sel_outer_unlock(msc);
 	}
 }
 
@@ -2659,6 +2674,7 @@ static int __allocate_component_cfg(struct mpam_component *comp)
 	mpam_reset_component_cfg(comp);
 
 	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
+		int err = 0;
 		struct mpam_msc *msc;
 		struct mpam_msc_ris *ris;
 		struct msmon_mbwu_state *mbwu_state;
@@ -2667,6 +2683,7 @@ static int __allocate_component_cfg(struct mpam_component *comp)
 			continue;
 
 		msc = vmsc->msc;
+		mpam_mon_sel_outer_lock(msc);
 		list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
 			if (!ris->props.num_mbwu_mon)
 				continue;
@@ -2674,16 +2691,21 @@ static int __allocate_component_cfg(struct mpam_component *comp)
 			mbwu_state = kzalloc_objs(*ris->mbwu_state,
 						  ris->props.num_mbwu_mon);
 			if (!mbwu_state) {
-				__destroy_component_cfg(comp);
-				return -ENOMEM;
+				err = -ENOMEM;
+				break;
 			}
 
 			init_garbage(&mbwu_state[0].garbage);
 
-			if (mpam_mon_sel_lock(msc)) {
+			if (mpam_mon_sel_inner_lock(msc)) {
 				ris->mbwu_state = mbwu_state;
-				mpam_mon_sel_unlock(msc);
+				mpam_mon_sel_inner_unlock(msc);
 			}
+		}
+		mpam_mon_sel_outer_unlock(msc);
+		if (err) {
+			__destroy_component_cfg(comp);
+			return err;
 		}
 	}
 
