@@ -686,6 +686,17 @@ install-perarch: toolspkgdir = $(CURDIR)/debian/$(tools_pkg_name)
 install-perarch: cloudpkgdir = $(CURDIR)/debian/$(cloud_pkg_name)
 install-perarch: bpftoolpkgdir = $(CURDIR)/debian/$(bpftool_pkg_name)
 install-perarch: perfpkgdir = $(CURDIR)/debian/$(perf_pkg_name)
+ifeq ($(do_tools_noble_hwe),true)
+install-perarch: perfinstalldir = $(toolspkgdir)/usr/lib/$(DEB_SOURCE)-tools-$(abi_release)
+install-perarch: perfjvmtiinstalldir = $(perfinstalldir)
+install-perarch: perfpythoninstalldir = $(perfinstalldir)/lib
+install-perarch: bpftoolinstalldir = $(toolspkgdir)/usr/lib/$(DEB_SOURCE)-tools-$(abi_release)
+else
+install-perarch: perfinstalldir = $(perfpkgdir)/usr/bin
+install-perarch: perfjvmtiinstalldir = $(perfpkgdir)/usr/lib
+install-perarch: perfpythoninstalldir = $(perfpkgdir)/usr/lib/python3/dist-packages
+install-perarch: bpftoolinstalldir = $(bpftoolpkgdir)/usr/sbin
+endif
 install-perarch: $(stampdir)/stamp-build-perarch
 	@echo Debug: $@
 	# Add the tools.
@@ -708,24 +719,24 @@ ifeq ($(do_tools_rtla),true)
 		$(toolspkgdir)/usr/lib/$(DEB_SOURCE)-tools-$(abi_release)/rtla
 endif
 ifeq ($(do_tools_perf),true)
-	install -d $(perfpkgdir)/usr/bin
+	install -d $(perfinstalldir)
 	install -m755 $(builddirpa)/tools/perf/perf \
-		$(perfpkgdir)/usr/bin/perf
+		$(perfinstalldir)/perf
 ifeq ($(do_tools_perf_jvmti),true)
-	install -d $(perfpkgdir)/usr/lib
+	install -d $(perfjvmtiinstalldir)
 	install -m644 $(builddirpa)/tools/perf/libperf-jvmti.so \
-		$(perfpkgdir)/usr/lib/
+		$(perfjvmtiinstalldir)/
 endif
 ifeq ($(do_tools_perf_python),true)
-	install -d $(perfpkgdir)/usr/lib/python3/dist-packages
+	install -d $(perfpythoninstalldir)
 	install -m644 $(builddirpa)/tools/perf/python/perf.*.so \
-		$(perfpkgdir)/usr/lib/python3/dist-packages/
+		$(perfpythoninstalldir)/
 endif
 endif # do_tools_perf
 ifeq ($(do_tools_bpftool),true)
-	install -d $(bpftoolpkgdir)/usr/sbin
+	install -d $(bpftoolinstalldir)/usr/sbin
 	install -m755 $(builddirpa)/tools/bpf/bpftool/bpftool \
-		$(bpftoolpkgdir)/usr/sbin/bpftool
+		$(bpftoolinstalldir)/bpftool
 endif
 ifeq ($(do_tools_x86),true)
 	install -m755 $(addprefix $(builddirpa)/tools/power/x86/, x86_energy_perf_policy/x86_energy_perf_policy turbostat/turbostat) \
@@ -757,6 +768,7 @@ endif
 ifeq ($(do_cloud_tools),true)
 	$(call dh_all,$(cloudpkg))
 endif
+ifneq ($(do_tools_noble_hwe),true)
 ifeq ($(do_linux_tools),true)
   ifeq ($(do_tools_bpftool),true)
     ifneq ($(filter $(bpftool_pkg_name),$(packages_enabled)),)
@@ -769,6 +781,7 @@ ifeq ($(do_linux_tools),true)
     endif
   endif
 endif
+endif # do_tools_noble_hwe
 
 binary-debs-deps-$(do_flavour_image_package) += $(addprefix binary-,$(flavours))
 
