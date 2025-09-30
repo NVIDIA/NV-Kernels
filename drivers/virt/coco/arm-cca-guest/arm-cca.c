@@ -17,6 +17,7 @@
 
 #ifdef CONFIG_PCI_TSM
 #include "rsi-da.h"
+#include "rhi-da.h"
 #endif
 
 /**
@@ -265,7 +266,7 @@ static int cca_devsec_tsm_probe(struct auxiliary_device *adev,
 
 #ifdef CONFIG_PCI_TSM
 	/* Allow tsm report even if tsm_register fails */
-	if (rsi_has_da_feature())
+	if (rsi_has_da_feature() && rhi_has_da_support())
 		cca_devsec_tsm_register(adev);
 #endif
 
