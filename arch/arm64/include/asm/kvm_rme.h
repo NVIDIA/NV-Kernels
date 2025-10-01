@@ -53,6 +53,7 @@ enum realm_state {
  * @params: Parameters for the RMI_REALM_CREATE command
  * @num_aux: The number of auxiliary pages required by the RMM
  * @vmid: VMID to be used by the RMM for the realm
+ * @mecid: MECID to be used by the RMM for the realm
  * @ia_bits: Number of valid Input Address bits in the IPA
  */
 struct realm {
@@ -64,6 +65,12 @@ struct realm {
 	unsigned long num_aux;
 	unsigned int vmid;
 	unsigned int ia_bits;
+	unsigned short mecid;
+	enum {
+		MEC_POLICY_UNCONFIGURED = 0,	/* Use shared for compatibility */
+		MEC_POLICY_PRIVATE,		/* Allocate private MECID */
+		MEC_POLICY_SHARED,		/* Use shared MECID */
+	} mec_policy;
 };
 
 /**
