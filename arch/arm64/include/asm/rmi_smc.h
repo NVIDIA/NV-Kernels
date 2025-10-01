@@ -61,7 +61,7 @@
 #define SMC_RMI_VDEV_GET_STATE		SMC_RMI_CALL(0x0189)
 #define SMC_RMI_VDEV_UNLOCK		SMC_RMI_CALL(0x018A)
 #define SMC_RMI_VDEV_GET_INTERFACE_REPORT SMC_RMI_CALL(0x01D0)
-
+#define SMC_RMI_VDEV_GET_DEV_MEASUREMENTS	SMC_RMI_CALL(0x01D1)
 #define SMC_RMI_VDEV_LOCK		SMC_RMI_CALL(0x01D2)
 
 #define RMI_ABI_MAJOR_VERSION	1
@@ -479,6 +479,23 @@ struct rmi_vdev_params {
 			unsigned long aux[MAX_VDEV_AUX_GRANULES];
 		};
 		u8 padding2[0x900];
+	};
+};
+
+#define RMI_VDEV_MEASURE_SIGNED		BIT(0)
+#define RMI_VDEV_MEASURE_RAW		BIT(1)
+struct rmi_vdev_measurement_params {
+	union {
+		u64 flags;
+		u8 padding0[256];
+	};
+	union {
+		u8 indices[32];
+		u8 padding1[256];
+	};
+	union {
+		u8 nonce[32];
+		u8 padding2[256];
 	};
 };
 
