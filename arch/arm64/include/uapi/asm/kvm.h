@@ -440,6 +440,8 @@ enum {
 /* List of configuration items accepted for KVM_CAP_ARM_RME_CONFIG_REALM */
 #define ARM_RME_CONFIG_RPV			0
 #define ARM_RME_CONFIG_HASH_ALGO		1
+#define ARM_RME_CONFIG_MEC			2
+#define ARM_RME_CONFIG_MEC_QUERY		3
 
 #define ARM_RME_CONFIG_HASH_ALGO_SHA256		0
 #define ARM_RME_CONFIG_HASH_ALGO_SHA512		1
@@ -459,6 +461,17 @@ struct arm_rme_config {
 			__u32	hash_algo;
 		};
 
+		/* cfg == ARM_RME_CONFIG_MEC */
+		struct {
+			/* At the moment this is a bool: 0=private MECID */
+			__u32	shared_mec;
+		};
+
+		/* cfg == ARM_RME_CONFIG_MEC_QUERY - output */
+		struct {
+			__u32	mec_supported;	/* 0=not supported, 1=supported */
+			__u32	mec_count;	/* Number of available MECIDs */
+		};
 		/* Fix the size of the union */
 		__u8	reserved[256];
 	};
