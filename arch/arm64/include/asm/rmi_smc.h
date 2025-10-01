@@ -45,6 +45,9 @@
 #define SMC_RMI_RTT_INIT_RIPAS		SMC_RMI_CALL(0x0168)
 #define SMC_RMI_RTT_SET_RIPAS		SMC_RMI_CALL(0x0169)
 
+#define SMC_RMI_MEC_SET_SHARED		SMC_RMI_CALL(0x018C)
+#define SMC_RMI_MEC_SET_PRIVATE		SMC_RMI_CALL(0x018D)
+
 #define RMI_ABI_MAJOR_VERSION	1
 #define RMI_ABI_MINOR_VERSION	0
 
@@ -119,6 +122,8 @@ struct realm_params {
 			u64 rtt_base;
 			s64 rtt_level_start;
 			u64 rtt_num_start;
+			u64 flags1;
+			u64 mecid;
 		};
 		u8 padding2[0x800];
 	};
