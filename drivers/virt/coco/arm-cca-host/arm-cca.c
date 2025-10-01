@@ -327,6 +327,10 @@ static ssize_t cca_tsm_guest_req(struct pci_tdi *tdi, enum pci_tsm_req_scope sco
 			/* error */
 			return len;
 		}
+		case __RHI_DA_VDEV_GET_INTERFACE_REPORT:
+		{
+			return cca_vdev_get_interface_report(pdev);
+		}
 		default:
 			return -EINVAL;
 		}

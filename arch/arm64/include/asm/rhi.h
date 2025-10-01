@@ -80,5 +80,6 @@ enum rhi_tdi_state {
 /* guest request operation nr */
 #define __RHI_DA_OBJECT_SIZE		0x1
 #define __RHI_DA_OBJECT_READ		0x2
+#define __RHI_DA_VDEV_GET_INTERFACE_REPORT 0x3
 
 #endif
