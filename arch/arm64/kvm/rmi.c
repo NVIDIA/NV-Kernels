@@ -12,7 +12,47 @@
 
 #include <asm/kvm_pgtable.h>
 
+#define MECID_INVALID	(-1)
+
+/*
+ * struct mecid_state - Global MECID allocation state
+ * @shared_mecid: The MECID being shared by multiple realms (-1 if none)
+ * @shared_mecid_members: Number of realms using the shared MECID
+ * @bitmap: Bitmap tracking allocated MECIDs
+ *
+ * All fields protected by mecid_lock defined below.
+ */
+struct mecid_state {
+	int shared_mecid;
+	unsigned int shared_mecid_members;
+	unsigned long *bitmap;
+};
+
+static struct mecid_state mecid_state = {
+	.shared_mecid = MECID_INVALID,
+	.shared_mecid_members = 0,
+	.bitmap = NULL,
+};
+
+/*
+ * Protects all fields in struct mecid_state.
+ * Must be taken after rme_vmid_lock if both locks are needed.
+ */
+static DEFINE_SPINLOCK(mecid_lock);
+
 static unsigned long rmm_feat_reg0;
+static unsigned long rmm_feat_reg1;
+
+/*
+ * Feature register 1 contains a 64-bit MAX_MECID, but the architecture only
+ * allows 16 bits at the moment.
+ */
+#define mecid_count() ((u32)rmm_feat_reg1 + 1)
+/*
+ * RMM reports MAX_MECID=0 (count=1) when MEC is not supported,
+ * otherwise reports the actual maximum MECID value.
+ */
+#define mecid_supported() (mecid_count() != 1)
 
 #define RMM_PAGE_SHIFT		12
 #define RMM_PAGE_SIZE		BIT(RMM_PAGE_SHIFT)
@@ -687,6 +727,9 @@ static int realm_create_rd(struct kvm *kvm)
 		params->flags |= RMI_REALM_PARAM_FLAG_PMU;
 	}
 
+	/* Set MECID in realm parameters - 0 when not supported */
+	params->mecid = mecid_supported() ? realm->mecid : 0;
+
 	r = realm_init_sve_param(kvm, params);
 	if (r)
 		goto out_undelegate_tables;
@@ -1308,6 +1351,143 @@ static void rmi_vmid_release(unsigned int vmid)
 	spin_unlock(&rmi_vmid_lock);
 }
 
+static int __mecid_alloc(struct mecid_state *state)
+{
+	lockdep_assert_held(&mecid_lock);
+	return bitmap_find_free_region(state->bitmap, mecid_count(), 0);
+}
+
+static int __mecid_get_shared(struct mecid_state *state)
+{
+	int mecid;
+
+	lockdep_assert_held(&mecid_lock);
+
+	if (state->shared_mecid != MECID_INVALID) {
+		if (WARN_ON(state->shared_mecid_members > UINT_MAX))
+			return -ENOSPC;
+
+		state->shared_mecid_members++;
+		return state->shared_mecid;
+	}
+
+	/* Sanity check: members without valid shared MECID indicates corruption */
+	if (WARN_ON(state->shared_mecid_members))
+		return -ENXIO;
+
+	mecid = __mecid_alloc(state);
+	if (mecid < 0)
+		return mecid;
+
+	if (rmi_mec_set_shared(mecid)) {
+		bitmap_release_region(state->bitmap, mecid, 0);
+		return -ENXIO;
+	}
+
+	state->shared_mecid = mecid;
+	state->shared_mecid_members++;
+
+	return mecid;
+}
+
+static int __mecid_put_shared(struct mecid_state *state)
+{
+	lockdep_assert_held(&mecid_lock);
+
+	if (WARN_ON(!state->shared_mecid_members || state->shared_mecid == MECID_INVALID))
+		return -EINVAL;
+
+	if (state->shared_mecid_members > 1) {
+		state->shared_mecid_members--;
+		return 0;
+	}
+
+	if (rmi_mec_set_private(state->shared_mecid))
+		return -ENXIO;
+
+	bitmap_release_region(state->bitmap, state->shared_mecid, 0);
+	state->shared_mecid = MECID_INVALID;
+	state->shared_mecid_members = 0;
+
+	return 0;
+}
+
+static int __mecid_init(struct mecid_state *state)
+{
+	if (!mecid_supported())
+		return 0;
+
+	state->bitmap = bitmap_zalloc(mecid_count(), GFP_KERNEL);
+	if (!state->bitmap) {
+		kvm_err("Couldn't allocate rme mecid bitmap\n");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static void __mecid_destroy(struct mecid_state *state)
+{
+	bitmap_free(state->bitmap);
+	state->bitmap = NULL;
+}
+
+/* Public wrappers that handle global state */
+static int rmi_mecid_init(void)
+{
+	return __mecid_init(&mecid_state);
+}
+
+static void rmi_mecid_destroy(void)
+{
+	__mecid_destroy(&mecid_state);
+}
+
+static int rmi_mecid_reserve(struct realm *realm)
+{
+	int ret = 0;
+
+	if (!mecid_supported()) {
+		/* RMM doesn't support MEC, force MECID to 0 */
+		realm->mecid = 0;
+		return 0;
+	}
+
+	spin_lock(&mecid_lock);
+	/* Unconfigured or explicitly shared -> use shared MECID */
+	if (realm->mec_policy != MEC_POLICY_PRIVATE)
+		ret = __mecid_get_shared(&mecid_state);
+	else
+		ret = __mecid_alloc(&mecid_state);
+	if (ret >= 0) {
+		realm->mecid = ret;
+		ret = 0;
+	}
+	spin_unlock(&mecid_lock);
+
+	return ret;
+}
+
+static void __mecid_release(struct mecid_state *state, unsigned int mecid)
+{
+	lockdep_assert_held(&mecid_lock);
+
+	if (mecid == state->shared_mecid)
+		WARN_ON(__mecid_put_shared(state));
+	else
+		bitmap_release_region(state->bitmap, mecid, 0);
+}
+
+static void rmi_mecid_release(unsigned int mecid)
+{
+	if (!mecid_supported())
+		return;
+
+	spin_lock(&mecid_lock);
+	__mecid_release(&mecid_state, mecid);
+	spin_unlock(&mecid_lock);
+}
+
 static int kvm_create_realm(struct kvm *kvm)
 {
 	struct realm *realm = &kvm->arch.realm;
@@ -1321,11 +1501,13 @@ static int kvm_create_realm(struct kvm *kvm)
 		return ret;
 	realm->vmid = ret;
 
+	ret = rmi_mecid_reserve(realm);
+	if (ret < 0)
+		goto err_free_vmid;
+
 	ret = realm_create_rd(kvm);
-	if (ret) {
-		rmi_vmid_release(realm->vmid);
-		return ret;
-	}
+	if (ret)
+		goto err_free_mecid;
 
 	WRITE_ONCE(realm->state, REALM_STATE_NEW);
 
@@ -1334,6 +1516,12 @@ static int kvm_create_realm(struct kvm *kvm)
 	realm->params = NULL;
 
 	return 0;
+
+err_free_mecid:
+	rmi_mecid_release(realm->mecid);
+err_free_vmid:
+	rmi_vmid_release(realm->vmid);
+	return ret;
 }
 
 static int config_realm_hash_algo(struct realm *realm,
@@ -1355,17 +1543,35 @@ static int config_realm_hash_algo(struct realm *realm,
 	return 0;
 }
 
+static int config_realm_mec(struct realm *realm,
+			    struct arm_rmi_config *cfg)
+{
+	realm->mec_policy = cfg->shared_mec ? MEC_POLICY_SHARED : MEC_POLICY_PRIVATE;
+
+	return 0;
+}
+
 static int kvm_rmi_config_realm(struct kvm *kvm, struct kvm_enable_cap *cap)
 {
 	struct arm_rmi_config cfg;
 	struct realm *realm = &kvm->arch.realm;
 	int r = 0;
 
-	if (kvm_realm_is_created(kvm))
-		return -EBUSY;
-
 	if (copy_from_user(&cfg, (void __user *)cap->args[1], sizeof(cfg)))
 		return -EFAULT;
+
+	/* Query operations don't require realm to be in NEW state */
+	if (cfg.cfg == ARM_RMI_CONFIG_MEC_QUERY) {
+		cfg.mec_supported = mecid_supported() ? 1 : 0;
+		cfg.mec_count = mecid_supported() ? mecid_count() : 0;
+
+		if (copy_to_user((void __user *)cap->args[1], &cfg, sizeof(cfg)))
+			return -EFAULT;
+		return 0;
+	}
+
+	if (kvm_realm_is_created(kvm))
+		return -EBUSY;
 
 	switch (cfg.cfg) {
 	case ARM_RMI_CONFIG_RPV:
@@ -1373,6 +1579,9 @@ static int kvm_rmi_config_realm(struct kvm *kvm, struct kvm_enable_cap *cap)
 		break;
 	case ARM_RMI_CONFIG_HASH_ALGO:
 		r = config_realm_hash_algo(realm, &cfg);
+		break;
+	case ARM_RMI_CONFIG_MEC:
+		r = config_realm_mec(realm, &cfg);
 		break;
 	default:
 		r = -EINVAL;
@@ -1456,6 +1665,7 @@ void kvm_destroy_realm(struct kvm *kvm)
 	}
 
 	rmi_vmid_release(realm->vmid);
+	rmi_mecid_release(realm->mecid);
 
 	for (i = 0; i < pgd_size; i += RMM_PAGE_SIZE) {
 		phys_addr_t pgd_phys = kvm->arch.mmu.pgd_phys + i;
@@ -1751,8 +1961,16 @@ void kvm_init_rmi(void)
 	if (WARN_ON(rmi_features(0, &rmm_feat_reg0)))
 		return;
 
-	if (rmi_vmid_init())
+	if (WARN_ON(rmi_features(1, &rmm_feat_reg1)))
 		return;
+
+	if (rmi_mecid_init())
+		return;
+
+	if (rmi_vmid_init()) {
+		rmi_mecid_destroy();
+		return;
+	}
 
 	static_branch_enable(&kvm_rmi_is_available);
 }
