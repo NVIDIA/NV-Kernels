@@ -16,6 +16,7 @@ do_tools_bpftool = true
 do_tools_x86	= true
 do_tools_rtla = true
 do_tools_acpidbg = true
+do_tools_noble_hwe = true
 
 do_lib_rust             = false
 gcc                     = gcc-13
