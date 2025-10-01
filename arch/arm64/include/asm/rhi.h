@@ -77,4 +77,8 @@ enum rhi_tdi_state {
 #define RHI_DA_VDEV_SET_TDI_STATE	SMC_RHI_CALL(0x0054)
 #define RHI_DA_VDEV_ABORT		SMC_RHI_CALL(0x0056)
 
+/* guest request operation nr */
+#define __RHI_DA_OBJECT_SIZE		0x1
+#define __RHI_DA_OBJECT_READ		0x2
+
 #endif

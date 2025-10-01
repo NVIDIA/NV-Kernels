@@ -11,6 +11,7 @@
 #include <linux/pci-tsm.h>
 #include <linux/sizes.h>
 #include <asm/rmi_smc.h>
+#include <asm/rhi.h>
 
 #define MAX_CACHE_OBJ_SIZE	SZ_16M
 #define CACHE_CHUNK_SIZE	SZ_4K
@@ -143,4 +144,7 @@ void *cca_vdev_create(struct realm *realm, struct pci_dev *pdev,
 		      struct pci_dev *pf0_dev, u32 guest_rid);
 void cca_vdev_unlock_and_destroy(struct realm *realm, struct pci_dev *pdev,
 				 struct pci_dev *pf0_dev);
+int cca_vdev_get_object_size(struct pci_dev *pdev, int type);
+int cca_vdev_read_cached_object(struct pci_dev *pdev, int type, unsigned long offset,
+				unsigned long max_len, void __user *user_buf);
 #endif
