@@ -505,4 +505,22 @@ static inline int rmi_rtt_unmap_unprotected(unsigned long rd,
 	return res.a0;
 }
 
+static inline int rmi_mec_set_shared(unsigned long mecid)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_1_1_invoke(SMC_RMI_MEC_SET_SHARED, mecid, &res);
+
+	return res.a0;
+}
+
+static inline int rmi_mec_set_private(unsigned long mecid)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_1_1_invoke(SMC_RMI_MEC_SET_PRIVATE, mecid, &res);
+
+	return res.a0;
+}
+
 #endif /* __ASM_RMI_CMDS_H */
