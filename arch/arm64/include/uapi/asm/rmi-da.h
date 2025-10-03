@@ -36,4 +36,9 @@ struct arm64_vdev_device_memmap_guest_req {
 	__aligned_u64 pa_base;
 };
 
+struct arm64_vdev_set_tdi_state_guest_req {
+	__u32 req_type;
+	__u32 tdi_state;
+};
+
 #endif

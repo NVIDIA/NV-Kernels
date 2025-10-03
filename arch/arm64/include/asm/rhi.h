@@ -84,5 +84,6 @@ enum rhi_tdi_state {
 #define __RHI_DA_VDEV_GET_MEASUREMENTS	0x4
 #define __REC_EXIT_DA_VDEV_REQUEST	0x5
 #define __REC_EXIT_DA_VDEV_MAP		0x6
+#define __RHI_DA_VDEV_SET_TDI_STATE	0x7
 
 #endif

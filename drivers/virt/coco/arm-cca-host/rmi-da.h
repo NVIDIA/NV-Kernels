@@ -158,4 +158,5 @@ int cca_vdev_device_request(struct pci_dev *pdev, unsigned long rec_id);
 int cca_vdev_device_map_validate(struct pci_dev *pdev, unsigned long vcpu_fd,
 				 unsigned long gpa_base, unsigned long gpa_top,
 				 unsigned long pa_base);
+int cca_vdev_device_start(struct pci_dev *pdev);
 #endif
