@@ -36,7 +36,7 @@ CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE note<'Required for Grace enable
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE note<'Required for Grace enablement'>
 
-CONFIG_CMA_SIZE_MBYTES                          policy<{'arm64': '32', 'arm64-nvidia': '128', 'arm64-nvidia-64k': '1024'}>
+CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '32', 'arm64-nvidia': '128', 'arm64-nvidia-64k': '1024'}>
 CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2095028'>
 
 CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
@@ -165,6 +165,9 @@ CONFIG_PREEMPT_NONE                             note<'required for NVIDIA worklo
 CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': 'y', 'arm64': 'n'}>
 CONFIG_PREEMPT_VOLUNTARY                        note<'required for NVIDIA workloads'>
 
+CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_RUST                                     note<'Make sure this remains enabled'>
+
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablement'>
 
@@ -189,7 +192,6 @@ CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablem
 
 # ---- Annotations without notes ----
 
-CONFIG_ARM64_BRBE                               policy<{'arm64': 'y'}>
 CONFIG_ARM_FFA_TRANSPORT                        policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_AS_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
@@ -197,16 +199,21 @@ CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-', 'arm64': '
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_BLK_DEV_RUST_NULL                        policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_CC_HAS_COUNTED_BY                        policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CC_HAS_KASAN_SW_TAGS                     policy<{'amd64': '-', 'arm64': 'y'}>
 CONFIG_CC_HAS_MIN_FUNCTION_ALIGNMENT            policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_CC_HAS_MULTIDIMENSIONAL_NONSTRING        policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CC_HAS_SANE_FUNCTION_ALIGNMENT           policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"'}>
-CONFIG_CPUFREQ_ARCH_CUR_FREQ                    policy<{'amd64': 'y'}>
+CONFIG_CORESIGHT_CTCU                           policy<{'arm64': 'm'}>
+CONFIG_CPUFREQ_DT_RUST                          policy<{'arm64': '-'}>
+CONFIG_DRM_NOUVEAU_CH7006                       policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOUVEAU_SIL164                       policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOVA                                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_GCC_VERSION                              policy<{'amd64': '130300', 'arm64': '130300'}>
 CONFIG_HAVE_RUST                                policy<{'amd64': 'y', 'arm64': '-'}>
 CONFIG_IOMMUFD_VFIO_CONTAINER                   policy<{'arm64': 'y'}>
-CONFIG_IRQ_MSI_IOMMU                            policy<{'amd64': '-', 'arm64': 'y'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_NVGRACE_EGM                              policy<{'arm64': 'm'}>
@@ -215,7 +222,6 @@ CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64':
 CONFIG_PINCTRL_MT8901                           policy<{'arm64': 'y'}>
 CONFIG_R8127                                    policy<{'amd64': 'n', 'arm64': 'm'}>
 CONFIG_RELR                                     policy<{'arm64': '-'}>
-CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_RUSTC_HAS_COERCE_POINTEE                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_RUSTC_LLVM_VERSION                       policy<{'amd64': '180103', 'arm64': '180103'}>
 CONFIG_RUSTC_SUPPORTS_ARM64                     policy<{'arm64': '-'}>
