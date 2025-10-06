@@ -2280,7 +2280,7 @@ int audit_log_object_context(struct audit_buffer *ab,
 		if (blob->secid[i] == 0)
 			continue;
 		error = security_secid_to_secctx(blob, &lsmdata, i);
-		if (error && error != -EINVAL) {
+		if (error < 0 && error != -EINVAL) {
 			audit_panic("error in audit_log_object_context");
 			return error;
 		}
