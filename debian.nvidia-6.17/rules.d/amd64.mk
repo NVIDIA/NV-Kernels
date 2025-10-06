@@ -18,7 +18,7 @@ do_tools_rtla = true
 do_extras_package = false
 do_tools_acpidbg = true
 
-do_lib_rust             = true
+do_lib_rust             = false
 gcc                     = gcc-13
 rustc                   = rustc-1.80
 rustfmt                 = /usr/lib/rust-1.80/bin/rustfmt
