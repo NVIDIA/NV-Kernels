@@ -117,32 +117,38 @@ static struct kobject *lfa_dir;
 
 static int get_nr_lfa_components(void)
 {
-	struct arm_smccc_res res = { 0 };
+	struct arm_smccc_1_2_regs reg = { 0 };
 
-	arm_smccc_1_1_invoke(LFA_1_0_FN_GET_INFO, 0x0, &res);
-	if (res.a0 != LFA_SUCCESS)
-		return res.a0;
+	reg.a0 = LFA_1_0_FN_GET_INFO;
+	reg.a1 = 0; /* lfa_info_selector = 0 */
 
-	return res.a1;
+	arm_smccc_1_2_invoke(&reg, &reg);
+	if (reg.a0 != LFA_SUCCESS)
+		return reg.a0;
+
+	return reg.a1;
 }
 
 static int call_lfa_activate(void *data)
 {
 	struct image_props *attrs = data;
-	struct arm_smccc_res res = { 0 };
+	struct arm_smccc_1_2_regs args = { 0 };
+	struct arm_smccc_1_2_regs res = { 0 };
+
+	args.a0 = LFA_1_0_FN_ACTIVATE;
+	args.a1 = attrs->fw_seq_id; /* fw_seq_id under consideration */
+	/*
+	 * As we do not support updates requiring a CPU reset (yet),
+	 * we pass 0 in args.a3 and args.a4, holding the entry point and context
+	 * ID respectively.
+	 * We want to force CPU rendezvous if either cpu_rendezvous or
+	 * cpu_rendezvous_forced is set. The flag value is flipped as
+	 * it is called skip_cpu_rendezvous in the spec.
+	 */
+	args.a2 = !(attrs->cpu_rendezvous_forced || attrs->cpu_rendezvous);
 
 	do {
-		/*
-		 * As we do not support updates requiring a CPU reset (yet),
-		 * we pass 0 in x3 and x4, holding the entry point and context
-		 * ID respectively.
-		 * We want to force CPU rendezvous if either cpu_rendezvous or
-		 * cpu_rendezvous_forced is set. The flag value is flipped as
-		 * it is called skip_cpu_rendezvous in the spec.
-		 */
-		arm_smccc_1_1_invoke(LFA_1_0_FN_ACTIVATE, attrs->fw_seq_id,
-			!(attrs->cpu_rendezvous_forced || attrs->cpu_rendezvous),
-			0, 0, &res);
+		arm_smccc_1_2_invoke(&args, &res);
 	} while (res.a0 == 0 && res.a1 == 1);
 
 	return res.a0;
@@ -150,7 +156,8 @@ static int call_lfa_activate(void *data)
 
 static int activate_fw_image(struct image_props *attrs)
 {
-	struct arm_smccc_res res = { 0 };
+	struct arm_smccc_1_2_regs args = { 0 };
+	struct arm_smccc_1_2_regs res = { 0 };
 	int ret;
 
 	/*
@@ -159,8 +166,10 @@ static int activate_fw_image(struct image_props *attrs)
 	 * LFA_PRIME/ACTIVATE will need to be called again.
 	 * res.a1 will become 0 once the prime/activate process completes.
 	 */
+	args.a0 = LFA_1_0_FN_PRIME;
+	args.a1 = attrs->fw_seq_id; /* fw_seq_id under consideration */
 	do {
-		arm_smccc_1_1_invoke(LFA_1_0_FN_PRIME, attrs->fw_seq_id, &res);
+		arm_smccc_1_2_invoke(&args, &res);
 		if (res.a0 != LFA_SUCCESS) {
 			pr_err("LFA_PRIME failed: %s\n",
 				lfa_error_strings[-res.a0]);
@@ -211,15 +220,17 @@ static ssize_t activation_pending_show(struct kobject *kobj,
 {
 	struct image_props *attrs = container_of(attr, struct image_props,
 					 image_attrs[LFA_ATTR_ACT_PENDING]);
-	struct arm_smccc_res res = { 0 };
+	struct arm_smccc_1_2_regs reg = { 0 };
 
 	/*
 	 * Activation pending status can change anytime thus we need to update
 	 * and return its current value
 	 */
-	arm_smccc_1_1_invoke(LFA_1_0_FN_GET_INVENTORY, attrs->fw_seq_id, &res);
-	if (res.a0 == LFA_SUCCESS)
-		attrs->activation_pending = !!(res.a3 & BIT(1));
+	reg.a0 = LFA_1_0_FN_GET_INVENTORY;
+	reg.a1 = attrs->fw_seq_id;
+	arm_smccc_1_2_invoke(&reg, &reg);
+	if (reg.a0 == LFA_SUCCESS)
+		attrs->activation_pending = !!(reg.a3 & BIT(1));
 
 	return sysfs_emit(buf, "%d\n", attrs->activation_pending);
 }
@@ -298,21 +309,23 @@ static ssize_t cancel_store(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	struct image_props *attrs = container_of(attr, struct image_props,
 						 image_attrs[LFA_ATTR_CANCEL]);
-	struct arm_smccc_res res = { 0 };
+	struct arm_smccc_1_2_regs reg = { 0 };
 
-	arm_smccc_1_1_invoke(LFA_1_0_FN_CANCEL, attrs->fw_seq_id, &res);
+	reg.a0 = LFA_1_0_FN_CANCEL;
+	reg.a1 = attrs->fw_seq_id;
+	arm_smccc_1_2_invoke(&reg, &reg);
 
 	/*
 	 * When firmware activation is called with "skip_cpu_rendezvous=1",
 	 * LFA_CANCEL can fail with LFA_BUSY if the activation could not be
 	 * cancelled.
 	 */
-	if (res.a0 == LFA_SUCCESS) {
+	if (reg.a0 == LFA_SUCCESS) {
 		pr_info("Activation cancelled for image %s\n",
 			attrs->image_name);
 	} else {
 		pr_err("Firmware activation could not be cancelled: %s\n",
-		       lfa_error_strings[-res.a0]);
+		       lfa_error_strings[-reg.a0]);
 		return -EINVAL;
 	}
 
@@ -395,21 +408,24 @@ static int create_fw_inventory(char *fw_uuid, int seq_id, u32 image_flags)
 
 static int create_fw_images_tree(void)
 {
-	struct arm_smccc_res res = { 0 };
+	struct arm_smccc_1_2_regs reg = { 0 };
 	struct uuid_regs image_uuid;
 	char image_id_str[40];
 	int ret, num_of_components;
 
 	num_of_components = get_nr_lfa_components();
+
 	for (int i = 0; i < num_of_components; i++) {
-		arm_smccc_1_1_invoke(LFA_1_0_FN_GET_INVENTORY, i, &res);
-		if (res.a0 == LFA_SUCCESS) {
-			image_uuid.uuid_lo = res.a1;
-			image_uuid.uuid_hi = res.a2;
+		reg.a0 = LFA_1_0_FN_GET_INVENTORY;
+		reg.a1 = i; /* fw_seq_id under consideration */
+		arm_smccc_1_2_invoke(&reg, &reg);
+		if (reg.a0 == LFA_SUCCESS) {
+			image_uuid.uuid_lo = reg.a1;
+			image_uuid.uuid_hi = reg.a2;
 
 			snprintf(image_id_str, sizeof(image_id_str), "%pUb",
 				 &image_uuid);
-			ret = create_fw_inventory(image_id_str, i, res.a3);
+			ret = create_fw_inventory(image_id_str, i, reg.a3);
 			if (ret)
 				return ret;
 		}
@@ -420,17 +436,29 @@ static int create_fw_images_tree(void)
 
 static int __init lfa_init(void)
 {
-	struct arm_smccc_res res = { 0 };
+	struct arm_smccc_1_2_regs reg = { 0 };
 	int err;
 
-	arm_smccc_1_1_invoke(LFA_1_0_FN_GET_VERSION, &res);
-	if (res.a0 == -LFA_NOT_SUPPORTED) {
+	/* LFA requires SMCCC version >= 1.2 */
+	if (arm_smccc_get_version() < ARM_SMCCC_VERSION_1_2) {
+		pr_err("Not supported with SMCCC version %u", arm_smccc_get_version());
+		return -ENODEV;
+	}
+
+	if (arm_smccc_1_1_get_conduit() == SMCCC_CONDUIT_NONE) {
+		pr_err("Invalid SMCCC conduit");
+		return -ENODEV;
+	}
+
+	reg.a0 = LFA_1_0_FN_GET_VERSION;
+	arm_smccc_1_2_invoke(&reg, &reg);
+	if (reg.a0 == -LFA_NOT_SUPPORTED) {
 		pr_err("Arm Live Firmware activation(LFA): no firmware agent found\n");
 		return -ENODEV;
 	}
 
 	pr_info("Arm Live Firmware Activation (LFA): detected v%ld.%ld\n",
-		res.a0 >> 16, res.a0 & 0xffff);
+		reg.a0 >> 16, reg.a0 & 0xffff);
 
 	lfa_dir = kobject_create_and_add("lfa", firmware_kobj);
 	if (!lfa_dir)
