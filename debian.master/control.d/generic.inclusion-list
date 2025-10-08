@@ -95,6 +95,9 @@ drivers/misc/cxl/*
 drivers/misc/eeprom/at24.ko
 drivers/misc/vmw_balloon.ko
 drivers/misc/vmw_vmci/vmw_vmci.ko
+drivers/misc/pvpanic/pvpanic.ko
+drivers/misc/pvpanic/pvpanic-mmio.ko
+drivers/misc/pvpanic/pvpanic-pci.ko
 drivers/mmc/host/sdhci-tegra.ko
 drivers/mtd/cmdlinepart.ko
 drivers/mtd/devices/powernv_flash.ko
