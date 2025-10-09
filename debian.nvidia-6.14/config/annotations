@@ -231,6 +231,7 @@ CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'amd64': '-', 'arm64': '
 CONFIG_EC_HUAWEI_GAOKUN                         policy<{'arm64': 'n'}>
 CONFIG_EINT_MTK_HP                              policy<{'arm64': 'm'}>
 CONFIG_FTRACE_SORT_STARTUP_TEST                 policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_FWCTL                                    policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_GCC_VERSION                              policy<{'amd64': '130300', 'arm64': '130300'}>
 CONFIG_GENERIC_PTDUMP                           policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_HAVE_BUILDTIME_MCOUNT_SORT               policy<{'amd64': 'y', 'arm64': 'y'}>
