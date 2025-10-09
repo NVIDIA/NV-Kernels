@@ -197,6 +197,7 @@ static void free_sink_buffer(struct etm_event_data *event_data)
 	int cpu;
 	cpumask_t *mask = &event_data->mask;
 	struct coresight_device *sink;
+	struct coresight_path *path;
 
 	if (!event_data->snk_config)
 		return;
@@ -205,7 +206,8 @@ static void free_sink_buffer(struct etm_event_data *event_data)
 		return;
 
 	cpu = cpumask_first(mask);
-	sink = coresight_get_sink(etm_event_cpu_path(event_data, cpu));
+	path = etm_event_cpu_path(event_data, cpu);
+	sink = coresight_get_sink(&path->path_list);
 	sink_ops(sink)->free_buffer(event_data->snk_config);
 }
 
@@ -230,7 +232,7 @@ static void free_event_data(struct work_struct *work)
 
 		ppath = etm_event_cpu_path_ptr(event_data, cpu);
 		if (!(IS_ERR_OR_NULL(*ppath))) {
-			struct coresight_device *sink = coresight_get_sink(*ppath);
+			struct coresight_device *sink = coresight_get_sink(&((*ppath)->path_list));
 
 			/*
 			 * Mark perf event as done for trace id allocator, but don't call
@@ -494,12 +496,12 @@ static void etm_event_start(struct perf_event *event, int flags)
 
 	path = etm_event_cpu_path(event_data, cpu);
 	/* We need a sink, no need to continue without one */
-	sink = coresight_get_sink(path);
+	sink = coresight_get_sink(&path->path_list);
 	if (WARN_ON_ONCE(!sink))
 		goto fail_end_stop;
 
 	/* Nothing will happen without a path */
-	if (coresight_enable_path(path, CS_MODE_PERF, handle))
+	if (coresight_enable_path(&path->path_list, CS_MODE_PERF, handle))
 		goto fail_end_stop;
 
 	/* Finally enable the tracer */
@@ -534,7 +536,7 @@ out:
 	return;
 
 fail_disable_path:
-	coresight_disable_path(path);
+	coresight_disable_path(&path->path_list);
 fail_end_stop:
 	/*
 	 * Check if the handle is still associated with the event,
@@ -599,7 +601,7 @@ static void etm_event_stop(struct perf_event *event, int mode)
 	if (!path)
 		return;
 
-	sink = coresight_get_sink(path);
+	sink = coresight_get_sink(&path->path_list);
 	if (!sink)
 		return;
 
@@ -643,7 +645,7 @@ static void etm_event_stop(struct perf_event *event, int mode)
 	}
 
 	/* Disabling the path make its elements available to other sessions */
-	coresight_disable_path(path);
+	coresight_disable_path(&path->path_list);
 }
 
 static int etm_event_add(struct perf_event *event, int mode)
