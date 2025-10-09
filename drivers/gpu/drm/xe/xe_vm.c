@@ -1867,7 +1867,7 @@ static int __xe_vm_bind(struct xe_vm *vm, struct xe_vma *vma,
 
 static int xe_vm_bind(struct xe_vm *vm, struct xe_vma *vma, struct xe_exec_queue *q,
 		      struct xe_bo *bo, struct xe_sync_entry *syncs,
-		      u32 num_syncs, bool immediate, bool first_op,
+		      u32 num_syncs, bool res_evict, bool immediate, bool first_op,
 		      bool last_op)
 {
 	int err;
@@ -1876,7 +1876,7 @@ static int xe_vm_bind(struct xe_vm *vm, struct xe_vma *vma, struct xe_exec_queue
 	xe_bo_assert_held(bo);
 
 	if (bo && immediate) {
-		err = xe_bo_validate(bo, vm, true);
+		err = xe_bo_validate(bo, vm, res_evict);
 		if (err)
 			return err;
 	}
@@ -2048,7 +2048,7 @@ static const u32 region_to_mem_type[] = {
 static int xe_vm_prefetch(struct xe_vm *vm, struct xe_vma *vma,
 			  struct xe_exec_queue *q, u32 region,
 			  struct xe_sync_entry *syncs, u32 num_syncs,
-			  bool first_op, bool last_op)
+			  bool res_evict, bool first_op, bool last_op)
 {
 	struct xe_exec_queue *wait_exec_queue = to_wait_exec_queue(vm, q);
 	int err;
@@ -2063,7 +2063,7 @@ static int xe_vm_prefetch(struct xe_vm *vm, struct xe_vma *vma,
 
 	if (vma->tile_mask != (vma->tile_present & ~vma->tile_invalidated)) {
 		return xe_vm_bind(vm, vma, q, xe_vma_bo(vma), syncs, num_syncs,
-				  true, first_op, last_op);
+				  res_evict, true, first_op, last_op);
 	} else {
 		int i;
 
@@ -2510,7 +2510,8 @@ static int vm_bind_ioctl_ops_parse(struct xe_vm *vm, struct xe_exec_queue *q,
 }
 
 static int op_execute(struct drm_exec *exec, struct xe_vm *vm,
-		      struct xe_vma *vma, struct xe_vma_op *op)
+		      struct xe_vma *vma, struct xe_vma_op *op,
+		      bool res_evict)
 {
 	int err;
 
@@ -2527,6 +2528,7 @@ static int op_execute(struct drm_exec *exec, struct xe_vm *vm,
 	case DRM_GPUVA_OP_MAP:
 		err = xe_vm_bind(vm, vma, op->q, xe_vma_bo(vma),
 				 op->syncs, op->num_syncs,
+				 res_evict,
 				 !xe_vm_in_fault_mode(vm),
 				 op->flags & XE_VMA_OP_FIRST,
 				 op->flags & XE_VMA_OP_LAST);
@@ -2553,7 +2555,7 @@ static int op_execute(struct drm_exec *exec, struct xe_vm *vm,
 			op->remap.prev->gpuva.flags |= XE_VMA_LAST_REBIND;
 			err = xe_vm_bind(vm, op->remap.prev, op->q,
 					 xe_vma_bo(op->remap.prev), op->syncs,
-					 op->num_syncs, true, false,
+					 op->num_syncs, res_evict, true, false,
 					 op->flags & XE_VMA_OP_LAST && !next);
 			op->remap.prev->gpuva.flags &= ~XE_VMA_LAST_REBIND;
 			if (err)
@@ -2566,7 +2568,7 @@ static int op_execute(struct drm_exec *exec, struct xe_vm *vm,
 			err = xe_vm_bind(vm, op->remap.next, op->q,
 					 xe_vma_bo(op->remap.next),
 					 op->syncs, op->num_syncs,
-					 true, false,
+					 res_evict, true, false,
 					 op->flags & XE_VMA_OP_LAST);
 			op->remap.next->gpuva.flags &= ~XE_VMA_LAST_REBIND;
 			if (err)
@@ -2584,6 +2586,7 @@ static int op_execute(struct drm_exec *exec, struct xe_vm *vm,
 	case DRM_GPUVA_OP_PREFETCH:
 		err = xe_vm_prefetch(vm, vma, op->q, op->prefetch.region,
 				     op->syncs, op->num_syncs,
+				     res_evict,
 				     op->flags & XE_VMA_OP_FIRST,
 				     op->flags & XE_VMA_OP_LAST);
 		break;
@@ -2598,7 +2601,7 @@ static int op_execute(struct drm_exec *exec, struct xe_vm *vm,
 }
 
 static int __xe_vma_op_execute(struct xe_vm *vm, struct xe_vma *vma,
-			       struct xe_vma_op *op)
+			       struct xe_vma_op *op, bool res_evict)
 {
 	struct drm_exec exec;
 	int err;
@@ -2606,7 +2609,7 @@ static int __xe_vma_op_execute(struct xe_vm *vm, struct xe_vma *vma,
 retry_userptr:
 	drm_exec_init(&exec, DRM_EXEC_INTERRUPTIBLE_WAIT, 0);
 	drm_exec_until_all_locked(&exec) {
-		err = op_execute(&exec, vm, vma, op);
+		err = op_execute(&exec, vm, vma, op, res_evict);
 		drm_exec_retry_on_contention(&exec);
 		if (err)
 			break;
@@ -2637,7 +2640,8 @@ retry_userptr:
 	return err;
 }
 
-static int xe_vma_op_execute(struct xe_vm *vm, struct xe_vma_op *op)
+static int xe_vma_op_execute(struct xe_vm *vm, struct xe_vma_op *op,
+			     bool res_evict)
 {
 	int ret = 0;
 
@@ -2645,7 +2649,7 @@ static int xe_vma_op_execute(struct xe_vm *vm, struct xe_vma_op *op)
 
 	switch (op->base.op) {
 	case DRM_GPUVA_OP_MAP:
-		ret = __xe_vma_op_execute(vm, op->map.vma, op);
+		ret = __xe_vma_op_execute(vm, op->map.vma, op, res_evict);
 		break;
 	case DRM_GPUVA_OP_REMAP:
 	{
@@ -2658,17 +2662,17 @@ static int xe_vma_op_execute(struct xe_vm *vm, struct xe_vma_op *op)
 		else
 			vma = op->remap.next;
 
-		ret = __xe_vma_op_execute(vm, vma, op);
+		ret = __xe_vma_op_execute(vm, vma, op, res_evict);
 		break;
 	}
 	case DRM_GPUVA_OP_UNMAP:
 		ret = __xe_vma_op_execute(vm, gpuva_to_vma(op->base.unmap.va),
-					  op);
+					  op, res_evict);
 		break;
 	case DRM_GPUVA_OP_PREFETCH:
 		ret = __xe_vma_op_execute(vm,
 					  gpuva_to_vma(op->base.prefetch.va),
-					  op);
+					  op, res_evict);
 		break;
 	default:
 		drm_warn(&vm->xe->drm, "NOT POSSIBLE");
@@ -2778,7 +2782,8 @@ static void vm_bind_ioctl_ops_unwind(struct xe_vm *vm,
 }
 
 static int vm_bind_ioctl_ops_execute(struct xe_vm *vm,
-				     struct list_head *ops_list)
+				     struct list_head *ops_list,
+				     bool res_evict)
 {
 	struct xe_vma_op *op, *next;
 	int err;
@@ -2786,7 +2791,7 @@ static int vm_bind_ioctl_ops_execute(struct xe_vm *vm,
 	lockdep_assert_held_write(&vm->lock);
 
 	list_for_each_entry_safe(op, next, ops_list, link) {
-		err = xe_vma_op_execute(vm, op);
+		err = xe_vma_op_execute(vm, op, res_evict);
 		if (err) {
 			drm_warn(&vm->xe->drm, "VM op(%d) failed with %d",
 				 op->base.op, err);
@@ -3143,7 +3148,12 @@ int xe_vm_bind_ioctl(struct drm_device *dev, void *data, struct drm_file *file)
 	if (q)
 		xe_exec_queue_get(q);
 
-	err = vm_bind_ioctl_ops_execute(vm, &ops_list);
+	/*
+	 * We only allow evicting a BO within the VM if it is not part of an
+	 * array of binds, as an array of binds can evict another BO within the
+	 * bind.
+	 */
+	err = vm_bind_ioctl_ops_execute(vm, &ops_list, args->num_binds <= 1);
 
 	up_write(&vm->lock);
 
