@@ -147,6 +147,9 @@ struct ishtp_device {
 	struct hbm_version version;
 	int transfer_path; /* Choice of transfer path: IPC or DMA */
 
+	/* Alloc a dedicated unbound workqueue for ishtp device */
+	struct workqueue_struct *unbound_wq;
+
 	/* ishtp device states */
 	enum ishtp_dev_state dev_state;
 	enum ishtp_hbm_state hbm_state;
