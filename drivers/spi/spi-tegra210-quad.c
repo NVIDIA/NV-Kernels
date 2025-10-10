@@ -999,8 +999,10 @@ static void tegra_qspi_handle_error(struct tegra_qspi *tqspi)
 	dev_err(tqspi->dev, "error in transfer, fifo status 0x%08x\n", tqspi->status_reg);
 	tegra_qspi_dump_regs(tqspi);
 	tegra_qspi_flush_fifos(tqspi, true);
-	if (device_reset(tqspi->dev) < 0)
+	if (device_reset(tqspi->dev) < 0) {
 		dev_warn_once(tqspi->dev, "device reset failed\n");
+		tegra_qspi_mask_clear_irq(tqspi);
+	}
 }
 
 static void tegra_qspi_transfer_end(struct spi_device *spi)
@@ -1144,12 +1146,14 @@ static int tegra_qspi_combined_seq_xfer(struct tegra_qspi *tqspi,
 							  QSPI_DMA_CTL);
 				}
 
-				/* Reset controller if timeout happens */
-				if (device_reset(tqspi->dev) < 0)
-					dev_warn_once(tqspi->dev,
-						      "device reset failed\n");
-				ret = -EIO;
-				goto exit;
+			/* Reset controller if timeout happens */
+			if (device_reset(tqspi->dev) < 0) {
+				dev_warn_once(tqspi->dev,
+					      "device reset failed\n");
+				tegra_qspi_mask_clear_irq(tqspi);
+			}
+			ret = -EIO;
+			goto exit;
 			}
 
 			if (tqspi->tx_status ||  tqspi->rx_status) {
@@ -1165,6 +1169,7 @@ static int tegra_qspi_combined_seq_xfer(struct tegra_qspi *tqspi,
 			goto exit;
 		}
 		msg->actual_length += xfer->len;
+		tqspi->curr_xfer = NULL;
 		if (!xfer->cs_change && transfer_phase == DATA_TRANSFER) {
 			tegra_qspi_transfer_end(spi);
 			spi_transfer_delay_exec(xfer);
@@ -1174,6 +1179,7 @@ static int tegra_qspi_combined_seq_xfer(struct tegra_qspi *tqspi,
 	ret = 0;
 
 exit:
+	tqspi->curr_xfer = NULL;
 	msg->status = ret;
 
 	return ret;
@@ -1257,6 +1263,8 @@ static int tegra_qspi_non_combined_seq_xfer(struct tegra_qspi *tqspi,
 		msg->actual_length += xfer->len + dummy_bytes;
 
 complete_xfer:
+		tqspi->curr_xfer = NULL;
+
 		if (ret < 0) {
 			tegra_qspi_transfer_end(spi);
 			spi_transfer_delay_exec(xfer);
@@ -1435,6 +1443,15 @@ exit:
 static irqreturn_t tegra_qspi_isr_thread(int irq, void *context_data)
 {
 	struct tegra_qspi *tqspi = context_data;
+
+	/*
+	 * Occasionally the IRQ thread takes a long time to wake up (usually
+	 * when the CPU that it's running on is excessively busy) and we have
+	 * already reached the timeout before and cleaned up the timed out
+	 * transfer. Avoid any processing in that case and bail out early.
+	 */
+	if (tqspi->curr_xfer == NULL)
+		return IRQ_NONE;
 
 	tqspi->status_reg = tegra_qspi_readl(tqspi, QSPI_FIFO_STATUS);
 
