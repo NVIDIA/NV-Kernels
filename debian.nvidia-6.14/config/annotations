@@ -224,6 +224,7 @@ CONFIG_CC_HAS_SIGN_RETURN_ADDRESS               policy<{'arm64': '-'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"'}>
 CONFIG_CGROUP_RESCTRL                           policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CPUFREQ_ARCH_CUR_FREQ                    policy<{'amd64': 'y'}>
+CONFIG_EINT_MTK_HP                              policy<{'arm64': 'm'}>
 CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_EC_HUAWEI_GAOKUN                         policy<{'arm64': 'n'}>
 CONFIG_FTRACE_SORT_STARTUP_TEST                 policy<{'amd64': 'n', 'arm64': 'n'}>
