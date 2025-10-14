@@ -35,10 +35,11 @@ static inline void ivpu_dbg_bo(struct ivpu_device *vdev, struct ivpu_bo *bo, con
 
 static struct sg_table *ivpu_bo_map_attachment(struct ivpu_device *vdev, struct ivpu_bo *bo)
 {
-	struct sg_table *sgt = bo->base.sgt;
+	struct sg_table *sgt;
 
 	drm_WARN_ON(&vdev->drm, !bo->base.base.import_attach);
 
+	sgt = bo->base.sgt;
 	if (!sgt) {
 		sgt = dma_buf_map_attachment_unlocked(bo->base.base.import_attach,
 						      DMA_BIDIRECTIONAL);
