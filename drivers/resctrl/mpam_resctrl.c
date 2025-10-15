@@ -361,7 +361,7 @@ void resctrl_arch_mon_ctx_free(struct rdt_resource *r,
 
 static int
 __read_mon(struct mpam_resctrl_mon *mon, struct mpam_component *mon_comp,
-	   enum mpam_device_features mon_type,
+	   enum mpam_device_features mon_type, enum mon_filter_options mon_opts,
 	   int mon_idx,
 	   enum resctrl_conf_type cdp_type, u32 closid, u32 rmid, u64 *val)
 {
@@ -390,6 +390,7 @@ __read_mon(struct mpam_resctrl_mon *mon, struct mpam_component *mon_comp,
 	cfg.match_pmg = true;
 	cfg.partid = closid;
 	cfg.pmg = rmid;
+	cfg.opts = mon_opts;
 
 	if (irqs_disabled()) {
 		/* Check if we can access this domain without an IPI */
@@ -400,27 +401,39 @@ __read_mon(struct mpam_resctrl_mon *mon, struct mpam_component *mon_comp,
 }
 
 static int read_mon_cdp_safe(struct mpam_resctrl_mon *mon, struct mpam_component *mon_comp,
-			     enum mpam_device_features mon_type,
+			     enum mpam_device_features mon_type, enum mon_filter_options mon_opts,
 			     int mon_idx, u32 closid, u32 rmid, u64 *val)
 {
 	if (cdp_enabled) {
 		u64 cdp_val = 0;
 		int err;
 
-		err = __read_mon(mon, mon_comp, mon_type, mon_idx,
+		err = __read_mon(mon, mon_comp, mon_type, mon_opts, mon_idx,
 				 CDP_CODE, closid, rmid, &cdp_val);
 		if (err)
 			return err;
 
-		err = __read_mon(mon, mon_comp, mon_type, mon_idx,
+		err = __read_mon(mon, mon_comp, mon_type, mon_opts, mon_idx,
 				 CDP_DATA, closid, rmid, &cdp_val);
 		if (!err)
 			*val += cdp_val;
 		return err;
 	}
 
-	return __read_mon(mon, mon_comp, mon_type, mon_idx,
+	return __read_mon(mon, mon_comp, mon_type, mon_idx, mon_opts,
 			  CDP_NONE, closid, rmid, val);
+}
+
+static enum mon_filter_options resctrl_evt_config_to_mpam(u32 local_evt_cfg)
+{
+	switch (local_evt_cfg) {
+	case READS_TO_LOCAL_MEM:
+		return COUNT_READ;
+	case NON_TEMP_WRITE_TO_LOCAL_MEM:
+		return COUNT_WRITE;
+	default:
+		return COUNT_BOTH;
+	}
 }
 
 /* MBWU when not in ABMC mode, and CSU counters. */
@@ -430,6 +443,7 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
 {
 	struct mpam_resctrl_dom *l3_dom;
 	struct mpam_component *mon_comp;
+	enum mon_filter_options mon_opts;
 	u32 mon_idx = *(u32 *)arch_mon_ctx;
 	enum mpam_device_features mon_type;
 	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[eventid];
@@ -441,6 +455,7 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
 
 	l3_dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
 	mon_comp = l3_dom->mon_comp[eventid];
+	mon_opts = resctrl_evt_config_to_mpam(l3_dom->mbm_local_evt_cfg);
 
 	switch (eventid) {
 	case QOS_L3_OCCUP_EVENT_ID:
@@ -454,7 +469,7 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
 		return -EINVAL;
 	}
 
-	return read_mon_cdp_safe(mon, mon_comp, mon_type, mon_idx,
+	return read_mon_cdp_safe(mon, mon_comp, mon_type, mon_opts, mon_idx,
 				 closid, rmid, val);
 }
 
@@ -464,6 +479,7 @@ int resctrl_arch_cntr_read(struct rdt_resource *r, struct rdt_mon_domain *d,
 			   enum resctrl_event_id eventid, u64 *val)
 {
 	struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[eventid];
+	enum mon_filter_options mon_opts;
 	struct mpam_resctrl_dom *l3_dom;
 	struct mpam_component *mon_comp;
 
@@ -475,9 +491,10 @@ int resctrl_arch_cntr_read(struct rdt_resource *r, struct rdt_mon_domain *d,
 
 	l3_dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
 	mon_comp = l3_dom->mon_comp[eventid];
+	mon_opts = resctrl_evt_config_to_mpam(l3_dom->mbm_local_evt_cfg);
 
 	return read_mon_cdp_safe(mon, mon_comp, mpam_feat_msmon_mbwu, mon_idx,
-				 closid, rmid, val);
+				 mon_opts, closid, rmid, val);
 }
 
 static void __reset_mon(struct mpam_resctrl_mon *mon, struct mpam_component *mon_comp,
@@ -1076,6 +1093,67 @@ static void mpam_resctrl_pick_counters(void)
 			     mpam_resctrl_counters[QOS_L3_MBM_TOTAL_EVENT_ID].class);
 }
 
+bool resctrl_arch_is_evt_configurable(enum resctrl_event_id evt)
+{
+	struct mpam_class *class;
+	struct mpam_props *cprops;
+
+	class = mpam_resctrl_counters[evt].class;
+	if (!class)
+		return false;
+
+	cprops = &class->props;
+
+	return mpam_has_feature(mpam_feat_msmon_mbwu_rwbw, cprops);
+}
+
+void resctrl_arch_mon_event_config_read(void *info)
+{
+	struct mpam_resctrl_dom *dom;
+	struct resctrl_mon_config_info *mon_info = info;
+
+	dom = container_of(mon_info->d, struct mpam_resctrl_dom, resctrl_mon_dom);
+	mon_info->mon_config = dom->mbm_local_evt_cfg & MAX_EVT_CONFIG_BITS;
+}
+
+void resctrl_arch_mon_event_config_write(void *info)
+{
+	struct mpam_resctrl_dom *dom;
+	struct resctrl_mon_config_info *mon_info = info;
+
+	WARN_ON_ONCE(mon_info->mon_config & ~MPAM_RESTRL_EVT_CONFIG_VALID);
+
+	dom = container_of(mon_info->d, struct mpam_resctrl_dom, resctrl_mon_dom);
+	dom->mbm_local_evt_cfg = mon_info->mon_config & MPAM_RESTRL_EVT_CONFIG_VALID;
+}
+
+void resctrl_arch_reset_rmid_all(struct rdt_resource *r, struct rdt_mon_domain *d)
+{
+	int i;
+	struct mpam_resctrl_dom *dom;
+	struct mpam_resctrl_mon *mon;
+	struct mpam_component *mon_comp;
+
+	dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
+	dom->mbm_local_evt_cfg = MPAM_RESTRL_EVT_CONFIG_VALID;
+
+	/*
+	 * Monitors may be backed by different classes of MSC, all
+	 * possible components need to be reset...
+	 */
+	for (i = 0; i < QOS_NUM_EVENTS; i++) {
+		mon = &mpam_resctrl_counters[i];
+		if (!mon->class)
+			continue;       // dummy resource
+
+		mon_comp = dom->mon_comp[i];
+		if (!mon_comp)
+			continue;
+
+		mpam_msmon_reset_all_mbwu(mon_comp);
+	}
+}
+
 static void __config_cntr(struct mpam_resctrl_mon *mon, u32 cntr_id,
 			  enum resctrl_conf_type cdp_type, u32 closid, u32 rmid,
 			  bool assign)
@@ -1291,6 +1369,7 @@ static void mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 		case QOS_L3_MBM_LOCAL_EVENT_ID:
 		case QOS_L3_MBM_TOTAL_EVENT_ID:
 			mpam_resctrl_monitor_init_abmc(mon);
+			l3->mon.mbm_cfg_mask = MPAM_RESTRL_EVT_CONFIG_VALID;
 
 			return;
 		default:
@@ -1600,6 +1679,8 @@ mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 				any_mon_comp = mon_comp;
 		}
 		WARN_ON_ONCE(!any_mon_comp);
+
+		dom->mbm_local_evt_cfg = MPAM_RESTRL_EVT_CONFIG_VALID;
 
 		mon_d = &dom->resctrl_mon_dom;
 		mpam_resctrl_domain_hdr_init(cpu, any_mon_comp, &mon_d->hdr);
