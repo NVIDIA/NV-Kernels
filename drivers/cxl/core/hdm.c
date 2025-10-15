@@ -1031,13 +1031,14 @@ static int init_hdm_decoder(struct cxl_port *port, struct cxl_decoder *cxld,
 			return -ENXIO;
 		}
 
+		port->commit_end = cxld->id;
+
 		if (size == 0) {
-			dev_warn(&port->dev,
+			dev_dbg(&port->dev,
 				 "decoder%d.%d: Committed with zero size\n",
 				 port->id, cxld->id);
-			return -ENXIO;
+			return -ENOSPC;
 		}
-		port->commit_end = cxld->id;
 	} else {
 		if (cxled) {
 			struct cxl_memdev *cxlmd = cxled_to_memdev(cxled);
@@ -1193,6 +1194,8 @@ static int devm_cxl_enumerate_decoders(struct cxl_hdm *cxlhdm,
 
 		rc = init_hdm_decoder(port, cxld, hdm, i, &dpa_base, info);
 		if (rc) {
+			if (rc == -ENOSPC)
+				continue;
 			dev_warn(&port->dev,
 				 "Failed to initialize decoder%d.%d\n",
 				 port->id, i);
