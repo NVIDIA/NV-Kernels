@@ -726,6 +726,45 @@ static void default_mock_decoder(struct cxl_decoder *cxld)
 	cxld->reset = mock_decoder_reset;
 }
 
+static void size_zero_mock_decoder_ep(struct cxl_decoder *cxld, u64 base)
+{
+	struct cxl_endpoint_decoder *cxled;
+
+	cxled = to_cxl_endpoint_decoder(&cxld->dev);
+	cxld->hpa_range = (struct range){
+		.start = base,
+		.end = base - 1,  /* Size 0 */
+	};
+
+	cxld->interleave_ways = 2;
+	cxld->interleave_granularity = 4096;
+	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->flags = CXL_DECODER_F_ENABLE;
+	cxled->state = CXL_DECODER_STATE_AUTO;
+	cxld->commit = mock_decoder_commit;
+	cxld->reset = mock_decoder_reset;
+}
+
+static void size_zero_mock_decoder_sw(struct device *dev, u64 base, int i)
+{
+	struct cxl_switch_decoder *cxlsd;
+	struct cxl_decoder *cxld;
+
+	cxlsd = to_cxl_switch_decoder(dev);
+	cxld = &cxlsd->cxld;
+	cxld->flags = CXL_DECODER_F_ENABLE;
+	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
+	if (i == 0)
+		cxld->interleave_ways = 2;
+	else
+		cxld->interleave_ways = 1;
+	cxld->interleave_granularity = 4096;
+	cxld->hpa_range = (struct range) {
+		.start = base,
+		.end = base - 1, /* Size 0 */
+	};
+}
+
 static int first_decoder(struct device *dev, const void *data)
 {
 	struct cxl_decoder *cxld;
@@ -734,6 +773,30 @@ static int first_decoder(struct device *dev, const void *data)
 		return 0;
 	cxld = to_cxl_decoder(dev);
 	if (cxld->id == 0)
+		return 1;
+	return 0;
+}
+
+static int second_decoder(struct device *dev, const void *data)
+{
+	struct cxl_decoder *cxld;
+
+	if (!is_switch_decoder(dev))
+		return 0;
+	cxld = to_cxl_decoder(dev);
+	if (cxld->id == 1)
+		return 1;
+	return 0;
+}
+
+static int third_decoder(struct device *dev, const void *data)
+{
+	struct cxl_decoder *cxld;
+
+	if (!is_switch_decoder(dev))
+		return 0;
+	cxld = to_cxl_decoder(dev);
+	if (cxld->id == 2)
 		return 1;
 	return 0;
 }
@@ -750,7 +813,7 @@ static void mock_init_hdm_decoder(struct cxl_decoder *cxld)
 	struct cxl_dport *dport;
 	struct device *dev;
 	bool hb0 = false;
-	u64 base;
+	u64 base = window->base_hpa;
 	int i;
 
 	if (is_endpoint_decoder(&cxld->dev)) {
@@ -775,6 +838,20 @@ static void mock_init_hdm_decoder(struct cxl_decoder *cxld)
 	}
 
 	/*
+	 * Decoders 1 and 2 of the endpoint under host bridge 0 should be enabled as zero-sized.
+	 * It would be even better to make sure that the parent switch uport decoder was
+	 * also enabled before enabling the size zero decoders but there is no harm in doing it
+	 * anyway.
+	 */
+	if (hb0 && (cxld->id == 1 || cxld->id == 2)) {
+		port = to_cxl_port(cxld->dev.parent);
+		size_zero_mock_decoder_ep(cxld, base);
+		/* Commit the zero-sized decoder */
+		port->commit_end = cxld->id;
+		return;
+	}
+
+	/*
 	 * The first decoder on the first 2 devices on the first switch
 	 * attached to host-bridge0 mock a fake / static RAM region. All
 	 * other decoders are default disabled. Given the round robin
@@ -787,7 +864,6 @@ static void mock_init_hdm_decoder(struct cxl_decoder *cxld)
 		return;
 	}
 
-	base = window->base_hpa;
 	cxld->hpa_range = (struct range) {
 		.start = base,
 		.end = base + size - 1,
@@ -845,6 +921,22 @@ static void mock_init_hdm_decoder(struct cxl_decoder *cxld)
 			.end = base + size - 1,
 		};
 		put_device(dev);
+
+		/* Enable the next two decoders also and make them zero sized */
+		dev = device_find_child(&iter->dev, NULL, second_decoder);
+		WARN_ON(!dev);
+		if (dev) {
+			size_zero_mock_decoder_sw(dev, base, i);
+			iter->commit_end = 1;
+			put_device(dev);
+		}
+		dev = device_find_child(&iter->dev, NULL, third_decoder);
+		WARN_ON(!dev);
+		if (dev) {
+			size_zero_mock_decoder_sw(dev, base, i);
+			iter->commit_end = 2;
+			put_device(dev);
+		}
 	}
 }
 
