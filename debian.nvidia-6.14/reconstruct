@@ -44,6 +44,10 @@ chmod +x 'drivers/net/ethernet/realtek/r8127/rtltool.h'
 chmod +x 'tools/testing/selftests/gpio/gpio-aggregator.sh'
 chmod +x 'tools/testing/selftests/ublk/test_stripe_04.sh'
 # Remove any files deleted from the orig.
+rm -f 'Documentation/arch/x86/resctrl.rst'
 rm -f 'arch/um/kernel/maccess.c'
+rm -f 'arch/x86/kernel/cpu/resctrl/trace.h'
 rm -f 'drivers/iommu/iommufd/fault.c'
+rm -f 'drivers/platform/arm64/acer-aspire1-ec.c'
+rm -f 'drivers/platform/arm64/lenovo-yoga-c630.c'
 exit 0
