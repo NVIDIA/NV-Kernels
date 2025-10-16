@@ -82,5 +82,6 @@ enum rhi_tdi_state {
 #define __RHI_DA_OBJECT_READ		0x2
 #define __RHI_DA_VDEV_GET_INTERFACE_REPORT 0x3
 #define __RHI_DA_VDEV_GET_MEASUREMENTS	0x4
+#define __REC_EXIT_DA_VDEV_REQUEST	0x5
 
 #endif

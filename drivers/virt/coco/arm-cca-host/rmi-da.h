@@ -93,6 +93,7 @@ struct cca_host_tdi {
 	struct pci_tdi tdi;
 	struct realm *realm;
 	void *rmm_vdev;
+	unsigned long vdev_id;
 	/* protected by cca_host_pf0_dsc.object_lock */
 	struct cache_object *interface_report;
 	struct cache_object *measurements;
@@ -153,4 +154,5 @@ int cca_vdev_read_cached_object(struct pci_dev *pdev, int type, unsigned long of
 int cca_vdev_get_interface_report(struct pci_dev *pdev);
 int cca_vdev_get_device_measurements(struct pci_dev *pdev, unsigned long flags,
 				     u8 *indices, u8 *nonce);
+int cca_vdev_device_request(struct pci_dev *pdev, unsigned long rec_id);
 #endif

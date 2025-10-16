@@ -7385,6 +7385,28 @@ the ``KVM_EXIT_ARM_SEA_FLAG_GPA_VALID`` flag is set. Otherwise, the value of
 ``gpa`` is unknown.
 
 ::
+		/* KVM_EXIT_ARM64_TIO*/
+		struct {
+			__u64 flags;
+			__u64 nr;
+			__u64 vdev_id;
+			__u64 gpa_base;
+			__u64 gpa_top;
+			__u64 pa_base;
+		} cca_exit;
+
+Used on arm64 systems. When the VM capability ``KVM_CAP_ARM_RMI`` is enabled,
+KVM generates a VM exit whenever the guest needs host assistance to map a vdev
+ID to a vdev object, or to validate a device-memory GPA-to-PA mapping. The
+``nr`` field records the exit reason; currently the following values are
+defined:
+
+* ``RMI_EXIT_VDEV_REQUEST``: the RMM is requiring host to provide the vdev
+  object details matching a specific virtual device id.
+* ``RMI_EXIT_VDEV_MAP``: the guest wants the host to validate or install a
+  device-memory mapping.
+
+The ``flags`` field must be zero.
 
 		/* Fix the size of the union. */
 		char padding[256];

@@ -23,4 +23,9 @@ struct arm64_vdev_device_measurement_guest_req {
 	__u8 *nonce;
 };
 
+struct arm64_vdev_device_idmap_guest_req {
+	__u32 req_type;
+	__s32 vcpu_fd;
+};
+
 #endif

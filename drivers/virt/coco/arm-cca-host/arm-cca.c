@@ -348,6 +348,18 @@ static ssize_t cca_tsm_guest_req(struct pci_tdi *tdi, enum pci_tsm_req_scope sco
 							       req_obj.nonce);
 			return ret;
 		}
+		case __REC_EXIT_DA_VDEV_REQUEST:
+		{
+			struct arm64_vdev_device_idmap_guest_req req_obj;
+
+			if (req_len > sizeof(req_obj))
+				return -EINVAL;
+
+			if (copy_from_user((void *)&req_obj, req.user, req_len))
+				return -EFAULT;
+
+			return cca_vdev_device_request(pdev, req_obj.vcpu_fd);
+		}
 		default:
 			return -EINVAL;
 		}

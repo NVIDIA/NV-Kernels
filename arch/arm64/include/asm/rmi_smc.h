@@ -60,6 +60,7 @@
 #define SMC_RMI_VDEV_DESTROY		SMC_RMI_CALL(0x0188)
 #define SMC_RMI_VDEV_GET_STATE		SMC_RMI_CALL(0x0189)
 #define SMC_RMI_VDEV_UNLOCK		SMC_RMI_CALL(0x018A)
+#define SMC_RMI_VDEV_COMPLETE		SMC_RMI_CALL(0x018e)
 #define SMC_RMI_VDEV_GET_INTERFACE_REPORT SMC_RMI_CALL(0x01D0)
 #define SMC_RMI_VDEV_GET_DEV_MEASUREMENTS	SMC_RMI_CALL(0x01D1)
 #define SMC_RMI_VDEV_LOCK		SMC_RMI_CALL(0x01D2)
@@ -225,6 +226,7 @@ struct rec_enter {
 #define RMI_EXIT_RIPAS_CHANGE		0x04
 #define RMI_EXIT_HOST_CALL		0x05
 #define RMI_EXIT_SERROR			0x06
+#define RMI_EXIT_VDEV_REQUEST		0x08
 
 struct rec_exit {
 	union { /* 0x000 */
@@ -266,12 +268,23 @@ struct rec_exit {
 			u64 ripas_base;
 			u64 ripas_top;
 			u8 ripas_value;
-			u8 padding8[7];
+			u8 padding8[15];
+			u64 s2ap_base;
+			u64 s2ap_top;
+			u64 vdev_id_1;
+			u64 vdev_id_2;
+			u64 dev_mem_base;
+			u64 dev_mem_top;
+			u64 dev_mem_pa;
 		};
 		u8 padding5[0x100];
 	};
 	union { /* 0x600 */
-		u16 imm;
+		struct {
+			u16 imm;
+			u8 padding[6];
+			u64 plane;
+		};
 		u8 padding6[0x100];
 	};
 	union { /* 0x700 */

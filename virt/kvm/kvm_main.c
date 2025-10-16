@@ -4126,6 +4126,12 @@ static struct file_operations kvm_vcpu_fops = {
 	KVM_COMPAT(kvm_vcpu_compat_ioctl),
 };
 
+bool file_is_vcpu(struct file *file)
+{
+	return file && file->f_op == &kvm_vcpu_fops;
+}
+EXPORT_SYMBOL_GPL(file_is_vcpu);
+
 /*
  * Allocates an inode for the vcpu.
  */

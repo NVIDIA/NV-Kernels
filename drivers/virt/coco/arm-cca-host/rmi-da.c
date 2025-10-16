@@ -1037,3 +1037,33 @@ int cca_vdev_get_device_measurements(struct pci_dev *pdev, unsigned long flags,
 	/* get and update the interface report cache. */
 	return vdev_update_device_measurements_cache(pdev);
 }
+
+int cca_vdev_device_request(struct pci_dev *pdev, unsigned long vcpu_fd)
+{
+	struct kvm *kvm;
+	struct kvm_vcpu *vcpu;
+	unsigned long rec_phys;
+	struct cca_host_tdi *host_tdi = NULL;
+	struct file *vcpu_filp __free(fput) = fget(vcpu_fd);
+
+	if (!file_is_vcpu(vcpu_filp))
+		return -EINVAL;
+
+	vcpu = vcpu_filp->private_data;
+	if (!vcpu)
+		return -EINVAL;
+
+	rec_phys = virt_to_phys(vcpu->arch.rec.rec_page);
+	host_tdi = to_cca_host_tdi(pdev);
+	if (!host_tdi)
+		return -EINVAL;
+
+	kvm = host_tdi->tdi.kvm;
+	/* make sure this is the same vm */
+	if (vcpu->kvm != kvm)
+		return -EINVAL;
+
+	if (rmi_vdev_complete(rec_phys, virt_to_phys(host_tdi->rmm_vdev)))
+		return -ENXIO;
+	return 0;
+}
