@@ -296,6 +296,71 @@ static void test_percent_to_max_rounding(struct kunit *test)
 	KUNIT_EXPECT_LE(test, 4 * num_rounded_up, 3 * total);
 }
 
+static void test_num_assignable_counters(struct kunit *test)
+{
+	struct mpam_resctrl_mon *mon =
+		&mpam_resctrl_counters[QOS_L3_MBM_TOTAL_EVENT_ID];
+	struct mpam_resctrl_res *res =
+		&mpam_resctrl_controls[RDT_RESOURCE_L3];
+	struct rdt_resource *r = &res->resctrl_res;
+	struct mpam_class fake_class = {};
+	struct mpam_class *orig_res_class = res->class;
+	struct mpam_class *orig_mon_class = mon->class;
+	int *orig_assigned_counters = mon->assigned_counters;
+	u32 orig_num_mbm_cntrs = r->mon.num_mbm_cntrs;
+	bool orig_mbm_cntr_assignable = r->mon.mbm_cntr_assignable;
+	bool orig_mbm_assign_on_mkdir = r->mon.mbm_assign_on_mkdir;
+	bool orig_cdp_enabled = cdp_enabled;
+	int fake_counter;
+
+	res->class = &fake_class;
+	mon->class = &fake_class;
+	mon->assigned_counters = &fake_counter;
+	r->mon.mbm_cntr_assignable = true;
+	r->mon.mbm_assign_on_mkdir = true;
+	cdp_enabled = false;
+
+	/* ABMC v5 takes the counter count from the selected MPAM class. */
+	fake_class.props.num_mbwu_mon = 4;
+	mpam_resctrl_monitor_sync_abmc_vals(r);
+	KUNIT_EXPECT_EQ(test, r->mon.num_mbm_cntrs, 4);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_cntr_assignable);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_assign_on_mkdir);
+
+	cdp_enabled = true;
+
+	/* CDP splits the available counters between code and data. */
+	mpam_resctrl_monitor_sync_abmc_vals(r);
+	KUNIT_EXPECT_EQ(test, r->mon.num_mbm_cntrs, 2);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_cntr_assignable);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_assign_on_mkdir);
+
+	/*
+	 * ABMC v5 remains in mbm_event mode even when CDP leaves no counters
+	 * available, avoiding contradictory mode information from resctrl.
+	 */
+	fake_class.props.num_mbwu_mon = 1;
+	mpam_resctrl_monitor_sync_abmc_vals(r);
+	KUNIT_EXPECT_EQ(test, r->mon.num_mbm_cntrs, 0);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_cntr_assignable);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_assign_on_mkdir);
+
+	/* Synchronization is deferred until assignable counters are allocated. */
+	mon->assigned_counters = NULL;
+	r->mon.num_mbm_cntrs = 3;
+	mpam_resctrl_monitor_sync_abmc_vals(r);
+	KUNIT_EXPECT_EQ(test, r->mon.num_mbm_cntrs, 3);
+
+	/* Restore global variables that were messed with */
+	res->class = orig_res_class;
+	mon->class = orig_mon_class;
+	mon->assigned_counters = orig_assigned_counters;
+	r->mon.num_mbm_cntrs = orig_num_mbm_cntrs;
+	r->mon.mbm_cntr_assignable = orig_mbm_cntr_assignable;
+	r->mon.mbm_assign_on_mkdir = orig_mbm_assign_on_mkdir;
+	cdp_enabled = orig_cdp_enabled;
+}
+
 static struct kunit_case mpam_resctrl_test_cases[] = {
 	KUNIT_CASE(test_get_mba_granularity),
 	KUNIT_CASE_PARAM(test_fract16_to_percent, test_percent_value_gen_params),
@@ -304,6 +369,7 @@ static struct kunit_case mpam_resctrl_test_cases[] = {
 	KUNIT_CASE(test_percent_to_max_rounding),
 	KUNIT_CASE_PARAM(test_percent_max_roundtrip_stability,
 			 test_all_bwa_wd_gen_params),
+	KUNIT_CASE(test_num_assignable_counters),
 	{}
 };
 
