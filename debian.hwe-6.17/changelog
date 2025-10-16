@@ -1,0 +1,331 @@
+linux-hwe-6.17 (6.17.0-6.6~24.04.1) noble; urgency=medium
+
+  * Initial version based on 6.17.0-6.6
+
+ -- Stefan Bader <stefan.bader@canonical.com>  Thu, 16 Oct 2025 17:34:59 +0200
+
+linux (6.17.0-6.6) questing; urgency=medium
+
+  * questing/linux: 6.17.0-6.6 -proposed tracker (LP: #2126040)
+
+  * Questing update: v6.17.1 upstream stable release (LP: #2126948)
+    - blk-mq: fix blk_mq_tags double free while nr_requests grown
+    - gcc-plugins: Remove TODO_verify_il for GCC >= 16
+    - scsi: target: target_core_configfs: Add length check to avoid buffer
+      overflow
+    - ALSA: usb-audio: fix race condition to UAF in snd_usbmidi_free
+    - wifi: rtw89: fix use-after-free in rtw89_core_tx_kick_off_and_wait()
+    - media: b2c2: Fix use-after-free causing by irq_check_work in
+      flexcop_pci_remove
+    - media: i2c: tc358743: Fix use-after-free bugs caused by orphan timer in
+      probe
+    - media: tuner: xc5000: Fix use-after-free in xc5000_release
+    - media: rc: fix races with imon_disconnect()
+    - media: uvcvideo: Mark invalid entities with id UVC_INVALID_ENTITY_ID
+    - mm: swap: check for stable address space before operating on the VMA
+    - wifi: ath11k: fix NULL dereference in ath11k_qmi_m3_load()
+    - media: iris: Fix memory leak by freeing untracked persist buffer
+    - media: stm32-csi: Fix dereference before NULL check
+    - ASoC: qcom: audioreach: fix potential null pointer dereference
+    - Linux 6.17.1
+
+  * RISC-V kernel config is out of sync with other archs (LP: #1981437)
+    - [Config] riscv64: Update EFI_SBAT_FILE
+    - [Config] riscv64: Enable EFI_ZBOOT
+    - [Config] riscv64: Disable support for non-RVA23 SoCs
+    - [Config] riscv64: Disable RISCV_ISA_FALLBACK
+    - [Config] riscv64: Sync config with other architectures
+
+  * Miscellaneous Ubuntu changes
+    - [Config] updateconfigs after rebase to 6.17
+
+linux (6.17.0-5.5) questing; urgency=medium
+
+  * questing/linux: 6.17.0-5.5 -proposed tracker (LP: #2125319)
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] resync git-ubuntu-log
+    - [Packaging] debian.master/dkms-versions -- update from kernel-versions
+      (main/d2025.09.22)
+
+  * [SRU] Failed to create source package: Unmet build dependencies:
+    bpftool:native (LP: #2122310)
+    - [Packaging] fix build profile spec for bpftool
+
+  * UBUNTU: fan: fail to check kmalloc() return could cause a NULL pointer
+    dereference (LP: #2125053)
+    - SAUCE: fan: vxlan: check memory allocation for map
+
+  * iproute2 breaking netplan DEP-8 tests in Questing, unexpected "fan-map" in
+    JSON output (LP: #2124257)
+    - SAUCE: fan: don't enforce a specific enum value for IFLA_VXLAN_FAN_MAP
+
+  * memory leaks when configuring a small rate limit in audit (LP: #2122554)
+    - SAUCE: audit: fix skb leak when audit rate limit is exceeded
+
+  * Support AMD Image Signal Processing (ISP) unit V4.0 (LP: #2110092)
+    - SAUCE: media: platform: amd: Introduce amd isp4 capture driver
+    - SAUCE: media: platform: amd: low level support for isp4 firmware
+    - SAUCE: media: platform: amd: Add isp4 fw and hw interface
+    - SAUCE: media: platform: amd: isp4 subdev and firmware loading handling
+      added
+    - SAUCE: media: platform: amd: isp4 video node and buffers handling added
+    - SAUCE: media: platform: amd: isp4 debug fs logging and more descriptive
+      errors
+    - SAUCE: Documentation: add documentation of AMD isp 4 driver
+    - [Config] Enable AMD_ISP4
+
+  * 25.10 Snapdragon X Elite: Sync concept kernel changes (LP: #2121477)
+    - phy: qcom: qmp-combo: Rename 'mode' to 'phy_mode'
+    - phy: qcom: qmp-combo: store DP phy power state
+    - phy: qcom: qmp-combo: introduce QMPPHY_MODE
+    - phy: qcom: qmp-combo: register a typec mux to change the QMPPHY_MODE
+    - arm64: dts: qcom: x1e80100-crd: Add USB multiport fingerprint reader
+    - dt-bindings: arm: qcom: Add Dell Latitude 7455
+    - dt-bindings: display: panel: samsung,atna40cu11: document ATNA40CU11
+    - dt-bindings: display: panel: samsung,atna40ct06: document ATNA40CT06
+    - drm/panel-edp: Add BOE NV140WUM-N64
+    - arm64: dts: qcom: x1-crd: Enable HBR3 on external DPs
+    - SAUCE: drm/dp: drm_edp_backlight_set_level: do not always send 3-byte
+      commands
+    - SAUCE: drm/edp-panel: Add touchscreen panel used by Lenovo X13s
+    - SAUCE: net: qrtr: mhi: synchronize qrtr and mhi preparation
+    - SAUCE: arm64: dts: qcom: x1e78100-t14s-oled: add eDP panel
+    - SAUCE: wip: arm64: dts: qcom: x1e80100-crd: Add WiFi/BT pwrseq
+    - SAUCE: wip: arm64: dts: qcom: x1e78100-t14s: enable bluetooth
+    - SAUCE: drm/dp: clamp PWM bit count to advertised MIN and MAX
+      capabilities
+    - SAUCE: arm64: dts: qcom: x1e80100-pmics: Disable pm8010 by default
+    - SAUCE: arm64: dts: qcom: x1e80100-dell-xps13-9345: Add Left/Right
+      Speakers and Tweeter
+    - SAUCE: arm64: dts: qcom: x1e80100-dell-xps13-9345: enable MICs LDO
+    - SAUCE: arm64: dts: qcom: x1e80100-dell-xps13-9345: Mark audio channels
+      as left-right swapped
+    - SAUCE: arm64: dts: qcom: sc8280xp-lenovo-thinkpad-x13: Set up 4-lane DP
+    - SAUCE: dt-bindings: phy: qcom,sc8280xp-qmp-usb43dp-phy: Document default
+      phy mode
+    - SAUCE: phy: qcom: qmp-combo: get default qmpphy_mode from DT
+    - SAUCE: arm64: dts: qcom: x1e78100-lenovo-thinkpad-t14s: add HDMI nodes
+    - SAUCE: dt-bindings: phy: qcom,sc8280xp-qmp-usb43dp: Reference usb-
+      switch.yaml to allow mode-switch
+    - SAUCE: dt-bindings: arm: qcom: Add Asus Zenbook A14 UX3407QA LCD/OLED
+      variants
+    - SAUCE: arm64: dts: qcom: Rework X1-based Asus Zenbook A14's displays
+    - SAUCE: arm64: dts: qcom: x1e80100-asus-zenbook-a14: Enable WiFi,
+      Bluetooth
+    - SAUCE: arm64: dts: qcom: Add support for Dell Inspiron 7441 / Latitude
+      7455
+    - SAUCE: firmware: qcom: scm: Allow QSEECOM on Dell Inspiron 7441 /
+      Latitude 7455
+    - SAUCE: dt-bindings: arm: qcom: Add Acer Swift 14 AI
+    - SAUCE: arm64: dts: qcom: x1-acer-swift-14: Add support for Acer Swift 14
+    - SAUCE: arm64: dts: qcom: x1e80100: allow mode-switch events to reach the
+      QMP Combo PHYs
+    - SAUCE: arm64: dts: qcom: x1e80100: move dp0/1/2 data-lanes to SoC dtsi
+    - SAUCE: arm64: dts: qcom: x1e80100: Set up 4-lane DP
+    - SAUCE: arm64: dts: qcom: x1e80100: move remaining dp0/1/2 data-lanes to
+      SoC dtsi
+    - Revert "UBUNTU: SAUCE: Change: cracking sound fix"
+
+  * UBSAN: shift-out-of-bounds in drivers/edac/skx_common.c:452:16
+    (LP: #2119713)
+    - EDAC/i10nm: Skip DIMM enumeration on a disabled memory controller
+
+  * Miscellaneous Ubuntu changes
+    - [Config] updateconfigs for v6.17-rc6 rebase
+
+ -- Timo Aaltonen <timo.aaltonen@canonical.com>  Mon, 22 Sep 2025 10:33:58 +0300
+
+linux (6.17.0-4.4) questing; urgency=medium
+
+  * questing/linux: 6.17.0-4.4 -proposed tracker (LP: #2122321)
+
+  * [SRU] Do not instantiate SPD5118 sensors on i801 SMBus controllers
+    (LP: #2114963)
+    - SAUCE: i2c: i801: Do not instantiate spd5118 under SPD Write Disable
+
+  * initramfs-tools: autopkgtest fails on arm64 with Possible missing firmware
+    /lib/firmware/apple/dfrmtfw-*.bin for built-in driver apple_z2
+    (LP: #2115758)
+    - [Config] Set TOUCHSCREEN_APPLE_Z2=m (arm64)
+
+  * Support TDX host in questing (LP: #2121873)
+    - SAUCE: x86/kexec: Consolidate relocate_kernel() function parameters
+    - SAUCE: x86/sme: Use percpu boolean to control WBINVD during kexec
+    - SAUCE: x86/virt/tdx: Mark memory cache state incoherent when making
+      SEAMCALL
+    - SAUCE: x86/kexec: Disable kexec/kdump on platforms with TDX partial
+      write erratum
+    - SAUCE: x86/virt/tdx: Remove the !KEXEC_CORE dependency
+    - SAUCE: x86/virt/tdx: Update the kexec section in the TDX documentation
+    - SAUCE: KVM: TDX: Explicitly do WBINVD when no more TDX SEAMCALLs
+    - [Config] enable TDX host support
+
+  * minimal kernel lacks modules for blk disk in arm64 openstack environments
+    where config_drive is required (LP: #2118499)
+    - [Config] Enable SYM53C8XX_2 on arm64
+
+  * Miscellaneous Ubuntu changes
+    - [Config] Re-enable Rust support, and make sure it doesn't get disabled
+      by accident
+    - [Config] updateconfigs for v6.17-rc5 rebase
+
+ -- Timo Aaltonen <timo.aaltonen@canonical.com>  Mon, 08 Sep 2025 17:10:38 +0300
+
+linux (6.17.0-3.3) questing; urgency=medium
+
+  * questing/linux: 6.17.0-3.3 -proposed tracker (LP: #2121512)
+
+  *  Enable Xilinx PS UART configs (LP: #2121337)
+    - [Config] Enable Xilinx PS UART configs
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] update variants
+    - [Packaging] debian.master/dkms-versions -- update from kernel-versions
+      (main/d2025.08.25)
+
+  * Plucky/Questing fails to boot on (older) Macs (LP: #2105402)
+    - SAUCE: hack: efi/libstub: enable t14s boot failure hack only on arm64
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] Fix linux-modules Description, add dependency on wireless-
+      regdb from old -extra
+    - [Packaging] Fix arch list for bpftool build-dep
+
+ -- Timo Aaltonen <timo.aaltonen@canonical.com>  Thu, 28 Aug 2025 10:37:03 +0300
+
+linux (6.17.0-2.2) questing; urgency=medium
+
+  * questing/linux: 6.17.0-2.2 -proposed tracker (LP: #2121374)
+
+  * Packaging resync (LP: #1786013)
+    - [Packaging] debian.master/dkms-versions -- update from kernel-versions
+      (main/d2025.08.25)
+
+  * enable Mediatek media platform drivers on arm64 (LP: #2116138)
+    - [Config] enable mediatek media platform drivers
+
+  * update apparmor and LSM stacking patch set (LP: #2028253)
+    - SAUCE: apparmor5.0.0 [1/38]: Stacking: Audit: Create audit_stamp
+      structure
+    - SAUCE: apparmor5.0.0 [2/38]: Stacking: Audit: Allow multiple records in
+      an audit_buffer
+    - SAUCE: apparmor5.0.0 [3/38]: Stacking: LSM: security_lsmblob_to_secctx
+      module selection
+    - SAUCE: apparmor5.0.0 [4/38]: Stacking: Audit: Add record for multiple
+      task security contexts
+    - SAUCE: apparmor5.0.0 [5/38]: Stacking: Audit: multiple subject lsm
+      values for netlabel
+    - SAUCE: apparmor5.0.0 [6/38]: Stacking: Audit: Add record for multiple
+      object contexts
+    - SAUCE: apparmor5.0.0 [7/38]: Stacking: LSM: Single calls in secid hooks
+    - SAUCE: apparmor5.0.0 [8/38]: Stacking: LSM: Exclusive secmark usage
+    - SAUCE: apparmor5.0.0 [9/38]: Stacking: Audit: Call only the first of the
+      audit rule hooks
+    - SAUCE: apparmor5.0.0 [10/38]: Stacking: AppArmor: Remove the exclusive
+      flag
+    - SAUCE: apparmor5.0.0 [11/38]: Revert "apparmor: fix dbus permission
+      queries to v9 ABI"
+    - SAUCE: apparmor5.0.0 [12/38]: Revert "apparmor: gate make fine grained
+      unix mediation behind v9 abi"
+    - SAUCE: apparmor5.0.0 [13/38]: apparmor: net: patch to provide
+      compatibility with v2.x net rules
+    - SAUCE: apparmor5.0.0 [14/38]: apparmor: net: add fine grained ipv4/ipv6
+      mediation
+    - SAUCE: apparmor5.0.0 [15/38]: apparmor: userns: add unprivileged user ns
+      mediation
+    - SAUCE: apparmor5.0.0 [16/38]: apparmor: userns: Add sysctls for
+      additional controls of unpriv userns restrictions
+    - SAUCE: apparmor5.0.0 [18/38]: apparmor: userns: open userns related
+      sysctl so lxc can check if restriction are in place
+    - SAUCE: apparmor5.0.0 [19/38]: apparmor: userns: allow profile to be
+      transitioned when a userns is created
+    - SAUCE: apparmor5.0.0 [20/38]: aoparmor: userns: Add support for execpath
+      in userns
+    - SAUCE: apparmor5.0.0 [21/38]: apparmor: mqueue: call
+      security_inode_init_security on inode creation
+    - SAUCE: apparmor5.0.0 [22/38]: apparmor: mqueue: add fine grained
+      mediation of posix mqueues
+    - SAUCE: apparmor5.0.0 [23/38]: apparmor: uring: add io_uring mediation
+    - SAUCE: apparmor5.0.0 [26/38]: apparmor: prompt: setup slab cache for
+      audit data
+    - SAUCE: apparmor5.0.0 [27/38]: apparmor: prompt: add the ability for
+      profiles to have a learning cache
+    - SAUCE: apparmor5.0.0 [28/38]: apparmor: prompt: enable userspace upcall
+      for mediation
+    - SAUCE: apparmor5.0.0 [29/38]: apparmor: prompt: pass prompt boolean
+      through into path_name as well
+    - SAUCE: apparmor5.0.0 [30/38]: apparmor: add AA_DEBUG_PROFILE to have
+      debug on profiles with flag set
+    - SAUCE: apparmor5.0.0 [31/38]: apparmor: make str table more generic and
+      be able to have multiple entries
+    - SAUCE: apparmor5.0.0 [32/38]: apparmor: check for supported version in
+      notification messages.
+    - SAUCE: apparmor5.0.0 [33/38]: apparmor: refactor building notice so it
+      is easier to extend
+    - SAUCE: apparmor5.0.0 [34/38]: apparmor: switch from ENOTSUPP to
+      EPROTONOSUPPORT
+    - SAUCE: apparmor5.0.0 [35/38]: UBUNTU: SAUCE: apparmor5.0.0 [35/38]:
+      apparmor: add support for meta data tags
+    - SAUCE: apparmor5.0.0 [36/38]: apparmor: mmap_file() doesn't need to be
+      called atomically
+    - SAUCE: apparmor5.0.0 [37/38]: apparmor: guard against free routines
+      being called with a NULL
+    - SAUCE: apparmor5.0.0 [38/38]: apparmor: prevent profile->disconnected
+      double free in aa_free_profile
+    - [Config] disable CONFIG_SECURITY_APPARMOR_RESTRICT_USERNS
+
+  * Installation of AppArmor on a 6.14 kernel produces error message "Illegal
+    number: yes" (LP: #2102680)
+    - SAUCE: apparmor5.0.0 [24/38]: apparmor: create an
+      AA_SFS_TYPE_BOOLEAN_INTPRINT sysctl variant
+    - SAUCE: apparmor5.0.0 [25/38]: apparmor: Use AA_SFS_FILE_BOOLEAN_INTPRINT
+      for userns and io_uring sysctls
+
+  * update apparmor and LSM stacking patch set (LP: #2028253) // [FFe]
+    apparmor-4.0.0-alpha2 for unprivileged user namespace restrictions in
+    mantic (LP: #2032602)
+    - SAUCE: apparmor5.0.0 [17/38]: apparmor: userns - make it so special
+      unconfined profiles can mediate user namespaces
+
+  * nvme no longer detected on boot after upgrade to 6.8.0-60 (LP: #2111521)
+    - SAUCE: PCI: Disable RRS polling for Intel SSDPE2KX020T8 nvme
+
+  * Miscellaneous Ubuntu changes
+    - [Packaging] Use host bpftool if doing cross-compiling
+    - [Packaging] Rename to linux
+    - [Packaging] d/t/ubuntu-regression-suite: use https to clone
+    - [Packaging] d/t/control: add snapd and fuse-overlayfs dependencies
+    - [Packaging] Drop/update some dkms packages.
+
+ -- Timo Aaltonen <timo.aaltonen@canonical.com>  Tue, 26 Aug 2025 17:15:12 +0300
+
+linux-unstable (6.17.0-1.1) questing; urgency=medium
+
+  * questing/linux-unstable: 6.17.0-1.1 -proposed tracker (LP: #2121054)
+
+  * Enable CONFIG_IPV6_OPTIMISTIC_DAD (LP: #1728366)
+    - [Config] Enable CONFIG_IPV6_OPTIMISTIC_DAD
+
+  * No IP Address assigned after hot-plugging Ethernet cable on HP Platform
+    (LP: #2115393)
+    - Revert "e1000e: change k1 configuration on MTP and later platforms"
+
+  * sources list generation using dwarfdump takes up to 0.5hr in build process
+    (LP: #2104911)
+    - [Packaging] Don't generate list of source files
+
+  * Miscellaneous Ubuntu changes
+    - [Config] updateconfig following rebase to v6.17-rc2
+    - [Packaging] Renane to linux-unstable
+    - SAUCE: gpio: aaeon: use new GPIO line value setter callbacks
+    - [Packaging] debian.master/dkms-versions: Drop failing dkms packages
+    - [Packaging] Don't suggest linux-modules-extra
+
+ -- Timo Aaltonen <timo.aaltonen@canonical.com>  Thu, 21 Aug 2025 11:22:12 +0300
+
+linux-unstable (6.17.0-0.0) questing; urgency=medium
+
+  * dummy entry
+
+ -- Timo Aaltonen <timo.aaltonen@canonical.com>  Mon, 18 Aug 2025 18:27:35 +0300
