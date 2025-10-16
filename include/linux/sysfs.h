@@ -97,6 +97,7 @@ struct attribute_group {
  */
 
 #define SYSFS_PREALLOC 010000
+#define SYSFS_GROUP_INVISIBLE	020000
 
 #define __ATTR(_name, _mode, _show, _store) {				\
 	.attr = {.name = __stringify(_name),				\
