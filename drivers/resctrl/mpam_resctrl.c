@@ -1866,7 +1866,7 @@ static void mpam_resctrl_domain_insert(struct list_head *list,
 static struct mpam_resctrl_dom *
 mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 {
-	int err, idx;
+	int err;
 	struct mpam_resctrl_dom *dom;
 	struct rdt_l3_mon_domain *mon_d;
 	struct rdt_ctrl_domain *ctrl_d;
