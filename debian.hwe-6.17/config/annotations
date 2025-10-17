@@ -16,29 +16,61 @@ CONFIG_MEMCG_V1                                 note<'Leave memcg v1 enabled on 
 
 CONFIG_AS_VERSION                               policy<{'amd64': '24200', 'arm64': '24200', 'armhf': '24200', 'ppc64el': '24200', 'riscv64': '24200', 's390x': '24200'}>
 CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_BLK_DEV_RUST_NULL                        policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '"bindgen 0.65.1"', 'arm64': '"bindgen 0.65.1"'}>
 CONFIG_CC_ASM_FLAG_OUTPUT_BROKEN                policy<{'s390x': 'y'}>
+CONFIG_CC_HAS_COUNTED_BY                        policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
 CONFIG_CC_HAS_KASAN_SW_TAGS                     policy<{'amd64': '-', 'arm64': 'y'}>
 CONFIG_CC_HAS_MIN_FUNCTION_ALIGNMENT            policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
+CONFIG_CC_HAS_MULTIDIMENSIONAL_NONSTRING        policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
 CONFIG_CC_HAS_SANE_FUNCTION_ALIGNMENT           policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"', 'armhf': '"arm-linux-gnueabihf-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"', 'ppc64el': '"powerpc64le-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"', 'riscv64': '"riscv64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"', 's390x': '"s390x-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"'}>
-CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DYNAMIC_FTRACE                           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_DYNAMIC_FTRACE_WITH_ARGS                 policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_DYNAMIC_FTRACE_WITH_CALL_OPS             policy<{'arm64': 'y', 'ppc64el': 'y', 'riscv64': '-'}>
+CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS         policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_FPROBE                                   policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': '-', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_FPROBE_EVENTS                            policy<{'amd64': 'y', 'arm64': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_FTRACE_MCOUNT_USE_PATCHABLE_FUNCTION_ENTRY policy<{'arm64': 'y', 'ppc64el': 'y', 'riscv64': '-'}>
+CONFIG_FTRACE_RECORD_RECURSION                  policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': '-', 's390x': 'n'}>
+CONFIG_FTRACE_VALIDATE_RCU_IS_WATCHING          policy<{'amd64': 'n', 'arm64': 'n', 'riscv64': '-', 's390x': 'n'}>
+CONFIG_FUNCTION_ALIGNMENT                       policy<{'amd64': '16', 'arm64': '8', 'armhf': '0', 'ppc64el': '4', 'riscv64': '0', 's390x': '8'}>
+CONFIG_FUNCTION_ALIGNMENT_4B                    policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': '-'}>
+CONFIG_FUNCTION_ALIGNMENT_8B                    policy<{'arm64': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_FUNCTION_GRAPH_RETADDR                   policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_FUNCTION_GRAPH_RETVAL                    policy<{'amd64': 'y', 'arm64': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_FUNCTION_GRAPH_TRACER                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_FUNCTION_PROFILER                        policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_FUNCTION_TRACER                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_GCC_SUPPORTS_DYNAMIC_FTRACE              policy<{'riscv64': '-'}>
 CONFIG_GCC_VERSION                              policy<{'amd64': '130300', 'arm64': '130300', 'armhf': '130300', 'ppc64el': '130300', 'riscv64': '130300', 's390x': '130300'}>
-CONFIG_HAVE_RUST                                policy<{'amd64': 'y', 'arm64': '-', 'riscv64': '-'}>
+CONFIG_HAVE_DYNAMIC_FTRACE                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_HAVE_DYNAMIC_FTRACE_WITH_ARGS            policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_HAVE_DYNAMIC_FTRACE_WITH_CALL_OPS        policy<{'arm64': 'y', 'ppc64el': 'y', 'riscv64': '-'}>
+CONFIG_HAVE_DYNAMIC_FTRACE_WITH_DIRECT_CALLS    policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_HAVE_FUNCTION_GRAPH_TRACER               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_HAVE_FUNCTION_TRACER                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_HID_BPF                                  policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': '-'}>
+CONFIG_KPROBE_EVENTS_ON_NOTRACE                 policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': '-', 's390x': 'n'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64': '24200', 'armhf': '24200', 'ppc64el': '24200', 'riscv64': '24200', 's390x': '24200'}>
+CONFIG_MARCH_Z17                                policy<{'s390x': '-'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125', 'armhf': '125', 'ppc64el': '125', 'riscv64': '125', 's390x': '125'}>
+CONFIG_PROC_PID_CPUSET                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_PSTORE_FTRACE                            policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': '-', 's390x': '-'}>
 CONFIG_RELR                                     policy<{'arm64': '-'}>
-CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_RISCV_ISA_ZABHA                          policy<{'riscv64': '-'}>
+CONFIG_RISCV_ISA_ZACAS                          policy<{'riscv64': '-'}>
 CONFIG_RUSTC_HAS_COERCE_POINTEE                 policy<{'amd64': '-', 'arm64': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
-CONFIG_RUSTC_LLVM_VERSION                       policy<{'amd64': '180103', 'arm64': '180103', 'armhf': '180103', 'ppc64el': '180103', 'riscv64': '180103', 's390x': '180103'}>
-CONFIG_RUSTC_SUPPORTS_ARM64                     policy<{'arm64': '-'}>
-CONFIG_RUSTC_VERSION                            policy<{'amd64': '108001', 'arm64': '108001', 'armhf': '108001', 'ppc64el': '108001', 'riscv64': '108001', 's390x': '108001'}>
-CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_RUST_FW_LOADER_ABSTRACTIONS              policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_RUST_PHYLIB_ABSTRACTIONS                 policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_SAMPLES_RUST                             policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_RUSTC_LLVM_VERSION                       policy<{'amd64': '190101', 'arm64': '190101', 'armhf': '190101', 'ppc64el': '190101', 'riscv64': '190101', 's390x': '190101'}>
+CONFIG_RUSTC_VERSION                            policy<{'amd64': '108200', 'arm64': '108200', 'armhf': '108200', 'ppc64el': '108200', 'riscv64': '108200', 's390x': '108200'}>
+CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '"rustc 1.82.0 (f6e511eec 2024-10-15) (built from a source tarball)"', 'arm64': '"rustc 1.82.0 (f6e511eec 2024-10-15) (built from a source tarball)"'}>
+CONFIG_RUST_PHYLIB_ABSTRACTIONS                 policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_SAMPLE_FPROBE                            policy<{'amd64': 'n', 'arm64': 'n', 'riscv64': '-', 's390x': 'n'}>
+CONFIG_SAMPLE_FTRACE_DIRECT                     policy<{'amd64': 'n', 'arm64': 'n', 'ppc64el': 'n', 'riscv64': '-', 's390x': 'n'}>
+CONFIG_SAMPLE_FTRACE_DIRECT_MULTI               policy<{'amd64': 'n', 'arm64': 'n', 'ppc64el': 'n', 'riscv64': '-', 's390x': 'n'}>
+CONFIG_SAMPLE_FTRACE_OPS                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': '-', 's390x': 'n'}>
+CONFIG_STACK_TRACER                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_TASKS_RUDE_RCU                           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': '-', 's390x': 'y'}>
+CONFIG_TOOLCHAIN_HAS_ZABHA                      policy<{'riscv64': '-'}>
+CONFIG_TOOLCHAIN_HAS_ZACAS                      policy<{'riscv64': '-'}>
 CONFIG_TOOLS_SUPPORT_RELR                       policy<{'amd64': 'y', 'arm64': '-', 'ppc64el': 'y'}>
+CONFIG_TUNE_Z17                                 policy<{'s390x': '-'}>
