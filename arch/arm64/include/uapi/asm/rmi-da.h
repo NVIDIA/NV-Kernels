@@ -28,4 +28,12 @@ struct arm64_vdev_device_idmap_guest_req {
 	__s32 vcpu_fd;
 };
 
+struct arm64_vdev_device_memmap_guest_req {
+	__u32 req_type;
+	__s32 vcpu_fd;
+	__aligned_u64 gpa_base;
+	__aligned_u64 gpa_top;
+	__aligned_u64 pa_base;
+};
+
 #endif

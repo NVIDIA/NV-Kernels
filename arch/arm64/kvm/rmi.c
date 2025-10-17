@@ -1320,6 +1320,121 @@ static void kvm_complete_ripas_change(struct kvm_vcpu *vcpu)
 }
 
 /*
+ * Even though we can map larger block, since we need to delegate each granule.
+ * We map granule size and fold
+ */
+static int __realm_dev_mem_map(struct kvm *kvm,
+			       struct kvm_mmu_memory_cache *cache, unsigned long rec_phys,
+			       unsigned long pdev_phys, unsigned long vdev_phys,
+			       unsigned long start_ipa, unsigned long end_ipa,
+			       phys_addr_t phys, unsigned long *top_ipa)
+{
+	int ret = 0;
+	unsigned long rmi_ret;
+	unsigned long ipa, next_ipa;
+	struct realm *realm = &kvm->arch.realm;
+	phys_addr_t rd_phys = virt_to_phys(realm->rd);
+
+	for (ipa = start_ipa ; ipa < end_ipa; ipa += PAGE_SIZE) {
+
+		if (rmi_granule_delegate(phys)) {
+			ret = -EINVAL;
+			goto err_delegate;
+		}
+
+		rmi_ret = rmi_vdev_mem_map(rd_phys, vdev_phys,
+					   ipa, RMM_RTT_MAX_LEVEL, phys);
+		if (RMI_RETURN_STATUS(rmi_ret) == RMI_ERROR_RTT) {
+			/* Create missing RTTs and retry */
+			int level = RMI_RETURN_INDEX(rmi_ret);
+
+			ret = realm_create_rtt_levels(realm, ipa, level,
+						      RMM_RTT_MAX_LEVEL,
+						      cache);
+			if (ret)
+				goto err_vdev_mem_map;
+
+			if (rmi_vdev_mem_map(rd_phys, vdev_phys,
+					     ipa, RMM_RTT_MAX_LEVEL, phys))
+				ret = -ENXIO;
+		}
+		if (ret)
+			goto err_vdev_mem_map;
+
+		phys += PAGE_SIZE;
+	}
+
+	/*
+	 * Return the highest mapped IPA within the range
+	 * (processed by vdev_mem_map)
+	 */
+	*top_ipa = end_ipa;
+
+	while (start_ipa < end_ipa) {
+		/* now validate the device memory mapping */
+		if (rmi_vdev_validate_mapping(rd_phys, rec_phys, pdev_phys,
+				vdev_phys, start_ipa, end_ipa, &next_ipa)) {
+			/*
+			 * We can't find the RTT error here, because
+			 * things are already setup by dev_mem_map before
+			 * Caller will do the unmap and undelegate
+			 */
+			return -ENXIO;
+		}
+		start_ipa = next_ipa;
+	}
+
+	return 0;
+
+ err_vdev_mem_map:
+	WARN_ON(rmi_granule_undelegate(phys));
+ err_delegate:
+	*top_ipa = ipa - PAGE_SIZE;
+	return ret;
+}
+
+int realm_dev_mem_map(struct kvm *kvm, unsigned long rec_phys,
+		      unsigned long pdev_phys, unsigned long vdev_phys,
+		      unsigned long start_ipa, unsigned long end_ipa,
+		      unsigned long start_pa)
+{
+	int ret;
+	unsigned long top_ipa;
+	unsigned long base_ipa = start_ipa;
+	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
+	struct kvm_mmu_memory_cache cache = { .gfp_zero = __GFP_ZERO };
+
+	do {
+		ret = kvm_mmu_topup_memory_cache(&cache,
+						 kvm_mmu_cache_min_pages(mmu));
+		if (ret)
+			break;
+
+		write_lock(&kvm->mmu_lock);
+		ret = __realm_dev_mem_map(kvm, &cache, rec_phys, pdev_phys,
+				vdev_phys, start_ipa, end_ipa, start_pa, &top_ipa);
+		write_unlock(&kvm->mmu_lock);
+
+		/* update base before we break out of loop*/
+		start_pa += top_ipa - start_ipa;
+		start_ipa = top_ipa;
+		if (ret && ret != -ENOMEM)
+			break;
+	} while (start_ipa < end_ipa);
+
+	kvm_mmu_free_memory_cache(&cache);
+	if (!ret) {
+		/* fold rtts if we can */
+		for (start_ipa = ALIGN(base_ipa, RMM_L2_BLOCK_SIZE);
+		     ((start_ipa + RMM_L2_BLOCK_SIZE) < end_ipa); start_ipa += RMM_L2_BLOCK_SIZE)
+			fold_rtt(&kvm->arch.realm, start_ipa, RMM_RTT_BLOCK_LEVEL);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(realm_dev_mem_map);
+
+/*
  * kvm_rec_pre_enter - Complete operations before entering a REC
  *
  * Some operations require work to be completed before entering a realm. That

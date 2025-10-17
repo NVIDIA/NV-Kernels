@@ -155,4 +155,7 @@ int cca_vdev_get_interface_report(struct pci_dev *pdev);
 int cca_vdev_get_device_measurements(struct pci_dev *pdev, unsigned long flags,
 				     u8 *indices, u8 *nonce);
 int cca_vdev_device_request(struct pci_dev *pdev, unsigned long rec_id);
+int cca_vdev_device_map_validate(struct pci_dev *pdev, unsigned long vcpu_fd,
+				 unsigned long gpa_base, unsigned long gpa_top,
+				 unsigned long pa_base);
 #endif

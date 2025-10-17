@@ -144,6 +144,42 @@ static int rec_exit_vdev_request(struct kvm_vcpu *vcpu)
 	kvm_prepare_vdev_request_exit(vcpu, rec->run->exit.vdev_id_1);
 	return 0;
 }
+
+static inline void kvm_prepare_vdev_validate_mapping_exit(struct kvm_vcpu *vcpu,
+							  gpa_t gpa_base, gpa_t gpa_top,
+							  hpa_t pa_base, unsigned long vdev_id)
+{
+	vcpu->run->exit_reason = KVM_EXIT_ARM64_TIO;
+	vcpu->run->cca_exit.nr = RMI_EXIT_VDEV_MAP;
+	vcpu->run->cca_exit.vdev_id  = vdev_id;
+	vcpu->run->cca_exit.flags = 0;
+	vcpu->run->cca_exit.gpa_base = gpa_base;
+	vcpu->run->cca_exit.gpa_top  = gpa_top;
+	vcpu->run->cca_exit.pa_base  = pa_base;
+}
+
+static int rec_exit_vdev_validate_mapping(struct kvm_vcpu *vcpu)
+{
+	struct kvm *kvm = vcpu->kvm;
+	struct realm *realm = &kvm->arch.realm;
+	struct realm_rec *rec = &vcpu->arch.rec;
+	unsigned long base = rec->run->exit.dev_mem_base;
+	unsigned long top = rec->run->exit.dev_mem_top;
+
+	if (!kvm_realm_is_private_address(realm, base) ||
+	    !kvm_realm_is_private_address(realm, top - 1)) {
+
+		/* Set RMI_REJECT bit */
+		rec->run->enter.flags = REC_ENTER_FLAG_DEV_MEM_RESPONSE;
+		vcpu_err(vcpu, "Invalid DEV_MEM_VALIDATE for %#lx - %#lx\n", base, top);
+		return -EINVAL;
+	}
+
+	kvm_prepare_vdev_validate_mapping_exit(vcpu, base, top, rec->run->exit.dev_mem_pa,
+					       rec->run->exit.vdev_id_1);
+	return 0;
+}
+
 static void update_arch_timer_irq_lines(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
@@ -215,6 +251,8 @@ int handle_rec_exit(struct kvm_vcpu *vcpu, int rec_run_ret)
 		return rec_exit_host_call(vcpu);
 	case RMI_EXIT_VDEV_REQUEST:
 		return rec_exit_vdev_request(vcpu);
+	case RMI_EXIT_VDEV_MAP:
+		return rec_exit_vdev_validate_mapping(vcpu);
 	}
 
 	kvm_pr_unimpl("Unsupported exit reason: %u\n",

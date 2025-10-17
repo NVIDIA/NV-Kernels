@@ -695,4 +695,30 @@ static inline unsigned long rmi_vdev_complete(unsigned long rec_phys, unsigned l
 	return res.a0;
 }
 
+static inline int rmi_vdev_validate_mapping(unsigned long rd, unsigned long rec_phys,
+					    unsigned long pdev_phys, unsigned long vdev_phys,
+					    unsigned long base, unsigned long top,
+					    unsigned long *out_top)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_1_1_invoke(SMC_RMI_VDEV_VALIDATE_MAPPING, rd,
+			     rec_phys, pdev_phys, vdev_phys, base, top, &res);
+
+	if (out_top)
+		*out_top = res.a1;
+
+	return res.a0;
+}
+
+static inline int rmi_vdev_mem_map(unsigned long rd, unsigned long vdev_phys,
+				   unsigned long ipa, unsigned long level, unsigned long pa)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_1_1_invoke(SMC_RMI_VDEV_MEM_MAP, rd, vdev_phys, ipa, level, pa, &res);
+
+	return res.a0;
+}
+
 #endif /* __ASM_RMI_CMDS_H */

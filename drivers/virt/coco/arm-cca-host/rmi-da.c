@@ -1067,3 +1067,40 @@ int cca_vdev_device_request(struct pci_dev *pdev, unsigned long vcpu_fd)
 		return -ENXIO;
 	return 0;
 }
+
+int cca_vdev_device_map_validate(struct pci_dev *pdev, unsigned long vcpu_fd,
+				 unsigned long gpa_base, unsigned long gpa_top,
+				 unsigned long pa_base)
+{
+	struct kvm *kvm;
+	struct realm *realm;
+	phys_addr_t rec_phys;
+	struct kvm_vcpu *vcpu;
+	phys_addr_t rmm_pdev_phys;
+	phys_addr_t rmm_vdev_phys;
+	struct cca_host_tdi *host_tdi;
+	struct cca_host_pf0_dsc *pf0_dsc;
+	struct file *vcpu_filp __free(fput) = fget(vcpu_fd);
+
+	if (!file_is_vcpu(vcpu_filp))
+		return -EINVAL;
+
+	vcpu = vcpu_filp->private_data;
+	if (!vcpu)
+		return -EINVAL;
+
+	host_tdi = to_cca_host_tdi(pdev);
+	pf0_dsc = to_cca_pf0_dsc(pdev->tsm->dsm_dev);
+	kvm = host_tdi->tdi.kvm;
+	realm = &kvm->arch.realm;
+	rec_phys = virt_to_phys(vcpu->arch.rec.rec_page);
+	rmm_vdev_phys = virt_to_phys(host_tdi->rmm_vdev);
+	rmm_pdev_phys = virt_to_phys(pf0_dsc->rmm_pdev);
+
+	/* make sure this is the same vm */
+	if (vcpu->kvm != kvm)
+		return -EINVAL;
+
+	return realm_dev_mem_map(kvm, rec_phys, rmm_pdev_phys,
+				 rmm_vdev_phys, gpa_base, gpa_top, pa_base);
+}
