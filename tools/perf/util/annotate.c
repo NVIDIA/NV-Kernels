@@ -2429,7 +2429,7 @@ int symbol__annotate(struct map_symbol *ms, struct evsel *evsel,
 	int err;
 
 	err = evsel__get_arch(evsel, &arch);
-	if (err < 0)
+	if (err)
 		return err;
 
 	if (parch)
