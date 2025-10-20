@@ -71,10 +71,6 @@ static const int amd_erratum_383[] =
 static const int amd_erratum_1054[] =
 	AMD_LEGACY_ERRATUM(AMD_MODEL_RANGE(0x17, 0, 0, 0x2f, 0xf));
 
-static const int amd_div0[] =
-	AMD_LEGACY_ERRATUM(AMD_MODEL_RANGE(0x17, 0x00, 0x0, 0x2f, 0xf),
-			   AMD_MODEL_RANGE(0x17, 0x50, 0x0, 0x5f, 0xf));
-
 static const int amd_erratum_1485[] =
 	AMD_LEGACY_ERRATUM(AMD_MODEL_RANGE(0x19, 0x10, 0x0, 0x1f, 0xf),
 			   AMD_MODEL_RANGE(0x19, 0x60, 0x0, 0xaf, 0xf));
@@ -1094,6 +1090,9 @@ static void init_amd_zen(struct cpuinfo_x86 *c)
 		if (!cpu_has(c, X86_FEATURE_CPB))
 			set_cpu_cap(c, X86_FEATURE_CPB);
 	}
+
+	pr_notice_once("AMD Zen1 DIV0 bug detected. Disable SMT for full protection.\n");
+	setup_force_cpu_bug(X86_BUG_DIV0);
 }
 
 static bool cpu_has_zenbleed_microcode(void)
@@ -1132,7 +1131,6 @@ static void zen2_zenbleed_check(struct cpuinfo_x86 *c)
 	} else {
 		msr_clear_bit(MSR_AMD64_DE_CFG, MSR_AMD64_DE_CFG_ZEN2_FP_BACKUP_FIX_BIT);
 	}
-
 }
 
 static void init_amd_zen2(struct cpuinfo_x86 *c)
@@ -1258,11 +1256,6 @@ static void init_amd(struct cpuinfo_x86 *c)
 		msr_set_bit(MSR_K7_HWCR, MSR_K7_HWCR_IRPERF_EN_BIT);
 
 	check_null_seg_clears_base(c);
-
-	if (cpu_has_amd_erratum(c, amd_div0)) {
-		pr_notice_once("AMD Zen1 DIV0 bug detected. Disable SMT for full protection.\n");
-		setup_force_cpu_bug(X86_BUG_DIV0);
-	}
 
 	if (!cpu_has(c, X86_FEATURE_HYPERVISOR) &&
 	     cpu_has_amd_erratum(c, amd_erratum_1485))
