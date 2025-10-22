@@ -10,7 +10,12 @@
 #include <linux/arm-smccc.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/auxiliary_bus.h>
+
 #include <asm/archrandom.h>
+#ifdef CONFIG_ARM64
+#include <asm/rsi_cmds.h>
+#endif
 
 static u32 smccc_version = ARM_SMCCC_VERSION_1_0;
 static enum arm_smccc_conduit smccc_conduit = SMCCC_CONDUIT_NONE;
@@ -81,9 +86,41 @@ bool arm_smccc_hypervisor_has_uuid(const uuid_t *hyp_uuid)
 }
 EXPORT_SYMBOL_GPL(arm_smccc_hypervisor_has_uuid);
 
+#ifdef CONFIG_ARM64
+static void __init register_rsi_device(struct platform_device *pdev)
+{
+	unsigned long ver_lower, ver_higher;
+	unsigned long ret = rsi_request_version(RSI_ABI_VERSION,
+						&ver_lower,
+						&ver_higher);
+
+	if (ret == RSI_SUCCESS)
+		__devm_auxiliary_device_create(&pdev->dev,
+					"arm_cca_guest", RSI_DEV_NAME, NULL, 0);
+
+}
+#else
+static void __init register_rsi_device(struct platform_device *pdev)
+{
+
+}
+#endif
+
 static int __init smccc_devices_init(void)
 {
 	struct platform_device *pdev;
+
+	pdev = platform_device_register_simple("arm-smccc",
+					PLATFORM_DEVID_NONE, NULL, 0);
+	if (IS_ERR(pdev)) {
+		pr_err("arm-smccc: could not register device: %ld\n", PTR_ERR(pdev));
+	} else {
+		/*
+		 * Register the RMI and RSI devices only when firmware exposes
+		 * the required SMCCC function IDs at a supported revision.
+		 */
+		register_rsi_device(pdev);
+	}
 
 	if (smccc_trng_available) {
 		pdev = platform_device_register_simple("smccc_trng", -1,
