@@ -1,6 +1,15 @@
 linux-hwe-6.17 (6.17.0-6.6~24.04.1) noble; urgency=medium
 
   * Initial version based on 6.17.0-6.6
+    - adjusted rust requirements to 1.82
+      - updated debian.hwe-6.17/control.stub.in
+      - updated debian.hwe-6.17/rules.d/hooks.mk
+    - updated Ubuntu.md
+    - updated debian/debian.env
+    - updated debian.hwe-6.17/annotations
+    - updated debian.hwe-6.17/dkms-version
+    - updated debian.hwe-6.17/etc/update.conf
+    - updated debian.hwe-6.17/variants
 
  -- Stefan Bader <stefan.bader@canonical.com>  Thu, 16 Oct 2025 17:34:59 +0200
 
