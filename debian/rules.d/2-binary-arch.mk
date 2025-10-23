@@ -114,6 +114,7 @@ endef
 # Install the finished build
 $(stampdir)/stamp-install-%: pkgdir_bin = $(CURDIR)/debian/$(bin_pkg_name)-$*
 $(stampdir)/stamp-install-%: pkgdir = $(CURDIR)/debian/$(mods_pkg_name)-$*
+$(stampdir)/stamp-install-%: pkgdir_ex = $(CURDIR)/debian/$(mods_extra_pkg_name)-$*
 $(stampdir)/stamp-install-%: pkgdir_bldinfo = $(CURDIR)/debian/$(bldinfo_pkg_name)-$*
 $(stampdir)/stamp-install-%: bindoc = $(pkgdir)/usr/share/doc/$(bin_pkg_name)-$*
 $(stampdir)/stamp-install-%: dbgpkgdir = $(CURDIR)/debian/$(bin_pkg_name)-$*-dbgsym
@@ -153,6 +154,9 @@ endif
 	)
 ifeq ($(do_dbgsym_package),true)
 	dh_prep -p$(bin_pkg_name)-$*-dbgsym
+endif
+ifeq ($(do_extras_package),true)
+	dh_prep -p$(mods_extra_pkg_name)-$*
 endif
 ifeq ($(do_linux_tools),true)
  ifeq ($(do_tools_bpftool),true)
@@ -210,6 +214,32 @@ endif
 		sort -u \
 		>>$(pkgdir)/lib/modprobe.d/blacklist_$(DEB_SOURCE)_$(abi_release)-$*.conf
 
+ifeq ($(do_extras_package),true)
+	#
+	# Remove all modules not in the inclusion list.
+	#
+	if [ -f $(DEBIAN)/control.d/$*.inclusion-list ] ; then \
+		/sbin/depmod -v -b $(pkgdir) $(abi_release)-$* | \
+			sed -e "s@$(pkgdir)/lib/modules/$(abi_release)-$*/kernel/@@g" | \
+			awk '{ print $$1 " " $$NF}' >$(build_dir)/module-inclusion.depmap; \
+		mkdir -p $(pkgdir_ex)/lib/modules/$(abi_release)-$*; \
+		mv $(pkgdir)/lib/modules/$(abi_release)-$*/kernel \
+			$(pkgdir_ex)/lib/modules/$(abi_release)-$*/kernel; \
+		$(SHELL) debian/scripts/module-inclusion --master \
+			$(pkgdir_ex)/lib/modules/$(abi_release)-$*/kernel \
+			$(pkgdir)/lib/modules/$(abi_release)-$*/kernel \
+			$(DEBIAN)/control.d/$*.inclusion-list \
+			$(build_dir)/module-inclusion.depmap 2>&1 | \
+				tee $*.inclusion-list.log; \
+		/sbin/depmod -b $(pkgdir) -ea -F $(pkgdir)/boot/System.map-$(abi_release)-$* \
+			$(abi_release)-$* 2>&1 |tee $*.depmod.log; \
+		if [ `grep -c 'unknown symbol' $*.depmod.log` -gt 0 ]; then \
+			echo "EE: Unresolved module dependencies in base package!"; \
+			exit 1; \
+		fi \
+	fi
+endif
+
 ifeq ($(no_dumpfile),)
 	makedumpfile -g $(pkgdir)/boot/vmcoreinfo-$(abi_release)-$* \
 		-x $(build_dir)/vmlinux
@@ -230,6 +260,13 @@ endif
 	$(call install_control,$(bin_pkg_name)-$*,image,postinst postrm preinst prerm)
 	install -d $(pkgdir)/usr/lib/linux/triggers
 	$(call install_control,$(mods_pkg_name)-$*,extra,postinst postrm)
+ifeq ($(do_extras_package),true)
+	# Install the postinit/postrm scripts in the extras package.
+	if [ -f $(DEBIAN)/control.d/$*.inclusion-list ] ; then	\
+		install -d $(pkgdir_ex)/usr/lib/linux/triggers; \
+		$(call install_control,$(mods_extra_pkg_name)-$*,extra,postinst postrm); \
+	fi
+endif
 	$(foreach _m,$(all_standalone_dkms_modules), \
 	  $(if $(enable_$(_m)), \
 	    install -d $(dkms_$(_m)_pkgdir)/usr/lib/linux/triggers; \
@@ -302,7 +339,7 @@ endif
 	$(call install_control,$(hdrs_pkg_name)-$*,headers,postinst)
 
 	# At the end of the package prep, run the module signature check
-	debian/scripts/checks/module-signature-check "$*" "$(pkgdir)" $(do_skip_checks)
+	debian/scripts/checks/module-signature-check "$*" "$(pkgdir)" "$(pkgdir_ex)" $(do_skip_checks)
 
 	#
 	# Remove files which are generated at installation by postinst,
@@ -366,6 +403,7 @@ ifeq ($(do_dbgsym_package),true)
 	# Add .gnu_debuglink sections to each stripped .ko
 	# pointing to unstripped verson
 	find $(pkgdir) \
+	  $(if $(filter true,$(do_extras_package)),$(pkgdir_ex)) \
 	  -name '*.ko' | while read path_module ; do \
 		module="/lib/modules/$${path_module#*/lib/modules/}"; \
 		if [[ -f "$(dbgpkgdir)/usr/lib/debug/$$module" ]] ; then \
@@ -394,7 +432,7 @@ endif
 		$(build_dir)/Module.symvers | sort > $(abi_dir)/$*
 
 	# Build the final ABI modules information.
-	find $(pkgdir_bin) $(pkgdir) \( -name '*.ko' -o -name '*.ko.*' \) | \
+	find $(pkgdir_bin) $(pkgdir) $(pkgdir_ex) \( -name '*.ko' -o -name '*.ko.*' \) | \
 		sed -e 's/.*\/\([^\/]*\)\.ko.*/\1/' | sort > $(abi_dir)/$*.modules
 
 	# Build the final ABI built-in modules information.
@@ -404,7 +442,7 @@ endif
 	fi
 
 	# Build the final ABI firmware information.
-	find $(pkgdir_bin) $(pkgdir) -name \*.ko | \
+	find $(pkgdir_bin) $(pkgdir) $(pkgdir_ex) -name \*.ko | \
 	while read ko; do \
 		/sbin/modinfo $$ko | grep ^firmware || true; \
 	done | sort -u >$(abi_dir)/$*.fwinfo
@@ -417,7 +455,7 @@ endif
 	fi
 
 	# Build the final ABI compiler information.
-	ko=$$(find $(pkgdir_bin) $(pkgdir) -name \*.ko | head -1); \
+	ko=$$(find $(pkgdir_bin) $(pkgdir) $(pkgdir_ex) -name \*.ko | head -1); \
 	readelf -p .comment "$$ko" | gawk ' \
 		($$1 == "[") { \
 			printf("%s", $$3); \
@@ -517,6 +555,7 @@ binary-arch-headers: $(stampdir)/stamp-install-arch-headers
 -include $(builddir)/skipped-dkms.mk
 binary-%: pkgimg = $(bin_pkg_name)-$*
 binary-%: pkgimg_mods = $(mods_pkg_name)-$*
+binary-%: pkgimg_ex = $(mods_extra_pkg_name)-$*
 binary-%: pkgbldinfo = $(bldinfo_pkg_name)-$*
 binary-%: pkghdr = $(hdrs_pkg_name)-$*
 binary-%: pkgrust = $(rust_pkg_name)-$*
@@ -535,6 +574,12 @@ binary-%: $(stampdir)/stamp-install-%
 
 	$(call dh_all,$(pkgimg)) -- -Znone
 	$(call dh_all,$(pkgimg_mods))$(if $(do_zstd_ko), -- -Znone)
+
+ifeq ($(do_extras_package),true)
+	if [ -f $(DEBIAN)/control.d/$*.inclusion-list ] ; then \
+		$(call dh_all_inline,$(pkgimg_ex))$(if $(do_zstd_ko), -- -Znone); \
+	fi
+endif
 
 	$(foreach _m,$(all_standalone_dkms_modules), \
 	  $(if $(enable_$(_m)),$(call dh_all,$(dkms_$(_m)_pkg_name)-$*)$(if $(do_zstd_ko), -- -Znone);)\
