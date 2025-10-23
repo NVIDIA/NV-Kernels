@@ -3789,17 +3789,8 @@ err_free_master:
 static void arm_smmu_release_device(struct device *dev)
 {
 	struct arm_smmu_master *master = dev_iommu_priv_get(dev);
-	struct iommu_domain *old_domain = iommu_get_domain_for_dev(dev);
 
 	WARN_ON(master->iopf_refcount);
-
-	/* Put the STE back to what arm_smmu_init_strtab() sets */
-	if (dev->iommu->require_direct)
-		arm_smmu_attach_dev_identity(&arm_smmu_identity_domain, dev,
-					     old_domain);
-	else
-		arm_smmu_attach_dev_blocked(&arm_smmu_blocked_domain, dev,
-					    old_domain);
 
 	arm_smmu_disable_pasid(master);
 	arm_smmu_remove_master(master);
@@ -3963,6 +3954,7 @@ static int arm_smmu_group_get_mpam(struct device *dev, u16 *partid,
 static const struct iommu_ops arm_smmu_ops = {
 	.identity_domain	= &arm_smmu_identity_domain,
 	.blocked_domain		= &arm_smmu_blocked_domain,
+	.release_domain		= &arm_smmu_blocked_domain,
 	.capable		= arm_smmu_capable,
 	.hw_info		= arm_smmu_hw_info,
 	.domain_alloc_sva       = arm_smmu_sva_domain_alloc,
