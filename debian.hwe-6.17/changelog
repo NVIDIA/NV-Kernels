@@ -1,3 +1,13 @@
+linux-hwe-6.17 (6.17.0-6.6~24.04.2) noble; urgency=medium
+
+  * Restoring code to produce linux-modules-extra for backward compatibility
+    - reverting back changes to debian/
+    - importing inclusion list from last known parent version
+  * Avoid updateconfigs warnings on armhf
+    - adjust annotations for drivers which no longer are available on armhf
+
+ -- Stefan Bader <stefan.bader@canonical.com>  Thu, 23 Oct 2025 15:22:26 +0200
+
 linux-hwe-6.17 (6.17.0-6.6~24.04.1) noble; urgency=medium
 
   * Initial version based on 6.17.0-6.6
