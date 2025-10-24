@@ -1959,8 +1959,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 
 	/*
 	 * For now we shouldn't be hitting protected addresses because they are
-	 * handled in private_memslot_fault(). In the future this check may be
-	 * relaxed to support e.g. protected devices.
+	 * handled in gmem_abort(). In the future this check may be relaxed to
+	 * support e.g. protected devices.
 	 */
 	if (vcpu_is_rec(vcpu) &&
 	    kvm_gpa_from_fault(kvm, fault_ipa) == fault_ipa)
