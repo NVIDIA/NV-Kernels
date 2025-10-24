@@ -117,11 +117,14 @@ CONFIG_ETM4X_IMPDEF_FEATURE                     note<'Required for Grace enablem
 CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
 CONFIG_GPIO_AAEON                               note<'Disable all Ubuntu ODM drivers'>
 
-CONFIG_IOMMU_DEFAULT_DMA_LAZY                   policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_IOMMU_DEFAULT_DMA_LAZY                   note<'Nvidia CPU SMMU supports passthrough and lazy IOMMU mode so set lazy mode as default for better performance'>
+CONFIG_IOMMU_DEFAULT_PASSTHROUGH                policy<{'arm64': 'y'}>
+CONFIG_IOMMU_DEFAULT_PASSTHROUGH                note<'On Nvidia CPU passthrough mode is recommend so set passthrough mode as default for better performance'>
 
-CONFIG_IOMMU_DEFAULT_DMA_STRICT                 policy<{'amd64': 'n', 'arm64': 'n'}>
-CONFIG_IOMMU_DEFAULT_DMA_STRICT                 note<'Nvidia CPU SMMU supports passthrough and lazy IOMMU mode so set lazy mode as default for better performance'>
+CONFIG_IOMMU_DEFAULT_DMA_LAZY                   policy<{'arm64': 'n'}>
+CONFIG_IOMMU_DEFAULT_DMA_LAZY                   note<'On Nvidia CPU passthrough mode is recommend so set passthrough mode as default for better performance'>
+
+CONFIG_IOMMU_DEFAULT_DMA_STRICT                 policy<{'arm64': 'n'}>
+CONFIG_IOMMU_DEFAULT_DMA_STRICT                 note<'On Nvidia CPU passthrough mode is recommend so set passthrough mode as default for better performance'>
 
 CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
 CONFIG_LEDS_AAEON                               note<'Disable all Ubuntu ODM drivers'>
