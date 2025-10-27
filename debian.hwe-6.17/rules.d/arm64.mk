@@ -9,7 +9,6 @@ uefi_signed     = true
 
 vdso		= vdso_install
 
-do_extras_package = true
 do_tools_usbip  = true
 do_tools_cpupower = true
 do_tools_perf   = true
@@ -19,3 +18,4 @@ do_tools_bpftool = true
 do_tools_rtla = true
 
 do_dtbs		= true
+do_extras_package = true

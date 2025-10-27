@@ -18,3 +18,10 @@ rustfmt			= /usr/lib/rust-1.80/bin/rustfmt
 bindgen			= bindgen-0.65
 EOD
 
+#
+# Re-enable producing linux-modules-extra for backwards compatibility.
+#
+for i in amd64 arm64 ppc64el s390x; do
+	echo "do_extras_package = true" >>${DEBIAN}/rules.d/${i}.mk
+done
+

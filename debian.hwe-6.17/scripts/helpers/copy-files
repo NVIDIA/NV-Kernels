@@ -48,7 +48,8 @@ if [ -d "${DEBIAN}/modprobe.d/" ]; then
 	rsync -avc --delete "${DEBIAN_MASTER}/modprobe.d/" "${DEBIAN}/modprobe.d"
 fi
 
-cp -p "${DEBIAN_MASTER}/control.d/"*.inclusion-list "${DEBIAN}/control.d"
+# Starting with questing, there is no longer the modules split
+# cp -p "${DEBIAN_MASTER}/control.d/"*.inclusion-list "${DEBIAN}/control.d"
 
 cp -p "${DEBIAN_MASTER}/reconstruct" "${DEBIAN}/reconstruct"
 
