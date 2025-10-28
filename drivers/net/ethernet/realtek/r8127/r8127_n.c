@@ -690,6 +690,12 @@ rtl8127_get_sw_tail_ptr(struct rtl8127_tx_ring *ring)
         }
 }
 
+static u32
+rtl8127_get_phy_status(struct rtl8127_private *tp)
+{
+        return RTL_R32(tp, PHYstatus);
+}
+
 static bool
 rtl8127_sysfs_testmode_on(struct rtl8127_private *tp)
 {
@@ -795,20 +801,19 @@ static void rtl8127_get_cp_len(struct rtl8127_private *tp,
                                int cp_len[RTL8127_CP_NUM])
 {
         int i;
-        u16 status;
+        u32 status;
         int tmp_cp_len;
 
-        status = RTL_R16(tp, PHYstatus);
+        status = rtl8127_get_phy_status(tp);
         if (status & LinkStatus) {
                 if (status & _10bps) {
                         tmp_cp_len = -1;
                 } else if (status & (_100bps | _1000bpsF)) {
-                        rtl8127_mdio_write(tp, 0x1f, 0x0a88);
-                        tmp_cp_len = rtl8127_mdio_read(tp, 0x10);
-                } else if (status & _2500bpsF) {
-                        rtl8127_mdio_write(tp, 0x1f, 0x0acb);
-                        tmp_cp_len = rtl8127_mdio_read(tp, 0x15);
-                        tmp_cp_len >>= 2;
+                        tmp_cp_len = rtl8127_mdio_direct_read_phy_ocp(tp, 0xA880);;
+                } else if (status & (_10000bpsF | _10000bpsL | _5000bpsF |
+                                     _5000bpsL | _2500bpsF | _2500bpsL)) {
+                        tmp_cp_len = rtl8127_mdio_direct_read_phy_ocp(tp, 0xAC2E);;
+                        tmp_cp_len >>= 5;
                 } else
                         tmp_cp_len = 0;
         } else
@@ -834,12 +839,11 @@ static int __rtl8127_get_cp_status(u16 val)
         case 0x0060:
                 return rtl8127_cp_normal;
         case 0x0048:
+        case 0x0042:
                 return rtl8127_cp_open;
         case 0x0050:
-                return rtl8127_cp_short;
-        case 0x0042:
         case 0x0044:
-                return rtl8127_cp_mismatch;
+                return rtl8127_cp_short;
         default:
                 return rtl8127_cp_normal;
         }
@@ -853,7 +857,7 @@ static int _rtl8127_get_cp_status(struct rtl8127_private *tp, u8 pair_num)
         if (pair_num > 3)
                 goto exit;
 
-        rtl8127_mdio_direct_write_phy_ocp(tp, 0xA436, 0x8027 + 4 * pair_num);
+        rtl8127_mdio_direct_write_phy_ocp(tp, 0xA436, 0x8026 + 4 * pair_num);
         val = rtl8127_mdio_direct_read_phy_ocp(tp, 0xA438);
 
         cp_status = __rtl8127_get_cp_status(val);
@@ -885,7 +889,7 @@ static u16 rtl8127_get_cp_pp(struct rtl8127_private *tp, u8 pair_num)
         if (pair_num > 3)
                 goto exit;
 
-        rtl8127_mdio_direct_write_phy_ocp(tp, 0xA436, 0x8029 + 4 * pair_num);
+        rtl8127_mdio_direct_write_phy_ocp(tp, 0xA436, 0x8028 + 4 * pair_num);
         pp = rtl8127_mdio_direct_read_phy_ocp(tp, 0xA438);
 
         pp &= 0x3fff;
@@ -899,10 +903,10 @@ static void rtl8127_get_cp_status(struct rtl8127_private *tp,
                                   int cp_status[RTL8127_CP_NUM],
                                   bool poe_mode)
 {
-        u16 status;
+        u32 status;
         int i;
 
-        status = RTL_R16(tp, PHYstatus);
+        status = rtl8127_get_phy_status(tp);
         if (status & LinkStatus && !(status & (_10bps | _100bps))) {
                 for (i=0; i<RTL8127_CP_NUM; i++)
                         cp_status[i] = rtl8127_cp_normal;
@@ -1444,19 +1448,13 @@ static int proc_get_temperature(struct seq_file *m, void *v)
 static int _proc_get_cable_info(struct seq_file *m, void *v, bool poe_mode)
 {
         int i;
-        u16 status;
+        u32 status;
         int cp_status[RTL8127_CP_NUM];
         int cp_len[RTL8127_CP_NUM] = {0};
         struct net_device *dev = m->private;
         struct rtl8127_private *tp = netdev_priv(dev);
         const char *pair_str[RTL8127_CP_NUM] = {"1-2", "3-6", "4-5", "7-8"};
         int ret;
-
-        switch (tp->mcfg) {
-        default:
-                ret = -EOPNOTSUPP;
-                goto error_out;
-        }
 
         rtnl_lock();
 
@@ -1474,7 +1472,7 @@ static int _proc_get_cable_info(struct seq_file *m, void *v, bool poe_mode)
 
         netif_testing_on(dev);
 
-        status = RTL_R16(tp, PHYstatus);
+        status = rtl8127_get_phy_status(tp);
         if (status & LinkStatus)
                 seq_printf(m, "\nlink speed:%d",
                            rtl8127_convert_link_speed(status));
@@ -1511,7 +1509,6 @@ static int _proc_get_cable_info(struct seq_file *m, void *v, bool poe_mode)
 error_unlock:
         rtnl_unlock();
 
-error_out:
         return ret;
 }
 
