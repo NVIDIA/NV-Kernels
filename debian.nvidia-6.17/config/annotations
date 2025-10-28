@@ -207,6 +207,7 @@ CONFIG_CC_HAS_SANE_FUNCTION_ALIGNMENT           policy<{'amd64': '-', 'arm64': '
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"'}>
 CONFIG_CORESIGHT_CTCU                           policy<{'arm64': 'm'}>
 CONFIG_CPUFREQ_DT_RUST                          policy<{'arm64': '-'}>
+CONFIG_EINT_MTK_HP                              policy<{'arm64': 'm'}>
 CONFIG_DRM_NOUVEAU_CH7006                       policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SIL164                       policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_DRM_NOVA                                 policy<{'amd64': '-', 'arm64': '-'}>

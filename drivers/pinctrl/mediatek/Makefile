@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # Core
 obj-$(CONFIG_EINT_MTK)			+= mtk-eint.o
+obj-$(CONFIG_EINT_MTK_HP)		+= mtk-eint-hotplug.o
 obj-$(CONFIG_PINCTRL_MTK)		+= pinctrl-mtk-common.o
 obj-$(CONFIG_PINCTRL_MTK_V2)		+= pinctrl-mtk-common-v2.o
 obj-$(CONFIG_PINCTRL_MTK_MTMIPS)	+= pinctrl-mtmips.o
