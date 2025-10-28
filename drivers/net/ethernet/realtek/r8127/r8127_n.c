@@ -1161,16 +1161,20 @@ static int proc_get_registers(struct seq_file *m, void *v)
         seq_puts(m, "\nDump MAC Registers\n");
         seq_puts(m, "Offset\tValue\n------\t-----\n");
 
-        rtnl_lock();
-
         for (n = 0; n < max;) {
                 seq_printf(m, "\n0x%04x:\t", n);
+
+                rtnl_lock();
 
                 for (i = 0; i < 16 && n < max; i++, n++) {
                         byte_rd = readb(ioaddr + n);
                         seq_printf(m, "%02x ", byte_rd);
                 }
+
+                rtnl_unlock();
         }
+
+        rtnl_lock();
 
         max = 0xB00;
         for (n = 0xA00; n < max;) {
@@ -1220,20 +1224,20 @@ static int proc_get_all_registers(struct seq_file *m, void *v)
         seq_puts(m, "\nDump All MAC Registers\n");
         seq_puts(m, "Offset\tValue\n------\t-----\n");
 
-        rtnl_lock();
-
         max = pci_resource_len(pdev, 2);
 
         for (n = 0; n < max;) {
                 seq_printf(m, "\n0x%04x:\t", n);
 
+                rtnl_lock();
+
                 for (i = 0; i < 16 && n < max; i++, n++) {
                         byte_rd = readb(ioaddr + n);
                         seq_printf(m, "%02x ", byte_rd);
                 }
-        }
 
-        rtnl_unlock();
+                rtnl_unlock();
+        }
 
         seq_printf(m, "\nTotal length:0x%X", max);
 
@@ -2073,12 +2077,12 @@ static int proc_get_registers(char *page, char **start,
                         "\nDump MAC Registers\n"
                         "Offset\tValue\n------\t-----\n");
 
-        rtnl_lock();
-
         for (n = 0; n < max;) {
                 len += snprintf(page + len, count - len,
                                 "\n0x%04x:\t",
                                 n);
+
+                rtnl_lock();
 
                 for (i = 0; i < 16 && n < max; i++, n++) {
                         byte_rd = readb(ioaddr + n);
@@ -2086,7 +2090,11 @@ static int proc_get_registers(char *page, char **start,
                                         "%02x ",
                                         byte_rd);
                 }
+
+                rtnl_unlock();
         }
+
+        rtnl_lock();
 
         max = 0xB00;
         for (n = 0xA00; n < max;) {
@@ -2154,8 +2162,6 @@ static int proc_get_all_registers(char *page, char **start,
                         "\nDump All MAC Registers\n"
                         "Offset\tValue\n------\t-----\n");
 
-        rtnl_lock();
-
         max = pci_resource_len(pdev, 2);
 
         for (n = 0; n < max;) {
@@ -2163,15 +2169,17 @@ static int proc_get_all_registers(char *page, char **start,
                                 "\n0x%04x:\t",
                                 n);
 
+                rtnl_lock();
+
                 for (i = 0; i < 16 && n < max; i++, n++) {
                         byte_rd = readb(ioaddr + n);
                         len += snprintf(page + len, count - len,
                                         "%02x ",
                                         byte_rd);
                 }
-        }
 
-        rtnl_unlock();
+                rtnl_unlock();
+        }
 
         len += snprintf(page + len, count - len, "\nTotal length:0x%X", max);
 
