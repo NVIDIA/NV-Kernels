@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (C) 2016-2022 NVIDIA Corporation
+ * Copyright (C) 2016-2025 NVIDIA Corporation
  */
 
 #include <linux/clk-provider.h>
@@ -587,6 +587,7 @@ tegra_bpmp_clk_register(struct tegra_bpmp *bpmp,
 	}
 
 	init.parent_names = parents;
+	init.flags = CLK_GET_RATE_NOCACHE;
 
 	err = devm_clk_hw_register(bpmp->dev, &clk->hw);
 
