@@ -583,6 +583,17 @@ static int rzg2l_irqc_common_probe(struct platform_device *pdev, struct device_n
 
 	register_syscore(&rzg2l_irqc_syscore);
 
+	/*
+	 * Prevent the cleanup function from invoking put_device by assigning
+	 * NULL to dev.
+	 *
+	 * make coccicheck will complain about missing put_device calls, but
+	 * those are false positives, as dev will be automatically "put" via
+	 * __free_put_device on the failing path.
+	 * On the successful path we don't actually want to "put" dev.
+	 */
+	dev = NULL;
+
 	return 0;
 }
 
