@@ -573,7 +573,7 @@ static __init int hfi_parse_features(void)
 	return 0;
 }
 
-static void hfi_do_enable(void)
+static void hfi_do_enable(void *data)
 {
 	/* This code runs only on the boot CPU. */
 	struct hfi_cpu_info *info = &per_cpu(hfi_cpu_info, 0);
@@ -584,7 +584,7 @@ static void hfi_do_enable(void)
 	hfi_enable();
 }
 
-static int hfi_do_disable(void)
+static int hfi_do_disable(void *data)
 {
 	/* No locking needed. There is no concurrency with CPU offline. */
 	hfi_disable();
@@ -592,9 +592,13 @@ static int hfi_do_disable(void)
 	return 0;
 }
 
-static struct syscore_ops hfi_pm_ops = {
+static const struct syscore_ops hfi_pm_ops = {
 	.resume = hfi_do_enable,
 	.suspend = hfi_do_disable,
+};
+
+static struct syscore hfi_pm = {
+	.ops = &hfi_pm_ops,
 };
 
 void __init intel_hfi_init(void)
@@ -632,7 +636,7 @@ void __init intel_hfi_init(void)
 	if (!hfi_updates_wq)
 		goto err_nomem;
 
-	register_syscore_ops(&hfi_pm_ops);
+	register_syscore(&hfi_pm);
 
 	return;
 

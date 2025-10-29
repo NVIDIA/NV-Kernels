@@ -2423,7 +2423,12 @@ static void resume_ioapic_id(int ioapic_idx)
 	raw_spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-static void ioapic_resume(void)
+static int ioapic_suspend(void *data)
+{
+	return save_ioapic_entries();
+}
+
+static void ioapic_resume(void *data)
 {
 	int ioapic_idx;
 
@@ -2433,14 +2438,18 @@ static void ioapic_resume(void)
 	restore_ioapic_entries();
 }
 
-static struct syscore_ops ioapic_syscore_ops = {
-	.suspend = save_ioapic_entries,
+static const struct syscore_ops ioapic_syscore_ops = {
+	.suspend = ioapic_suspend,
 	.resume = ioapic_resume,
+};
+
+static struct syscore ioapic_syscore = {
+	.ops = &ioapic_syscore_ops,
 };
 
 static int __init ioapic_init_ops(void)
 {
-	register_syscore_ops(&ioapic_syscore_ops);
+	register_syscore(&ioapic_syscore);
 
 	return 0;
 }

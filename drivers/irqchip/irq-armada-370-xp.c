@@ -697,14 +697,14 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
 	} while (1);
 }
 
-static int armada_370_xp_mpic_suspend(void)
+static int armada_370_xp_mpic_suspend(void *data)
 {
 	doorbell_mask_reg = readl(per_cpu_int_base +
 				  ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
 	return 0;
 }
 
-static void armada_370_xp_mpic_resume(void)
+static void armada_370_xp_mpic_resume(void *data)
 {
 	int nirqs;
 	irq_hw_number_t irq;
@@ -753,9 +753,13 @@ static void armada_370_xp_mpic_resume(void)
 	ipi_resume();
 }
 
-static struct syscore_ops armada_370_xp_mpic_syscore_ops = {
+static const struct syscore_ops armada_370_xp_mpic_syscore_ops = {
 	.suspend	= armada_370_xp_mpic_suspend,
 	.resume		= armada_370_xp_mpic_resume,
+};
+
+static struct syscore armada_370_xp_mpic_syscore = {
+	.ops = &armada_370_xp_mpic_syscore_ops,
 };
 
 static int __init armada_370_xp_mpic_of_init(struct device_node *node,
@@ -821,7 +825,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
 					armada_370_xp_mpic_handle_cascade_irq);
 	}
 
-	register_syscore_ops(&armada_370_xp_mpic_syscore_ops);
+	register_syscore(&armada_370_xp_mpic_syscore);
 
 	return 0;
 }

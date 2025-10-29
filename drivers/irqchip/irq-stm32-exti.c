@@ -621,7 +621,7 @@ static int stm32_exti_h_set_affinity(struct irq_data *d,
 	return IRQ_SET_MASK_OK_DONE;
 }
 
-static int __maybe_unused stm32_exti_h_suspend(void)
+static int __maybe_unused stm32_exti_h_suspend(void *data)
 {
 	struct stm32_exti_chip_data *chip_data;
 	int i;
@@ -636,7 +636,7 @@ static int __maybe_unused stm32_exti_h_suspend(void)
 	return 0;
 }
 
-static void __maybe_unused stm32_exti_h_resume(void)
+static void __maybe_unused stm32_exti_h_resume(void *data)
 {
 	struct stm32_exti_chip_data *chip_data;
 	int i;
@@ -649,22 +649,26 @@ static void __maybe_unused stm32_exti_h_resume(void)
 	}
 }
 
-static struct syscore_ops stm32_exti_h_syscore_ops = {
+static const struct syscore_ops stm32_exti_h_syscore_ops = {
 #ifdef CONFIG_PM_SLEEP
 	.suspend	= stm32_exti_h_suspend,
 	.resume		= stm32_exti_h_resume,
 #endif
 };
 
+static struct syscore stm32_exti_h_syscore = {
+	.ops = &stm32_exti_h_syscore_ops,
+};
+
 static void stm32_exti_h_syscore_init(struct stm32_exti_host_data *host_data)
 {
 	stm32_host_data = host_data;
-	register_syscore_ops(&stm32_exti_h_syscore_ops);
+	register_syscore(&stm32_exti_h_syscore);
 }
 
 static void stm32_exti_h_syscore_deinit(void)
 {
-	unregister_syscore_ops(&stm32_exti_h_syscore_ops);
+	unregister_syscore(&stm32_exti_h_syscore);
 }
 
 static int stm32_exti_h_retrigger(struct irq_data *d)
