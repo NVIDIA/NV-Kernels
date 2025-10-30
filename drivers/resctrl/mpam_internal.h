@@ -285,7 +285,7 @@ struct mpam_quirk {
 
 #define IIDR_PROD(x)	((x) << MPAMF_IIDR_PRODUCTID_SHIFT)
 #define IIDR_VAR(x)	((x) << MPAMF_IIDR_VARIANT_SHIFT)
-#define IIDR_REV(x)	((x) << MPAMF_IIDR_REVISON_SHIFT)
+#define IIDR_REV(x)	((x) << MPAMF_IIDR_REVISION_SHIFT)
 #define IIDR_IMP(x)	((x) << MPAMF_IIDR_IMPLEMENTER_SHIFT)
 
 #define IIDR_MATCH_ONE	(IIDR_PROD(0xfff) | IIDR_VAR(0xf) | IIDR_REV(0xf) | IIDR_IMP(0xfff))
@@ -690,6 +690,11 @@ static inline void mpam_resctrl_teardown_class(struct mpam_class *class) { }
 #define MPAMF_IIDR_REVISION	GENMASK(15, 12)
 #define MPAMF_IIDR_VARIANT	GENMASK(19, 16)
 #define MPAMF_IIDR_PRODUCTID	GENMASK(31, 20)
+
+#define MPAMF_IIDR_IMPLEMENTER_SHIFT	0
+#define MPAMF_IIDR_REVISION_SHIFT	12
+#define MPAMF_IIDR_VARIANT_SHIFT	16
+#define MPAMF_IIDR_PRODUCTID_SHIFT	20
 
 /* MPAMF_AIDR - MPAM architecture ID register */
 #define MPAMF_AIDR_ARCH_MINOR_REV	GENMASK(3, 0)
