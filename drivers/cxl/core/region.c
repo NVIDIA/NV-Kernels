@@ -3710,6 +3710,7 @@ static int cxl_region_debugfs_poison_inject(void *data, u64 offset)
 	if (validate_region_offset(cxlr, offset))
 		return -EINVAL;
 
+	offset -= cxlr->params.cache_size;
 	rc = region_offset_to_dpa_result(cxlr, offset, &result);
 	if (rc || !result.cxlmd || result.dpa == ULLONG_MAX) {
 		dev_dbg(&cxlr->dev,
@@ -3742,6 +3743,7 @@ static int cxl_region_debugfs_poison_clear(void *data, u64 offset)
 	if (validate_region_offset(cxlr, offset))
 		return -EINVAL;
 
+	offset -= cxlr->params.cache_size;
 	rc = region_offset_to_dpa_result(cxlr, offset, &result);
 	if (rc || !result.cxlmd || result.dpa == ULLONG_MAX) {
 		dev_dbg(&cxlr->dev,
