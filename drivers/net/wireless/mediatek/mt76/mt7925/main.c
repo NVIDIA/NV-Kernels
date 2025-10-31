@@ -1368,20 +1368,6 @@ void mt7925_mlo_pm_work(struct work_struct *work)
 					    mt7925_mlo_pm_iter, dev);
 }
 
-static bool is_valid_alpha2(const char *alpha2)
-{
-	if (!alpha2)
-		return false;
-
-	if (alpha2[0] == '0' && alpha2[1] == '0')
-		return true;
-
-	if (isalpha(alpha2[0]) && isalpha(alpha2[1]))
-		return true;
-
-	return false;
-}
-
 void mt7925_scan_work(struct work_struct *work)
 {
 	struct mt792x_phy *phy;
@@ -1390,7 +1376,6 @@ void mt7925_scan_work(struct work_struct *work)
 						scan_work.work);
 
 	while (true) {
-		struct mt76_dev *mdev = &phy->dev->mt76;
 		struct sk_buff *skb;
 		struct tlv *tlv;
 		int tlv_len;
@@ -1421,13 +1406,7 @@ void mt7925_scan_work(struct work_struct *work)
 			case UNI_EVENT_SCAN_DONE_CHNLINFO:
 				evt = (struct mt7925_mcu_scan_chinfo_event *)tlv->data;
 
-				if (!is_valid_alpha2(evt->alpha2))
-					break;
-
-				if (mdev->alpha2[0] != '0' && mdev->alpha2[1] != '0')
-					break;
-
-				mt7925_mcu_set_clc(phy->dev, evt->alpha2, ENVIRON_INDOOR);
+				mt7925_regd_change(phy, evt->alpha2);
 
 				break;
 			case UNI_EVENT_SCAN_DONE_NLO:
