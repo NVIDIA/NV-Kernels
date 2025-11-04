@@ -117,17 +117,6 @@ static void cxl_cper_prot_err_work_fn(struct work_struct *work)
 }
 static DECLARE_WORK(cxl_cper_prot_err_work, cxl_cper_prot_err_work_fn);
 
-int cxl_ras_init(void)
-{
-	return cxl_cper_register_prot_err_work(&cxl_cper_prot_err_work);
-}
-
-void cxl_ras_exit(void)
-{
-	cxl_cper_unregister_prot_err_work(&cxl_cper_prot_err_work);
-	cancel_work_sync(&cxl_cper_prot_err_work);
-}
-
 static bool is_pcie_endpoint(struct pci_dev *pdev)
 {
 	return pci_pcie_type(pdev) == PCI_EXP_TYPE_ENDPOINT;
@@ -178,6 +167,51 @@ static void __iomem *cxl_get_ras_base(struct device *dev)
 	return NULL;
 }
 
+/*
+ * Return 'struct cxl_port *' parent CXL port of dev's
+ *
+ * Reference count increments on success
+ *
+ * dev: Find the parent port of this dev
+ */
+static struct cxl_port *get_cxl_port(struct pci_dev *pdev)
+{
+	switch (pci_pcie_type(pdev)) {
+	case PCI_EXP_TYPE_ROOT_PORT:
+	case PCI_EXP_TYPE_DOWNSTREAM:
+	{
+		struct cxl_dport *dport;
+		struct cxl_port *port = find_cxl_port(&pdev->dev, &dport);
+
+		if (!port) {
+			pci_err(pdev, "Failed to find the CXL device");
+			return NULL;
+		}
+		return port;
+	}
+	case PCI_EXP_TYPE_UPSTREAM:
+	{
+		struct cxl_port *port = find_cxl_port_by_uport(&pdev->dev);
+
+		if (!port) {
+			pci_err(pdev, "Failed to find the CXL device");
+			return NULL;
+		}
+		return port;
+	}
+	case PCI_EXP_TYPE_ENDPOINT:
+	{
+		struct cxl_dev_state *cxlds = pci_get_drvdata(pdev);
+		struct cxl_port *port = cxlds->cxlmd->endpoint;
+
+		get_device(&port->dev);
+		return port;
+	}
+	}
+	pci_warn_once(pdev, "Error: Unsupported device type (%X)", pci_pcie_type(pdev));
+	return NULL;
+}
+
 /**
  * cxl_dport_init_ras_reporting - Setup CXL RAS report on this dport
  * @dport: the cxl_dport that needs to be initialized
@@ -211,6 +245,23 @@ void cxl_uport_init_ras_reporting(struct cxl_port *port,
 		dev_dbg(&port->dev, "Failed to map RAS capability\n");
 }
 EXPORT_SYMBOL_NS_GPL(cxl_uport_init_ras_reporting, "CXL");
+
+static bool device_lock_if(struct device *dev, bool cond)
+{
+	if (cond)
+		device_lock(dev);
+	return cond;
+}
+
+static void device_unlock_if(struct device *dev, bool take)
+{
+	if (take)
+		device_unlock(dev);
+}
+
+static void cxl_do_recovery(struct pci_dev *pdev)
+{
+}
 
 void cxl_handle_cor_ras(struct device *dev, u64 serial, void __iomem *ras_base)
 {
@@ -388,3 +439,84 @@ pci_ers_result_t pci_error_detected(struct pci_dev *pdev,
 	return rc;
 }
 EXPORT_SYMBOL_NS_GPL(pci_error_detected, "CXL");
+
+static void cxl_handle_proto_error(struct cxl_proto_err_work_data *err_info)
+{
+	struct pci_dev *pdev = err_info->pdev;
+
+	if (err_info->severity == AER_CORRECTABLE) {
+
+		if (pdev->aer_cap)
+			pci_clear_and_set_config_dword(pdev,
+						       pdev->aer_cap + PCI_ERR_COR_STATUS,
+						       0, PCI_ERR_COR_INTERNAL);
+
+		if (is_pcie_endpoint(pdev)) {
+			struct cxl_dev_state *cxlds = pci_get_drvdata(pdev);
+			cxl_cor_error_detected(&cxlds->cxlmd->dev);
+                } else {
+			cxl_port_cor_error_detected(&pdev->dev);
+		}
+
+		pcie_clear_device_status(pdev);
+	} else {
+		cxl_do_recovery(pdev);
+	}
+}
+
+static void cxl_proto_err_work_fn(struct work_struct *work)
+{
+	struct cxl_proto_err_work_data wd;
+
+	while (cxl_proto_err_kfifo_get(&wd)) {
+		struct pci_dev *pdev __free(pci_dev_put) = wd.pdev;
+		struct device *cxlmd_dev;
+
+		if (!pdev) {
+			pr_err_ratelimited("NULL PCI device passed in AER-CXL KFIFO\n");
+			continue;
+		}
+
+		guard(device)(&pdev->dev);
+		if (is_pcie_endpoint(pdev)) {
+			struct cxl_dev_state *cxlds = pci_get_drvdata(pdev);
+
+			if (!cxl_pci_drv_bound(pdev))
+				continue;
+			cxlmd_dev = &cxlds->cxlmd->dev;
+			device_lock_if(cxlmd_dev, cxlmd_dev);
+		} else {
+			cxlmd_dev = NULL;
+		}
+
+		struct cxl_port *port __free(put_cxl_port) = get_cxl_port(pdev);
+		if (!port)
+			continue;
+		guard(device)(&port->dev);
+
+		cxl_handle_proto_error(&wd);
+		device_unlock_if(cxlmd_dev, cxlmd_dev);
+	}
+}
+
+static struct work_struct cxl_proto_err_work;
+static DECLARE_WORK(cxl_proto_err_work, cxl_proto_err_work_fn);
+
+int cxl_ras_init(void)
+{
+	if (cxl_cper_register_prot_err_work(&cxl_cper_prot_err_work))
+		pr_err("Failed to initialize CXL RAS CPER\n");
+
+	cxl_register_proto_err_work(&cxl_proto_err_work);
+
+	return 0;
+}
+
+void cxl_ras_exit(void)
+{
+	cxl_cper_unregister_prot_err_work(&cxl_cper_prot_err_work);
+	cancel_work_sync(&cxl_cper_prot_err_work);
+
+	cxl_unregister_proto_err_work();
+	cancel_work_sync(&cxl_proto_err_work);
+}
