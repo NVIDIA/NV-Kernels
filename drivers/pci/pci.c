@@ -5058,7 +5058,9 @@ static bool cxl_sbr_masked(struct pci_dev *dev)
 	if (!dvsec)
 		return false;
 
-	rc = pci_read_config_word(dev, dvsec + PCI_DVSEC_CXL_PORT_CTL, &reg);
+	rc = pci_read_config_word(dev,
+				  dvsec + PCI_DVSEC_CXL_PORT_CTL,
+				  &reg);
 	if (rc || PCI_POSSIBLE_ERROR(reg))
 		return false;
 
