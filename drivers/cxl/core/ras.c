@@ -259,8 +259,138 @@ static void device_unlock_if(struct device *dev, bool take)
 		device_unlock(dev);
 }
 
+/**
+ * cxl_report_error_detected
+ * @dev: Device being reported
+ * @data: Result
+ * @err_pdev: Device with initial detected error. Is locked immediately
+ *            after KFIFO dequeue.
+ */
+static int cxl_report_error_detected(struct device *dev, void *data, struct pci_dev *err_pdev)
+{
+	bool need_lock = (dev != &err_pdev->dev);
+	pci_ers_result_t vote, *result = data;
+	struct pci_dev *pdev;
+
+	if (!dev || !dev_is_pci(dev))
+		return 0;
+	pdev = to_pci_dev(dev);
+
+	device_lock_if(&pdev->dev, need_lock);
+	if (is_pcie_endpoint(pdev) && !cxl_pci_drv_bound(pdev)) {
+		device_unlock_if(&pdev->dev, need_lock);
+		return PCI_ERS_RESULT_NONE;
+	}
+
+	if (pdev->aer_cap)
+		pci_clear_and_set_config_dword(pdev,
+					       pdev->aer_cap + PCI_ERR_COR_STATUS,
+					       0, PCI_ERR_COR_INTERNAL);
+
+	if (is_pcie_endpoint(pdev)) {
+		struct cxl_dev_state *cxlds = pci_get_drvdata(pdev);
+
+		device_lock_if(&cxlds->cxlmd->dev, need_lock);
+		vote = cxl_error_detected(&cxlds->cxlmd->dev);
+		device_unlock_if(&cxlds->cxlmd->dev, need_lock);
+	} else {
+		vote = cxl_port_error_detected(dev);
+	}
+
+	pcie_clear_device_status(pdev);
+	*result = pcie_ers_merge_result(*result, vote);
+	device_unlock_if(&pdev->dev, need_lock);
+
+	return 0;
+}
+
+static int match_port_by_parent_dport(struct device *dev, const void *dport_dev)
+{
+	struct cxl_port *port;
+
+	if (!is_cxl_port(dev))
+		return 0;
+
+	port = to_cxl_port(dev);
+
+	return port->parent_dport->dport_dev == dport_dev;
+}
+
+/**
+ * cxl_walk_port
+ *
+ * @port: Port be traversed into
+ * @cb: Callback for handling the CXL Ports
+ * @userdata: Result
+ * @err_pdev: Device with initial detected error. Is locked immediately
+ *            after KFIFO dequeue.
+ */
+static void cxl_walk_port(struct cxl_port *port,
+			  int (*cb)(struct device *, void *, struct pci_dev *),
+			  void *userdata,
+			  struct pci_dev *err_pdev)
+{
+	struct cxl_port *err_port __free(put_cxl_port) = get_cxl_port(err_pdev);
+	bool need_lock = (port != err_port);
+	struct cxl_dport *dport = NULL;
+	unsigned long index;
+
+	device_lock_if(&port->dev, need_lock);
+	if (is_cxl_endpoint(port)) {
+		cb(port->uport_dev->parent, userdata, err_pdev);
+		device_unlock_if(&port->dev, need_lock);
+		return;
+	}
+
+	if (port->uport_dev && dev_is_pci(port->uport_dev))
+		cb(port->uport_dev, userdata, err_pdev);
+
+	/*
+	 * Iterate over the set of Downstream Ports recorded in port->dports (XArray):
+	 *  - For each dport, attempt to find a child CXL Port whose parent dport
+	 *    match.
+	 *  - Invoke the provided callback on the dport's device.
+	 *  - If a matching child CXL Port device is found, recurse into that port to
+	 *    continue the walk.
+	 */
+	xa_for_each(&port->dports, index, dport)
+	{
+		struct device *child_port_dev __free(put_device) =
+			bus_find_device(&cxl_bus_type, &port->dev, dport->dport_dev,
+					match_port_by_parent_dport);
+
+		cb(dport->dport_dev, userdata, err_pdev);
+		if (child_port_dev)
+			cxl_walk_port(to_cxl_port(child_port_dev), cb, userdata, err_pdev);
+	}
+	device_unlock_if(&port->dev, need_lock);
+}
+
 static void cxl_do_recovery(struct pci_dev *pdev)
 {
+	pci_ers_result_t status = PCI_ERS_RESULT_CAN_RECOVER;
+	struct cxl_port *port __free(put_cxl_port) = get_cxl_port(pdev);
+
+	if (!port) {
+		pci_err(pdev, "Failed to find the CXL device\n");
+		return;
+	}
+
+	cxl_walk_port(port, cxl_report_error_detected, &status, pdev);
+	if (status == PCI_ERS_RESULT_PANIC)
+		panic("CXL cachemem error.");
+
+	/*
+	 * If we have native control of AER, clear error status in the device
+	 * that detected the error.  If the platform retained control of AER,
+	 * it is responsible for clearing this status.  In that case, the
+	 * signaling device may not even be visible to the OS.
+	 */
+	if (cxl_error_is_native(pdev)) {
+		pcie_clear_device_status(pdev);
+		pci_aer_clear_nonfatal_status(pdev);
+		pci_aer_clear_fatal_status(pdev);
+	}
 }
 
 void cxl_handle_cor_ras(struct device *dev, u64 serial, void __iomem *ras_base)
@@ -484,16 +614,17 @@ static void cxl_proto_err_work_fn(struct work_struct *work)
 			if (!cxl_pci_drv_bound(pdev))
 				continue;
 			cxlmd_dev = &cxlds->cxlmd->dev;
-			device_lock_if(cxlmd_dev, cxlmd_dev);
 		} else {
 			cxlmd_dev = NULL;
 		}
 
+		/* Lock the CXL parent Port */
 		struct cxl_port *port __free(put_cxl_port) = get_cxl_port(pdev);
 		if (!port)
 			continue;
 		guard(device)(&port->dev);
 
+		device_lock_if(cxlmd_dev, cxlmd_dev);
 		cxl_handle_proto_error(&wd);
 		device_unlock_if(cxlmd_dev, cxlmd_dev);
 	}
