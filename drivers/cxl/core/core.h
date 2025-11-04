@@ -7,6 +7,7 @@
 #include <linux/pci.h>
 #include <cxl/mailbox.h>
 #include <linux/rwsem.h>
+#include <linux/pci.h>
 
 extern const struct device_type cxl_nvdimm_bridge_type;
 extern const struct device_type cxl_nvdimm_type;
@@ -148,23 +149,19 @@ int cxl_port_get_switch_dport_bandwidth(struct cxl_port *port,
 #ifdef CONFIG_CXL_RAS
 int cxl_ras_init(void);
 void cxl_ras_exit(void);
-bool cxl_handle_ras(struct cxl_dev_state *cxlds, void __iomem *ras_base);
-void cxl_handle_cor_ras(struct cxl_dev_state *cxlds, void __iomem *ras_base);
+bool cxl_handle_ras(struct device *dev, void __iomem *ras_base);
+void cxl_handle_cor_ras(struct device *dev, void __iomem *ras_base);
 #else
 static inline int cxl_ras_init(void)
 {
 	return 0;
 }
-
-static inline void cxl_ras_exit(void)
-{
-}
-
-static inline bool cxl_handle_ras(struct cxl_dev_state *cxlds, void __iomem *ras_base)
+static inline void cxl_ras_exit(void) { }
+static inline bool cxl_handle_ras(struct device *dev, void __iomem *ras_base)
 {
 	return false;
 }
-static inline void cxl_handle_cor_ras(struct cxl_dev_state *cxlds, void __iomem *ras_base) { }
+static inline void cxl_handle_cor_ras(struct device *dev, void __iomem *ras_base) { }
 #endif /* CONFIG_CXL_RAS */
 
 /* Restricted CXL Host specific RAS functions */
