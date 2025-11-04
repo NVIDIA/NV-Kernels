@@ -157,6 +157,8 @@ void cxl_cor_error_detected(struct device *dev);
 pci_ers_result_t pci_error_detected(struct pci_dev *pdev,
 				    pci_channel_state_t error);
 void pci_cor_error_detected(struct pci_dev *pdev);
+pci_ers_result_t cxl_port_error_detected(struct device *dev);
+void cxl_port_cor_error_detected(struct device *dev);
 #else
 static inline int cxl_ras_init(void)
 {
@@ -176,6 +178,11 @@ static inline pci_ers_result_t pci_error_detected(struct pci_dev *pdev,
 	return PCI_ERS_RESULT_NONE;
 }
 static inline void pci_cor_error_detected(struct pci_dev *pdev) { }
+static inline void cxl_port_cor_error_detected(struct device *dev) { }
+static inline pci_ers_result_t cxl_port_error_detected(struct device *dev)
+{
+	return PCI_ERS_RESULT_NONE;
+}
 #endif /* CONFIG_CXL_RAS */
 
 /* Restricted CXL Host specific RAS functions */
@@ -190,6 +197,9 @@ static inline void cxl_handle_rdport_errors(struct cxl_dev_state *cxlds) { }
 #endif /* CONFIG_CXL_RCH_RAS */
 
 int cxl_gpf_port_setup(struct cxl_dport *dport);
+struct cxl_port *find_cxl_port(struct device *dport_dev,
+			       struct cxl_dport **dport);
+struct cxl_port *find_cxl_port_by_uport(struct device *uport_dev);
 
 struct cxl_hdm;
 int cxl_hdm_decode_init(struct cxl_dev_state *cxlds, struct cxl_hdm *cxlhdm,

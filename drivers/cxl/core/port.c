@@ -1361,8 +1361,8 @@ static struct cxl_port *__find_cxl_port(struct cxl_find_port_ctx *ctx)
 	return NULL;
 }
 
-static struct cxl_port *find_cxl_port(struct device *dport_dev,
-				      struct cxl_dport **dport)
+struct cxl_port *find_cxl_port(struct device *dport_dev,
+			       struct cxl_dport **dport)
 {
 	struct cxl_find_port_ctx ctx = {
 		.dport_dev = dport_dev,
@@ -1565,7 +1565,7 @@ static int match_port_by_uport(struct device *dev, const void *data)
  * Function takes a device reference on the port device. Caller should do a
  * put_device() when done.
  */
-static struct cxl_port *find_cxl_port_by_uport(struct device *uport_dev)
+struct cxl_port *find_cxl_port_by_uport(struct device *uport_dev)
 {
 	struct device *dev;
 
@@ -1574,6 +1574,7 @@ static struct cxl_port *find_cxl_port_by_uport(struct device *uport_dev)
 		return to_cxl_port(dev);
 	return NULL;
 }
+EXPORT_SYMBOL_NS_GPL(find_cxl_port_by_uport, "CXL");
 
 static int update_decoder_targets(struct device *dev, void *data)
 {
