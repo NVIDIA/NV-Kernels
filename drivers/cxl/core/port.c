@@ -1195,6 +1195,8 @@ __devm_cxl_add_dport(struct cxl_port *port, struct device *dport_dev,
 			return ERR_PTR(rc);
 		}
 		port->component_reg_phys = CXL_RESOURCE_NONE;
+		if (!is_cxl_endpoint(port) && dev_is_pci(port->uport_dev))
+			cxl_uport_init_ras_reporting(port, &port->dev);
 	}
 
 	get_device(dport_dev);
@@ -1623,6 +1625,8 @@ static struct cxl_dport *cxl_port_add_dport(struct cxl_port *port,
 		return new_dport;
 
 	cxl_switch_parse_cdat(new_dport);
+
+	cxl_dport_init_ras_reporting(new_dport, &port->dev);
 
 	if (ida_is_empty(&port->decoder_ida)) {
 		rc = devm_cxl_switch_port_decoders_setup(port);
