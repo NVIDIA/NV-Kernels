@@ -20,7 +20,7 @@ menuconfig CXL_BUS
 if CXL_BUS
 
 config CXL_PCI
-	tristate "PCI manageability"
+	bool "PCI manageability"
 	default CXL_BUS
 	help
 	  The CXL specification defines a "CXL memory device" sub-class in the
@@ -29,12 +29,12 @@ config CXL_PCI
 	  memory to be mapped into the system address map (Host-managed Device
 	  Memory (HDM)).
 
-	  Say 'y/m' to enable a driver that will attach to CXL memory expander
+	  Say 'y' to enable a driver that will attach to CXL memory expander
 	  devices enumerated by the memory device class code for configuration
 	  and management primarily via the mailbox interface. See Chapter 2.3
 	  Type 3 CXL Device in the CXL 2.0 specification for more details.
 
-	  If unsure say 'm'.
+	  If unsure say 'y'.
 
 config CXL_MEM_RAW_COMMANDS
 	bool "RAW Command Interface for Memory Devices"

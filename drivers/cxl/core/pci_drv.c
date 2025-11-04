@@ -1131,6 +1131,17 @@ static struct pci_driver cxl_pci_driver = {
 	},
 };
 
+bool cxl_pci_drv_bound(struct pci_dev *pdev)
+{
+	device_lock_assert(&pdev->dev);
+
+	if (pdev->driver != &cxl_pci_driver)
+		pr_err_ratelimited("%s device not bound to CXL PCI driver\n",
+				   pci_name(pdev));
+
+	return (pdev->driver == &cxl_pci_driver);
+}
+
 #define CXL_EVENT_HDR_FLAGS_REC_SEVERITY GENMASK(1, 0)
 static void cxl_handle_cper_event(enum cxl_event_type ev_type,
 				  struct cxl_cper_event_rec *rec)
@@ -1177,7 +1188,7 @@ static void cxl_cper_work_fn(struct work_struct *work)
 }
 static DECLARE_WORK(cxl_cper_work, cxl_cper_work_fn);
 
-static int __init cxl_pci_driver_init(void)
+int __init cxl_pci_driver_init(void)
 {
 	int rc;
 
@@ -1192,15 +1203,9 @@ static int __init cxl_pci_driver_init(void)
 	return rc;
 }
 
-static void __exit cxl_pci_driver_exit(void)
+void cxl_pci_driver_exit(void)
 {
 	cxl_cper_unregister_work(&cxl_cper_work);
 	cancel_work_sync(&cxl_cper_work);
 	pci_unregister_driver(&cxl_pci_driver);
 }
-
-module_init(cxl_pci_driver_init);
-module_exit(cxl_pci_driver_exit);
-MODULE_DESCRIPTION("CXL: PCI manageability");
-MODULE_LICENSE("GPL v2");
-MODULE_IMPORT_NS("CXL");

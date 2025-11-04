@@ -2508,8 +2508,14 @@ static __init int cxl_core_init(void)
 	if (rc)
 		goto err_ras;
 
+	rc = cxl_pci_driver_init();
+	if (rc)
+		goto err_pci;
+
 	return 0;
 
+err_pci:
+	cxl_ras_exit();
 err_ras:
 	cxl_region_exit();
 err_region:
@@ -2523,6 +2529,7 @@ err_wq:
 
 static void cxl_core_exit(void)
 {
+	cxl_pci_driver_exit();
 	cxl_ras_exit();
 	cxl_region_exit();
 	bus_unregister(&cxl_bus_type);

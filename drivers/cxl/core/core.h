@@ -195,4 +195,13 @@ int cxl_set_feature(struct cxl_mailbox *cxl_mbox, const uuid_t *feat_uuid,
 		    u16 *return_code);
 #endif
 
+#ifdef CONFIG_CXL_PCI
+bool cxl_pci_drv_bound(struct pci_dev *pdev);
+int cxl_pci_driver_init(void);
+void cxl_pci_driver_exit(void);
+#else
+static inline bool cxl_pci_drv_bound(struct pci_dev *pdev) { return false; };
+static inline int cxl_pci_driver_init(void) { return 0; }
+static inline void cxl_pci_driver_exit(void) { }
+#endif
 #endif /* __CXL_CORE_H__ */
