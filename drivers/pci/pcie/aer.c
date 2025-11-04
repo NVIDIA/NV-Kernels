@@ -1099,8 +1099,6 @@ static bool find_source_device(struct pci_dev *parent,
 	return true;
 }
 
-#ifdef CONFIG_PCIEAER_CXL
-
 /**
  * pci_aer_unmask_internal_errors - unmask internal errors
  * @dev: pointer to the pci_dev data structure
@@ -1125,24 +1123,6 @@ void pci_aer_unmask_internal_errors(struct pci_dev *dev)
 	pci_write_config_dword(dev, aer + PCI_ERR_COR_MASK, mask);
 }
 EXPORT_SYMBOL_GPL(pci_aer_unmask_internal_errors);
-
-bool cxl_error_is_native(struct pci_dev *dev)
-{
-	struct pci_host_bridge *host = pci_find_host_bridge(dev->bus);
-
-	return (pcie_ports_native || host->native_aer);
-}
-EXPORT_SYMBOL_NS_GPL(cxl_error_is_native, "CXL");
-
-bool is_internal_error(struct aer_err_info *info)
-{
-	if (info->severity == AER_CORRECTABLE)
-		return info->status & PCI_ERR_COR_INTERNAL;
-
-	return info->status & PCI_ERR_UNC_INTN;
-}
-EXPORT_SYMBOL_NS_GPL(is_internal_error, "CXL");
-#endif /* CONFIG_CXL_RAS */
 
 /**
  * pci_aer_handle_error - handle logging error into an event log
@@ -1180,7 +1160,10 @@ static void pci_aer_handle_error(struct pci_dev *dev, struct aer_err_info *info)
 static void handle_error_source(struct pci_dev *dev, struct aer_err_info *info)
 {
 	cxl_rch_handle_error(dev, info);
-	pci_aer_handle_error(dev, info);
+	if (is_cxl_error(dev, info))
+		cxl_forward_error(dev, info);
+	else
+		pci_aer_handle_error(dev, info);
 	pci_dev_put(dev);
 }
 
