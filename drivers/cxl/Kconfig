@@ -237,4 +237,11 @@ config CXL_RAS
 	def_bool y
 	depends on ACPI_APEI_GHES && PCIEAER && CXL_PCI
 
+config CXL_RCH_RAS
+	bool "CXL: Restricted CXL Host (RCH) protocol error handling"
+	def_bool n
+	depends on CXL_RAS
+	help
+	  RAS support for Restricted CXL Host (RCH) defined in CXL1.1.
+
 endif

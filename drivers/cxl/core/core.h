@@ -4,6 +4,7 @@
 #ifndef __CXL_CORE_H__
 #define __CXL_CORE_H__
 
+#include <linux/pci.h>
 #include <cxl/mailbox.h>
 #include <linux/rwsem.h>
 
@@ -167,7 +168,7 @@ static inline void cxl_handle_cor_ras(struct cxl_dev_state *cxlds, void __iomem 
 #endif /* CONFIG_CXL_RAS */
 
 /* Restricted CXL Host specific RAS functions */
-#ifdef CONFIG_CXL_RAS
+#ifdef CONFIG_CXL_RCH_RAS
 void cxl_dport_map_rch_aer(struct cxl_dport *dport);
 void cxl_disable_rch_root_ints(struct cxl_dport *dport);
 void cxl_handle_rdport_errors(struct cxl_dev_state *cxlds);
@@ -175,7 +176,7 @@ void cxl_handle_rdport_errors(struct cxl_dev_state *cxlds);
 static inline void cxl_dport_map_rch_aer(struct cxl_dport *dport) { }
 static inline void cxl_disable_rch_root_ints(struct cxl_dport *dport) { }
 static inline void cxl_handle_rdport_errors(struct cxl_dev_state *cxlds) { }
-#endif /* CONFIG_CXL_RAS */
+#endif /* CONFIG_CXL_RCH_RAS */
 
 int cxl_gpf_port_setup(struct cxl_dport *dport);
 
