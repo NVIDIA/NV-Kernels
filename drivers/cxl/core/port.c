@@ -1438,6 +1438,10 @@ EXPORT_SYMBOL_NS_GPL(cxl_endpoint_autoremove, "CXL");
  */
 static void delete_switch_port(struct cxl_port *port)
 {
+	cxl_mask_proto_interrupts(port->uport_dev);
+	if (port->parent_dport)
+		cxl_mask_proto_interrupts(port->parent_dport->dport_dev);
+
 	devm_release_action(port->dev.parent, cxl_unlink_parent_dport, port);
 	devm_release_action(port->dev.parent, cxl_unlink_uport, port);
 	devm_release_action(port->dev.parent, unregister_port, port);
@@ -1459,8 +1463,10 @@ static void del_dports(struct cxl_port *port)
 
 	device_lock_assert(&port->dev);
 
-	xa_for_each(&port->dports, index, dport)
+	xa_for_each(&port->dports, index, dport) {
+		cxl_mask_proto_interrupts(dport->dport_dev);
 		del_dport(dport);
+	}
 }
 
 struct detach_ctx {
@@ -1486,6 +1492,8 @@ static int port_has_memdev(struct device *dev, const void *data)
 static void cxl_detach_ep(void *data)
 {
 	struct cxl_memdev *cxlmd = data;
+
+	cxl_mask_proto_interrupts(cxlmd->cxlds->dev);
 
 	for (int i = cxlmd->depth - 1; i >= 1; i--) {
 		struct cxl_port *port, *parent_port;
