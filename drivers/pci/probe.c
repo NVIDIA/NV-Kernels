@@ -1692,6 +1692,34 @@ static void set_pcie_thunderbolt(struct pci_dev *dev)
 		dev->is_thunderbolt = 1;
 }
 
+static void set_pcie_cxl(struct pci_dev *dev)
+{
+	struct pci_dev *parent;
+	u16 dvsec = pci_find_dvsec_capability(dev, PCI_VENDOR_ID_CXL,
+					      PCI_DVSEC_CXL_FLEXBUS_PORT);
+	if (dvsec) {
+		u16 cap;
+
+		pci_read_config_word(dev, dvsec + PCI_DVSEC_CXL_FLEXBUS_STATUS_OFFSET, &cap);
+
+		dev->is_cxl = FIELD_GET(PCI_DVSEC_CXL_FLEXBUS_STATUS_CACHE_MASK, cap) ||
+			FIELD_GET(PCI_DVSEC_CXL_FLEXBUS_STATUS_MEM_MASK, cap);
+	}
+
+	if (!pci_is_pcie(dev) ||
+	    !(pci_pcie_type(dev) == PCI_EXP_TYPE_ENDPOINT ||
+	      pci_pcie_type(dev) == PCI_EXP_TYPE_UPSTREAM))
+		return;
+
+	/*
+	 * Update parent's CXL state because alternate protocol training
+	 * may have changed
+	 */
+	parent = pci_upstream_bridge(dev);
+	if (parent)
+	    set_pcie_cxl(parent);
+}
+
 static void set_pcie_untrusted(struct pci_dev *dev)
 {
 	struct pci_dev *parent = pci_upstream_bridge(dev);
@@ -2021,6 +2049,8 @@ int pci_setup_device(struct pci_dev *dev)
 
 	/* Need to have dev->cfg_size ready */
 	set_pcie_thunderbolt(dev);
+
+	set_pcie_cxl(dev);
 
 	set_pcie_untrusted(dev);
 
