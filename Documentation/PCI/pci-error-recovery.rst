@@ -102,6 +102,8 @@ Possible return values are::
 		PCI_ERS_RESULT_NEED_RESET,  /* Device driver wants slot to be reset. */
 		PCI_ERS_RESULT_DISCONNECT,  /* Device has completely failed, is unrecoverable */
 		PCI_ERS_RESULT_RECOVERED,   /* Device driver is fully recovered and operational */
+		PCI_ERS_RESULT_NO_AER_DRIVER, /* No AER capabilities registered for the driver */
+		PCI_ERS_RESULT_PANIC,       /* System is unstable, panic. Is CXL specific */
 	};
 
 A driver does not have to implement all of these callbacks; however,
@@ -115,6 +117,10 @@ a slot_reset().
 The actual steps taken by a platform to recover from a PCI error
 event will be platform-dependent, but will follow the general
 sequence described below.
+
+PCI_ERS_RESULT_PANIC is currently unique to CXL and handled in CXL
+cxl_do_recovery(). The PCI pcie_do_recovery() routine does not report or
+handle PCI_ERS_RESULT_PANIC.
 
 STEP 0: Error Event
 -------------------
