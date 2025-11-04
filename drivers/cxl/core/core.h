@@ -159,6 +159,8 @@ pci_ers_result_t pci_error_detected(struct pci_dev *pdev,
 void pci_cor_error_detected(struct pci_dev *pdev);
 pci_ers_result_t cxl_port_error_detected(struct device *dev);
 void cxl_port_cor_error_detected(struct device *dev);
+void cxl_mask_proto_interrupts(struct device *dev);
+void cxl_unmask_proto_interrupts(struct device *dev);
 #else
 static inline int cxl_ras_init(void)
 {
@@ -183,6 +185,8 @@ static inline pci_ers_result_t cxl_port_error_detected(struct device *dev)
 {
 	return PCI_ERS_RESULT_NONE;
 }
+static inline void cxl_unmask_proto_interrupts(struct device *dev) { }
+static inline void cxl_mask_proto_interrupts(struct device *dev) { }
 #endif /* CONFIG_CXL_RAS */
 
 /* Restricted CXL Host specific RAS functions */
