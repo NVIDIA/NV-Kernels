@@ -1561,6 +1561,8 @@ int cppc_set_epp_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls, bool enable)
 	struct cpc_register_resource *auto_sel_reg;
 	struct cpc_desc *cpc_desc = per_cpu(cpc_desc_ptr, cpu);
 	struct cppc_pcc_data *pcc_ss_data = NULL;
+	bool autosel_support_in_ffh_or_sysmem;
+	bool epp_support_in_ffh_or_sysmem;
 	int ret;
 
 	if (!cpc_desc) {
@@ -1570,6 +1572,11 @@ int cppc_set_epp_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls, bool enable)
 
 	auto_sel_reg = &cpc_desc->cpc_regs[AUTO_SEL_ENABLE];
 	epp_set_reg = &cpc_desc->cpc_regs[ENERGY_PERF];
+
+	epp_support_in_ffh_or_sysmem = CPC_SUPPORTED(epp_set_reg) &&
+				(CPC_IN_FFH(epp_set_reg) || CPC_IN_SYSTEM_MEMORY(epp_set_reg));
+	autosel_support_in_ffh_or_sysmem = CPC_SUPPORTED(auto_sel_reg) &&
+				(CPC_IN_FFH(auto_sel_reg) || CPC_IN_SYSTEM_MEMORY(auto_sel_reg));
 
 	if (CPC_IN_PCC(epp_set_reg) || CPC_IN_PCC(auto_sel_reg)) {
 		if (pcc_ss_id < 0) {
@@ -1595,13 +1602,28 @@ int cppc_set_epp_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls, bool enable)
 		/* after writing CPC, transfer the ownership of PCC to platform */
 		ret = send_pcc_cmd(pcc_ss_id, CMD_WRITE);
 		up_write(&pcc_ss_data->pcc_lock);
-	} else if (osc_cpc_flexible_adr_space_confirmed &&
-		   CPC_SUPPORTED(epp_set_reg) && CPC_IN_FFH(epp_set_reg)) {
-		ret = cpc_write(cpu, epp_set_reg, perf_ctrls->energy_perf);
+	} else if (osc_cpc_flexible_adr_space_confirmed) {
+		if (!epp_support_in_ffh_or_sysmem && !autosel_support_in_ffh_or_sysmem) {
+			ret = -EOPNOTSUPP;
+		} else {
+			if (autosel_support_in_ffh_or_sysmem) {
+				ret = cpc_write(cpu, auto_sel_reg, enable);
+				if (ret)
+					return ret;
+			}
+
+			if (epp_support_in_ffh_or_sysmem) {
+				ret = cpc_write(cpu, epp_set_reg, perf_ctrls->energy_perf);
+				if (ret)
+					return ret;
+			}
+		}
 	} else {
-		ret = -ENOTSUPP;
-		pr_debug("_CPC in PCC and _CPC in FFH are not supported\n");
+		ret = -EOPNOTSUPP;
 	}
+
+	if (ret == -EOPNOTSUPP)
+		pr_debug("_CPC in PCC and _CPC in FFH are not supported\n");
 
 	return ret;
 }
@@ -1748,8 +1770,8 @@ int cppc_get_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls)
 {
 	struct cpc_desc *cpc_desc = per_cpu(cpc_desc_ptr, cpu);
 	struct cpc_register_resource *desired_perf_reg, *min_perf_reg, *max_perf_reg,
-				     *energy_perf_reg;
-	u64 desired_perf = 0, min = 0, max = 0, energy_perf = 0;
+				     *energy_perf_reg, *auto_sel_reg;
+	u64 desired_perf = 0, min = 0, max = 0, energy_perf = 0, auto_sel = 0;
 	int pcc_ss_id = per_cpu(cpu_pcc_subspace_idx, cpu);
 	struct cppc_pcc_data *pcc_ss_data = NULL;
 	int ret = 0, regs_in_pcc = 0;
@@ -1768,10 +1790,12 @@ int cppc_get_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls)
 	min_perf_reg = &cpc_desc->cpc_regs[MIN_PERF];
 	max_perf_reg = &cpc_desc->cpc_regs[MAX_PERF];
 	energy_perf_reg = &cpc_desc->cpc_regs[ENERGY_PERF];
+	auto_sel_reg = &cpc_desc->cpc_regs[AUTO_SEL_ENABLE];
 
 	/* Are any of the regs PCC ?*/
 	if (CPC_IN_PCC(desired_perf_reg) || CPC_IN_PCC(min_perf_reg) ||
-	    CPC_IN_PCC(max_perf_reg) || CPC_IN_PCC(energy_perf_reg)) {
+	    CPC_IN_PCC(max_perf_reg) || CPC_IN_PCC(energy_perf_reg) ||
+	    CPC_IN_PCC(auto_sel_reg)) {
 		if (pcc_ss_id < 0) {
 			pr_debug("Invalid pcc_ss_id for CPU:%d\n", cpu);
 			return -ENODEV;
@@ -1803,6 +1827,10 @@ int cppc_get_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls)
 	if (CPC_SUPPORTED(energy_perf_reg))
 		cpc_read(cpu, energy_perf_reg, &energy_perf);
 	perf_ctrls->energy_perf = energy_perf;
+
+	if (CPC_SUPPORTED(auto_sel_reg))
+		cpc_read(cpu, auto_sel_reg, &auto_sel);
+	perf_ctrls->auto_sel = (bool)auto_sel;
 
 out_err:
 	if (regs_in_pcc)
