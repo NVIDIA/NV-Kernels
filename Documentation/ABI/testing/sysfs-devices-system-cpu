@@ -327,6 +327,52 @@ Description:	Energy performance preference
 
 		This file is only present if the cppc-cpufreq driver is in use.
 
+What:		/sys/devices/system/cpu/cpuX/cpufreq/min_perf
+Date:		December 2025
+Contact:	linux-pm@vger.kernel.org
+Description:	Minimum Performance Frequency
+
+		Read/write a frequency value in kHz from/to this file. This
+		file conveys the minimum performance level (as frequency) at
+		which the platform may run. The frequency value is internally
+		converted to a performance value and must correspond to a
+		performance level in the range [Lowest Performance, Highest
+		Performance], inclusive. The minimum must be less than or equal
+		to the maximum performance. The performance range can be checked
+		from nodes:
+			/sys/devices/system/cpu/cpuX/acpi_cppc/highest_perf
+			/sys/devices/system/cpu/cpuX/acpi_cppc/lowest_perf
+
+		This file is only present if the cppc-cpufreq driver is in use.
+
+What:		/sys/devices/system/cpu/cpuX/cpufreq/max_perf
+Date:		December 2025
+Contact:	linux-pm@vger.kernel.org
+Description:	Maximum Performance Frequency
+
+		Read/write a frequency value in kHz from/to this file. This
+		file conveys the maximum performance level (as frequency) at
+		which the platform may run. The frequency value is internally
+		converted to a performance value and must correspond to a
+		performance level in the range [Lowest Performance, Highest
+		Performance], inclusive. The performance range can be checked
+		from nodes:
+			/sys/devices/system/cpu/cpuX/acpi_cppc/highest_perf
+			/sys/devices/system/cpu/cpuX/acpi_cppc/lowest_perf
+
+		This file is only present if the cppc-cpufreq driver is in use.
+
+What:		/sys/devices/system/cpu/cpuX/cpufreq/perf_limited
+Date:		December 2025
+Contact:	linux-pm@vger.kernel.org
+Description:	Performance Limited
+
+		Read/write a 32 bits value from/to this file. This file indicates
+		to OSPM that an unpredictable event has limited processor
+		performance, and the delivered performance may be less than
+		desired/minimum performance.
+
+		This file is only present if the cppc-cpufreq driver is in use.
 
 What:		/sys/devices/system/cpu/cpu*/cache/index3/cache_disable_{0,1}
 Date:		August 2008
