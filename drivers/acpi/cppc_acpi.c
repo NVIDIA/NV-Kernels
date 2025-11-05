@@ -1812,6 +1812,32 @@ int cppc_set_max_perf(int cpu, u64 max_perf)
 EXPORT_SYMBOL_GPL(cppc_set_max_perf);
 
 /**
+ * cppc_get_perf_limited - Get the Performance Limited register value.
+ * @cpu: CPU from which to get Performance Limited register.
+ * @perf_limited: Pointer to store the Performance Limited value.
+ *
+ * Return: 0 for success, -EIO on register access failure, -EOPNOTSUPP if not supported.
+ */
+int cppc_get_perf_limited(int cpu, u64 *perf_limited)
+{
+	return cppc_get_reg_val(cpu, PERF_LIMITED, perf_limited);
+}
+EXPORT_SYMBOL_GPL(cppc_get_perf_limited);
+
+/**
+ * cppc_set_perf_limited() - Write the Performance Limited register.
+ * @cpu: CPU on which to write register.
+ * @perf_limited: Value to write to the perf_limited register.
+ *
+ * Return: 0 for success, -EIO on register access failure, -EOPNOTSUPP if not supported.
+ */
+int cppc_set_perf_limited(int cpu, u64 perf_limited)
+{
+	return cppc_set_reg_val(cpu, PERF_LIMITED, perf_limited);
+}
+EXPORT_SYMBOL_GPL(cppc_set_perf_limited);
+
+/**
  * cppc_get_perf - Get a CPU's performance controls.
  * @cpu: CPU for which to get performance controls.
  * @perf_ctrls: ptr to cppc_perf_ctrls. See cppc_acpi.h
