@@ -838,59 +838,21 @@ static ssize_t store_auto_select(struct cpufreq_policy *policy,
 	return count;
 }
 
-static ssize_t show_auto_act_window(struct cpufreq_policy *policy, char *buf)
+static ssize_t cppc_cpufreq_sysfs_show_u64(unsigned int cpu, int (*get_func)(int, u64 *), char *buf)
 {
 	u64 val;
-	int ret;
+	int ret = get_func(cpu, &val);
 
-	ret = cppc_get_auto_act_window(policy->cpu, &val);
-
-	/* show "<unsupported>" when this register is not supported by cpc */
 	if (ret == -EOPNOTSUPP)
 		return sysfs_emit(buf, "<unsupported>\n");
-
 	if (ret)
 		return ret;
 
 	return sysfs_emit(buf, "%llu\n", val);
 }
 
-static ssize_t store_auto_act_window(struct cpufreq_policy *policy,
-				     const char *buf, size_t count)
-{
-	u64 usec;
-	int ret;
-
-	ret = kstrtou64(buf, 0, &usec);
-	if (ret)
-		return ret;
-
-	ret = cppc_set_auto_act_window(policy->cpu, usec);
-	if (ret)
-		return ret;
-
-	return count;
-}
-
-static ssize_t show_energy_performance_preference_val(struct cpufreq_policy *policy, char *buf)
-{
-	u64 val;
-	int ret;
-
-	ret = cppc_get_epp_perf(policy->cpu, &val);
-
-	/* show "<unsupported>" when this register is not supported by cpc */
-	if (ret == -EOPNOTSUPP)
-		return sysfs_emit(buf, "<unsupported>\n");
-
-	if (ret)
-		return ret;
-
-	return sysfs_emit(buf, "%llu\n", val);
-}
-
-static ssize_t store_energy_performance_preference_val(struct cpufreq_policy *policy,
-						       const char *buf, size_t count)
+static ssize_t cppc_cpufreq_sysfs_store_u64(unsigned int cpu, int (*set_func)(int, u64),
+					    const char *buf, size_t count)
 {
 	u64 val;
 	int ret;
@@ -899,11 +861,30 @@ static ssize_t store_energy_performance_preference_val(struct cpufreq_policy *po
 	if (ret)
 		return ret;
 
-	ret = cppc_set_epp(policy->cpu, val);
-	if (ret)
-		return ret;
+	ret = set_func((int)cpu, val);
 
-	return count;
+	return ret ? ret : count;
+}
+
+static ssize_t show_auto_act_window(struct cpufreq_policy *policy, char *buf)
+{
+	return cppc_cpufreq_sysfs_show_u64(policy->cpu, cppc_get_auto_act_window, buf);
+}
+
+static ssize_t store_auto_act_window(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	return cppc_cpufreq_sysfs_store_u64(policy->cpu, cppc_set_auto_act_window, buf, count);
+}
+
+static ssize_t show_energy_performance_preference_val(struct cpufreq_policy *policy, char *buf)
+{
+	return cppc_cpufreq_sysfs_show_u64(policy->cpu, cppc_get_epp_perf, buf);
+}
+
+static ssize_t store_energy_performance_preference_val(struct cpufreq_policy *policy,
+						       const char *buf, size_t count)
+{
+	return cppc_cpufreq_sysfs_store_u64(policy->cpu, cppc_set_epp, buf, count);
 }
 
 cpufreq_freq_attr_ro(freqdomain_cpus);
