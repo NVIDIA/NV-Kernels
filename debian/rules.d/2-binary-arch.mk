@@ -63,14 +63,6 @@ ifneq ($(skipdbg),true)
 		$(build_cd) $(kmake) $(build_O) $(conc_level) scripts_gdb ; \
 	fi
 endif
-
-	# Collect the list of kernel source files used for this build. Need to do this early
-	# before modules are stripped. Fail if the resulting file is empty.
-	find $(builddir)/build-$* -name vmlinux -o -name \*.ko -exec dwarfdump -i {} \; | \
-		grep -E 'DW_AT_(call|decl)_file' | sed -n 's|.*\s/|/|p' | sort -u > \
-		$(builddir)/build-$*/sources.list
-	test -s $(builddir)/build-$*/sources.list
-
 	@touch $@
 
 define build_dkms_sign =
@@ -547,8 +539,6 @@ endif
 	fi
 	install -m644 $(DROOT)/canonical-certs.pem $(pkgdir_bldinfo)/usr/lib/linux/$(abi_release)-$*/canonical-certs.pem
 	install -m644 $(DROOT)/canonical-revoked-certs.pem $(pkgdir_bldinfo)/usr/lib/linux/$(abi_release)-$*/canonical-revoked-certs.pem
-	# List of source files used for this build
-	install -m644 $(builddir)/build-$*/sources.list $(pkgdir_bldinfo)/usr/lib/linux/$(abi_release)-$*/sources
 
 ifneq ($(full_build),false)
 	# Clean out this flavours build directory.
