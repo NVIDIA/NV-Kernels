@@ -742,6 +742,12 @@ static int realm_create_rd(struct kvm *kvm)
 		goto out_undelegate_tables;
 	}
 
+	if (WARN_ON(realm->num_aux > REC_PARAMS_AUX_GRANULES)) {
+		WARN_ON(rmi_realm_destroy(rd_phys));
+		r = -ENXIO;
+		goto out_undelegate_tables;
+	}
+
 	realm->rd = rd;
 
 	return 0;
