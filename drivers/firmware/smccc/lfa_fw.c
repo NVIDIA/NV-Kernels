@@ -129,6 +129,31 @@ static int get_nr_lfa_components(void)
 	return reg.a1;
 }
 
+static int lfa_cancel(struct image_props *attrs)
+{
+	struct arm_smccc_1_2_regs reg = { 0 };
+
+	reg.a0 = LFA_1_0_FN_CANCEL;
+	reg.a1 = attrs->fw_seq_id;
+	arm_smccc_1_2_invoke(&reg, &reg);
+
+	/*
+	 * When firmware activation is called with "skip_cpu_rendezvous=1",
+	 * LFA_CANCEL can fail with LFA_BUSY if the activation could not be
+	 * cancelled.
+	 */
+	if (reg.a0 == LFA_SUCCESS) {
+		pr_info("Activation cancelled for image %s\n",
+			attrs->image_name);
+	} else {
+		pr_err("Firmware activation could not be cancelled: %s\n",
+		       lfa_error_strings[-reg.a0]);
+		return -EINVAL;
+	}
+
+	return reg.a0;
+}
+
 static int call_lfa_activate(void *data)
 {
 	struct image_props *attrs = data;
@@ -159,6 +184,11 @@ static int activate_fw_image(struct image_props *attrs)
 	struct arm_smccc_1_2_regs args = { 0 };
 	struct arm_smccc_1_2_regs res = { 0 };
 	int ret;
+
+	if (attrs->may_reset_cpu) {
+		pr_err("CPU reset not supported by kernel driver\n");
+		return -EINVAL;
+	}
 
 	/*
 	 * LFA_PRIME/ACTIVATE will return 1 in res.a1 if the firmware
@@ -284,12 +314,6 @@ static ssize_t activate_store(struct kobject *kobj, struct kobj_attribute *attr,
 					 image_attrs[LFA_ATTR_ACTIVATE]);
 	int ret;
 
-	if (attrs->may_reset_cpu) {
-		pr_err("Firmware component requires unsupported CPU reset\n");
-
-		return -EINVAL;
-	}
-
 	ret = activate_fw_image(attrs);
 	if (ret) {
 		pr_err("Firmware activation failed: %s\n",
@@ -309,25 +333,11 @@ static ssize_t cancel_store(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	struct image_props *attrs = container_of(attr, struct image_props,
 						 image_attrs[LFA_ATTR_CANCEL]);
-	struct arm_smccc_1_2_regs reg = { 0 };
+	int ret;
 
-	reg.a0 = LFA_1_0_FN_CANCEL;
-	reg.a1 = attrs->fw_seq_id;
-	arm_smccc_1_2_invoke(&reg, &reg);
-
-	/*
-	 * When firmware activation is called with "skip_cpu_rendezvous=1",
-	 * LFA_CANCEL can fail with LFA_BUSY if the activation could not be
-	 * cancelled.
-	 */
-	if (reg.a0 == LFA_SUCCESS) {
-		pr_info("Activation cancelled for image %s\n",
-			attrs->image_name);
-	} else {
-		pr_err("Firmware activation could not be cancelled: %s\n",
-		       lfa_error_strings[-reg.a0]);
-		return -EINVAL;
-	}
+	ret = lfa_cancel(attrs);
+	if (ret != 0)
+		return ret;
 
 	return count;
 }
@@ -367,6 +377,8 @@ static int create_fw_inventory(char *fw_uuid, int seq_id, u32 image_flags)
 	for (int i = 0; i < ARRAY_SIZE(fw_images_uuids); i++) {
 		if (!strcmp(fw_images_uuids[i].uuid, fw_uuid))
 			image_name = fw_images_uuids[i].name;
+		else
+			image_name = fw_uuid;
 	}
 
 	attrs->image_dir = kobject_create_and_add(fw_uuid, lfa_dir);
@@ -414,6 +426,10 @@ static int create_fw_images_tree(void)
 	int ret, num_of_components;
 
 	num_of_components = get_nr_lfa_components();
+	if (num_of_components <= 0) {
+		pr_err("Error getting number of LFA components");
+		return -ENODEV;
+	}
 
 	for (int i = 0; i < num_of_components; i++) {
 		reg.a0 = LFA_1_0_FN_GET_INVENTORY;
