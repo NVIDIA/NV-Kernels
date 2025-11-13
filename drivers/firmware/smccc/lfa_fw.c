@@ -19,7 +19,12 @@
 #include <linux/nmi.h>
 #include <linux/ktime.h>
 #include <linux/delay.h>
+#include <linux/platform_device.h>
+#include <linux/acpi.h>
+#include <linux/interrupt.h>
+#include <linux/mutex.h>
 
+#define DRIVER_NAME	"ARM_LFA"
 #define LFA_ERROR_STRING(name) \
 	[name] = #name
 #undef pr_fmt
@@ -129,6 +134,7 @@ static const struct fw_image_uuid {
 };
 
 static struct kobject *lfa_dir;
+static DEFINE_MUTEX(lfa_lock);
 
 static int get_nr_lfa_components(void)
 {
@@ -374,17 +380,23 @@ static ssize_t activate_store(struct kobject *kobj, struct kobj_attribute *attr,
 					 image_attrs[LFA_ATTR_ACTIVATE]);
 	int ret;
 
+	if (!mutex_trylock(&lfa_lock)) {
+		pr_err("Mutex locked, try again");
+		return -EAGAIN;
+	}
+
 	ret = activate_fw_image(attrs);
 	if (ret) {
 		pr_err("Firmware activation failed: %s\n",
 			lfa_error_strings[-ret]);
-
+		mutex_unlock(&lfa_lock);
 		return -ECANCELED;
 	}
 
 	pr_info("Firmware activation succeeded\n");
 
 	/* TODO: refresh image flags here*/
+	mutex_unlock(&lfa_lock);
 	return count;
 }
 
@@ -510,6 +522,106 @@ static int create_fw_images_tree(void)
 	return 0;
 }
 
+static irqreturn_t lfa_irq_thread(int irq, void *data)
+{
+	struct image_props *attrs = NULL;
+	int ret;
+	int num_of_components, curr_component;
+
+	mutex_lock(&lfa_lock);
+
+	/*
+	 * As per LFA spec, after activation of a component, the caller
+	 * is expected to re-enumerate the component states (using
+	 * LFA_GET_INFO then LFA_GET_INVENTORY).
+	 * Hence we need an unconditional loop.
+	 */
+
+	do {
+		/* TODO: refresh image flags here */
+		/* If refresh fails goto exit_unlock */
+
+		/* Initialize counters to track list traversal  */
+		num_of_components = get_nr_lfa_components();
+		curr_component = 0;
+
+		/* Execute PRIME and ACTIVATE for activable FW component */
+		list_for_each_entry(attrs, &lfa_fw_images, image_node) {
+			curr_component++;
+			if ((!attrs->activation_capable) || (!attrs->activation_pending)) {
+				/* LFA not applicable for this FW component */
+				continue;
+			}
+
+			ret = activate_fw_image(attrs);
+			if (ret) {
+				pr_err("Firmware %s activation failed: %s\n",
+					attrs->image_name, lfa_error_strings[-ret]);
+				goto exit_unlock;
+			}
+
+			pr_info("Firmware %s activation succeeded", attrs->image_name);
+			/* Refresh FW component details */
+			break;
+		}
+	} while (curr_component < num_of_components);
+
+	/* TODO: refresh image flags here */
+	/* If refresh fails goto exit_unlock */
+
+exit_unlock:
+	mutex_unlock(&lfa_lock);
+	return IRQ_HANDLED;
+}
+
+static int lfa_probe(struct platform_device *pdev)
+{
+	int err;
+	unsigned int irq;
+
+	err = platform_get_irq_byname_optional(pdev, "fw-store-updated-interrupt");
+	if (err < 0)
+		err = platform_get_irq(pdev, 0);
+	if (err < 0) {
+		pr_err("Interrupt not found, functionality will be unavailable.");
+
+		/* Bail out without failing the driver. */
+		return 0;
+	}
+	irq = err;
+
+	err = request_threaded_irq(irq, NULL, lfa_irq_thread, IRQF_ONESHOT, DRIVER_NAME, NULL);
+	if (err != 0) {
+		pr_err("Interrupt setup failed, functionality will be unavailable.");
+
+		/* Bail out without failing the driver. */
+		return 0;
+	}
+
+	return 0;
+}
+
+static const struct of_device_id lfa_of_ids[] = {
+	{ .compatible = "arm,armhf000", },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, lfa_of_ids);
+
+static const struct acpi_device_id lfa_acpi_ids[] = {
+	{"ARMHF000"},
+	{},
+};
+MODULE_DEVICE_TABLE(acpi, lfa_acpi_ids);
+
+static struct platform_driver lfa_driver = {
+	.probe = lfa_probe,
+	.driver = {
+		.name = DRIVER_NAME,
+		.of_match_table = lfa_of_ids,
+		.acpi_match_table = ACPI_PTR(lfa_acpi_ids),
+	},
+};
+
 static int __init lfa_init(void)
 {
 	struct arm_smccc_1_2_regs reg = { 0 };
@@ -536,22 +648,32 @@ static int __init lfa_init(void)
 	pr_info("Arm Live Firmware Activation (LFA): detected v%ld.%ld\n",
 		reg.a0 >> 16, reg.a0 & 0xffff);
 
+	err = platform_driver_register(&lfa_driver);
+	if (err < 0)
+		pr_err("Platform driver register failed");
+
 	lfa_dir = kobject_create_and_add("lfa", firmware_kobj);
 	if (!lfa_dir)
 		return -ENOMEM;
 
+	mutex_lock(&lfa_lock);
 	err = create_fw_images_tree();
 	if (err != 0)
 		kobject_put(lfa_dir);
 
+	mutex_unlock(&lfa_lock);
 	return err;
 }
 module_init(lfa_init);
 
 static void __exit lfa_exit(void)
 {
+	mutex_lock(&lfa_lock);
 	clean_fw_images_tree();
+	mutex_unlock(&lfa_lock);
+
 	kobject_put(lfa_dir);
+	platform_driver_unregister(&lfa_driver);
 }
 module_exit(lfa_exit);
 
