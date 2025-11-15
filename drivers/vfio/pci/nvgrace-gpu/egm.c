@@ -33,6 +33,7 @@ struct egm_region {
 	DECLARE_HASHTABLE(htbl, 0x10);
 #ifdef CONFIG_MEMORY_FAILURE
 	struct pfn_address_space pfn_address_space;
+	bool pfn_space_registered;
 #endif
 };
 
@@ -140,7 +141,10 @@ static int nvgrace_egm_release(struct inode *inode, struct file *file)
 
 	if (atomic_dec_and_test(&region->open_count)) {
 #ifdef CONFIG_MEMORY_FAILURE
-		unregister_pfn_address_space(&region->pfn_address_space);
+		if (region->pfn_space_registered) {
+			unregister_pfn_address_space(&region->pfn_address_space);
+			region->pfn_space_registered = false;
+		}
 #endif
 		file->private_data = NULL;
 	}
@@ -169,7 +173,10 @@ static int nvgrace_egm_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_ops = &nvgrace_egm_mmap_ops;
 
 	ret = nvgrace_egm_register_pfn_range(region, vma);
+	if (ret == 0)
+		region->pfn_space_registered = true;
 #endif
+
 	return ret;
 }
 
@@ -458,6 +465,9 @@ int register_egm_node(struct pci_dev *pdev)
 	region->egmpxm = egmpxm;
 
 	hash_init(region->htbl);
+#ifdef CONFIG_MEMORY_FAILURE
+	region->pfn_space_registered = false;
+#endif
 	INIT_LIST_HEAD(&region->gpus);
 
 	atomic_set(&region->open_count, 0);
