@@ -1,8 +1,8 @@
 build_arch	= arm64
 defconfig	= defconfig
 flavours	= generic generic-64k
-build_image	= vmlinuz.efi
-kernel_file	= arch/$(build_arch)/boot/vmlinuz.efi
+build_image	= Image.gz
+kernel_file	= arch/$(build_arch)/boot/Image.gz
 install_file	= vmlinuz
 no_dumpfile = true
 uefi_signed     = true
