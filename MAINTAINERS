@@ -24055,7 +24055,7 @@ S:	Maintained
 T:	git https://git.kernel.org/pub/scm/linux/kernel/git/conor/linux.git/
 F:	Documentation/devicetree/bindings/cache/
 F:	drivers/cache
-F:	include/cache_coherency.h
+F:	include/linux/cache_coherency.h
 F:	lib/cache_maint.c
 
 STARFIRE/DURALAN NETWORK DRIVER
