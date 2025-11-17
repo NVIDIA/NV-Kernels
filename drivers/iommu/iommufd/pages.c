@@ -1410,6 +1410,18 @@ struct iopt_pages *iopt_alloc_user_pages(void __user *uptr,
 		return pages;
 	pages->uptr = uptr_down;
 	pages->type = IOPT_ADDRESS_USER;
+
+	if (pages->account_mode == IOPT_PAGES_ACCOUNT_USER) {
+		struct vm_area_struct *vma;
+
+		mmap_read_lock(pages->source_mm);
+		vma = find_vma(pages->source_mm, (unsigned long)uptr_down);
+		if (vma && (vma->vm_flags & VM_PFNMAP)) {
+			pages->account_mode = IOPT_PAGES_ACCOUNT_NONE;
+		}
+		mmap_read_unlock(pages->source_mm);
+	}
+	
 	return pages;
 }
 
