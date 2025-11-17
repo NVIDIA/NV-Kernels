@@ -20,12 +20,6 @@ BPFTOOL_VERSION_PATCH = $(shell sed -ne \
 	tools/bpf/bpftool/main.c)
 BPFTOOL_VERSION = $(shell expr $(BPFTOOL_VERSION_MAJOR) + 6).$(BPFTOOL_VERSION_MINOR).$(BPFTOOL_VERSION_PATCH)
 BPFTOOL_GENCONTROL_ARGS = -v$(BPFTOOL_VERSION)+$(DEB_VERSION)
-ifneq ($(DEB_HOST_ARCH),$(DEB_BUILD_ARCH))
-# Use system bpftool when cross-building
-BPFTOOL_PATH = /usr/sbin/bpftool
-else
-BPFTOOL_PATH = $(builddirpa)/tools/bpf/bpftool/bpftool
-endif
 
 debian/scripts/fix-filenames: debian/scripts/fix-filenames.c
 	$(HOSTCC) $^ -o $@
@@ -70,7 +64,7 @@ ifeq ($(do_linux_tools),true)
   ifeq ($(do_tools_bpftool_stub),true)
 	echo '#error "Kernel does not support CONFIG_DEBUG_INFO_BTF"' > $(build_dir)/vmlinux.h
   else
-	$(BPFTOOL_PATH) btf dump file $(build_dir)/vmlinux format c > $(build_dir)/vmlinux.h
+	$(builddirpa)/tools/bpf/bpftool/bpftool btf dump file $(build_dir)/vmlinux format c > $(build_dir)/vmlinux.h
   endif
  endif
 endif
@@ -649,14 +643,14 @@ ifeq ($(do_tools_usbip),true)
 	chmod 755 $(builddirpa)/tools/usb/usbip/autogen.sh
 	cd $(builddirpa)/tools/usb/usbip && ./autogen.sh
 	chmod 755 $(builddirpa)/tools/usb/usbip/configure
-	cd $(builddirpa)/tools/usb/usbip && ./configure --host=$(DEB_HOST_GNU_TYPE) --prefix=$(builddirpa)/tools/usb/usbip/bin
+	cd $(builddirpa)/tools/usb/usbip && ./configure --prefix=$(builddirpa)/tools/usb/usbip/bin
 	cd $(builddirpa)/tools/usb/usbip && make install CFLAGS="-g -O2 -static" CROSS_COMPILE=$(CROSS_COMPILE)
 endif
 ifeq ($(do_tools_acpidbg),true)
 	cd $(builddirpa)/tools/power/acpi && make clean && make CFLAGS="-g -O2 -static -I$(builddirpa)/include" CROSS_COMPILE=$(CROSS_COMPILE) acpidbg
 endif
 ifeq ($(do_tools_rtla),true)
-	cd $(builddirpa) && $(kmake) -C tools/tracing/rtla clean && $(kmake) LD=$(CROSS_COMPILE)ld HOSTLD=ld -C tools/tracing/rtla static
+	cd $(builddirpa) && $(kmake) -C tools/tracing/rtla clean && $(kmake) LD=ld -C tools/tracing/rtla static
 endif
 ifeq ($(do_tools_cpupower),true)
 	make -C $(builddirpa)/tools/power/cpupower \
