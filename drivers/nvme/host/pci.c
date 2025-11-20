@@ -30,6 +30,10 @@
 
 #include "trace.h"
 #include "nvme.h"
+#ifdef CONFIG_NVFS
+#define NVFS_USE_DMA_ITER_API
+#include "nvfs.h"
+#endif
 
 #define SQ_SIZE(q)	((q)->q_depth << (q)->sqes)
 #define CQ_SIZE(q)	((q)->q_depth * sizeof(struct nvme_completion))
@@ -261,6 +265,11 @@ enum nvme_iod_flags {
 
 	/* single segment dma mapping */
 	IOD_SINGLE_SEGMENT	= 1U << 2,
+
+#ifdef CONFIG_NVFS
+	/* NVFS GPU Direct Storage I/O */
+	IOD_NVFS_IO		= 1U << 3,
+#endif
 };
 
 struct nvme_dma_vec {
@@ -286,6 +295,9 @@ struct nvme_iod {
 	dma_addr_t meta_dma;
 	struct sg_table meta_sgt;
 	struct nvme_sgl_desc *meta_descriptor;
+#ifdef CONFIG_NVFS
+	void *nvfs_cookie;
+#endif
 };
 
 static inline unsigned int nvme_dbbuf_size(struct nvme_dev *dev)
@@ -711,11 +723,21 @@ static void nvme_free_sgls(struct request *req)
 	}
 }
 
+#ifdef CONFIG_NVFS
+#include "nvfs-dma.h"
+#endif
+
 static void nvme_unmap_data(struct request *req)
 {
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
 	struct nvme_queue *nvmeq = req->mq_hctx->driver_data;
 	struct device *dma_dev = nvmeq->dev->dev;
+
+#ifdef CONFIG_NVFS
+	/* Check if this was an NVFS I/O and handle unmapping */
+	if (nvme_nvfs_unmap_data(req))
+		return;
+#endif
 
 	if (iod->flags & IOD_SINGLE_SEGMENT) {
 		static_assert(offsetof(union nvme_data_ptr, prp1) ==
@@ -743,6 +765,21 @@ static bool nvme_pci_prp_iter_next(struct request *req, struct device *dma_dev,
 
 	if (iter->len)
 		return true;
+
+#ifdef CONFIG_NVFS
+	if (iod->flags & IOD_NVFS_IO) {
+		if (!nvfs_ops->nvfs_blk_rq_dma_map_iter_next(req, dma_dev, 
+					&iod->dma_state, iter))
+			return false;
+		
+		iod->dma_vecs[iod->nr_dma_vecs].addr = iter->addr;
+		iod->dma_vecs[iod->nr_dma_vecs].len = iter->len;
+		iod->nr_dma_vecs++;
+		
+		return true;
+	}
+#endif
+
 	if (!blk_rq_dma_map_iter_next(req, dma_dev, &iod->dma_state, iter))
 		return false;
 	if (!dma_use_iova(&iod->dma_state) && dma_need_unmap(dma_dev)) {
@@ -763,7 +800,11 @@ static blk_status_t nvme_pci_setup_data_prp(struct request *req,
 	unsigned int prp_len, i;
 	__le64 *prp_list;
 
-	if (!dma_use_iova(&iod->dma_state) && dma_need_unmap(nvmeq->dev->dev)) {
+	if (
+#ifdef CONFIG_NVFS
+		(iod->flags & IOD_NVFS_IO) ||
+#endif
+		(!dma_use_iova(&iod->dma_state) && dma_need_unmap(nvmeq->dev->dev))) {
 		iod->dma_vecs = mempool_alloc(nvmeq->dev->dmavec_mempool,
 				GFP_ATOMIC);
 		if (!iod->dma_vecs)
@@ -868,6 +909,11 @@ done:
 	 */
 	iod->cmd.common.dptr.prp1 = cpu_to_le64(prp1_dma);
 	iod->cmd.common.dptr.prp2 = cpu_to_le64(prp2_dma);
+#ifdef CONFIG_NVFS
+	/* For NVFS, don't call nvme_unmap_data - cleanup happens in nvme_nvfs_unmap_data */
+	if (iod->flags & IOD_NVFS_IO)
+		return iter->status;
+#endif
 	if (unlikely(iter->status))
 		nvme_unmap_data(req);
 	return iter->status;
@@ -908,10 +954,15 @@ static blk_status_t nvme_pci_setup_data_sgl(struct request *req,
 	/* set the transfer type as SGL */
 	iod->cmd.common.flags = NVME_CMD_SGL_METABUF;
 
-	if (entries == 1 || blk_rq_dma_map_coalesce(&iod->dma_state)) {
-		nvme_pci_sgl_set_data(&iod->cmd.common.dptr.sgl, iter);
-		iod->total_len += iter->len;
-		return BLK_STS_OK;
+#ifdef CONFIG_NVFS
+	if (!(iod->flags & IOD_NVFS_IO))
+#endif
+	{
+		if (entries == 1 || blk_rq_dma_map_coalesce(&iod->dma_state)) {
+			nvme_pci_sgl_set_data(&iod->cmd.common.dptr.sgl, iter);
+			iod->total_len += iter->len;
+			return BLK_STS_OK;
+		}
 	}
 
 	if (entries <= NVME_SMALL_POOL_SIZE / sizeof(*sg_list))
@@ -930,10 +981,21 @@ static blk_status_t nvme_pci_setup_data_sgl(struct request *req,
 		}
 		nvme_pci_sgl_set_data(&sg_list[mapped++], iter);
 		iod->total_len += iter->len;
-	} while (blk_rq_dma_map_iter_next(req, nvmeq->dev->dev, &iod->dma_state,
+	} while (
+#ifdef CONFIG_NVFS
+		(iod->flags & IOD_NVFS_IO) ?
+			nvfs_ops->nvfs_blk_rq_dma_map_iter_next(req, nvmeq->dev->dev,
+					&iod->dma_state, iter) :
+#endif
+		blk_rq_dma_map_iter_next(req, nvmeq->dev->dev, &iod->dma_state,
 				iter));
 
 	nvme_pci_sgl_set_seg(&iod->cmd.common.dptr.sgl, sgl_dma, mapped);
+#ifdef CONFIG_NVFS
+	/* For NVFS, don't call nvme_unmap_data - cleanup happens in nvme_nvfs_unmap_data */
+	if (iod->flags & IOD_NVFS_IO)
+		return iter->status;
+#endif
 	if (unlikely(iter->status))
 		nvme_unmap_data(req);
 	return iter->status;
@@ -987,6 +1049,12 @@ static blk_status_t nvme_map_data(struct request *req)
 	struct blk_dma_iter iter;
 	blk_status_t ret;
 
+#ifdef CONFIG_NVFS
+	bool is_nvfs_io = false;
+	ret = nvme_nvfs_map_data(req, &is_nvfs_io);
+	if (is_nvfs_io)
+		return ret;
+#endif
 	/*
 	 * Try to skip the DMA iterator for single segment requests, as that
 	 * significantly improves performances for small I/O sizes.
