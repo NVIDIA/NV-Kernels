@@ -635,7 +635,7 @@ static bool ima_match_rules(struct ima_rule_entry *rule,
 		default:
 			break;
 		}
-		if (!rc)
+		if (rc <= 0)
 			return false;
 	}
 	return true;
