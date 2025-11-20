@@ -1832,7 +1832,7 @@ static int mpam_reprogram_ris(void *_arg)
 	spin_lock(&partid_max_lock);
 	partid_max = mpam_partid_max;
 	spin_unlock(&partid_max_lock);
-	for (partid = 0; partid <= partid_max + 1; partid++)
+	for (partid = 0; partid <= partid_max; partid++)
 		mpam_reprogram_ris_partid(ris, partid, cfg);
 
 	return 0;
