@@ -2350,15 +2350,15 @@ int amdgpu_ras_add_bad_pages(struct amdgpu_device *adev,
 		goto out;
 
 	for (i = 0; i < pages; i++) {
-		if (amdgpu_ras_check_bad_page_unlock(con,
-			bps[i].retired_page << AMDGPU_GPU_PAGE_SHIFT))
-			continue;
-
 		if (!data->space_left &&
 			amdgpu_ras_realloc_eh_data_space(adev, data, 256)) {
 			ret = -ENOMEM;
 			goto out;
 		}
+
+		if (amdgpu_ras_check_bad_page_unlock(con,
+			bps[i].retired_page << AMDGPU_GPU_PAGE_SHIFT))
+			continue;
 
 		amdgpu_vram_mgr_reserve_range(&adev->mman.vram_mgr,
 			bps[i].retired_page << AMDGPU_GPU_PAGE_SHIFT,
