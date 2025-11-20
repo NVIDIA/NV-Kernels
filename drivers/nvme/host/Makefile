@@ -2,7 +2,7 @@
 
 CONTEXT_ANALYSIS			:= y
 ccflags-y				+= -I$(src)
-
+ccflags-y				+= -DCONFIG_NVFS
 obj-$(CONFIG_NVME_CORE)			+= nvme-core.o
 obj-$(CONFIG_BLK_DEV_NVME)		+= nvme.o
 obj-$(CONFIG_NVME_FABRICS)		+= nvme-fabrics.o
@@ -21,10 +21,11 @@ nvme-core-$(CONFIG_NVME_HWMON)		+= hwmon.o
 nvme-core-$(CONFIG_NVME_HOST_AUTH)	+= auth.o
 
 nvme-y					+= pci.o
-
+nvme-y					+= nvfs-dma.o
 nvme-fabrics-y				+= fabrics.o
 
 nvme-rdma-y				+= rdma.o
+nvme-rdma-y				+= nvfs-rdma.o
 
 nvme-fc-y				+= fc.o
 
