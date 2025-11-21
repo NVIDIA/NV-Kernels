@@ -685,7 +685,7 @@ static void mlx5e_rq_timeout_work(struct work_struct *timeout_work)
 	 * channels are closing for another reason, making this work no longer
 	 * necessary.
 	 */
-	while (!netdev_trylock(rq->netdev)) {
+	while (!mutex_trylock(&rq->netdev->lock)) {
 		if (!test_bit(MLX5E_STATE_CHANNELS_ACTIVE, &rq->priv->state))
 			return;
 		msleep(20);
