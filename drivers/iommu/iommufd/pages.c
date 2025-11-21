@@ -1723,6 +1723,9 @@ void iopt_area_unmap_domain(struct iopt_area *area, struct iommu_domain *domain)
 void iopt_area_unfill_domain(struct iopt_area *area, struct iopt_pages *pages,
 			     struct iommu_domain *domain)
 {
+	if (iopt_dmabuf_revoked(pages))
+		return;
+
 	__iopt_area_unfill_domain(area, pages, domain,
 				  iopt_area_last_index(area));
 }
@@ -1742,6 +1745,9 @@ int iopt_area_fill_domain(struct iopt_area *area, struct iommu_domain *domain)
 	int rc;
 
 	lockdep_assert_held(&area->pages->mutex);
+
+	if (iopt_dmabuf_revoked(area->pages))
+		return 0;
 
 	rc = pfn_reader_first(&pfns, area->pages, iopt_area_index(area),
 			      iopt_area_last_index(area));
@@ -1802,33 +1808,38 @@ int iopt_area_fill_domains(struct iopt_area *area, struct iopt_pages *pages)
 		return 0;
 
 	mutex_lock(&pages->mutex);
-	rc = pfn_reader_first(&pfns, pages, iopt_area_index(area),
-			      iopt_area_last_index(area));
-	if (rc)
-		goto out_unlock;
+	if (!iopt_dmabuf_revoked(pages)) {
+		rc = pfn_reader_first(&pfns, pages, iopt_area_index(area),
+				      iopt_area_last_index(area));
+		if (rc)
+			goto out_unlock;
 
-	while (!pfn_reader_done(&pfns)) {
-		done_first_end_index = pfns.batch_end_index;
-		done_all_end_index = pfns.batch_start_index;
-		xa_for_each(&area->iopt->domains, index, domain) {
-			rc = batch_to_domain(&pfns.batch, domain, area,
-					     pfns.batch_start_index);
+		while (!pfn_reader_done(&pfns)) {
+			done_first_end_index = pfns.batch_end_index;
+			done_all_end_index = pfns.batch_start_index;
+			xa_for_each(&area->iopt->domains, index, domain) {
+				rc = batch_to_domain(&pfns.batch, domain, area,
+						     pfns.batch_start_index);
+				if (rc)
+					goto out_unmap;
+			}
+			done_all_end_index = done_first_end_index;
+
+			rc = pfn_reader_next(&pfns);
 			if (rc)
 				goto out_unmap;
 		}
-		done_all_end_index = done_first_end_index;
-
-		rc = pfn_reader_next(&pfns);
+		rc = pfn_reader_update_pinned(&pfns);
 		if (rc)
 			goto out_unmap;
+
+		pfn_reader_destroy(&pfns);
 	}
-	rc = pfn_reader_update_pinned(&pfns);
-	if (rc)
-		goto out_unmap;
 
 	area->storage_domain = xa_load(&area->iopt->domains, 0);
 	interval_tree_insert(&area->pages_node, &pages->domains_itree);
-	goto out_destroy;
+	mutex_unlock(&pages->mutex);
+	return 0;
 
 out_unmap:
 	pfn_reader_release_pins(&pfns);
@@ -1855,7 +1866,6 @@ out_unmap:
 							end_index);
 		}
 	}
-out_destroy:
 	pfn_reader_destroy(&pfns);
 out_unlock:
 	mutex_unlock(&pages->mutex);
@@ -1882,11 +1892,15 @@ void iopt_area_unfill_domains(struct iopt_area *area, struct iopt_pages *pages)
 	if (!area->storage_domain)
 		goto out_unlock;
 
-	xa_for_each(&iopt->domains, index, domain)
-		if (domain != area->storage_domain)
+	xa_for_each(&iopt->domains, index, domain) {
+		if (domain == area->storage_domain)
+			continue;
+
+		if (!iopt_dmabuf_revoked(pages))
 			iopt_area_unmap_domain_range(
 				area, domain, iopt_area_index(area),
 				iopt_area_last_index(area));
+	}
 
 	if (IS_ENABLED(CONFIG_IOMMUFD_TEST))
 		WARN_ON(RB_EMPTY_NODE(&area->pages_node.rb));
