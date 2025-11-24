@@ -2844,6 +2844,12 @@ static irqreturn_t __mpam_irq_handler(int irq, struct mpam_msc *msc)
 			   msc->id, mpam_errcode_names[errcode], partid, pmg,
 			   ris);
 
+	/* No action is required for the MPAM programming errors */
+	if ((errcode != MPAM_ERRCODE_REQ_PARTID_RANGE) &&
+	    (errcode != MPAM_ERRCODE_REQ_PMG_RANGE)) {
+		return IRQ_HANDLED;
+	}
+
 	/* Disable this interrupt. */
 	mpam_disable_msc_ecr(msc);
 
