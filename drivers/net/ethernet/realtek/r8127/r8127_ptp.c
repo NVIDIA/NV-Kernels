@@ -751,6 +751,9 @@ void rtl8127_ptp_init(struct rtl8127_private *tp)
         hrtimer_init(&tp->pps_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
         tp->pps_timer.function = rtl8127_hrtimer_for_pps;
 
+        tp->hwtstamp_config.rx_filter = HWTSTAMP_FILTER_NONE;
+        tp->hwtstamp_config.tx_type = HWTSTAMP_TX_OFF;
+
         /* reset the PTP related hardware bits */
         rtl8127_ptp_reset(tp);
 
