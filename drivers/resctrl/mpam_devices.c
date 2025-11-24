@@ -726,7 +726,8 @@ static int mpam_ris_get_affinity(struct mpam_msc *msc, cpumask_t *affinity,
 		if (cpumask_empty(affinity)) {
 			dev_warn_once(&msc->pdev->dev, "CPU-less numa node");
 			cpumask_copy(affinity, cpu_possible_mask);
-		}
+		} else if (class->level > 3)
+			cpumask_copy(affinity, cpu_possible_mask);
 		break;
 	case MPAM_CLASS_UNKNOWN:
 		return 0;

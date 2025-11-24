@@ -385,9 +385,9 @@ int alloc_rmid(u32 closid);
 
 void free_rmid(u32 closid, u32 rmid);
 
-int resctrl_l3_mon_resource_init(void);
+int resctrl_mon_init(void);
 
-void resctrl_l3_mon_resource_exit(void);
+void resctrl_mon_exit(void);
 
 void mon_event_count(void *info);
 
@@ -455,6 +455,11 @@ ssize_t resctrl_mbm_assign_on_mkdir_write(struct kernfs_open_file *of, char *buf
 int mbm_L3_assignments_show(struct kernfs_open_file *of, struct seq_file *s, void *v);
 
 ssize_t mbm_L3_assignments_write(struct kernfs_open_file *of, char *buf, size_t nbytes,
+				 loff_t off);
+
+int mbm_MB_assignments_show(struct kernfs_open_file *of, struct seq_file *s, void *v);
+
+ssize_t mbm_MB_assignments_write(struct kernfs_open_file *of, char *buf, size_t nbytes,
 				 loff_t off);
 
 #ifdef CONFIG_RESCTRL_FS_PSEUDO_LOCK
