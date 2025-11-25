@@ -346,6 +346,8 @@ static int rtl8127_phc_enable(struct ptp_clock_info *ptp,
 
 static void rtl8127_ptp_enable_config(struct rtl8127_private *tp)
 {
+	tp->syncE_en = 1;
+
         if (tp->syncE_en)
                 rtl8127_set_eth_phy_ocp_bit(tp, PTP_SYNCE_CTL, BIT_0);
         else
