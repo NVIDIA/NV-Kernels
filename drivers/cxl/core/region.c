@@ -3934,6 +3934,14 @@ static struct cxl_region *construct_region(struct cxl_root_decoder *cxlrd,
 	if (part < 0)
 		return ERR_PTR(-EBUSY);
 
+	if (part >= cxlds->nr_partitions) {
+		dev_err(cxlmd->dev.parent,
+			"%s:%s: invalid partition index %d (max %u)\n",
+			dev_name(&cxlmd->dev), dev_name(&cxled->cxld.dev),
+			part, cxlds->nr_partitions);
+		return ERR_PTR(-ENXIO);
+	}
+
 	do {
 		cxlr = __create_region(cxlrd, cxlds->part[part].mode,
 				       atomic_read(&cxlrd->region_id));
