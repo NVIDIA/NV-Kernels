@@ -358,8 +358,13 @@ static void rtl8127_ptp_enable_config(struct rtl8127_private *tp)
         rtl8127_set_eth_phy_ocp_bit(tp, 0xA640, BIT_15);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 int rtl8127_get_ts_info(struct net_device *netdev,
                         struct ethtool_ts_info *info)
+#else
+int rtl8127_get_ts_info(struct net_device *netdev,
+                        struct kernel_ethtool_ts_info *info)
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0) */
 {
         struct rtl8127_private *tp = netdev_priv(netdev);
 

@@ -185,8 +185,13 @@ static inline u8 ptp_get_msgtype(const struct ptp_header *hdr,
 struct rtl8127_private;
 struct RxDescV3;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0)
 int rtl8127_get_ts_info(struct net_device *netdev,
                         struct ethtool_ts_info *info);
+#else
+int rtl8127_get_ts_info(struct net_device *netdev,
+                        struct kernel_ethtool_ts_info *info);
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6,11,0) */
 
 void rtl8127_ptp_reset(struct rtl8127_private *tp);
 void rtl8127_ptp_init(struct rtl8127_private *tp);
