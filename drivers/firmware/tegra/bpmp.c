@@ -3,6 +3,7 @@
  * SPDX-FileCopyrightText: Copyright (c) 2016-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved
  */
 
+#include <linux/acpi.h>
 #include <linux/clk/tegra.h>
 #include <linux/genalloc.h>
 #include <linux/mailbox_client.h>
@@ -309,11 +310,75 @@ static ssize_t tegra_bpmp_channel_write(struct tegra_bpmp_channel *channel,
 
 static int __maybe_unused tegra_bpmp_resume(struct device *dev);
 
+static int tegra_bpmp_transfer_acpi(struct tegra_bpmp *bpmp,
+			     struct tegra_bpmp_message *msg)
+{
+	acpi_status status;
+	union acpi_object params[2];
+	struct acpi_object_list param_list;
+	struct acpi_buffer output = { ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *obj;
+	u32 i;
+
+	params[0].type = ACPI_TYPE_INTEGER;
+	params[0].integer.value = msg->mrq;
+
+	params[1].type = ACPI_TYPE_BUFFER;
+	params[1].buffer.length = msg->tx.size;
+	params[1].buffer.pointer = (u8 *)msg->tx.data;
+
+	param_list.count = 2;
+	param_list.pointer = params;
+
+	status = acpi_evaluate_object(ACPI_HANDLE(bpmp->dev), "BMRQ",
+				      &param_list, &output);
+	if (ACPI_FAILURE(status)) {
+		acpi_evaluation_failure_warn(ACPI_HANDLE(bpmp->dev), "BMRQ",
+					     status);
+		return -ENODEV;
+	}
+
+	obj = (union acpi_object *)output.pointer;
+	/* Validate returned type */
+	if (!obj || obj->type != ACPI_TYPE_PACKAGE) {
+		dev_err(bpmp->dev, "Invalid BMRQ data\n");
+		kfree(output.pointer);
+		return -ENODATA;
+	}
+
+	/* Iterate over package elements */
+	for (i = 0; i < obj->package.count; i++) {
+		union acpi_object *elem = &obj->package.elements[i];
+
+		switch (elem->type) {
+		case ACPI_TYPE_INTEGER:
+			msg->rx.ret = elem->integer.value;
+			break;
+
+		case ACPI_TYPE_BUFFER:
+			memcpy(msg->rx.data, elem->buffer.pointer,
+			       min(msg->rx.size, (size_t)elem->buffer.length));
+			break;
+
+		default:
+			dev_warn(bpmp->dev, "Element %u: Unknown type %d\n", i, elem->type);
+			break;
+		}
+	}
+
+	/* Free memory allocated by ACPI core */
+	kfree(output.pointer);
+	return 0;
+}
+
 int tegra_bpmp_transfer_atomic(struct tegra_bpmp *bpmp,
 			       struct tegra_bpmp_message *msg)
 {
 	struct tegra_bpmp_channel *channel;
 	int err;
+
+	if (WARN_ON(ACPI_HANDLE(bpmp->dev)))
+		return -EOPNOTSUPP;
 
 	if (WARN_ON(!irqs_disabled()))
 		return -EPERM;
@@ -355,8 +420,8 @@ int tegra_bpmp_transfer_atomic(struct tegra_bpmp *bpmp,
 }
 EXPORT_SYMBOL_GPL(tegra_bpmp_transfer_atomic);
 
-int tegra_bpmp_transfer(struct tegra_bpmp *bpmp,
-			struct tegra_bpmp_message *msg)
+static int tegra_bpmp_transfer_channel(struct tegra_bpmp *bpmp,
+				struct tegra_bpmp_message *msg)
 {
 	struct tegra_bpmp_channel *channel;
 	unsigned long timeout;
@@ -393,6 +458,15 @@ int tegra_bpmp_transfer(struct tegra_bpmp *bpmp,
 
 	return tegra_bpmp_channel_read(channel, msg->rx.data, msg->rx.size,
 				       &msg->rx.ret);
+}
+
+int tegra_bpmp_transfer(struct tegra_bpmp *bpmp,
+			struct tegra_bpmp_message *msg)
+{
+	if (ACPI_HANDLE(bpmp->dev))
+		return tegra_bpmp_transfer_acpi(bpmp, msg);
+	else
+		return tegra_bpmp_transfer_channel(bpmp, msg);
 }
 EXPORT_SYMBOL_GPL(tegra_bpmp_transfer);
 
@@ -472,6 +546,9 @@ int tegra_bpmp_request_mrq(struct tegra_bpmp *bpmp, unsigned int mrq,
 	struct tegra_bpmp_mrq *entry;
 	unsigned long flags;
 
+	if (ACPI_HANDLE(bpmp->dev))
+		return -EOPNOTSUPP;
+
 	if (!handler)
 		return -EINVAL;
 
@@ -496,6 +573,9 @@ void tegra_bpmp_free_mrq(struct tegra_bpmp *bpmp, unsigned int mrq, void *data)
 {
 	struct tegra_bpmp_mrq *entry;
 	unsigned long flags;
+
+	if (ACPI_HANDLE(bpmp->dev))
+		return;
 
 	spin_lock_irqsave(&bpmp->lock, flags);
 
@@ -572,11 +652,17 @@ static int tegra_bpmp_ping(struct tegra_bpmp *bpmp)
 	msg.rx.data = &response;
 	msg.rx.size = sizeof(response);
 
-	local_irq_save(flags);
-	start = ktime_get();
-	err = tegra_bpmp_transfer_atomic(bpmp, &msg);
-	end = ktime_get();
-	local_irq_restore(flags);
+	if (ACPI_HANDLE(bpmp->dev)) {
+		start = ktime_get();
+		err = tegra_bpmp_transfer_acpi(bpmp, &msg);
+		end = ktime_get();
+	} else {
+		local_irq_save(flags);
+		start = ktime_get();
+		err = tegra_bpmp_transfer_atomic(bpmp, &msg);
+		end = ktime_get();
+		local_irq_restore(flags);
+	}
 
 	if (!err)
 		dev_dbg(bpmp->dev,
@@ -614,10 +700,13 @@ static int tegra_bpmp_get_firmware_tag_old(struct tegra_bpmp *bpmp, char *tag,
 	msg.tx.data = &request;
 	msg.tx.size = sizeof(request);
 
-	local_irq_save(flags);
-	err = tegra_bpmp_transfer_atomic(bpmp, &msg);
-	local_irq_restore(flags);
-
+	if (ACPI_HANDLE(bpmp->dev)) {
+		err = tegra_bpmp_transfer_acpi(bpmp, &msg);
+	} else {
+		local_irq_save(flags);
+		err = tegra_bpmp_transfer_atomic(bpmp, &msg);
+		local_irq_restore(flags);
+	}
 	if (err == 0)
 		memcpy(tag, virt, TAG_SZ);
 
@@ -703,6 +792,9 @@ static int tegra_bpmp_init_channels(struct tegra_bpmp *bpmp)
 {
 	size_t size;
 
+	if (ACPI_HANDLE(bpmp->dev))
+		return 0;
+
 	INIT_LIST_HEAD(&bpmp->mrqs);
 	spin_lock_init(&bpmp->lock);
 
@@ -743,6 +835,9 @@ static int tegra_bpmp_init_channels(struct tegra_bpmp *bpmp)
 static int tegra_bpmp_init_resources(struct tegra_bpmp *bpmp)
 {
 	int err;
+
+	if (!bpmp->dev->of_node)
+		return 0;
 
 	err = of_platform_default_populate(bpmp->dev->of_node, NULL, bpmp->dev);
 	if (err < 0)
@@ -791,10 +886,12 @@ static int tegra_bpmp_probe(struct platform_device *pdev)
 			return err;
 	}
 
-	err = tegra_bpmp_request_mrq(bpmp, MRQ_PING,
-				     tegra_bpmp_mrq_handle_ping, bpmp);
-	if (err < 0)
-		goto deinit;
+	if (!ACPI_HANDLE(bpmp->dev)) {
+		err = tegra_bpmp_request_mrq(bpmp, MRQ_PING,
+					     tegra_bpmp_mrq_handle_ping, bpmp);
+		if (err < 0)
+			goto deinit;
+	}
 
 	err = tegra_bpmp_ping(bpmp);
 	if (err < 0) {
