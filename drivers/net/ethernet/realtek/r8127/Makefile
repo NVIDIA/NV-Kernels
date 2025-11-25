@@ -30,6 +30,6 @@
 #  US6,570,884, US6,115,776, and US6,327,625.
 ################################################################################
 
-ccflags-y += -DCONFIG_SOC_LAN -DCONFIG_R8127_NAPI -DCONFIG_R8127_VLAN -DCONFIG_ASPM -DENABLE_S5WOL -DENABLE_EEE -DENABLE_TX_NO_CLOSE -DENABLE_GIGA_LITE
+ccflags-y += -DCONFIG_SOC_LAN -DCONFIG_R8127_NAPI -DCONFIG_R8127_VLAN -DCONFIG_ASPM -DENABLE_S5WOL -DENABLE_EEE -DENABLE_TX_NO_CLOSE -DENABLE_GIGA_LITE -DENABLE_PTP_SUPPORT
 obj-$(CONFIG_R8127) += r8127.o
-r8127-y := r8127_n.o rtl_eeprom.o rtltool.o
+r8127-y := r8127_n.o rtl_eeprom.o rtltool.o r8127_ptp.o
