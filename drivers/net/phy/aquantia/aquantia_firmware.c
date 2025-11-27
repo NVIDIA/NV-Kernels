@@ -362,8 +362,8 @@ int aqr_firmware_load(struct phy_device *phydev)
 		goto exit;
 
 	ret = aqr_firmware_load_nvmem(phydev);
-	if (!ret)
-		goto exit;
+	if (ret == -EPROBE_DEFER || !ret)
+		return ret;
 
 	ret = aqr_firmware_load_fs(phydev);
 	if (ret)
