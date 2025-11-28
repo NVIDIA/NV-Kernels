@@ -200,8 +200,6 @@ static inline int del_timer_sync(struct timer_list *timer)
 	return timer_delete_sync(timer);
 }
 
-#define del_singleshot_timer_sync(t) del_timer_sync(t)
-
 /**
  * del_timer - Delete a pending timer
  * @timer:	The timer to be deleted
