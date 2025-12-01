@@ -423,7 +423,12 @@ int perf_cpu_map__merge(struct perf_cpu_map **orig, struct perf_cpu_map *other)
 	}
 
 	tmp_len = __perf_cpu_map__nr(*orig) + __perf_cpu_map__nr(other);
+#if defined(__s390x__) || defined (__powerpc64__)
+	/* Hack to avoid malloc bailing in argument check for those arches */
+	tmp_cpus = malloc(tmp_len * ((unsigned int) sizeof(struct perf_cpu)));
+#else
 	tmp_cpus = malloc(tmp_len * sizeof(struct perf_cpu));
+#endif
 	if (!tmp_cpus)
 		return -ENOMEM;
 
