@@ -133,6 +133,7 @@ static const struct fw_image_uuid {
 	},
 };
 
+static int update_fw_images_tree(void);
 static struct kobject *lfa_dir;
 static DEFINE_MUTEX(lfa_lock);
 
@@ -282,17 +283,6 @@ static int activate_fw_image(struct image_props *attrs)
 	return ret;
 }
 
-static void set_image_flags(struct image_props *attrs, int seq_id,
-			    u32 image_flags)
-{
-	attrs->fw_seq_id = seq_id;
-	attrs->activation_capable = !!(image_flags & BIT(0));
-	attrs->activation_pending = !!(image_flags & BIT(1));
-	attrs->may_reset_cpu = !!(image_flags & BIT(2));
-	/* cpu_rendezvous_optional bit has inverse logic in the spec */
-	attrs->cpu_rendezvous = !(image_flags & BIT(3));
-}
-
 static ssize_t name_show(struct kobject *kobj, struct kobj_attribute *attr,
 			 char *buf)
 {
@@ -395,7 +385,9 @@ static ssize_t activate_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	pr_info("Firmware activation succeeded\n");
 
-	/* TODO: refresh image flags here*/
+	ret = update_fw_images_tree();
+	if (ret)
+		pr_err("Failed to update FW images tree");
 	mutex_unlock(&lfa_lock);
 	return count;
 }
@@ -425,20 +417,41 @@ static struct kobj_attribute image_attrs_group[LFA_ATTR_NR_IMAGES] = {
 	[LFA_ATTR_CANCEL]		= __ATTR_WO(cancel)
 };
 
+static void delete_fw_image_node(struct image_props *attrs)
+{
+	int i;
+
+	for (i = 0; i < LFA_ATTR_NR_IMAGES; i++)
+		sysfs_remove_file(attrs->image_dir, &attrs->image_attrs[i].attr);
+
+	kobject_put(attrs->image_dir);
+	attrs->image_dir = NULL;
+	list_del(&attrs->image_node);
+	kfree(attrs);
+}
+
 static void clean_fw_images_tree(void)
 {
 	struct image_props *attrs, *tmp;
 
-	list_for_each_entry_safe(attrs, tmp, &lfa_fw_images, image_node) {
-		kobject_put(attrs->image_dir);
-		list_del(&attrs->image_node);
-		kfree(attrs);
-	}
+	list_for_each_entry_safe(attrs, tmp, &lfa_fw_images, image_node)
+		delete_fw_image_node(attrs);
 }
 
-static int create_fw_inventory(char *fw_uuid, int seq_id, u32 image_flags)
+static void update_fw_image_node(struct image_props *attrs, int seq_id,
+			    char *fw_uuid, u32 image_flags)
 {
-	const char *image_name = "(unknown)";
+	attrs->fw_seq_id = seq_id;
+	attrs->image_name = fw_uuid;
+	attrs->activation_capable = !!(image_flags & BIT(0));
+	attrs->activation_pending = !!(image_flags & BIT(1));
+	attrs->may_reset_cpu = !!(image_flags & BIT(2));
+	/* cpu_rendezvous_optional bit has inverse logic in the spec */
+	attrs->cpu_rendezvous = !(image_flags & BIT(3));
+}
+
+static int create_fw_image_node(int seq_id, char *fw_uuid, u32 image_flags)
+{
 	struct image_props *attrs;
 	int ret;
 
@@ -446,21 +459,12 @@ static int create_fw_inventory(char *fw_uuid, int seq_id, u32 image_flags)
 	if (!attrs)
 		return -ENOMEM;
 
-	for (int i = 0; i < ARRAY_SIZE(fw_images_uuids); i++) {
-		if (!strcmp(fw_images_uuids[i].uuid, fw_uuid))
-			image_name = fw_images_uuids[i].name;
-		else
-			image_name = fw_uuid;
-	}
-
 	attrs->image_dir = kobject_create_and_add(fw_uuid, lfa_dir);
 	if (!attrs->image_dir)
 		return -ENOMEM;
 
-	INIT_LIST_HEAD(&attrs->image_node);
-	attrs->image_name = image_name;
-	attrs->cpu_rendezvous_forced = 1;
-	set_image_flags(attrs, seq_id, image_flags);
+	/* Update FW attributes */
+	update_fw_image_node(attrs, seq_id, fw_uuid, image_flags);
 
 	/*
 	 * The attributes for each sysfs file are constant (handler functions,
@@ -485,17 +489,19 @@ static int create_fw_inventory(char *fw_uuid, int seq_id, u32 image_flags)
 			return ret;
 		}
 	}
-	list_add(&attrs->image_node, &lfa_fw_images);
+	list_add_tail(&attrs->image_node, &lfa_fw_images);
 
 	return ret;
 }
 
-static int create_fw_images_tree(void)
+static int update_fw_images_tree(void)
 {
 	struct arm_smccc_1_2_regs reg = { 0 };
 	struct uuid_regs image_uuid;
+	struct image_props *attrs, *tmp;
 	char image_id_str[40];
 	int ret, num_of_components;
+	int node_idx = 0;
 
 	num_of_components = get_nr_lfa_components();
 	if (num_of_components <= 0) {
@@ -503,20 +509,65 @@ static int create_fw_images_tree(void)
 		return -ENODEV;
 	}
 
-	for (int i = 0; i < num_of_components; i++) {
-		reg.a0 = LFA_1_0_FN_GET_INVENTORY;
-		reg.a1 = i; /* fw_seq_id under consideration */
-		arm_smccc_1_2_invoke(&reg, &reg);
-		if (reg.a0 == LFA_SUCCESS) {
+	/*
+	 * Pass 1:
+	 *    For nodes < num_of_components, update fw_image_node
+	 *    For nodes >= num_of_components, delete
+	 */
+	list_for_each_entry_safe(attrs, tmp, &lfa_fw_images, image_node) {
+		if (attrs->fw_seq_id < num_of_components) {
+			/* Update this FW image node */
+
+			/* Get FW details */
+			reg.a0 = LFA_1_0_FN_GET_INVENTORY;
+			reg.a1 = attrs->fw_seq_id;
+			arm_smccc_1_2_invoke(&reg, &reg);
+
+			if (reg.a0 != LFA_SUCCESS)
+				return -EINVAL;
+
+			/* Build image name with UUID */
 			image_uuid.uuid_lo = reg.a1;
 			image_uuid.uuid_hi = reg.a2;
+			snprintf(image_id_str, sizeof(image_id_str), "%pUb", &image_uuid);
 
-			snprintf(image_id_str, sizeof(image_id_str), "%pUb",
-				 &image_uuid);
-			ret = create_fw_inventory(image_id_str, i, reg.a3);
-			if (ret)
-				return ret;
+			if (strcmp(attrs->image_name, image_id_str)) {
+				/* UUID doesn't match previous UUID for given FW, not expected */
+				pr_err("FW seq id %u: Previous UUID %s doesn't match current %s",
+					attrs->fw_seq_id, attrs->image_name, image_id_str);
+				return -EINVAL;
+			}
+
+			/* Update FW attributes */
+			update_fw_image_node(attrs, attrs->fw_seq_id, image_id_str, reg.a3);
+			node_idx++;
+		} else {
+			/* This node is beyond valid FW components list */
+			delete_fw_image_node(attrs);
 		}
+	}
+
+	/*
+	 * Pass 2:
+	 *    If current FW components number is more than previous list, add new component nodes.
+	 */
+	for (; node_idx < num_of_components; node_idx++) {
+		/* Get FW details */
+		reg.a0 = LFA_1_0_FN_GET_INVENTORY;
+		reg.a1 = node_idx;
+		arm_smccc_1_2_invoke(&reg, &reg);
+
+		if (reg.a0 != LFA_SUCCESS)
+			return -EINVAL;
+
+		/* Build image name with UUID */
+		image_uuid.uuid_lo = reg.a1;
+		image_uuid.uuid_hi = reg.a2;
+		snprintf(image_id_str, sizeof(image_id_str), "%pUb", &image_uuid);
+
+		ret = create_fw_image_node(node_idx, image_id_str, reg.a3);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
@@ -538,8 +589,9 @@ static irqreturn_t lfa_irq_thread(int irq, void *data)
 	 */
 
 	do {
-		/* TODO: refresh image flags here */
-		/* If refresh fails goto exit_unlock */
+		ret = update_fw_images_tree();
+		if (ret)
+			goto exit_unlock;
 
 		/* Initialize counters to track list traversal  */
 		num_of_components = get_nr_lfa_components();
@@ -561,13 +613,13 @@ static irqreturn_t lfa_irq_thread(int irq, void *data)
 			}
 
 			pr_info("Firmware %s activation succeeded", attrs->image_name);
-			/* Refresh FW component details */
 			break;
 		}
 	} while (curr_component < num_of_components);
 
-	/* TODO: refresh image flags here */
-	/* If refresh fails goto exit_unlock */
+	ret = update_fw_images_tree();
+	if (ret)
+		goto exit_unlock;
 
 exit_unlock:
 	mutex_unlock(&lfa_lock);
@@ -657,7 +709,7 @@ static int __init lfa_init(void)
 		return -ENOMEM;
 
 	mutex_lock(&lfa_lock);
-	err = create_fw_images_tree();
+	err = update_fw_images_tree();
 	if (err != 0)
 		kobject_put(lfa_dir);
 
