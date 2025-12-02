@@ -1511,7 +1511,7 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 	ep_ctx->tx_info = cpu_to_le32(EP_MAX_ESIT_PAYLOAD_LO(max_esit_payload) |
 				      EP_AVG_TRB_LENGTH(avg_trb_len));
 	ep_ctx->reserved[0] = cpu_to_le32(0x1 | (0x1 << 11)); //mtk's bpks & bm
-		pr_err("%s rsv %#x\n", __func__, ep_ctx->reserved[0]);
+		pr_debug("%s rsv %#x\n", __func__, ep_ctx->reserved[0]);
 
 	return 0;
 }
