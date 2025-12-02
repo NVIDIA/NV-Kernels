@@ -28,5 +28,6 @@
 #define RPMHPD_XO               18
 #define RPMHPD_NSP2             19
 #define RPMHPD_GMXC		20
+#define SC8280XP_MXC_AO		16
 
 #endif
