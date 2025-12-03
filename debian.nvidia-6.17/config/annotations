@@ -228,6 +228,7 @@ CONFIG_HAVE_RUST                                policy<{'amd64': 'y', 'arm64': '
 CONFIG_INET_PSP                                 policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_IOMMUFD_VFIO_CONTAINER                   policy<{'arm64': 'y'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
+CONFIG_MLX5_EN_PSP                              policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_NVGRACE_EGM                              policy<{'arm64': 'm'}>
 CONFIG_NVIDIA_FFA_EC                            policy<{'arm64': 'y'}>
