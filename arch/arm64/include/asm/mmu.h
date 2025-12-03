@@ -81,6 +81,11 @@ extern void mark_linear_text_alias_ro(void);
 extern int split_kernel_leaf_mapping(unsigned long start, unsigned long end);
 extern void linear_map_maybe_split_to_ptes(void);
 
+extern void split_contpte(pte_t *ptep);
+extern void split_contpmd(pmd_t *pmdp);
+extern int split_pmd(pmd_t *pmdp, pmd_t pmd, gfp_t gfp, bool to_cont);
+extern int split_pud(pud_t *pudp, pud_t pud, gfp_t gfp, bool to_cont);
+
 /*
  * This check is triggered during the early boot before the cpufeature
  * is initialised. Checking the status on the local CPU allows the boot

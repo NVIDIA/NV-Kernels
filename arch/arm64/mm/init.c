@@ -335,6 +335,11 @@ void __init bootmem_init(void)
 	memblock_dump_all();
 }
 
+void __init mem_init(void)
+{
+	swiotlb_update_mem_attributes();
+}
+
 void __init arch_mm_preinit(void)
 {
 	unsigned int flags = SWIOTLB_VERBOSE;
@@ -357,7 +362,6 @@ void __init arch_mm_preinit(void)
 	}
 
 	swiotlb_init(swiotlb, flags);
-	swiotlb_update_mem_attributes();
 
 	/*
 	 * Check boundaries twice: Some fundamental inconsistencies can be

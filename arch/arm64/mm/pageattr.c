@@ -15,6 +15,7 @@
 #include <asm/set_memory.h>
 #include <asm/tlbflush.h>
 #include <asm/kfence.h>
+#include <asm/pgalloc.h>
 
 struct page_change_data {
 	pgprot_t set_mask;
@@ -34,15 +35,22 @@ static ptdesc_t set_pageattr_masks(ptdesc_t val, struct mm_walk *walk)
 static int pageattr_pud_entry(pud_t *pud, unsigned long addr,
 			      unsigned long next, struct mm_walk *walk)
 {
-	pud_t val = pudp_get(pud);
+	pud_t old_val = pudp_get(pud);
+	pud_t val = __pud(set_pageattr_masks(pud_val(old_val), walk));
+	int ret;
 
-	if (pud_sect(val)) {
-		if (WARN_ON_ONCE((next - addr) != PUD_SIZE))
-			return -EINVAL;
-		val = __pud(set_pageattr_masks(pud_val(val), walk));
-		set_pud(pud, val);
-		walk->action = ACTION_CONTINUE;
+	if (!(pud_sect(old_val) || pud_sect(val)))
+		return 0;
+
+	if ((next - addr) != PUD_SIZE) {
+		ret = split_pud(pud, old_val, GFP_PGTABLE_KERNEL, true);
+		if (ret)
+			return ret;
+		return 0;
 	}
+
+	set_pud(pud, val);
+	walk->action = ACTION_CONTINUE;
 
 	return 0;
 }
@@ -50,15 +58,25 @@ static int pageattr_pud_entry(pud_t *pud, unsigned long addr,
 static int pageattr_pmd_entry(pmd_t *pmd, unsigned long addr,
 			      unsigned long next, struct mm_walk *walk)
 {
-	pmd_t val = pmdp_get(pmd);
+	pmd_t old_val = pmdp_get(pmd);
+	pmd_t val = __pmd(set_pageattr_masks(pmd_val(old_val), walk));
+	int ret;
 
-	if (pmd_sect(val)) {
-		if (WARN_ON_ONCE((next - addr) != PMD_SIZE))
-			return -EINVAL;
-		val = __pmd(set_pageattr_masks(pmd_val(val), walk));
-		set_pmd(pmd, val);
-		walk->action = ACTION_CONTINUE;
+	if (!(pmd_sect(old_val) || pmd_sect(val)))
+		return 0;
+
+	if (pmd_cont(old_val))
+		split_contpmd(pmd);
+
+	if ((next - addr) != PMD_SIZE) {
+		ret = split_pmd(pmd, old_val, GFP_PGTABLE_KERNEL, true);
+		if (ret)
+			return ret;
+		return 0;
 	}
+
+	set_pmd(pmd, val);
+	walk->action = ACTION_CONTINUE;
 
 	return 0;
 }
@@ -67,6 +85,9 @@ static int pageattr_pte_entry(pte_t *pte, unsigned long addr,
 			      unsigned long next, struct mm_walk *walk)
 {
 	pte_t val = __ptep_get(pte);
+
+	if (pte_cont(val))
+		split_contpte(pte);
 
 	val = __pte(set_pageattr_masks(pte_val(val), walk));
 	__set_pte(pte, val);
