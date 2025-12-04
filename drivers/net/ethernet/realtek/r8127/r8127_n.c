@@ -1216,39 +1216,6 @@ static int proc_get_registers(struct seq_file *m, void *v)
         return 0;
 }
 
-static int proc_get_all_registers(struct seq_file *m, void *v)
-{
-        struct net_device *dev = m->private;
-        int i, n, max;
-        u8 byte_rd;
-        struct rtl8127_private *tp = netdev_priv(dev);
-        void __iomem *ioaddr = tp->mmio_addr;
-        struct pci_dev *pdev = tp->pci_dev;
-
-        seq_puts(m, "\nDump All MAC Registers\n");
-        seq_puts(m, "Offset\tValue\n------\t-----\n");
-
-        max = pci_resource_len(pdev, 2);
-
-        for (n = 0; n < max;) {
-                seq_printf(m, "\n0x%04x:\t", n);
-
-                rtnl_lock();
-
-                for (i = 0; i < 16 && n < max; i++, n++) {
-                        byte_rd = readb(ioaddr + n);
-                        seq_printf(m, "%02x ", byte_rd);
-                }
-
-                rtnl_unlock();
-        }
-
-        seq_printf(m, "\nTotal length:0x%X", max);
-
-        seq_putc(m, '\n');
-        return 0;
-}
-
 static int proc_get_pcie_phy(struct seq_file *m, void *v)
 {
         struct net_device *dev = m->private;
@@ -2143,49 +2110,6 @@ static int proc_get_registers(char *page, char **start,
         return len;
 }
 
-static int proc_get_all_registers(char *page, char **start,
-                                  off_t offset, int count,
-                                  int *eof, void *data)
-{
-        struct net_device *dev = data;
-        int i, n, max;
-        u8 byte_rd;
-        struct rtl8127_private *tp = netdev_priv(dev);
-        void __iomem *ioaddr = tp->mmio_addr;
-        struct pci_dev *pdev = tp->pci_dev;
-        int len = 0;
-
-        len += snprintf(page + len, count - len,
-                        "\nDump All MAC Registers\n"
-                        "Offset\tValue\n------\t-----\n");
-
-        max = pci_resource_len(pdev, 2);
-
-        for (n = 0; n < max;) {
-                len += snprintf(page + len, count - len,
-                                "\n0x%04x:\t",
-                                n);
-
-                rtnl_lock();
-
-                for (i = 0; i < 16 && n < max; i++, n++) {
-                        byte_rd = readb(ioaddr + n);
-                        len += snprintf(page + len, count - len,
-                                        "%02x ",
-                                        byte_rd);
-                }
-
-                rtnl_unlock();
-        }
-
-        len += snprintf(page + len, count - len, "\nTotal length:0x%X", max);
-
-        len += snprintf(page + len, count - len, "\n");
-
-        *eof = 1;
-        return len;
-}
-
 static int proc_get_pcie_phy(char *page, char **start,
                              off_t offset, int count,
                              int *eof, void *data)
@@ -2784,7 +2708,6 @@ static const struct rtl8127_proc_file rtl8127_debug_proc_files[] = {
         { "driver_var", &proc_get_driver_variable },
         { "tally", &proc_get_tally_counter },
         { "registers", &proc_get_registers },
-        { "registers2", &proc_get_all_registers },
         { "pcie_phy", &proc_get_pcie_phy },
         { "eth_phy", &proc_get_eth_phy },
         { "ext_regs", &proc_get_extended_registers },
