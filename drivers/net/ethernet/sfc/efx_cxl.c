@@ -11,6 +11,7 @@
 #include <cxl/pci.h>
 #include "net_driver.h"
 #include "efx_cxl.h"
+#include "efx.h"
 
 #define EFX_CTPIO_BUFFER_SIZE	SZ_256M
 
@@ -140,15 +141,36 @@ int efx_cxl_init(struct efx_probe_data *probe_data)
 		cxl->efx_region = cxl_create_region(cxl->cxlrd, &cxl->cxled, 1);
 		if (IS_ERR(cxl->efx_region)) {
 			pci_err(pci_dev, "CXL accel create region failed");
-			cxl_put_root_decoder(cxl->cxlrd);
-			cxl_dpa_free(cxl->cxled);
-			return PTR_ERR(cxl->efx_region);
+			rc = PTR_ERR(cxl->efx_region);
+			goto err_dpa;
+		}
+
+		rc = cxl_get_region_range(cxl->efx_region, &range);
+		if (rc) {
+			pci_err(pci_dev, "CXL getting regions params failed");
+			goto err_detach;
+		}
+
+		cxl->ctpio_cxl = ioremap(range.start, range.end - range.start + 1);
+		if (!cxl->ctpio_cxl) {
+			pci_err(pci_dev, "CXL ioremap region (%pra) failed", &range);
+			rc = -ENOMEM;
+			goto err_detach;
 		}
 	}
 
 	probe_data->cxl = cxl;
+	probe_data->cxl_pio_initialised = true;
 
 	return 0;
+
+err_detach:
+	cxl_decoder_detach(NULL, cxl->cxled, 0, DETACH_INVALIDATE);
+	unregister_region(cxl->efx_region);
+err_dpa:
+	cxl_put_root_decoder(cxl->cxlrd);
+	cxl_dpa_free(cxl->cxled);
+	return rc;
 }
 
 void efx_cxl_exit(struct efx_probe_data *probe_data)
@@ -156,19 +178,17 @@ void efx_cxl_exit(struct efx_probe_data *probe_data)
 	if (!probe_data->cxl)
 		return;
 
-	if (probe_data->cxl->hdm_was_committed) {
-		iounmap(probe_data->cxl->ctpio_cxl);
-		cxl_decoder_detach(NULL, probe_data->cxl->cxled, 0,
-				   DETACH_INVALIDATE);
+	iounmap(probe_data->cxl->ctpio_cxl);
+	cxl_decoder_detach(NULL, probe_data->cxl->cxled, 0,
+			   DETACH_INVALIDATE);
 
+	if (!probe_data->cxl->hdm_was_committed) {
+		cxl_dpa_free(probe_data->cxl->cxled);
+		cxl_put_root_decoder(probe_data->cxl->cxlrd);
+	} else {
 		/* Release decoder reference from cxl_get_committed_decoder() */
 		if (probe_data->cxl->cxled)
 			put_device(&probe_data->cxl->cxled->cxld.dev);
-	} else {
-		cxl_decoder_detach(NULL, probe_data->cxl->cxled, 0,
-				   DETACH_INVALIDATE);
-		cxl_dpa_free(probe_data->cxl->cxled);
-		cxl_put_root_decoder(probe_data->cxl->cxlrd);
 	}
 
 	unregister_region(probe_data->cxl->efx_region);
