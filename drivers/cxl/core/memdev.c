@@ -1039,7 +1039,8 @@ static const struct file_operations cxl_memdev_fops = {
 	.llseek = noop_llseek,
 };
 
-struct cxl_memdev *cxl_memdev_alloc(struct cxl_dev_state *cxlds)
+struct cxl_memdev *cxl_memdev_alloc(struct cxl_dev_state *cxlds,
+				    const struct cxl_memdev_ops *ops)
 {
 	struct cxl_memdev *cxlmd;
 	struct device *dev;
@@ -1056,6 +1057,8 @@ struct cxl_memdev *cxl_memdev_alloc(struct cxl_dev_state *cxlds)
 
 	cxlmd->id = rc;
 	cxlmd->depth = -1;
+	cxlmd->ops = ops;
+	cxlmd->endpoint = ERR_PTR(-ENXIO);
 	cxlmd->cxlds = cxlds;
 	cxlds->cxlmd = cxlmd;
 

@@ -144,6 +144,12 @@ static int cxl_mem_probe(struct device *dev)
 			return rc;
 	}
 
+	if (cxlmd->ops) {
+		rc = cxlmd->ops->probe(cxlmd);
+		if (rc)
+			return rc;
+	}
+
 	rc = devm_cxl_memdev_edac_register(cxlmd);
 	if (rc)
 		dev_dbg(dev, "CXL memdev EDAC registration failed rc=%d\n", rc);
@@ -169,15 +175,17 @@ static int cxl_mem_probe(struct device *dev)
  * devm_cxl_add_memdev - Add a CXL memory device
  * @host: devres alloc/release context and parent for the memdev
  * @cxlds: CXL device state to associate with the memdev
+ * @ops: optional operations to run in cxl_mem::{probe,remove}() context
  *
  * Upon return the device will have had a chance to attach to the
  * cxl_mem driver, but may fail if the CXL topology is not ready
  * (hardware CXL link down, or software platform CXL root not attached)
  */
 struct cxl_memdev *devm_cxl_add_memdev(struct device *host,
-				       struct cxl_dev_state *cxlds)
+				       struct cxl_dev_state *cxlds,
+				       const struct cxl_memdev_ops *ops)
 {
-	struct cxl_memdev *cxlmd = cxl_memdev_alloc(cxlds);
+	struct cxl_memdev *cxlmd = cxl_memdev_alloc(cxlds, ops);
 	int rc;
 
 	if (IS_ERR(cxlmd))
@@ -189,7 +197,26 @@ struct cxl_memdev *devm_cxl_add_memdev(struct device *host,
 		return ERR_PTR(rc);
 	}
 
-	return devm_cxl_memdev_add_or_reset(host, cxlmd);
+	cxlmd = devm_cxl_memdev_add_or_reset(host, cxlmd);
+	if (IS_ERR(cxlmd))
+		return cxlmd;
+
+	/*
+	 * If ops is provided fail if the driver is not attached upon
+	 * return. The ->endpoint ERR_PTR may have a more precise error
+	 * code to convey. Note that failure here could be the result of
+	 * a race to teardown the CXL port topology. I.e.
+	 * cxl_mem_probe() could have succeeded and then cxl_mem unbound
+	 * before the lock is acquired.
+	 */
+	guard(device)(&cxlmd->dev);
+	if (ops && !cxlmd->dev.driver) {
+		if (IS_ERR(cxlmd->endpoint))
+			return ERR_CAST(cxlmd->endpoint);
+		return ERR_PTR(-ENXIO);
+	}
+
+	return cxlmd;
 }
 EXPORT_SYMBOL_NS_GPL(devm_cxl_add_memdev, "CXL");
 
