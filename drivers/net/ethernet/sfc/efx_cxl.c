@@ -128,6 +128,14 @@ int efx_cxl_init(struct efx_probe_data *probe_data)
 			cxl_put_root_decoder(cxl->cxlrd);
 			return -ENOSPC;
 		}
+
+		cxl->cxled = cxl_request_dpa(cxl->cxlmd, CXL_PARTMODE_RAM,
+					     EFX_CTPIO_BUFFER_SIZE);
+		if (IS_ERR(cxl->cxled)) {
+			pci_err(pci_dev, "CXL accel request DPA failed");
+			cxl_put_root_decoder(cxl->cxlrd);
+			return PTR_ERR(cxl->cxled);
+		}
 	}
 
 	probe_data->cxl = cxl;
@@ -150,6 +158,7 @@ void efx_cxl_exit(struct efx_probe_data *probe_data)
 		if (probe_data->cxl->cxled)
 			put_device(&probe_data->cxl->cxled->cxld.dev);
 	} else {
+		cxl_dpa_free(probe_data->cxl->cxled);
 		cxl_put_root_decoder(probe_data->cxl->cxlrd);
 	}
 }
