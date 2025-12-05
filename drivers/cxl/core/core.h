@@ -232,4 +232,7 @@ static inline bool cxl_pci_drv_bound(struct pci_dev *pdev) { return false; };
 static inline int cxl_pci_driver_init(void) { return 0; }
 static inline void cxl_pci_driver_exit(void) { }
 #endif
+
+resource_size_t cxl_rcd_component_reg_phys(struct device *dev,
+					   struct cxl_dport *dport);
 #endif /* __CXL_CORE_H__ */
