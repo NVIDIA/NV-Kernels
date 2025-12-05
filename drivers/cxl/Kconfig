@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 menuconfig CXL_BUS
-	tristate "CXL (Compute Express Link) Devices Support"
+	bool "CXL (Compute Express Link) Devices Support"
 	depends on PCI
 	select FW_LOADER
 	select FW_UPLOAD
@@ -22,6 +22,7 @@ if CXL_BUS
 config CXL_PCI
 	bool "PCI manageability"
 	default CXL_BUS
+	select CXL_MEM
 	help
 	  The CXL specification defines a "CXL memory device" sub-class in the
 	  PCI "memory controller" base class of devices. Device's identified by
@@ -89,7 +90,6 @@ config CXL_PMEM
 
 config CXL_MEM
 	tristate "CXL: Memory Expansion"
-	depends on CXL_PCI
 	default CXL_BUS
 	help
 	  The CXL.mem protocol allows a device to act as a provider of "System
