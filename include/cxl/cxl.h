@@ -255,4 +255,13 @@ struct cxl_endpoint_decoder *cxl_get_committed_decoder(struct cxl_memdev *cxlmd,
 						       struct cxl_region **cxlr);
 struct range;
 int cxl_get_region_range(struct cxl_region *region, struct range *range);
+enum cxl_detach_mode {
+	DETACH_ONLY,
+	DETACH_INVALIDATE,
+};
+
+int cxl_decoder_detach(struct cxl_region *cxlr,
+		       struct cxl_endpoint_decoder *cxled, int pos,
+		       enum cxl_detach_mode mode);
+void unregister_region(void *_cxlr);
 #endif /* __CXL_CXL_H__ */

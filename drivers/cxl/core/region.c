@@ -2199,6 +2199,7 @@ int cxl_decoder_detach(struct cxl_region *cxlr,
 	}
 	return 0;
 }
+EXPORT_SYMBOL_NS_GPL(cxl_decoder_detach, "CXL");
 
 static int __attach_target(struct cxl_region *cxlr,
 			   struct cxl_endpoint_decoder *cxled, int pos,
@@ -2393,7 +2394,7 @@ static struct cxl_region *to_cxl_region(struct device *dev)
 	return container_of(dev, struct cxl_region, dev);
 }
 
-static void unregister_region(void *_cxlr)
+void unregister_region(void *_cxlr)
 {
 	struct cxl_region *cxlr = _cxlr;
 	struct cxl_region_params *p = &cxlr->params;
@@ -2412,6 +2413,7 @@ static void unregister_region(void *_cxlr)
 	cxl_region_iomem_release(cxlr);
 	put_device(&cxlr->dev);
 }
+EXPORT_SYMBOL_NS_GPL(unregister_region, "CXL");
 
 static struct lock_class_key cxl_region_key;
 
