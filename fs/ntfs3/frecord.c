@@ -2101,12 +2101,12 @@ static struct page *ntfs_lock_new_page(struct address_space *mapping,
 }
 
 /*
- * ni_readpage_cmpr
+ * ni_read_folio_cmpr
  *
  * When decompressing, we typically obtain more than one page per reference.
  * We inject the additional pages into the page cache.
  */
-int ni_readpage_cmpr(struct ntfs_inode *ni, struct page *page)
+int ni_read_folio_cmpr(struct ntfs_inode *ni, struct page *page)
 {
 	int err;
 	struct ntfs_sb_info *sbi = ni->mi.sbi;
