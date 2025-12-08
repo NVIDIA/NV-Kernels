@@ -11329,7 +11329,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 		if (dc_resource_is_dsc_encoding_supported(dc)) {
 			ret = compute_mst_dsc_configs_for_state(state, dm_state->context, vars);
-			if (ret) {
+			if (!ret) {
 				DRM_DEBUG_DRIVER("compute_mst_dsc_configs_for_state() failed\n");
 				ret = -EINVAL;
 				goto fail;
