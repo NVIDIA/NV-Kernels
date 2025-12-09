@@ -407,15 +407,6 @@ char *efi_convert_cmdline(efi_loaded_image_t *image)
 	return (char *)cmdline_addr;
 }
 
-#ifdef CONFIG_ARM64
-#define EFI_EVENT_GROUP_BEFORE_EXIT_BOOT_SERVICES \
-	EFI_GUID(0x8be0e274, 0x3970, 0x4b44,  0x80, 0xc5, 0x1a, 0xb9, 0x50, 0x2f, 0x3b, 0xfc)
-
-static void efi_before_ebs_notify(efi_event_t event, void *context)
-{
-}
-#endif
-
 /**
  * efi_exit_boot_services() - Exit boot services
  * @handle:	handle of the exiting image
@@ -436,30 +427,9 @@ efi_status_t efi_exit_boot_services(void *handle, void *priv,
 {
 	struct efi_boot_memmap *map;
 	efi_status_t status;
-#ifdef CONFIG_ARM64
-	efi_guid_t guid = EFI_EVENT_GROUP_BEFORE_EXIT_BOOT_SERVICES;
-	efi_event_t event;
-#endif
 
 	if (efi_disable_pci_dma)
 		efi_pci_disable_bridge_busmaster();
-
-#ifdef CONFIG_ARM64
-	status = efi_bs_call(create_event_ex, EFI_EVT_NOTIFY_SIGNAL,
-			     EFI_TPL_CALLBACK, efi_before_ebs_notify, NULL,
-			     &guid, &event);
-	if (status == EFI_SUCCESS) {
-		status = efi_bs_call(signal_event, event);
-		if (status != EFI_SUCCESS)
-			efi_err("%s - signal event failed: %02lx\n", __func__, status);
-
-		status = efi_bs_call(close_event, event);
-		if (status != EFI_SUCCESS)
-			efi_err("%s - close event failed: %02lx\n", __func__, status);
-	} else {
-		efi_err("%s - create event ex failed: %02lx\n", __func__, status);
-	}
-#endif
 
 	status = efi_get_memory_map(&map, true);
 	if (status != EFI_SUCCESS)

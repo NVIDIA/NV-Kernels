@@ -34,16 +34,7 @@ static int prepend(char **buffer, int buflen, const char *str, int namelen)
 
 #define CHROOT_NSCONNECT (PATH_CHROOT_REL | PATH_CHROOT_NSCONNECT)
 
-/**
- * aa_disconnect - handle paths not connected
- * @path: path to lookup  (NOT NULL)
- * @buf:  buffer to store path to  (NOT NULL)
- * @name: Returns - pointer for start of path name with in @buf (NOT NULL)
- * @flags: profile flags perms controlling path lookup
- * @flag_match: flags matching path lookup from enum path_flags
- * @disconnected: string to prefix to disconnected paths
- *
- * If the path is not connected to the expected root,
+/* If the path is not connected to the expected root,
  * check if it is a sysctl and handle specially else remove any
  * leading / that __d_path may have returned.
  * Unless
@@ -54,12 +45,12 @@ static int prepend(char **buffer, int buflen, const char *str, int namelen)
  *     of chroot) and specifically directed to connect paths to
  *     namespace root.
  */
-int aa_disconnect(const struct path *path, char *buf, char **name,
-		  int flags, int flags_match, const char *disconnected)
+static int disconnect(const struct path *path, char *buf, char **name,
+		      int flags, const char *disconnected)
 {
 	int error = 0;
 
-	if (!(flags & flags_match) &&
+	if (!(flags & PATH_CONNECT_PATH) &&
 	    !(((flags & CHROOT_NSCONNECT) == CHROOT_NSCONNECT) &&
 	      our_mnt(path->mnt))) {
 		/* disconnected path, don't return pathname starting
@@ -119,9 +110,8 @@ static int d_namespace_path(const struct path *path, char *buf, char **name,
 			error = prepend(name, *name - buf, "/proc", 5);
 			goto out;
 		} else
-			error = aa_disconnect(path, buf, name, flags,
-					      PATH_CONNECT_PATH,
-					      disconnected);
+			error = disconnect(path, buf, name, flags,
+					   disconnected);
 		goto out;
 	}
 
@@ -159,8 +149,7 @@ static int d_namespace_path(const struct path *path, char *buf, char **name,
 	*name = res;
 
 	if (!connected)
-		error = aa_disconnect(path, buf, name, flags,
-				      PATH_CONNECT_PATH, disconnected);
+		error = disconnect(path, buf, name, flags, disconnected);
 
 	/* Handle two cases:
 	 * 1. A deleted dentry && profile is not allowing mediation of deleted

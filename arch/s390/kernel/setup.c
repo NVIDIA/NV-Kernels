@@ -51,7 +51,6 @@
 #include <linux/start_kernel.h>
 #include <linux/hugetlb.h>
 #include <linux/kmemleak.h>
-#include <linux/security.h>
 
 #include <asm/archrandom.h>
 #include <asm/boot_data.h>
@@ -840,7 +839,7 @@ static void __init setup_control_program_code(void)
 		return;
 
 	diag_stat_inc(DIAG_STAT_X318);
-	asm volatile("diag %0,0,0x318\n" : : "d" (diag318_info.val));
+	asm volatile("diag %0,0,0x318" : : "d" (diag318_info.val));
 }
 
 /*
@@ -919,9 +918,6 @@ void __init setup_arch(char **cmdline_p)
 		pr_info("Lowcore relocated to 0x%px\n", get_lowcore());
 
 	log_component_list();
-
-	if (ipl_get_secureboot())
-		security_lock_kernel_down("Secure IPL mode", LOCKDOWN_INTEGRITY_MAX);
 
 	/* Have one command line that is parsed and saved in /proc/cmdline */
 	/* boot_command_line has been already set up in early.c */

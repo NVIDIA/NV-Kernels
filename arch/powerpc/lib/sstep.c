@@ -8,7 +8,6 @@
 #include <linux/kprobes.h>
 #include <linux/ptrace.h>
 #include <linux/prefetch.h>
-#include <asm/cpu_has_feature.h>
 #include <asm/sstep.h>
 #include <asm/processor.h>
 #include <linux/uaccess.h>

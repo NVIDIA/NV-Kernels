@@ -38,7 +38,6 @@
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/memory-failure.h>
 #include <linux/page-flags.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/task.h>
@@ -155,10 +154,6 @@ static const struct ctl_table memory_failure_table[] = {
 	}
 };
 
-static struct rb_root_cached pfn_space_itree = RB_ROOT_CACHED;
-
-static DEFINE_MUTEX(pfn_space_lock);
-
 /*
  * Return values:
  *   1:   the page is dissolved (if needed) and taken off from buddy,
@@ -217,106 +212,34 @@ static bool page_handle_poison(struct page *page, bool hugepage_or_freepage, boo
 	return true;
 }
 
-#if IS_ENABLED(CONFIG_HWPOISON_INJECT)
+static hwpoison_filter_func_t __rcu *hwpoison_filter_func __read_mostly;
 
-u32 hwpoison_filter_enable = 0;
-u32 hwpoison_filter_dev_major = ~0U;
-u32 hwpoison_filter_dev_minor = ~0U;
-u64 hwpoison_filter_flags_mask;
-u64 hwpoison_filter_flags_value;
-EXPORT_SYMBOL_GPL(hwpoison_filter_enable);
-EXPORT_SYMBOL_GPL(hwpoison_filter_dev_major);
-EXPORT_SYMBOL_GPL(hwpoison_filter_dev_minor);
-EXPORT_SYMBOL_GPL(hwpoison_filter_flags_mask);
-EXPORT_SYMBOL_GPL(hwpoison_filter_flags_value);
-
-static int hwpoison_filter_dev(struct page *p)
+void hwpoison_filter_register(hwpoison_filter_func_t *filter)
 {
-	struct folio *folio = page_folio(p);
-	struct address_space *mapping;
-	dev_t dev;
-
-	if (hwpoison_filter_dev_major == ~0U &&
-	    hwpoison_filter_dev_minor == ~0U)
-		return 0;
-
-	mapping = folio_mapping(folio);
-	if (mapping == NULL || mapping->host == NULL)
-		return -EINVAL;
-
-	dev = mapping->host->i_sb->s_dev;
-	if (hwpoison_filter_dev_major != ~0U &&
-	    hwpoison_filter_dev_major != MAJOR(dev))
-		return -EINVAL;
-	if (hwpoison_filter_dev_minor != ~0U &&
-	    hwpoison_filter_dev_minor != MINOR(dev))
-		return -EINVAL;
-
-	return 0;
+	rcu_assign_pointer(hwpoison_filter_func, filter);
 }
+EXPORT_SYMBOL_GPL(hwpoison_filter_register);
 
-static int hwpoison_filter_flags(struct page *p)
+void hwpoison_filter_unregister(void)
 {
-	if (!hwpoison_filter_flags_mask)
-		return 0;
-
-	if ((stable_page_flags(p) & hwpoison_filter_flags_mask) ==
-				    hwpoison_filter_flags_value)
-		return 0;
-	else
-		return -EINVAL;
+	RCU_INIT_POINTER(hwpoison_filter_func, NULL);
+	synchronize_rcu();
 }
+EXPORT_SYMBOL_GPL(hwpoison_filter_unregister);
 
-/*
- * This allows stress tests to limit test scope to a collection of tasks
- * by putting them under some memcg. This prevents killing unrelated/important
- * processes such as /sbin/init. Note that the target task may share clean
- * pages with init (eg. libc text), which is harmless. If the target task
- * share _dirty_ pages with another task B, the test scheme must make sure B
- * is also included in the memcg. At last, due to race conditions this filter
- * can only guarantee that the page either belongs to the memcg tasks, or is
- * a freed page.
- */
-#ifdef CONFIG_MEMCG
-u64 hwpoison_filter_memcg;
-EXPORT_SYMBOL_GPL(hwpoison_filter_memcg);
-static int hwpoison_filter_task(struct page *p)
+static int hwpoison_filter(struct page *p)
 {
-	if (!hwpoison_filter_memcg)
-		return 0;
+	int ret = 0;
+	hwpoison_filter_func_t *filter;
 
-	if (page_cgroup_ino(p) != hwpoison_filter_memcg)
-		return -EINVAL;
+	rcu_read_lock();
+	filter = rcu_dereference(hwpoison_filter_func);
+	if (filter)
+		ret = filter(p);
+	rcu_read_unlock();
 
-	return 0;
+	return ret;
 }
-#else
-static int hwpoison_filter_task(struct page *p) { return 0; }
-#endif
-
-int hwpoison_filter(struct page *p)
-{
-	if (!hwpoison_filter_enable)
-		return 0;
-
-	if (hwpoison_filter_dev(p))
-		return -EINVAL;
-
-	if (hwpoison_filter_flags(p))
-		return -EINVAL;
-
-	if (hwpoison_filter_task(p))
-		return -EINVAL;
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(hwpoison_filter);
-#else
-int hwpoison_filter(struct page *p)
-{
-	return 0;
-}
-#endif
 
 /*
  * Kill all processes that have a poisoned page mapped and then isolate
@@ -446,22 +369,13 @@ static unsigned long dev_pagemap_mapping_shift(struct vm_area_struct *vma,
  * not much we can do.	We just print a message and ignore otherwise.
  */
 
-#define FSDAX_INVALID_PGOFF ULONG_MAX
-
 /*
  * Schedule a process for later kill.
  * Uses GFP_ATOMIC allocations to avoid potential recursions in the VM.
- *
- * Notice: @pgoff is used when:
- * a. @p is a fsdax page and a filesystem with a memory failure handler
- * has claimed the memory_failure event.
- * b. pgoff is not backed by struct page.
- * In all other cases, page->index and page->mapping are sufficient
- * for mapping the page back to its corresponding user virtual address.
  */
 static void __add_to_kill(struct task_struct *tsk, const struct page *p,
 			  struct vm_area_struct *vma, struct list_head *to_kill,
-			  unsigned long ksm_addr, pgoff_t pgoff)
+			  unsigned long addr)
 {
 	struct to_kill *tk;
 
@@ -471,20 +385,11 @@ static void __add_to_kill(struct task_struct *tsk, const struct page *p,
 		return;
 	}
 
-	/* Check for pgoff not backed by struct page */
-	if (!(pfn_valid(pgoff)) && (vma->vm_flags & VM_PFNMAP)) {
-		tk->addr = vma_address(vma, pgoff, 1);
-		tk->size_shift = PAGE_SHIFT;
-	} else {
-		tk->addr = ksm_addr ? ksm_addr : page_address_in_vma(page_folio(p), p, vma);
-		if (is_zone_device_page(p)) {
-			if (pgoff != FSDAX_INVALID_PGOFF)
-				tk->addr = vma_address(vma, pgoff, 1);
-			tk->size_shift = dev_pagemap_mapping_shift(vma, tk->addr);
-		} else {
-			tk->size_shift = folio_shift(page_folio(p));
-		}
-	}
+	tk->addr = addr;
+	if (is_zone_device_page(p))
+		tk->size_shift = dev_pagemap_mapping_shift(vma, tk->addr);
+	else
+		tk->size_shift = folio_shift(page_folio(p));
 
 	/*
 	 * Send SIGKILL if "tk->addr == -EFAULT". Also, as
@@ -497,8 +402,8 @@ static void __add_to_kill(struct task_struct *tsk, const struct page *p,
 	 * has a mapping for the page.
 	 */
 	if (tk->addr == -EFAULT) {
-		pr_info("Unable to find address %lx in %s\n",
-			pfn_valid(pgoff) ? page_to_pfn(p) : pgoff, tsk->comm);
+		pr_info("Unable to find user space address %lx in %s\n",
+			page_to_pfn(p), tsk->comm);
 	} else if (tk->size_shift == 0) {
 		kfree(tk);
 		return;
@@ -515,7 +420,7 @@ static void add_to_kill_anon_file(struct task_struct *tsk, const struct page *p,
 {
 	if (addr == -EFAULT)
 		return;
-	__add_to_kill(tsk, p, vma, to_kill, addr, FSDAX_INVALID_PGOFF);
+	__add_to_kill(tsk, p, vma, to_kill, addr);
 }
 
 #ifdef CONFIG_KSM
@@ -537,7 +442,7 @@ void add_to_kill_ksm(struct task_struct *tsk, const struct page *p,
 		     unsigned long addr)
 {
 	if (!task_in_to_kill_list(to_kill, tsk))
-		__add_to_kill(tsk, p, vma, to_kill, addr, FSDAX_INVALID_PGOFF);
+		__add_to_kill(tsk, p, vma, to_kill, addr);
 }
 #endif
 /*
@@ -704,21 +609,21 @@ static void collect_procs_file(const struct folio *folio,
 	i_mmap_unlock_read(mapping);
 }
 
-static void add_to_kill_pgoff(struct task_struct *tsk, const struct page *p,
+#ifdef CONFIG_FS_DAX
+static void add_to_kill_fsdax(struct task_struct *tsk, const struct page *p,
 			      struct vm_area_struct *vma,
 			      struct list_head *to_kill, pgoff_t pgoff)
 {
 	unsigned long addr = vma_address(vma, pgoff, 1);
-	__add_to_kill(tsk, p, vma, to_kill, addr, pgoff);
+	__add_to_kill(tsk, p, vma, to_kill, addr);
 }
 
 /*
- * Collect processes when the error hit a fsdax page or a PFN not backed by
- * struct page.
+ * Collect processes when the error hit a fsdax page.
  */
-static void collect_procs_pgoff(const struct page *page,
-        struct address_space *mapping, pgoff_t pgoff,
-        struct list_head *to_kill, bool pre_remove)
+static void collect_procs_fsdax(const struct page *page,
+		struct address_space *mapping, pgoff_t pgoff,
+		struct list_head *to_kill, bool pre_remove)
 {
 	struct vm_area_struct *vma;
 	struct task_struct *tsk;
@@ -739,12 +644,13 @@ static void collect_procs_pgoff(const struct page *page,
 			continue;
 		vma_interval_tree_foreach(vma, &mapping->i_mmap, pgoff, pgoff) {
 			if (vma->vm_mm == t->mm)
-				add_to_kill_pgoff(t, page, vma, to_kill, pgoff);
+				add_to_kill_fsdax(t, page, vma, to_kill, pgoff);
 		}
 	}
 	rcu_read_unlock();
 	i_mmap_unlock_read(mapping);
 }
+#endif /* CONFIG_FS_DAX */
 
 /*
  * Collect the processes who have the corrupted page mapped to kill.
@@ -979,7 +885,6 @@ static const char * const action_page_types[] = {
 	[MF_MSG_DAX]			= "dax page",
 	[MF_MSG_UNSPLIT_THP]		= "unsplit thp",
 	[MF_MSG_ALREADY_POISONED]	= "already poisoned page",
-	[MF_MSG_PFN_MAP]		= "non struct page pfn",
 	[MF_MSG_UNKNOWN]		= "unknown page",
 };
 
@@ -1222,7 +1127,7 @@ static int me_swapcache_clean(struct page_state *ps, struct page *p)
 	struct folio *folio = page_folio(p);
 	int ret;
 
-	delete_from_swap_cache(folio);
+	swap_cache_del_folio(folio);
 
 	ret = delete_from_lru_cache(folio) ? MF_FAILED : MF_RECOVERED;
 	folio_unlock(folio);
@@ -1374,8 +1279,7 @@ static int action_result(unsigned long pfn, enum mf_action_page_type type,
 
 	if (type != MF_MSG_ALREADY_POISONED) {
 		num_poisoned_pages_inc(pfn);
-		if (type != MF_MSG_PFN_MAP)
-			update_per_node_mf_stats(pfn, result);
+		update_per_node_mf_stats(pfn, result);
 	}
 
 	pr_err("%#lx: recovery action for %s: %s\n",
@@ -1732,10 +1636,10 @@ static int identify_page_state(unsigned long pfn, struct page *p,
 	 * carried out only if the first check can't determine the page status.
 	 */
 	for (ps = error_states;; ps++)
-		if ((p->flags & ps->mask) == ps->res)
+		if ((p->flags.f & ps->mask) == ps->res)
 			break;
 
-	page_flags |= (p->flags & (1UL << PG_dirty));
+	page_flags |= (p->flags.f & (1UL << PG_dirty));
 
 	if (!ps->mask)
 		for (ps = error_states;; ps++)
@@ -1889,7 +1793,7 @@ int mf_dax_kill_procs(struct address_space *mapping, pgoff_t index,
 		 * The pre_remove case is revoking access, the memory is still
 		 * good and could theoretically be put back into service.
 		 */
-		collect_procs_pgoff(page, mapping, index, &to_kill, pre_remove);
+		collect_procs_fsdax(page, mapping, index, &to_kill, pre_remove);
 		unmap_and_kill(&to_kill, page_to_pfn(page), mapping,
 				index, mf_flags);
 unlock:
@@ -2161,7 +2065,7 @@ retry:
 		return action_result(pfn, MF_MSG_FREE_HUGE, res);
 	}
 
-	page_flags = folio->flags;
+	page_flags = folio->flags.f;
 
 	if (!hwpoison_user_mappings(folio, p, pfn, flags)) {
 		folio_unlock(folio);
@@ -2240,83 +2144,6 @@ static void kill_procs_now(struct page *p, unsigned long pfn, int flags,
 	kill_procs(&tokill, true, pfn, flags);
 }
 
-int register_pfn_address_space(struct pfn_address_space *pfn_space)
-{
-	if (!pfn_space)
-		return -EINVAL;
-
-	if (!request_mem_region(pfn_space->node.start << PAGE_SHIFT,
-	    (pfn_space->node.last - pfn_space->node.start + 1) << PAGE_SHIFT, ""))
-		return -EBUSY;
-
-	mutex_lock(&pfn_space_lock);
-	interval_tree_insert(&pfn_space->node, &pfn_space_itree);
-	mutex_unlock(&pfn_space_lock);
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(register_pfn_address_space);
-
-void unregister_pfn_address_space(struct pfn_address_space *pfn_space)
-{
-	if (!pfn_space)
-		return;
-
-	mutex_lock(&pfn_space_lock);
-	interval_tree_remove(&pfn_space->node, &pfn_space_itree);
-	mutex_unlock(&pfn_space_lock);
-	release_mem_region(pfn_space->node.start << PAGE_SHIFT,
-			   (pfn_space->node.last - pfn_space->node.start + 1) << PAGE_SHIFT);
-}
-EXPORT_SYMBOL_GPL(unregister_pfn_address_space);
-
-static int memory_failure_pfn(unsigned long pfn, int flags)
-{
-	struct interval_tree_node *node;
-	int res = MF_FAILED;
-	LIST_HEAD(tokill);
-
-	mutex_lock(&pfn_space_lock);
-	/*
-	 * Modules registers with MM the address space mapping to the device memory they
-	 * manage. Iterate to identify exactly which address space has mapped to this
-	 * failing PFN.
-	 */
-	for (node = interval_tree_iter_first(&pfn_space_itree, pfn, pfn); node;
-	     node = interval_tree_iter_next(node, pfn, pfn)) {
-		struct pfn_address_space *pfn_space =
-			container_of(node, struct pfn_address_space, node);
-		/*
-		 * Modules managing the device memory need to be conveyed about the
-		 * memory failure so that the poisoned PFN can be tracked.
-		 */
-		if (pfn_space->ops)
-			pfn_space->ops->failure(pfn_space, pfn);
-
-		collect_procs_pgoff(NULL, pfn_space->mapping, pfn, &tokill, false);
-
-		unmap_mapping_range(pfn_space->mapping, pfn << PAGE_SHIFT,
-				    PAGE_SIZE, 0);
-
-		res = MF_RECOVERED;
-	}
-	mutex_unlock(&pfn_space_lock);
-
-	if (res == MF_FAILED)
-		return action_result(pfn, MF_MSG_PFN_MAP, res);
-
-	/*
-	 * Unlike System-RAM there is no possibility to swap in a different
-	 * physical page at a given virtual address, so all userspace
-	 * consumption of direct PFN memory necessitates SIGBUS (i.e.
-	 * MF_MUST_KILL)
-	 */
-	flags |= MF_ACTION_REQUIRED | MF_MUST_KILL;
-	kill_procs(&tokill, true, pfn, flags);
-
-	return action_result(pfn, MF_MSG_PFN_MAP, MF_RECOVERED);
-}
-
 /**
  * memory_failure - Handle memory failure of a page.
  * @pfn: Page Number of the corrupted page
@@ -2360,11 +2187,6 @@ int memory_failure(unsigned long pfn, int flags)
 	if (!(flags & MF_SW_SIMULATED))
 		hw_memory_failure = true;
 
-	if (!pfn_valid(pfn) && !arch_is_platform_page(PFN_PHYS(pfn))) {
-		res = memory_failure_pfn(pfn, flags);
-		goto unlock_mutex;
-	}
-
 	p = pfn_to_online_page(pfn);
 	if (!p) {
 		res = arch_memory_failure(pfn, flags);
@@ -2372,7 +2194,7 @@ int memory_failure(unsigned long pfn, int flags)
 			goto unlock_mutex;
 
 		if (pfn_valid(pfn)) {
-			pgmap = get_dev_pagemap(pfn, NULL);
+			pgmap = get_dev_pagemap(pfn);
 			put_ref_page(pfn, flags);
 			if (pgmap) {
 				res = memory_failure_dev_pagemap(pfn, flags,
@@ -2503,7 +2325,7 @@ try_again:
 	 * folio_remove_rmap_*() in try_to_unmap_one(). So to determine page
 	 * status correctly, we save a copy of the page flags at this time.
 	 */
-	page_flags = folio->flags;
+	page_flags = folio->flags.f;
 
 	/*
 	 * __munlock_folio() may clear a writeback folio's LRU flag without
@@ -2848,13 +2670,13 @@ static int soft_offline_in_use_page(struct page *page)
 				putback_movable_pages(&pagelist);
 
 			pr_info("%#lx: %s migration failed %ld, type %pGp\n",
-				pfn, msg_page[huge], ret, &page->flags);
+				pfn, msg_page[huge], ret, &page->flags.f);
 			if (ret > 0)
 				ret = -EBUSY;
 		}
 	} else {
 		pr_info("%#lx: %s isolation failed, page count %d, type %pGp\n",
-			pfn, msg_page[huge], page_count(page), &page->flags);
+			pfn, msg_page[huge], page_count(page), &page->flags.f);
 		ret = -EBUSY;
 	}
 	return ret;

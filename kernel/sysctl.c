@@ -17,7 +17,6 @@
 #include <linux/limits.h>
 #include <linux/syscalls.h>
 #include <linux/capability.h>
-#include <linux/user_namespace.h>
 
 #include "../lib/kstrtox.h"
 
@@ -1495,15 +1494,6 @@ static const struct ctl_table sysctl_subsys_table[] = {
 		.procname	= "ignore-unaligned-usertrap",
 		.data		= &no_unaligned_warning,
 		.maxlen		= sizeof (int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-#endif
-#ifdef CONFIG_USER_NS
-	{
-		.procname	= "unprivileged_userns_clone",
-		.data		= &unprivileged_userns_clone,
-		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},

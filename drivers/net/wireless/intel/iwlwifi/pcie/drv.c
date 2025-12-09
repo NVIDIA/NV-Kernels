@@ -208,7 +208,6 @@ VISIBLE_IF_IWLWIFI_KUNIT const struct pci_device_id iwl_hw_card_ids[] = {
 	{IWL_PCI_DEVICE(0x088E, 0x446A, iwl6030_mac_cfg)},
 	{IWL_PCI_DEVICE(0x088E, 0x4860, iwl6030_mac_cfg)},
 	{IWL_PCI_DEVICE(0x088F, 0x5260, iwl6030_mac_cfg)},
-	{IWL_PCI_DEVICE(0x088F, 0x526A, iwl6030_mac_cfg)},
 
 /* 105 Series */
 	{IWL_PCI_DEVICE(0x0894, 0x0022, iwl105_mac_cfg)},
@@ -1180,16 +1179,11 @@ static int iwl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 static void iwl_pci_remove(struct pci_dev *pdev)
 {
 	struct iwl_trans *trans = pci_get_drvdata(pdev);
-	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 
 	if (!trans)
 		return;
 
-	cancel_delayed_work_sync(&trans_pcie->me_recheck_wk);
-
-	iwl_drv_stop(trans->drv);
-
-	iwl_trans_pcie_free(trans);
+	iwl_pcie_gen1_2_remove(trans);
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -1261,7 +1255,7 @@ static int _iwl_pci_resume(struct device *device, bool restore)
 		 * won't really know how to recover.
 		 */
 		iwl_pcie_prepare_card_hw(trans);
-		iwl_finish_nic_init(trans);
+		iwl_trans_activate_nic(trans);
 		iwl_op_mode_device_powered_off(trans->op_mode);
 	}
 

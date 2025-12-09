@@ -99,8 +99,7 @@ int aa_may_ptrace(const struct cred *tracer_cred, struct aa_label *tracer,
 
 #define AA_USERNS_CREATE	8
 
-struct aa_label *aa_profile_ns_perm(struct aa_profile *profile,
-				    struct apparmor_audit_data *ad,
-				    u32 request);
+int aa_profile_ns_perm(struct aa_profile *profile,
+		       struct apparmor_audit_data *ad, u32 request);
 
 #endif /* __AA_TASK_H */

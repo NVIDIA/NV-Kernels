@@ -58,7 +58,7 @@ config 8139TOO
 config 8139TOO_PIO
 	bool "Use PIO instead of MMIO"
 	default y
-	depends on 8139TOO
+	depends on 8139TOO && !NO_IOPORT_MAP
 	help
 	  This instructs the driver to use programmed I/O ports (PIO) instead
 	  of PCI shared memory (MMIO).  This can possibly solve some problems
@@ -139,7 +139,5 @@ config RTASE
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called rtase. This is recommended.
-
-source "drivers/net/ethernet/realtek/r8127/Kconfig"
 
 endif # NET_VENDOR_REALTEK

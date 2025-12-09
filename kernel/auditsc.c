@@ -995,9 +995,9 @@ static void audit_reset_context(struct audit_context *ctx)
 
 	ctx->current_state = ctx->state;
 	ctx->stamp.serial = 0;
+	ctx->stamp.ctime = (struct timespec64){ .tv_sec = 0, .tv_nsec = 0 };
 	ctx->major = 0;
 	ctx->uring_op = 0;
-	ctx->stamp.ctime = (struct timespec64){ .tv_sec = 0, .tv_nsec = 0 };
 	memset(ctx->argv, 0, sizeof(ctx->argv));
 	ctx->return_code = 0;
 	ctx->prio = (ctx->state == AUDIT_STATE_RECORD ? ~0ULL : 0);
@@ -1092,24 +1092,29 @@ static inline void audit_free_context(struct audit_context *context)
 	kfree(context);
 }
 
-static void audit_log_pid_context(struct audit_context *context, pid_t pid,
-				  kuid_t auid, kuid_t uid,
-				  unsigned int sessionid, struct lsm_prop *prop,
-				  char *comm)
+static int audit_log_pid_context(struct audit_context *context, pid_t pid,
+				 kuid_t auid, kuid_t uid,
+				 unsigned int sessionid, struct lsm_prop *prop,
+				 char *comm)
 {
 	struct audit_buffer *ab;
+	int rc = 0;
 
 	ab = audit_log_start(context, GFP_KERNEL, AUDIT_OBJ_PID);
 	if (!ab)
-		return;
+		return rc;
 
 	audit_log_format(ab, "opid=%d oauid=%d ouid=%d oses=%d", pid,
 			 from_kuid(&init_user_ns, auid),
 			 from_kuid(&init_user_ns, uid), sessionid);
-	if (lsmprop_is_set(prop))
-		audit_log_object_context(ab, prop);
+	if (lsmprop_is_set(prop) && audit_log_obj_ctx(ab, prop))
+		rc = 1;
 
-	return;
+	audit_log_format(ab, " ocomm=");
+	audit_log_untrustedstring(ab, comm);
+	audit_log_end(ab);
+
+	return rc;
 }
 
 static void audit_log_execve_info(struct audit_context *context,
@@ -1379,8 +1384,10 @@ static void show_special(struct audit_context *context, int *call_panic)
 				 from_kuid(&init_user_ns, context->ipc.uid),
 				 from_kgid(&init_user_ns, context->ipc.gid),
 				 context->ipc.mode);
-		if (lsmprop_is_set(&context->ipc.oprop))
-			audit_log_object_context(ab, &context->ipc.oprop);
+		if (lsmprop_is_set(&context->ipc.oprop)) {
+			if (audit_log_obj_ctx(ab, &context->ipc.oprop))
+				*call_panic = 1;
+		}
 		if (context->ipc.has_perm) {
 			audit_log_end(ab);
 			ab = audit_log_start(context, GFP_KERNEL,
@@ -1536,8 +1543,9 @@ static void audit_log_name(struct audit_context *context, struct audit_names *n,
 				 from_kgid(&init_user_ns, n->gid),
 				 MAJOR(n->rdev),
 				 MINOR(n->rdev));
-	if (lsmprop_is_set(&n->oprop))
-		audit_log_object_context(ab, &n->oprop);
+	if (lsmprop_is_set(&n->oprop) &&
+	    audit_log_obj_ctx(ab, &n->oprop))
+		*call_panic = 2;
 
 	/* log the audit_names record type */
 	switch (n->type) {
@@ -1742,20 +1750,22 @@ static void audit_log_exit(void)
 		struct audit_aux_data_pids *axs = (void *)aux;
 
 		for (i = 0; i < axs->pid_count; i++)
-			audit_log_pid_context(context, axs->target_pid[i],
-					      axs->target_auid[i],
-					      axs->target_uid[i],
-					      axs->target_sessionid[i],
-					      &axs->target_ref[i],
-					      axs->target_comm[i]);
+			if (audit_log_pid_context(context, axs->target_pid[i],
+						  axs->target_auid[i],
+						  axs->target_uid[i],
+						  axs->target_sessionid[i],
+						  &axs->target_ref[i],
+						  axs->target_comm[i]))
+				call_panic = 1;
 	}
 
-	if (context->target_pid)
-		audit_log_pid_context(context, context->target_pid,
-				      context->target_auid, context->target_uid,
-				      context->target_sessionid,
-				      &context->target_ref,
-				      context->target_comm);
+	if (context->target_pid &&
+	    audit_log_pid_context(context, context->target_pid,
+				  context->target_auid, context->target_uid,
+				  context->target_sessionid,
+				  &context->target_ref,
+				  context->target_comm))
+		call_panic = 1;
 
 	if (context->pwd.dentry && context->pwd.mnt) {
 		ab = audit_log_start(context, GFP_KERNEL, AUDIT_CWD);

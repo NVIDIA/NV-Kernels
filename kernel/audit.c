@@ -82,6 +82,13 @@ static u32	audit_failure = AUDIT_FAIL_PRINTK;
 /* private audit network namespace index */
 static unsigned int audit_net_id;
 
+/* Number of modules that provide a security context.
+   List of lsms that provide a security context */
+static u32 audit_subj_secctx_cnt;
+static u32 audit_obj_secctx_cnt;
+static const struct lsm_id *audit_subj_lsms[MAX_LSM_COUNT];
+static const struct lsm_id *audit_obj_lsms[MAX_LSM_COUNT];
+
 /**
  * struct audit_net - audit private network namespace data
  * @sk: communication socket
@@ -279,6 +286,33 @@ static pid_t auditd_pid_vnr(void)
 	rcu_read_unlock();
 
 	return pid;
+}
+
+/**
+ * audit_cfg_lsm - Identify a security module as providing a secctx.
+ * @lsmid: LSM identity
+ * @flags: which contexts are provided
+ *
+ * Description:
+ * Increments the count of the security modules providing a secctx.
+ * If the LSM id is already in the list leave it alone.
+ */
+void audit_cfg_lsm(const struct lsm_id *lsmid, int flags)
+{
+	int i;
+
+	if (flags & AUDIT_CFG_LSM_SECCTX_SUBJECT) {
+		for (i = 0 ; i < audit_subj_secctx_cnt; i++)
+			if (audit_subj_lsms[i] == lsmid)
+				return;
+		audit_subj_lsms[audit_subj_secctx_cnt++] = lsmid;
+	}
+	if (flags & AUDIT_CFG_LSM_SECCTX_OBJECT) {
+		for (i = 0 ; i < audit_obj_secctx_cnt; i++)
+			if (audit_obj_lsms[i] == lsmid)
+				return;
+		audit_obj_lsms[audit_obj_secctx_cnt++] = lsmid;
+	}
 }
 
 /**
@@ -1797,11 +1831,12 @@ static struct audit_buffer *audit_buffer_alloc(struct audit_context *ctx,
 	if (!ab)
 		return NULL;
 
+	skb_queue_head_init(&ab->skb_list);
+
 	ab->skb = nlmsg_new(AUDIT_BUFSIZ, gfp_mask);
 	if (!ab->skb)
 		goto err;
 
-	skb_queue_head_init(&ab->skb_list);
 	skb_queue_tail(&ab->skb_list, ab->skb);
 
 	if (!nlmsg_put(ab->skb, 0, 0, type, 0, 0))
@@ -2237,17 +2272,25 @@ static void audit_buffer_aux_end(struct audit_buffer *ab)
 	ab->skb = skb_peek(&ab->skb_list);
 }
 
-int audit_log_subject_context(struct audit_buffer *ab, struct lsm_prop *prop)
+/**
+ * audit_log_subj_ctx - Add LSM subject information
+ * @ab: audit_buffer
+ * @prop: LSM subject properties.
+ *
+ * Add a subj= field and, if necessary, a AUDIT_MAC_TASK_CONTEXTS record.
+ */
+int audit_log_subj_ctx(struct audit_buffer *ab, struct lsm_prop *prop)
 {
 	struct lsm_context ctx;
-	bool space = false;
+	char *space = "";
 	int error;
 	int i;
 
+	security_current_getlsmprop_subj(prop);
 	if (!lsmprop_is_set(prop))
 		return 0;
 
-	if (lsm_prop_cnt < 2) {
+	if (audit_subj_secctx_cnt < 2) {
 		error = security_lsmprop_to_secctx(prop, &ctx, LSM_ID_UNDEF);
 		if (error < 0) {
 			if (error != -EINVAL)
@@ -2264,91 +2307,91 @@ int audit_log_subject_context(struct audit_buffer *ab, struct lsm_prop *prop)
 	if (error)
 		goto error_path;
 
-	for (i = 0; i < lsm_active_cnt; i++) {
-		if (!lsm_idlist[i]->lsmprop)
-			continue;
+	for (i = 0; i < audit_subj_secctx_cnt; i++) {
 		error = security_lsmprop_to_secctx(prop, &ctx,
-						   lsm_idlist[i]->id);
+						   audit_subj_lsms[i]->id);
 		if (error < 0) {
+			/*
+			 * Don't print anything. An LSM like BPF could
+			 * claim to support contexts, but only do so under
+			 * certain conditions.
+			 */
 			if (error == -EOPNOTSUPP)
 				continue;
-			audit_log_format(ab, "%ssubj_%s=?", space ? " " : "",
-					 lsm_idlist[i]->name);
 			if (error != -EINVAL)
-				audit_panic("error in audit_log_task_context");
+				audit_panic("error in audit_log_subj_ctx");
 		} else {
-			audit_log_format(ab, "%ssubj_%s=%s", space ? " " : "",
-					 lsm_idlist[i]->name, ctx.context);
+			audit_log_format(ab, "%ssubj_%s=%s", space,
+					 audit_subj_lsms[i]->name, ctx.context);
+			space = " ";
 			security_release_secctx(&ctx);
 		}
-		space = true;
 	}
 	audit_buffer_aux_end(ab);
 	return 0;
 
 error_path:
-	audit_panic("error in audit_log_subject_context");
+	audit_panic("error in audit_log_subj_ctx");
 	return error;
 }
-EXPORT_SYMBOL(audit_log_subject_context);
+EXPORT_SYMBOL(audit_log_subj_ctx);
 
 int audit_log_task_context(struct audit_buffer *ab)
 {
 	struct lsm_prop prop;
 
 	security_current_getlsmprop_subj(&prop);
-	return audit_log_subject_context(ab, &prop);
+	return audit_log_subj_ctx(ab, &prop);
 }
 EXPORT_SYMBOL(audit_log_task_context);
 
-void audit_log_object_context(struct audit_buffer *ab, struct lsm_prop *prop)
+int audit_log_obj_ctx(struct audit_buffer *ab, struct lsm_prop *prop)
 {
 	int i;
-	int error;
-	bool space = false;
-	struct lsm_context context;
+	int rc;
+	int error = 0;
+	char *space = "";
+	struct lsm_context ctx;
 
-	if (lsm_prop_cnt < 2) {
-		error = security_lsmprop_to_secctx(prop, &context,
-						   LSM_ID_UNDEF);
+	if (audit_obj_secctx_cnt < 2) {
+		error = security_lsmprop_to_secctx(prop, &ctx, LSM_ID_UNDEF);
 		if (error < 0) {
 			if (error != -EINVAL)
 				goto error_path;
-			return;
+			return error;
 		}
-		audit_log_format(ab, " obj=%s", context.context);
-		security_release_secctx(&context);
-		return;
+		audit_log_format(ab, " obj=%s", ctx.context);
+		security_release_secctx(&ctx);
+		return 0;
 	}
 	audit_log_format(ab, " obj=?");
 	error = audit_buffer_aux_new(ab, AUDIT_MAC_OBJ_CONTEXTS);
 	if (error)
 		goto error_path;
 
-	for (i = 0; i < lsm_prop_cnt; i++) {
-		if (!lsm_idlist[i]->lsmprop)
-			continue;
-		error = security_lsmprop_to_secctx(prop, &context,
-						   lsm_idlist[i]->id);
-		if (error < 0) {
-			audit_log_format(ab, "%sobj_%s=?",
-					 space ? " " : "", lsm_idlist[i]->name);
-			if (error != -EINVAL)
-				audit_panic("error in audit_log_object_context");
+	for (i = 0; i < audit_obj_secctx_cnt; i++) {
+		rc = security_lsmprop_to_secctx(prop, &ctx,
+						audit_obj_lsms[i]->id);
+		if (rc < 0) {
+			audit_log_format(ab, "%sobj_%s=?", space,
+					 audit_obj_lsms[i]->name);
+			if (rc != -EINVAL)
+				audit_panic("error in audit_log_obj_ctx");
+			error = rc;
 		} else {
-			audit_log_format(ab, "%sobj_%s=%s",
-					 space ? " " : "", lsm_idlist[i]->name,
-					 context.context);
-			security_release_secctx(&context);
+			audit_log_format(ab, "%sobj_%s=%s", space,
+					 audit_obj_lsms[i]->name, ctx.context);
+			security_release_secctx(&ctx);
 		}
-		space = true;
+		space = " ";
 	}
 
 	audit_buffer_aux_end(ab);
-	return;
+	return error;
 
 error_path:
-	audit_panic("error in audit_log_object_context");
+	audit_panic("error in audit_log_obj_ctx");
+	return error;
 }
 
 void audit_log_d_path_exe(struct audit_buffer *ab,
@@ -2571,9 +2614,8 @@ static void __audit_log_end(struct sk_buff *skb)
 		nlh = nlmsg_hdr(skb);
 		nlh->nlmsg_len = skb->len - NLMSG_HDRLEN;
 
-		/* queue the netlink packet and poke the kauditd thread */
+		/* queue the netlink packet */
 		skb_queue_tail(&audit_queue, skb);
-		wake_up_interruptible(&kauditd_wait);
 	} else {
 		audit_log_lost("rate limit exceeded");
 		kfree_skb(skb);
@@ -2598,6 +2640,9 @@ void audit_log_end(struct audit_buffer *ab)
 
 	while ((skb = skb_dequeue(&ab->skb_list)))
 		__audit_log_end(skb);
+
+	/* poke the kauditd thread */
+	wake_up_interruptible(&kauditd_wait);
 
 	audit_buffer_free(ab);
 }

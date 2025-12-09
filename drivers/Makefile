@@ -64,8 +64,13 @@ obj-y				+= char/
 # iommu/ comes before gpu as gpu are using iommu controllers
 obj-y				+= iommu/
 
+# gpu/ comes after char for AGP vs DRM startup and after iommu
+obj-y				+= gpu/
 
 obj-$(CONFIG_CONNECTOR)		+= connector/
+
+# i810fb depends on char/agp/
+obj-$(CONFIG_FB_I810)           += video/fbdev/i810/
 
 obj-$(CONFIG_PARPORT)		+= parport/
 obj-y				+= base/ block/ misc/ mfd/ nfc/
@@ -78,11 +83,6 @@ obj-y				+= macintosh/
 obj-y				+= scsi/
 obj-y				+= nvme/
 obj-$(CONFIG_ATA)		+= ata/
-
-# gpu/ comes after char for AGP vs DRM startup and after iommu
-obj-y				+= gpu/
-# i810fb depends on char/agp/
-obj-$(CONFIG_FB_I810)           += video/fbdev/i810/
 obj-$(CONFIG_TARGET_CORE)	+= target/
 obj-$(CONFIG_MTD)		+= mtd/
 obj-$(CONFIG_SPI)		+= spi/
@@ -161,7 +161,7 @@ obj-$(CONFIG_SOUNDWIRE)		+= soundwire/
 
 # Virtualization drivers
 obj-$(CONFIG_VIRT_DRIVERS)	+= virt/
-obj-$(subst m,y,$(CONFIG_HYPERV))	+= hv/
+obj-$(CONFIG_HYPERV)		+= hv/
 
 obj-$(CONFIG_PM_DEVFREQ)	+= devfreq/
 obj-$(CONFIG_EXTCON)		+= extcon/
@@ -195,4 +195,5 @@ obj-$(CONFIG_DRM_ACCEL)		+= accel/
 obj-$(CONFIG_CDX_BUS)		+= cdx/
 obj-$(CONFIG_DPLL)		+= dpll/
 
+obj-$(CONFIG_DIBS)		+= dibs/
 obj-$(CONFIG_S390)		+= s390/

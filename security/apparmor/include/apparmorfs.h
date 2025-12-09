@@ -15,8 +15,6 @@ extern struct path aa_null;
 
 enum aa_sfs_type {
 	AA_SFS_TYPE_BOOLEAN,
-	// Boolean that gets printed as 0/1 for backwards compatibility
-	AA_SFS_TYPE_BOOLEAN_INTPRINT,
 	AA_SFS_TYPE_STRING,
 	AA_SFS_TYPE_U64,
 	AA_SFS_TYPE_FOPS,
@@ -44,10 +42,6 @@ extern const struct file_operations aa_sfs_seq_file_ops;
 #define AA_SFS_FILE_BOOLEAN(_name, _value) \
 	{ .name = (_name), .mode = 0444, \
 	  .v_type = AA_SFS_TYPE_BOOLEAN, .v.boolean = (_value), \
-	  .file_ops = &aa_sfs_seq_file_ops }
-#define AA_SFS_FILE_BOOLEAN_INTPRINT(_name, _value) \
-	{ .name = (_name), .mode = 0444, \
-	  .v_type = AA_SFS_TYPE_BOOLEAN_INTPRINT, .v.boolean = (_value), \
 	  .file_ops = &aa_sfs_seq_file_ops }
 #define AA_SFS_FILE_STRING(_name, _value) \
 	{ .name = (_name), .mode = 0444, \
@@ -95,7 +89,6 @@ enum aafs_prof_type {
 	AAFS_PROF_RAW_DATA,
 	AAFS_PROF_RAW_HASH,
 	AAFS_PROF_RAW_ABI,
-	AAFS_PROF_LEARNING_COUNT,
 	AAFS_PROF_SIZEOF,
 };
 

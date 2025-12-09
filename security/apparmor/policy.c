@@ -88,11 +88,7 @@
 #include "include/resource.h"
 
 int unprivileged_userns_apparmor_policy = 1;
-int aa_unprivileged_userns_restricted = IS_ENABLED(CONFIG_SECURITY_APPARMOR_RESTRICT_USERNS);
-int aa_unprivileged_userns_restricted_force;
-int aa_unprivileged_userns_restricted_complain;
 int aa_unprivileged_unconfined_restricted;
-int aa_unprivileged_uring_restricted;
 
 const char *const aa_profile_mode_names[] = {
 	"enforce",
@@ -102,21 +98,13 @@ const char *const aa_profile_mode_names[] = {
 	"user",
 };
 
-void aa_destroy_tags(struct aa_tags_struct *tags)
-{
-	kfree_sensitive(tags->hdrs.table);
-	kfree_sensitive(tags->sets.table);
-	aa_destroy_str_table(&tags->strs);
-	memset(tags, 0, sizeof(*tags));
-}
 
 static void aa_free_pdb(struct aa_policydb *pdb)
 {
 	if (pdb) {
 		aa_put_dfa(pdb->dfa);
 		kvfree(pdb->perms);
-		aa_destroy_str_table(&pdb->trans);
-		aa_destroy_tags(&pdb->tags);
+		aa_free_str_table(&pdb->trans);
 		kfree(pdb);
 	}
 }
@@ -236,9 +224,6 @@ static void aa_free_data(void *ptr, void *arg)
 {
 	struct aa_data *data = ptr;
 
-	if (!ptr)
-		return;
-
 	kvfree_sensitive(data->data, data->size);
 	kfree_sensitive(data->key);
 	kfree_sensitive(data);
@@ -247,9 +232,6 @@ static void aa_free_data(void *ptr, void *arg)
 static void free_attachment(struct aa_attachment *attach)
 {
 	int i;
-
-	if (!attach)
-		return;
 
 	for (i = 0; i < attach->xattr_count; i++)
 		kfree_sensitive(attach->xattrs[i]);
@@ -310,17 +292,8 @@ void aa_free_profile(struct aa_profile *profile)
 	aa_put_ns(profile->ns);
 	kfree_sensitive(profile->rename);
 	kfree_sensitive(profile->disconnected);
-	/*
-	 * If disconnected is specified while disconnected_ipc is not,
-	 * disconnected_ipc will be set to disconnected in unpack_profile().
-	 * Thus, we need to check that the pointers are distinct in order to
-	 * prevent a double free.
-	 */
-	if (profile->disconnected_ipc != profile->disconnected)
-		kfree_sensitive(profile->disconnected_ipc);
 
 	free_attachment(&profile->attach);
-	kfree_sensitive(profile->net_compat);
 
 	/*
 	 * at this point there are no tasks that can have a reference
@@ -341,7 +314,6 @@ void aa_free_profile(struct aa_profile *profile)
 	kfree_sensitive(profile->hash);
 	aa_put_loaddata(profile->rawdata);
 	aa_label_destroy(&profile->label);
-	aa_audit_cache_destroy(&profile->learning_cache);
 
 	kfree_sensitive(profile);
 }
@@ -392,8 +364,6 @@ struct aa_profile *aa_alloc_profile(const char *hname, struct aa_proxy *proxy,
 	profile->label.vec[0] = profile;
 
 	profile->signal = SIGKILL;
-	aa_audit_cache_init(&profile->learning_cache);
-
 	/* refcount released by caller */
 	return profile;
 
@@ -1286,8 +1256,7 @@ ssize_t aa_replace_profiles(struct aa_ns *policy_ns, struct aa_label *label,
 		list_del_init(&ent->list);
 		op = (!ent->old && !ent->rename) ? OP_PROF_LOAD : OP_PROF_REPL;
 
-		if (ent->old && ent->old->learning_cache.size == 0 &&
-		    ent->old->rawdata == ent->new->rawdata &&
+		if (ent->old && ent->old->rawdata == ent->new->rawdata &&
 		    ent->new->rawdata) {
 			/* dedup actual profile replacement */
 			audit_policy(label, op, ns_name, ent->new->base.hname,

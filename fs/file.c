@@ -858,7 +858,6 @@ struct file *file_close_fd(unsigned int fd)
 
 	return file;
 }
-EXPORT_SYMBOL(file_close_fd);
 
 void do_close_on_exec(struct files_struct *files)
 {
@@ -1331,7 +1330,10 @@ int replace_fd(unsigned fd, struct file *file, unsigned flags)
 	err = expand_files(files, fd);
 	if (unlikely(err < 0))
 		goto out_unlock;
-	return do_dup2(files, file, fd, flags);
+	err = do_dup2(files, file, fd, flags);
+	if (err < 0)
+		return err;
+	return 0;
 
 out_unlock:
 	spin_unlock(&files->file_lock);

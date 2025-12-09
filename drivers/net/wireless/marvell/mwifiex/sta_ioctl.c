@@ -180,7 +180,7 @@ int mwifiex_fill_new_bss_desc(struct mwifiex_private *priv,
 	return mwifiex_update_bss_desc_with_ie(priv->adapter, bss_desc);
 }
 
-void mwifiex_dnld_txpwr_table(struct mwifiex_private *priv)
+static void mwifiex_dnld_dt_txpwr_table(struct mwifiex_private *priv)
 {
 	if (priv->adapter->dt_node) {
 		char txpwr[] = {"marvell,00_txpwrlimit"};
@@ -188,6 +188,62 @@ void mwifiex_dnld_txpwr_table(struct mwifiex_private *priv)
 		memcpy(&txpwr[8], priv->adapter->country_code, 2);
 		mwifiex_dnld_dt_cfgdata(priv, priv->adapter->dt_node, txpwr);
 	}
+}
+
+static int mwifiex_request_rgpower_table(struct mwifiex_private *priv)
+{
+	struct mwifiex_802_11d_domain_reg *domain_info = &priv->adapter->domain_reg;
+	struct mwifiex_adapter *adapter = priv->adapter;
+	char rgpower_table_name[30];
+	char country_code[3];
+
+	strscpy(country_code, domain_info->country_code, sizeof(country_code));
+
+	/* World regulatory domain "00" has WW as country code */
+	if (strncmp(country_code, "00", 2) == 0)
+		strscpy(country_code, "WW", sizeof(country_code));
+
+	snprintf(rgpower_table_name, sizeof(rgpower_table_name),
+		 "nxp/rgpower_%s.bin", country_code);
+
+	mwifiex_dbg(adapter, INFO, "info: %s: requesting regulatory power table %s\n",
+		    __func__, rgpower_table_name);
+
+	if (adapter->rgpower_data) {
+		release_firmware(adapter->rgpower_data);
+		adapter->rgpower_data = NULL;
+	}
+
+	if ((request_firmware(&adapter->rgpower_data, rgpower_table_name,
+			      adapter->dev))) {
+		mwifiex_dbg(
+			adapter, INFO,
+			"info: %s: failed to request regulatory power table\n",
+			__func__);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int mwifiex_dnld_rgpower_table(struct mwifiex_private *priv)
+{
+	int ret;
+
+	ret = mwifiex_request_rgpower_table(priv);
+	if (ret)
+		return ret;
+
+	return mwifiex_send_rgpower_table(priv, priv->adapter->rgpower_data->data,
+					  priv->adapter->rgpower_data->size);
+}
+
+void mwifiex_dnld_txpwr_table(struct mwifiex_private *priv)
+{
+	if (mwifiex_dnld_rgpower_table(priv) == 0)
+		return;
+
+	mwifiex_dnld_dt_txpwr_table(priv);
 }
 
 static int mwifiex_process_country_ie(struct mwifiex_private *priv,
@@ -554,24 +610,6 @@ int mwifiex_enable_hs(struct mwifiex_adapter *adapter)
 	return true;
 }
 EXPORT_SYMBOL_GPL(mwifiex_enable_hs);
-
-int mwifiex_set_led(struct mwifiex_adapter *adapter, int on)
-{
-	struct mwifiex_private *priv;
-	struct mwifiex_led_param ledcfg;
-
-	priv = mwifiex_get_priv(adapter, MWIFIEX_BSS_ROLE_STA);
-	if (!priv->is_edge_gateway)
-		return -ENODEV;
-
-	memset(&ledcfg, 0, sizeof(struct mwifiex_led_param));
-	ledcfg.on = cpu_to_le16(on);
-
-	return mwifiex_send_cmd(priv,
-				HostCmd_CMD_802_11_LED_CONTROL,
-				HostCmd_ACT_GEN_SET, 0,
-				&ledcfg, true);
-}
 
 /*
  * IOCTL request handler to get BSS information.

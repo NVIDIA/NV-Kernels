@@ -19,7 +19,6 @@
 
 #include "file.h"
 #include "label.h"
-#include "notify.h"
 
 extern const char *const audit_mode_names[];
 #define AUDIT_MAX_INDEX 5
@@ -39,7 +38,6 @@ enum audit_type {
 	AUDIT_APPARMOR_STATUS,
 	AUDIT_APPARMOR_ERROR,
 	AUDIT_APPARMOR_KILL,
-	AUDIT_APPARMOR_USER,
 	AUDIT_APPARMOR_AUTO
 };
 
@@ -60,7 +58,6 @@ enum audit_type {
 #define OP_CHMOD "chmod"
 #define OP_CHOWN "chown"
 #define OP_GETATTR "getattr"
-#define OP_SETATTR "setattr"
 #define OP_OPEN "open"
 
 #define OP_FRECEIVE "file_receive"
@@ -111,9 +108,7 @@ enum audit_type {
 #define OP_URING_OVERRIDE "uring_override"
 #define OP_URING_SQPOLL "uring_sqpoll"
 
-#define AUDIT_TAILGLOB_NAME 1
 struct apparmor_audit_data {
-	u32 flags;		/* control flags not part of actual data */
 	int error;
 	int type;
 	u16 class;
@@ -124,10 +119,6 @@ struct apparmor_audit_data {
 	const char *info;
 	u32 request;
 	u32 denied;
-	u32 tags;
-
-	struct task_struct *subjtsk;
-
 	union {
 		/* these entries require a custom callback fn */
 		struct {
@@ -154,12 +145,6 @@ struct apparmor_audit_data {
 						int addrlen;
 					} peer;
 				} net;
-				struct {
-					const char *target;
-				} ns;
-				struct {
-					kuid_t ouid;
-				} mq;
 			};
 		};
 		struct {
@@ -182,44 +167,6 @@ struct apparmor_audit_data {
 	struct common_audit_data common;
 };
 
-struct aa_audit_node {
-	struct kref count;
-	struct apparmor_audit_data data;
-	struct list_head list;
-	struct aa_knotif knotif;
-};
-extern struct kmem_cache *aa_audit_slab;
-
-static inline struct aa_audit_node *aa_alloc_audit_node(gfp_t gfp)
-{
-	return kmem_cache_zalloc(aa_audit_slab, gfp);
-}
-
-
-struct aa_audit_cache {
-	spinlock_t lock;
-	int size;
-	struct list_head head;
-};
-
-static inline void aa_audit_cache_init(struct aa_audit_cache *cache)
-{
-	cache->size = 0;
-	spin_lock_init(&cache->lock);
-	INIT_LIST_HEAD(&cache->head);
-}
-
-struct aa_audit_node *aa_audit_cache_find(struct aa_audit_cache *cache,
-					  struct apparmor_audit_data *ad);
-struct aa_audit_node *aa_audit_cache_insert(struct aa_audit_cache *cache,
-					    struct aa_audit_node *node);
-void aa_audit_cache_update_ent(struct aa_audit_cache *cache,
-			       struct aa_audit_node *node,
-			       struct apparmor_audit_data *data);
-void aa_audit_cache_destroy(struct aa_audit_cache *cache);
-
-
-
 /* macros for dealing with  apparmor_audit_data structure */
 #define aad(SA) (container_of(SA, struct apparmor_audit_data, common))
 #define aad_of_va(VA) aad((struct common_audit_data *)(VA))
@@ -229,7 +176,6 @@ void aa_audit_cache_destroy(struct aa_audit_cache *cache);
 	struct apparmor_audit_data NAME = {				\
 		.class = (C),						\
 		.op = (X),                                              \
-		.subjtsk = NULL,                                        \
 		.common.type = (T),					\
 		.common.u.tsk = NULL,					\
 		.common.apparmor_audit_data = &NAME,			\
@@ -260,28 +206,5 @@ void aa_audit_rule_free(void *vrule);
 int aa_audit_rule_init(u32 field, u32 op, char *rulestr, void **vrule, gfp_t gfp);
 int aa_audit_rule_known(struct audit_krule *rule);
 int aa_audit_rule_match(struct lsm_prop *prop, u32 field, u32 op, void *vrule);
-
-
-void aa_audit_node_free_kref(struct kref *kref);
-struct aa_audit_node *aa_dup_audit_data(struct apparmor_audit_data *orig,
-					gfp_t gfp);
-long aa_audit_data_cmp(struct apparmor_audit_data *lhs,
-		       struct apparmor_audit_data *rhs);
-
-
-static inline struct aa_audit_node *aa_get_audit_node(struct aa_audit_node *node)
-{
-	if (node)
-		kref_get(&(node->count));
-
-	return node;
-}
-
-static inline void aa_put_audit_node(struct aa_audit_node *node)
-{
-	if (node)
-		kref_put(&node->count, aa_audit_node_free_kref);
-}
-
 
 #endif /* __AA_AUDIT_H */

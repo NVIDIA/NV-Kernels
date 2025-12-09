@@ -168,7 +168,6 @@ struct lsm_prop {
 
 extern const char *const lockdown_reasons[LOCKDOWN_CONFIDENTIALITY_MAX+1];
 extern u32 lsm_active_cnt;
-extern u32 lsm_prop_cnt;
 extern const struct lsm_id *lsm_idlist[];
 
 /* These functions are in security/commoncap.c */
@@ -392,7 +391,7 @@ int security_dentry_init_security(struct dentry *dentry, int mode,
 				  const char **xattr_name,
 				  struct lsm_context *lsmcxt);
 int security_dentry_create_files_as(struct dentry *dentry, int mode,
-					struct qstr *name,
+					const struct qstr *name,
 					const struct cred *old,
 					struct cred *new);
 int security_path_notify(const struct path *path, u64 mask,
@@ -490,7 +489,7 @@ int security_file_receive(struct file *file);
 int security_file_open(struct file *file);
 int security_file_post_open(struct file *file, int mask);
 int security_file_truncate(struct file *file);
-int security_task_alloc(struct task_struct *task, unsigned long clone_flags);
+int security_task_alloc(struct task_struct *task, u64 clone_flags);
 void security_task_free(struct task_struct *task);
 int security_cred_alloc_blank(struct cred *cred, gfp_t gfp);
 void security_cred_free(struct cred *cred);
@@ -577,7 +576,6 @@ int security_inode_notifysecctx(struct inode *inode, void *ctx, u32 ctxlen);
 int security_inode_setsecctx(struct dentry *dentry, void *ctx, u32 ctxlen);
 int security_inode_getsecctx(struct inode *inode, struct lsm_context *cp);
 int security_locked_down(enum lockdown_reason what);
-int security_lock_kernel_down(const char *where, enum lockdown_reason level);
 int lsm_fill_user_ctx(struct lsm_ctx __user *uctx, u32 *uctx_len,
 		      void *val, size_t val_len, u64 id, u64 flags);
 int security_bdev_alloc(struct block_device *bdev);
@@ -874,7 +872,7 @@ static inline int security_dentry_init_security(struct dentry *dentry,
 }
 
 static inline int security_dentry_create_files_as(struct dentry *dentry,
-						  int mode, struct qstr *name,
+						  int mode, const struct qstr *name,
 						  const struct cred *old,
 						  struct cred *new)
 {
@@ -1218,7 +1216,7 @@ static inline int security_file_truncate(struct file *file)
 }
 
 static inline int security_task_alloc(struct task_struct *task,
-				      unsigned long clone_flags)
+				      u64 clone_flags)
 {
 	return 0;
 }
@@ -1589,10 +1587,6 @@ static inline int security_inode_getsecctx(struct inode *inode,
 	return -EOPNOTSUPP;
 }
 static inline int security_locked_down(enum lockdown_reason what)
-{
-	return 0;
-}
-static inline int security_lock_kernel_down(const char *where, enum lockdown_reason level)
 {
 	return 0;
 }

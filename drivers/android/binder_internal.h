@@ -4,7 +4,6 @@
 #define _LINUX_BINDER_INTERNAL_H
 
 #include <linux/fs.h>
-#include <linux/kconfig.h>
 #include <linux/list.h>
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
@@ -77,7 +76,7 @@ extern const struct file_operations binder_fops;
 
 extern char *binder_devices_param;
 
-#if IS_ENABLED(CONFIG_ANDROID_BINDERFS)
+#ifdef CONFIG_ANDROID_BINDERFS
 extern bool is_binderfs_device(const struct inode *inode);
 extern struct dentry *binderfs_create_file(struct dentry *dir, const char *name,
 					   const struct file_operations *fops,
@@ -96,7 +95,7 @@ static inline struct dentry *binderfs_create_file(struct dentry *dir,
 }
 #endif
 
-#if IS_ENABLED(CONFIG_ANDROID_BINDERFS)
+#ifdef CONFIG_ANDROID_BINDERFS
 extern int __init init_binderfs(void);
 #else
 static inline int __init init_binderfs(void)
@@ -538,8 +537,8 @@ struct binder_transaction {
 	struct binder_proc *to_proc;
 	struct binder_thread *to_thread;
 	struct binder_transaction *to_parent;
-	unsigned need_reply:1;
-	/* unsigned is_dead:1; */       /* not used at the moment */
+	unsigned is_async:1;
+	unsigned is_reply:1;
 
 	struct binder_buffer *buffer;
 	unsigned int    code;

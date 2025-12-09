@@ -3,7 +3,7 @@
  * MediaTek Pinctrl Paris Driver, which implement the vendor per-pin
  * bindings for MediaTek SoC.
  *
- * Copyright (C) 2018-2025 MediaTek Inc.
+ * Copyright (C) 2018 MediaTek Inc.
  * Author: Sean Wang <sean.wang@mediatek.com>
  *	   Zhiyong Tao <zhiyong.tao@mediatek.com>
  *	   Hongzhou.Yang <hongzhou.yang@mediatek.com>
@@ -169,7 +169,7 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
 		if (!ret)
 			err = -EINVAL;
 		break;
-	case PIN_CONFIG_OUTPUT:
+	case PIN_CONFIG_LEVEL:
 		err = mtk_hw_get_value(hw, desc, PINCTRL_PIN_REG_DIR, &ret);
 		if (err)
 			break;
@@ -292,7 +292,7 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		/* regard all non-zero value as enable */
 		err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SR, !!arg);
 		break;
-	case PIN_CONFIG_OUTPUT:
+	case PIN_CONFIG_LEVEL:
 		err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_DO,
 				       arg);
 		if (err)
@@ -936,15 +936,6 @@ static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
 	return mtk_eint_set_debounce(hw->eint, desc->eint.eint_n, debounce);
 }
 
-static void mtk_pinctrl_gpio_range_init(struct mtk_pinctrl *hw, struct gpio_chip *chip)
-{
-	hw->range.name = "mtk_pinctrl_gpio_range";
-	hw->range.id = 0;
-	hw->range.pin_base = 0;
-	hw->range.base = chip->base;
-	hw->range.npins = hw->soc->npins;
-}
-
 static int mtk_build_gpiochip(struct mtk_pinctrl *hw)
 {
 	struct gpio_chip *chip = &hw->chip;
@@ -967,8 +958,6 @@ static int mtk_build_gpiochip(struct mtk_pinctrl *hw)
 	ret = gpiochip_add_data(chip, hw);
 	if (ret < 0)
 		return ret;
-
-	mtk_pinctrl_gpio_range_init(hw, chip);
 
 	return 0;
 }
@@ -1008,7 +997,6 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct pinctrl_pin_desc *pins;
 	struct mtk_pinctrl *hw;
-	struct fwnode_handle *fwnode = dev_fwnode(&pdev->dev);
 	int err, i;
 
 	hw = devm_kzalloc(&pdev->dev, sizeof(*hw), GFP_KERNEL);
@@ -1033,20 +1021,16 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	for (i = 0; i < hw->soc->nbase_names; i++) {
-		hw->base[i] = is_of_node(fwnode)
-			? devm_platform_ioremap_resource_byname(pdev, hw->soc->base_names[i])
-			: devm_platform_get_and_ioremap_resource(pdev, i, NULL);
+		hw->base[i] = devm_platform_ioremap_resource_byname(pdev,
+					hw->soc->base_names[i]);
 		if (IS_ERR(hw->base[i]))
 			return PTR_ERR(hw->base[i]);
 	}
 
 	hw->nbase = hw->soc->nbase_names;
 
-	if (is_of_node(fwnode))
-		hw->rsel_si_unit = of_property_read_bool(hw->dev->of_node,
+	hw->rsel_si_unit = of_property_read_bool(hw->dev->of_node,
 						 "mediatek,rsel-resistance-in-si-unit");
-	else
-		hw->rsel_si_unit = false;
 
 	spin_lock_init(&hw->lock);
 
@@ -1092,8 +1076,6 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 	err = mtk_build_gpiochip(hw);
 	if (err)
 		return dev_err_probe(dev, err, "Failed to add gpio_chip\n");
-
-	pinctrl_add_gpio_range(hw->pctrl, &hw->range);
 
 	platform_set_drvdata(pdev, hw);
 

@@ -1642,6 +1642,17 @@ static const struct qmp_phy_init_tbl x1e80100_usb43dp_pcs_usb_tbl[] = {
 	QMP_PHY_INIT_CFG(QPHY_V6_PCS_USB3_RXEQTRAINING_DFE_TIME_S2, 0x07),
 };
 
+/* list of regulators */
+struct qmp_regulator_data {
+	const char *name;
+	unsigned int enable_load;
+};
+
+static struct qmp_regulator_data qmp_phy_vreg_l[] = {
+	{ .name = "vdda-phy", .enable_load = 21800 },
+	{ .name = "vdda-pll", .enable_load = 36000 },
+};
+
 static const u8 qmp_dp_v3_pre_emphasis_hbr3_hbr2[4][4] = {
 	{ 0x00, 0x0c, 0x15, 0x1a },
 	{ 0x02, 0x0e, 0x16, 0xff },
@@ -1797,7 +1808,7 @@ struct qmp_phy_cfg {
 	const char * const *reset_list;
 	int num_resets;
 	/* regulators to be requested */
-	const char * const *vreg_list;
+	const struct qmp_regulator_data *vreg_list;
 	int num_vregs;
 
 	/* array of registers with different offsets */
@@ -1908,11 +1919,6 @@ static const char * const msm8996_usb3phy_reset_l[] = {
 
 static const char * const sc7180_usb3phy_reset_l[] = {
 	"phy",
-};
-
-/* list of regulators */
-static const char * const qmp_phy_vreg_l[] = {
-	"vdda-phy", "vdda-pll",
 };
 
 static const struct qmp_combo_offsets qmp_combo_offsets_v3 = {
@@ -3438,16 +3444,32 @@ static int qmp_combo_vreg_init(struct qmp_combo *qmp)
 	const struct qmp_phy_cfg *cfg = qmp->cfg;
 	struct device *dev = qmp->dev;
 	int num = cfg->num_vregs;
-	int i;
+	int ret, i;
 
 	qmp->vregs = devm_kcalloc(dev, num, sizeof(*qmp->vregs), GFP_KERNEL);
 	if (!qmp->vregs)
 		return -ENOMEM;
 
 	for (i = 0; i < num; i++)
-		qmp->vregs[i].supply = cfg->vreg_list[i];
+		qmp->vregs[i].supply = cfg->vreg_list[i].name;
 
-	return devm_regulator_bulk_get(dev, num, qmp->vregs);
+	ret = devm_regulator_bulk_get(dev, num, qmp->vregs);
+	if (ret) {
+		dev_err(dev, "failed at devm_regulator_bulk_get\n");
+		return ret;
+	}
+
+	for (i = 0; i < num; i++) {
+		ret = regulator_set_load(qmp->vregs[i].consumer,
+					cfg->vreg_list[i].enable_load);
+		if (ret) {
+			dev_err(dev, "failed to set load at %s\n",
+				qmp->vregs[i].supply);
+			return ret;
+		}
+	}
+
+	return 0;
 }
 
 static int qmp_combo_reset_init(struct qmp_combo *qmp)
@@ -4095,19 +4117,13 @@ static struct phy *qmp_combo_phy_xlate(struct device *dev, const struct of_phand
 	return ERR_PTR(-EINVAL);
 }
 
-static const char * const qmpphy_mode_str[] = {
-	[QMPPHY_MODE_USB3DP] = "usb3+dp",
-	[QMPPHY_MODE_DP_ONLY] = "dp",
-	[QMPPHY_MODE_USB3_ONLY] = "usb3",
-};
-
 static int qmp_combo_probe(struct platform_device *pdev)
 {
 	struct qmp_combo *qmp;
 	struct device *dev = &pdev->dev;
 	struct device_node *dp_np, *usb_np;
 	struct phy_provider *phy_provider;
-	int ret, i;
+	int ret;
 
 	qmp = devm_kzalloc(dev, sizeof(*qmp), GFP_KERNEL);
 	if (!qmp)
@@ -4178,18 +4194,6 @@ static int qmp_combo_probe(struct platform_device *pdev)
 	 * check both sub-blocks' init tables for blunders at probe time.
 	 */
 	qmp->qmpphy_mode = QMPPHY_MODE_USB3DP;
-
-	/* Replace with DT provided mode */
-	if (of_find_property(dev->of_node, "qcom,combo-initial-mode", NULL)) {
-		for (i = 0; i < ARRAY_SIZE(qmpphy_mode_str); ++i) {
-			ret = of_property_match_string(dev->of_node, "qcom,combo-initial-mode",
-						       qmpphy_mode_str[i]);
-			if (!ret) {
-				qmp->qmpphy_mode = i;
-				break;
-			}
-		}
-	}
 
 	qmp->usb_phy = devm_phy_create(dev, usb_np, &qmp_combo_usb_phy_ops);
 	if (IS_ERR(qmp->usb_phy)) {

@@ -4102,7 +4102,7 @@ static int smk_skb_to_addr_ipv6(struct sk_buff *skb, struct sockaddr_in6 *sip)
 #ifdef CONFIG_NETWORK_SECMARK
 static struct smack_known *smack_from_skb(struct sk_buff *skb)
 {
-	if (!smack_secmark() || skb == NULL || skb->secmark == 0)
+	if (skb == NULL || skb->secmark == 0)
 		return NULL;
 
 	return smack_from_secid(skb->secmark);
@@ -4908,7 +4908,7 @@ static int smack_inode_copy_up_xattr(struct dentry *src, const char *name)
 }
 
 static int smack_dentry_create_files_as(struct dentry *dentry, int mode,
-					struct qstr *name,
+					const struct qstr *name,
 					const struct cred *old,
 					struct cred *new)
 {
@@ -5030,13 +5030,11 @@ struct lsm_blob_sizes smack_blob_sizes __ro_after_init = {
 	.lbs_sock = sizeof(struct socket_smack),
 	.lbs_superblock = sizeof(struct superblock_smack),
 	.lbs_xattr_count = SMACK_INODE_INIT_XATTRS,
-	.lbs_secmark = true,
 };
 
 static const struct lsm_id smack_lsmid = {
 	.name = "smack",
 	.id = LSM_ID_SMACK,
-	.lsmprop = true,
 };
 
 static struct security_hook_list smack_hooks[] __ro_after_init = {
@@ -5268,6 +5266,11 @@ static __init int smack_init(void)
 
 	/* initialize the smack_known_list */
 	init_smack_known_list();
+
+	/* Inform the audit system that secctx is used */
+	audit_cfg_lsm(&smack_lsmid,
+		      AUDIT_CFG_LSM_SECCTX_SUBJECT |
+		      AUDIT_CFG_LSM_SECCTX_OBJECT);
 
 	return 0;
 }

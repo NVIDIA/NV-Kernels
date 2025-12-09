@@ -83,6 +83,7 @@
  * Arrow Lake-H (SOC)		0x7722	32	hard	yes	yes	yes
  * Panther Lake-H (SOC)		0xe322	32	hard	yes	yes	yes
  * Panther Lake-P (SOC)		0xe422	32	hard	yes	yes	yes
+ * Wildcat Lake-U (SOC)		0x4d22	32	hard	yes	yes	yes
  *
  * Features supported by this driver:
  * Software PEC				no
@@ -236,6 +237,7 @@
 #define PCI_DEVICE_ID_INTEL_5_3400_SERIES_SMBUS		0x3b30
 #define PCI_DEVICE_ID_INTEL_TIGERLAKE_H_SMBUS		0x43a3
 #define PCI_DEVICE_ID_INTEL_ELKHART_LAKE_SMBUS		0x4b23
+#define PCI_DEVICE_ID_INTEL_WILDCAT_LAKE_U_SMBUS	0x4d22
 #define PCI_DEVICE_ID_INTEL_JASPER_LAKE_SMBUS		0x4da3
 #define PCI_DEVICE_ID_INTEL_ALDER_LAKE_P_SMBUS		0x51a3
 #define PCI_DEVICE_ID_INTEL_ALDER_LAKE_M_SMBUS		0x54a3
@@ -928,7 +930,6 @@ out:
 	 */
 	iowrite8(SMBHSTSTS_INUSE_STS | STATUS_FLAGS, SMBHSTSTS(priv));
 
-	pm_runtime_mark_last_busy(&priv->pci_dev->dev);
 	pm_runtime_put_autosuspend(&priv->pci_dev->dev);
 	return ret;
 }
@@ -976,14 +977,6 @@ static void i801_disable_host_notify(struct i801_priv *priv)
 		return;
 
 	iowrite8(priv->original_slvcmd, SMBSLVCMD(priv));
-}
-
-static inline __maybe_unused void __i801_register_spd(struct i801_priv *priv)
-{
-	if (priv->original_hstcfg & SMBHSTCFG_SPD_WD)
-		i2c_register_spd_write_disable(&priv->adapter);
-	else
-		i2c_register_spd_write_enable(&priv->adapter);
 }
 
 static const struct i2c_algorithm smbus_algorithm = {
@@ -1064,6 +1057,7 @@ static const struct pci_device_id i801_ids[] = {
 	{ PCI_DEVICE_DATA(INTEL, ARROW_LAKE_H_SMBUS,		FEATURES_ICH5 | FEATURE_TCO_CNL) },
 	{ PCI_DEVICE_DATA(INTEL, PANTHER_LAKE_H_SMBUS,		FEATURES_ICH5 | FEATURE_TCO_CNL) },
 	{ PCI_DEVICE_DATA(INTEL, PANTHER_LAKE_P_SMBUS,		FEATURES_ICH5 | FEATURE_TCO_CNL) },
+	{ PCI_DEVICE_DATA(INTEL, WILDCAT_LAKE_U_SMBUS,		FEATURES_ICH5 | FEATURE_TCO_CNL) },
 	{ 0, }
 };
 
@@ -1165,19 +1159,6 @@ static void dmi_check_onboard_devices(const struct dmi_header *dm, void *adap)
 	}
 }
 
-#ifdef CONFIG_I2C_I801_MUX
-static void i801_register_spd(struct i801_priv *priv)
-{
-	if (!priv->mux_pdev)
-		__i801_register_spd(priv);
-}
-#else
-static void i801_register_spd(struct i801_priv *priv)
-{
-	__i801_register_spd(priv);
-}
-#endif
-
 /* Register optional targets */
 static void i801_probe_optional_targets(struct i801_priv *priv)
 {
@@ -1198,7 +1179,10 @@ static void i801_probe_optional_targets(struct i801_priv *priv)
 		dmi_walk(dmi_check_onboard_devices, &priv->adapter);
 
 	/* Instantiate SPD EEPROMs unless the SMBus is multiplexed */
-	i801_register_spd(priv);
+#ifdef CONFIG_I2C_I801_MUX
+	if (!priv->mux_pdev)
+#endif
+		i2c_register_spd_write_enable(&priv->adapter);
 }
 #else
 static void __init input_apanel_init(void) {}
@@ -1301,7 +1285,7 @@ static int i801_notifier_call(struct notifier_block *nb, unsigned long action,
 		return NOTIFY_DONE;
 
 	/* Call i2c_register_spd for muxed child segments */
-	__i801_register_spd(priv);
+	i2c_register_spd_write_enable(to_i2c_adapter(dev));
 
 	return NOTIFY_OK;
 }

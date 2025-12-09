@@ -9,7 +9,6 @@
  */
 
 #include "include/af_unix.h"
-#include "include/af_inet.h"
 #include "include/apparmor.h"
 #include "include/audit.h"
 #include "include/cred.h"
@@ -23,16 +22,10 @@
 
 struct aa_sfs_entry aa_sfs_entry_network[] = {
 	AA_SFS_FILE_STRING("af_mask",	AA_SFS_AF_MASK),
-	AA_SFS_FILE_BOOLEAN("af_inet",	1),
 	{ }
 };
 
 struct aa_sfs_entry aa_sfs_entry_networkv9[] = {
-	AA_SFS_FILE_STRING("af_mask",	AA_SFS_AF_MASK),
-	AA_SFS_FILE_BOOLEAN("af_unix",	1),
-	{ }
-};
-struct aa_sfs_entry aa_sfs_entry_network_compat[] = {
 	AA_SFS_FILE_STRING("af_mask",	AA_SFS_AF_MASK),
 	AA_SFS_FILE_BOOLEAN("af_unix",	1),
 	{ }
@@ -138,12 +131,12 @@ void audit_net_cb(struct audit_buffer *ab, void *va)
 	audit_log_format(ab, " protocol=%d", ad->net.protocol);
 
 	if (ad->request & NET_PERMS_MASK) {
-		audit_log_format(ab, " requested=");
+		audit_log_format(ab, " requested_mask=");
 		aa_audit_perm_mask(ab, ad->request, NULL, 0,
 				   net_mask_names, NET_PERMS_MASK);
 
 		if (ad->denied & NET_PERMS_MASK) {
-			audit_log_format(ab, " denied=");
+			audit_log_format(ab, " denied_mask=");
 			aa_audit_perm_mask(ab, ad->denied, NULL, 0,
 					   net_mask_names, NET_PERMS_MASK);
 		}
@@ -268,32 +261,12 @@ int aa_profile_af_perm(struct aa_profile *profile,
 
 	if (profile_unconfined(profile))
 		return 0;
-
 	state = RULE_MEDIATES_NET(rules);
-	if (state) {
-		state = aa_match_to_prot(rules->policy, state, request, family,
-					 type, protocol, &p, &ad->info);
-		return aa_do_perms(profile, rules->policy, state, request, p,
-				   ad);
-	} else if (profile->net_compat) {
-		/* 2.x socket mediation compat */
-		struct aa_perms perms = { };
-
-		perms.allow = (profile->net_compat->allow[family] &
-			       (1 << type)) ?
-			ALL_PERMS_MASK : 0;
-		perms.audit = (profile->net_compat->audit[family] &
-			       (1 << type)) ?
-			ALL_PERMS_MASK : 0;
-		perms.quiet = (profile->net_compat->quiet[family] &
-			       (1 << type)) ?
-			ALL_PERMS_MASK : 0;
-
-		return aa_do_perms(profile, rules->policy, state, request,
-				   &perms, ad);
-	} /* else */
-
-	return 0;
+	if (!state)
+		return 0;
+	state = aa_match_to_prot(rules->policy, state, request, family, type,
+				 protocol, &p, &ad->info);
+	return aa_do_perms(profile, rules->policy, state, request, p, ad);
 }
 
 int aa_af_perm(const struct cred *subj_cred, struct aa_label *label,

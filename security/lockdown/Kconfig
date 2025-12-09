@@ -16,19 +16,6 @@ config SECURITY_LOCKDOWN_LSM_EARLY
 	  subsystem is fully initialised. If enabled, lockdown will
 	  unconditionally be called before any other LSMs.
 
-config LOCK_DOWN_IN_SECURE_BOOT
-	bool "Lock down the kernel in Secure Boot mode"
-	default n
-	depends on (EFI || S390 || PPC) && SECURITY_LOCKDOWN_LSM_EARLY
-	help
-	  Secure Boot provides a mechanism for ensuring that the firmware will
-	  only load signed bootloaders and kernels.  Secure boot mode
-	  determination is platform-specific; examples include EFI secure boot
-	  and SIPL on s390.
-
-	  Enabling this option results in kernel lockdown being triggered if
-	  booted under secure boot.
-
 choice
 	prompt "Kernel default lockdown mode"
 	default LOCK_DOWN_KERNEL_FORCE_NONE

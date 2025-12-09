@@ -55,7 +55,6 @@ enum ovl_opt {
 	Opt_uuid,
 	Opt_nfs_export,
 	Opt_userxattr,
-	Opt_nouserxattr,
 	Opt_xino,
 	Opt_metacopy,
 	Opt_verity,
@@ -153,7 +152,6 @@ const struct fs_parameter_spec ovl_parameter_spec[] = {
 	fsparam_enum("uuid",                Opt_uuid, ovl_parameter_uuid),
 	fsparam_enum("nfs_export",          Opt_nfs_export, ovl_parameter_bool),
 	fsparam_flag("userxattr",           Opt_userxattr),
-	fsparam_flag("nouserxattr",         Opt_nouserxattr),
 	fsparam_enum("xino",                Opt_xino, ovl_parameter_xino),
 	fsparam_enum("metacopy",            Opt_metacopy, ovl_parameter_bool),
 	fsparam_enum("verity",              Opt_verity, ovl_parameter_verity),
@@ -278,17 +276,26 @@ static int ovl_mount_dir(const char *name, struct path *path)
 static int ovl_mount_dir_check(struct fs_context *fc, const struct path *path,
 			       enum ovl_opt layer, const char *name, bool upper)
 {
+	bool is_casefolded = ovl_dentry_casefolded(path->dentry);
 	struct ovl_fs_context *ctx = fc->fs_private;
+	struct ovl_fs *ofs = fc->s_fs_info;
 
 	if (!d_is_dir(path->dentry))
 		return invalfc(fc, "%s is not a directory", name);
 
 	/*
 	 * Allow filesystems that are case-folding capable but deny composing
-	 * ovl stack from case-folded directories.
+	 * ovl stack from inconsistent case-folded directories.
 	 */
-	if (ovl_dentry_casefolded(path->dentry))
-		return invalfc(fc, "case-insensitive directory on %s not supported", name);
+	if (!ctx->casefold_set) {
+		ofs->casefold = is_casefolded;
+		ctx->casefold_set = true;
+	}
+
+	if (ofs->casefold != is_casefolded) {
+		return invalfc(fc, "case-%ssensitive directory on %s is inconsistent",
+			       is_casefolded ? "in" : "", name);
+	}
 
 	if (ovl_dentry_weird(path->dentry))
 		return invalfc(fc, "filesystem on %s not supported", name);
@@ -687,9 +694,6 @@ static int ovl_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		put_cred(cred);
 		break;
 	}
-	case Opt_nouserxattr:
-		config->userxattr = false;
-		break;
 	default:
 		pr_err("unrecognized mount option \"%s\" or missing value\n",
 		       param->key);
@@ -796,8 +800,6 @@ int ovl_init_fs_context(struct fs_context *fc)
 	ofs->config.nfs_export		= ovl_nfs_export_def;
 	ofs->config.xino		= ovl_xino_def();
 	ofs->config.metacopy		= ovl_metacopy_def;
-	if (fc->user_ns != &init_user_ns)
-		ofs->config.userxattr = true;
 
 	fc->s_fs_info		= ofs;
 	fc->fs_private		= ctx;
@@ -1072,8 +1074,6 @@ int ovl_show_options(struct seq_file *m, struct dentry *dentry)
 		seq_puts(m, ",volatile");
 	if (ofs->config.userxattr)
 		seq_puts(m, ",userxattr");
-	else
-		seq_puts(m, ",nouserxattr");
 	if (ofs->config.verity_mode != ovl_verity_mode_def())
 		seq_printf(m, ",verity=%s",
 			   ovl_verity_mode(&ofs->config));

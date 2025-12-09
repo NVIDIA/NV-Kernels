@@ -91,7 +91,7 @@ enum label_flags {
 	FLAG_PROFILE = 0x200,		/* label is a profile */
 	FLAG_EXPLICIT = 0x400,		/* explicit static label */
 	FLAG_STALE = 0x800,		/* replaced/removed */
-	FLAG_INTERRUPTIBLE = 0x1000,
+	FLAG_RENAMED = 0x1000,		/* label has renaming in it */
 	FLAG_REVOKED = 0x2000,		/* label has revocation in it */
 	FLAG_DEBUG1 = 0x4000,
 	FLAG_DEBUG2 = 0x8000,
@@ -258,7 +258,6 @@ static inline bool label_mediates_safe(struct aa_label *L, unsigned char C)
 	return label_mediates(L, C);
 }
 
-int aa_label_cmp(struct aa_label *a, struct aa_label *b);
 void aa_labelset_destroy(struct aa_labelset *ls);
 void aa_labelset_init(struct aa_labelset *ls);
 void __aa_labelset_update_subtree(struct aa_ns *ns);

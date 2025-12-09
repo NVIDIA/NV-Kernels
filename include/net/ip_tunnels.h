@@ -11,7 +11,9 @@
 #include <linux/bitops.h>
 
 #include <net/dsfield.h>
+#include <net/flow.h>
 #include <net/gro_cells.h>
+#include <net/inet_dscp.h>
 #include <net/inet_ecn.h>
 #include <net/netns/generic.h>
 #include <net/rtnetlink.h>
@@ -128,28 +130,6 @@ struct ip_tunnel_prl_entry {
 };
 
 struct metadata_dst;
-/* A fan overlay /8 (250.0.0.0/8, for example) maps to exactly one /16
- * underlay (10.88.0.0/16, for example).  Multiple local addresses within
- * the /16 may be used, but a particular overlay may not span
- * multiple underlay subnets.
- *
- * We store one underlay, indexed by the overlay's high order octet.
- */
-#define FAN_OVERLAY_CNT		256
-
-struct ip_fan_map {
-	__be32			underlay;
-	__be32			overlay;
-	u16			underlay_prefix;
-	u16			overlay_prefix;
-	u32			overlay_mask;
-	struct list_head	list;
-	struct rcu_head		rcu;
-};
-
-struct ip_tunnel_fan {
-	struct list_head	fan_maps;
-};
 
 /* Kernel-side variant of ip_tunnel_parm */
 struct ip_tunnel_parm_kern {
@@ -201,18 +181,12 @@ struct ip_tunnel {
 #endif
 	struct ip_tunnel_prl_entry __rcu *prl;	/* potential router list */
 	unsigned int		prl_count;	/* # of entries in PRL */
-	struct ip_tunnel_fan	fan;
 	unsigned int		ip_tnl_net_id;
 	struct gro_cells	gro_cells;
 	__u32			fwmark;
 	bool			collect_md;
 	bool			ignore_df;
 };
-
-static inline int fan_has_map(const struct ip_tunnel_fan *fan)
-{
-	return !list_empty(&fan->fan_maps);
-}
 
 struct tnl_ptk_info {
 	IP_TUNNEL_DECLARE_FLAGS(flags);
@@ -390,7 +364,7 @@ static inline void ip_tunnel_init_flow(struct flowi4 *fl4,
 
 	fl4->daddr = daddr;
 	fl4->saddr = saddr;
-	fl4->flowi4_tos = tos;
+	fl4->flowi4_dscp = inet_dsfield_to_dscp(tos);
 	fl4->flowi4_proto = proto;
 	fl4->fl4_gre_key = key;
 	fl4->flowi4_mark = mark;
@@ -636,6 +610,21 @@ struct metadata_dst *iptunnel_metadata_reply(struct metadata_dst *md,
 					     gfp_t flags);
 int skb_tunnel_check_pmtu(struct sk_buff *skb, struct dst_entry *encap_dst,
 			  int headroom, bool reply);
+
+static inline void ip_tunnel_adj_headroom(struct net_device *dev,
+					  unsigned int headroom)
+{
+	/* we must cap headroom to some upperlimit, else pskb_expand_head
+	 * will overflow header offsets in skb_headers_offset_update().
+	 */
+	const unsigned int max_allowed = 512;
+
+	if (headroom > max_allowed)
+		headroom = max_allowed;
+
+	if (headroom > READ_ONCE(dev->needed_headroom))
+		WRITE_ONCE(dev->needed_headroom, headroom);
+}
 
 int iptunnel_handle_offloads(struct sk_buff *skb, int gso_type_mask);
 

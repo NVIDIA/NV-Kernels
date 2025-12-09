@@ -1692,13 +1692,7 @@ static int gic_irq_domain_translate(struct irq_domain *d,
 		if(fwspec->param_count != 2)
 			return -EINVAL;
 
-		/*
-		 * Below check was added on assumption that MAX_IPI
-		 * value will not be greater than 8.
-		 */
-		BUILD_BUG_ON(MAX_IPI > 8);
-
-		if (fwspec->param[0] < MAX_IPI) {
+		if (fwspec->param[0] < 16) {
 			pr_err(FW_BUG "Illegal GSI%d translation request\n",
 			       fwspec->param[0]);
 			return -EINVAL;
@@ -1772,8 +1766,9 @@ static int gic_irq_domain_select(struct irq_domain *d,
 				 struct irq_fwspec *fwspec,
 				 enum irq_domain_bus_token bus_token)
 {
-	unsigned int type, ret, ppi_idx;
+	unsigned int type, ppi_idx;
 	irq_hw_number_t hwirq;
+	int ret;
 
 	/* Not for us */
 	if (fwspec->fwnode != d->fwnode)

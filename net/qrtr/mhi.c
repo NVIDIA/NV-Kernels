@@ -15,7 +15,6 @@ struct qrtr_mhi_dev {
 	struct qrtr_endpoint ep;
 	struct mhi_device *mhi_dev;
 	struct device *dev;
-	struct completion prepared;
 };
 
 /* From MHI to QRTR */
@@ -54,10 +53,6 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	if (skb->sk)
 		sock_hold(skb->sk);
 
-	rc = wait_for_completion_interruptible(&qdev->prepared);
-	if (rc)
-		goto free_skb;
-
 	rc = skb_linearize(skb);
 	if (rc)
 		goto free_skb;
@@ -90,7 +85,6 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	qdev->mhi_dev = mhi_dev;
 	qdev->dev = &mhi_dev->dev;
 	qdev->ep.xmit = qcom_mhi_qrtr_send;
-	init_completion(&qdev->prepared);
 
 	dev_set_drvdata(&mhi_dev->dev, qdev);
 	rc = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NID_AUTO);
@@ -103,7 +97,6 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 		qrtr_endpoint_unregister(&qdev->ep);
 		return rc;
 	}
-	complete_all(&qdev->prepared);
 
 	dev_dbg(qdev->dev, "Qualcomm MHI QRTR driver probed\n");
 

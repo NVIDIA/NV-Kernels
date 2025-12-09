@@ -52,11 +52,6 @@ struct aa_sk_ctx {
 	struct aa_label __rcu *peer_lastupdate;	/* ptr cmp only, no deref */
 };
 
-static inline bool aa_secmark(void)
-{
-	return apparmor_blob_sizes.lbs_secmark;
-}
-
 static inline struct aa_sk_ctx *aa_sock(const struct sock *sk)
 {
 	return sk->sk_security + apparmor_blob_sizes.lbs_sock;
@@ -80,18 +75,6 @@ static inline struct aa_sk_ctx *aa_sock(const struct sock *sk)
 			 (SK)->sk_protocol)
 
 
-
-/* struct aa_net - network confinement data
- * @allow: basic network families permissions
- * @audit: which network permissions to force audit
- * @quiet: which network permissions to quiet rejects
- */
-struct aa_net_compat {
-	u16 allow[AF_MAX];
-	u16 audit[AF_MAX];
-	u16 quiet[AF_MAX];
-};
-
 struct aa_secmark {
 	u8 audit;
 	u8 deny;
@@ -100,7 +83,6 @@ struct aa_secmark {
 };
 
 extern struct aa_sfs_entry aa_sfs_entry_network[];
-extern struct aa_sfs_entry aa_sfs_entry_network_compat[];
 extern struct aa_sfs_entry aa_sfs_entry_networkv9[];
 
 int aa_do_perms(struct aa_profile *profile, struct aa_policydb *policy,

@@ -2497,8 +2497,3 @@ int ipl_report_free(struct ipl_report *report)
 }
 
 #endif
-
-bool ipl_get_secureboot(void)
-{
-	return !!ipl_secure_flag;
-}

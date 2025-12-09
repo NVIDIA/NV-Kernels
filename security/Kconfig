@@ -72,15 +72,6 @@ config MSEAL_SYSTEM_MAPPINGS
 	  For complete descriptions of memory sealing, please see
 	  Documentation/userspace-api/mseal.rst
 
-config SECURITY_PERF_EVENTS_RESTRICT
-	bool "Restrict unprivileged use of performance events"
-	depends on PERF_EVENTS
-	help
-	  If you say Y here, the kernel.perf_event_paranoid sysctl
-	  will be set to 3 by default, and no unprivileged use of the
-	  perf_event_open syscall will be permitted unless it is
-	  changed.
-
 config SECURITY
 	bool "Enable different security models"
 	depends on SYSFS
@@ -278,6 +269,7 @@ endchoice
 
 config LSM
 	string "Ordered list of enabled LSMs"
+	depends on SECURITY
 	default "landlock,lockdown,yama,loadpin,safesetid,smack,selinux,tomoyo,apparmor,ipe,bpf" if DEFAULT_SECURITY_SMACK
 	default "landlock,lockdown,yama,loadpin,safesetid,apparmor,selinux,smack,tomoyo,ipe,bpf" if DEFAULT_SECURITY_APPARMOR
 	default "landlock,lockdown,yama,loadpin,safesetid,tomoyo,ipe,bpf" if DEFAULT_SECURITY_TOMOYO

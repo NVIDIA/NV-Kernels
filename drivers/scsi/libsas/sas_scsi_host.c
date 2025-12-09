@@ -431,9 +431,6 @@ int sas_eh_abort_handler(struct scsi_cmnd *cmd)
 	struct sas_internal *i = to_sas_internal(host->transportt);
 	unsigned long flags;
 
-	if (current != host->ehandler)
-		return FAILED;
-
 	if (!i->dft->lldd_abort_task)
 		return FAILED;
 
@@ -848,7 +845,7 @@ int sas_change_queue_depth(struct scsi_device *sdev, int depth)
 EXPORT_SYMBOL_GPL(sas_change_queue_depth);
 
 int sas_bios_param(struct scsi_device *scsi_dev,
-			  struct block_device *bdev,
+			  struct gendisk *unused,
 			  sector_t capacity, int *hsc)
 {
 	hsc[0] = 255;

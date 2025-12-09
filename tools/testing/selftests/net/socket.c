@@ -6,7 +6,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <limits.h>
 
 #include "../kselftest.h"
 
@@ -27,10 +26,7 @@ struct socket_testcase {
 };
 
 static struct socket_testcase tests[] = {
-	/* libc might have a smaller value of AF_MAX than the kernel
-	 * actually supports, so use INT_MAX instead.
-	 */
-	{ INT_MAX, 0,           0,           -EAFNOSUPPORT,    0  },
+	{ AF_MAX,  0,           0,           -EAFNOSUPPORT,    0 },
 	{ AF_INET, SOCK_STREAM, IPPROTO_TCP, 0,                1  },
 	{ AF_INET, SOCK_DGRAM,  IPPROTO_TCP, -EPROTONOSUPPORT, 1  },
 	{ AF_INET, SOCK_DGRAM,  IPPROTO_UDP, 0,                1  },
@@ -43,6 +39,7 @@ static int run_tests(void)
 {
 	char err_string1[ERR_STRING_SZ];
 	char err_string2[ERR_STRING_SZ];
+	const char *msg1, *msg2;
 	int i, err;
 
 	err = 0;
@@ -60,13 +57,13 @@ static int run_tests(void)
 			    errno == -s->expect)
 				continue;
 
-			strerror_r(-s->expect, err_string1, ERR_STRING_SZ);
-			strerror_r(errno, err_string2, ERR_STRING_SZ);
+			msg1 = strerror_r(-s->expect, err_string1, ERR_STRING_SZ);
+			msg2 = strerror_r(errno, err_string2, ERR_STRING_SZ);
 
 			fprintf(stderr, "socket(%d, %d, %d) expected "
 				"err (%s) got (%s)\n",
 				s->domain, s->type, s->protocol,
-				err_string1, err_string2);
+				msg1, msg2);
 
 			err = -1;
 			break;
@@ -74,12 +71,12 @@ static int run_tests(void)
 			close(fd);
 
 			if (s->expect < 0) {
-				strerror_r(errno, err_string1, ERR_STRING_SZ);
+				msg1 = strerror_r(errno, err_string1, ERR_STRING_SZ);
 
 				fprintf(stderr, "socket(%d, %d, %d) expected "
 					"success got err (%s)\n",
 					s->domain, s->type, s->protocol,
-					err_string1);
+					msg1);
 
 				err = -1;
 				break;

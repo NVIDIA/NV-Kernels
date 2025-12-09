@@ -72,18 +72,6 @@ config LEDS_88PM860X
 	  This option enables support for on-chip LED drivers found on Marvell
 	  Semiconductor 88PM8606 PMIC.
 
-config LEDS_AAEON
-	tristate "AAEON LED driver"
-	depends on X86
-	depends on UBUNTU_ODM_DRIVERS
-	select MFD_AAEON
-	help
-	  This led driver adds support for LED brightness control on Single
-	  Board Computers produced by AAEON.
-
-	  This driver leverages the ASUS WMI interface to access device
-	  resources.
-
 config LEDS_AN30259A
 	tristate "LED support for Panasonic AN30259A"
 	depends on LEDS_CLASS && I2C && OF
@@ -456,6 +444,7 @@ config LEDS_LP55XX_COMMON
 	depends on OF
 	depends on I2C
 	select FW_LOADER
+	select FW_LOADER_USER_HELPER
 	help
 	  This option supports common operations for LP5521/5523/55231/5562/5569/
 	  8501 devices.
@@ -685,7 +674,7 @@ config LEDS_BD2606MVV
 	help
 	  This option enables support for BD2606MVV LED driver chips
 	  accessed via the I2C bus. It supports setting brightness, with
-	  the limitiation that there are groups of two channels sharing
+	  the limitation that there are groups of two channels sharing
 	  a brightness setting, but not the on/off setting.
 
 	  To compile this driver as a module, choose M here: the module will

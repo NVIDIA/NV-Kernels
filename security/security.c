@@ -32,29 +32,24 @@
 #include <net/flow.h>
 #include <net/sock.h>
 
-/* How many LSMs were built into the kernel? */
-#define LSM_COUNT (__end_lsm_info - __start_lsm_info)
+#define SECURITY_HOOK_ACTIVE_KEY(HOOK, IDX) security_hook_active_##HOOK##_##IDX
 
 /*
- * How many LSMs are built into the kernel as determined at
- * build time. Used to determine fixed array sizes.
- * The capability module is accounted for by CONFIG_SECURITY
+ * Identifier for the LSM static calls.
+ * HOOK is an LSM hook as defined in linux/lsm_hookdefs.h
+ * IDX is the index of the static call. 0 <= NUM < MAX_LSM_COUNT
  */
-#define LSM_CONFIG_COUNT ( \
-	(IS_ENABLED(CONFIG_SECURITY) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_SELINUX) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_SMACK) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_TOMOYO) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_APPARMOR) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_YAMA) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_LOADPIN) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_SAFESETID) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_LOCKDOWN_LSM) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_BPF_LSM) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_LANDLOCK) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_IMA) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_EVM) ? 1 : 0) + \
-	(IS_ENABLED(CONFIG_SECURITY_IPE) ? 1 : 0))
+#define LSM_STATIC_CALL(HOOK, IDX) lsm_static_call_##HOOK##_##IDX
+
+/*
+ * Call the macro M for each LSM hook MAX_LSM_COUNT times.
+ */
+#define LSM_LOOP_UNROLL(M, ...) 		\
+do {						\
+	UNROLL(MAX_LSM_COUNT, M, __VA_ARGS__)	\
+} while (0)
+
+#define LSM_DEFINE_UNROLL(M, ...) UNROLL(MAX_LSM_COUNT, M, __VA_ARGS__)
 
 /*
  * These are descriptions of the reasons that can be passed to the
@@ -95,7 +90,6 @@ const char *const lockdown_reasons[LOCKDOWN_CONFIDENTIALITY_MAX + 1] = {
 	[LOCKDOWN_CONFIDENTIALITY_MAX] = "confidentiality",
 };
 
-struct security_hook_heads security_hook_heads __ro_after_init;
 static BLOCKING_NOTIFIER_HEAD(blocking_lsm_notifier_chain);
 
 static struct kmem_cache *lsm_file_cache;
@@ -111,8 +105,57 @@ static __initdata const char *chosen_major_lsm;
 static __initconst const char *const builtin_lsm_order = CONFIG_LSM;
 
 /* Ordered list of LSMs to initialize. */
-static __initdata struct lsm_info **ordered_lsms;
+static __initdata struct lsm_info *ordered_lsms[MAX_LSM_COUNT + 1];
 static __initdata struct lsm_info *exclusive;
+
+#ifdef CONFIG_HAVE_STATIC_CALL
+#define LSM_HOOK_TRAMP(NAME, NUM) \
+	&STATIC_CALL_TRAMP(LSM_STATIC_CALL(NAME, NUM))
+#else
+#define LSM_HOOK_TRAMP(NAME, NUM) NULL
+#endif
+
+/*
+ * Define static calls and static keys for each LSM hook.
+ */
+#define DEFINE_LSM_STATIC_CALL(NUM, NAME, RET, ...)			\
+	DEFINE_STATIC_CALL_NULL(LSM_STATIC_CALL(NAME, NUM),		\
+				*((RET(*)(__VA_ARGS__))NULL));		\
+	DEFINE_STATIC_KEY_FALSE(SECURITY_HOOK_ACTIVE_KEY(NAME, NUM));
+
+#define LSM_HOOK(RET, DEFAULT, NAME, ...)				\
+	LSM_DEFINE_UNROLL(DEFINE_LSM_STATIC_CALL, NAME, RET, __VA_ARGS__)
+#include <linux/lsm_hook_defs.h>
+#undef LSM_HOOK
+#undef DEFINE_LSM_STATIC_CALL
+
+/*
+ * Initialise a table of static calls for each LSM hook.
+ * DEFINE_STATIC_CALL_NULL invocation above generates a key (STATIC_CALL_KEY)
+ * and a trampoline (STATIC_CALL_TRAMP) which are used to call
+ * __static_call_update when updating the static call.
+ *
+ * The static calls table is used by early LSMs, some architectures can fault on
+ * unaligned accesses and the fault handling code may not be ready by then.
+ * Thus, the static calls table should be aligned to avoid any unhandled faults
+ * in early init.
+ */
+struct lsm_static_calls_table
+	static_calls_table __ro_after_init __aligned(sizeof(u64)) = {
+#define INIT_LSM_STATIC_CALL(NUM, NAME)					\
+	(struct lsm_static_call) {					\
+		.key = &STATIC_CALL_KEY(LSM_STATIC_CALL(NAME, NUM)),	\
+		.trampoline = LSM_HOOK_TRAMP(NAME, NUM),		\
+		.active = &SECURITY_HOOK_ACTIVE_KEY(NAME, NUM),		\
+	},
+#define LSM_HOOK(RET, DEFAULT, NAME, ...)				\
+	.NAME = {							\
+		LSM_DEFINE_UNROLL(INIT_LSM_STATIC_CALL, NAME)		\
+	},
+#include <linux/lsm_hook_defs.h>
+#undef LSM_HOOK
+#undef INIT_LSM_STATIC_CALL
+	};
 
 static __initdata bool debug;
 #define init_debug(...)						\
@@ -174,7 +217,7 @@ static void __init append_ordered_lsm(struct lsm_info *lsm, const char *from)
 	if (exists_ordered_lsm(lsm))
 		return;
 
-	if (WARN(last_lsm == LSM_COUNT, "%s: out of LSM slots!?\n", from))
+	if (WARN(last_lsm == MAX_LSM_COUNT, "%s: out of LSM static calls!?\n", from))
 		return;
 
 	/* Enable this LSM, if it is not already set. */
@@ -240,12 +283,9 @@ static void __init lsm_set_blob_sizes(struct lsm_blob_sizes *needed)
 	lsm_set_blob_size(&needed->lbs_xattr_count,
 			  &blob_sizes.lbs_xattr_count);
 	lsm_set_blob_size(&needed->lbs_bdev, &blob_sizes.lbs_bdev);
-	if (needed->lbs_secmark) {
-		if (blob_sizes.lbs_secmark)
-			needed->lbs_secmark = false;
-		else
-			blob_sizes.lbs_secmark = true;
-	}
+	lsm_set_blob_size(&needed->lbs_bpf_map, &blob_sizes.lbs_bpf_map);
+	lsm_set_blob_size(&needed->lbs_bpf_prog, &blob_sizes.lbs_bpf_prog);
+	lsm_set_blob_size(&needed->lbs_bpf_token, &blob_sizes.lbs_bpf_token);
 }
 
 /* Prepare LSM for initialization. */
@@ -283,8 +323,7 @@ static void __init initialize_lsm(struct lsm_info *lsm)
  * Current index to use while initializing the lsm id list.
  */
 u32 lsm_active_cnt __ro_after_init;
-u32 lsm_prop_cnt __ro_after_init;
-const struct lsm_id *lsm_idlist[LSM_CONFIG_COUNT];
+const struct lsm_id *lsm_idlist[MAX_LSM_COUNT];
 
 /* Populate ordered LSMs list from comma-separated LSM name list. */
 static void __init ordered_lsm_parse(const char *order, const char *origin)
@@ -366,6 +405,25 @@ static void __init ordered_lsm_parse(const char *order, const char *origin)
 	kfree(sep);
 }
 
+static void __init lsm_static_call_init(struct security_hook_list *hl)
+{
+	struct lsm_static_call *scall = hl->scalls;
+	int i;
+
+	for (i = 0; i < MAX_LSM_COUNT; i++) {
+		/* Update the first static call that is not used yet */
+		if (!scall->hl) {
+			__static_call_update(scall->key, scall->trampoline,
+					     hl->hook.lsm_func_addr);
+			scall->hl = hl;
+			static_branch_enable(scall->active);
+			return;
+		}
+		scall++;
+	}
+	panic("%s - Ran out of static slots.\n", __func__);
+}
+
 static void __init lsm_early_cred(struct cred *cred);
 static void __init lsm_early_task(struct task_struct *task);
 
@@ -393,9 +451,6 @@ static void __init report_lsm_order(void)
 static void __init ordered_lsm_init(void)
 {
 	struct lsm_info **lsm;
-
-	ordered_lsms = kcalloc(LSM_COUNT + 1, sizeof(*ordered_lsms),
-			       GFP_KERNEL);
 
 	if (chosen_lsm_order) {
 		if (chosen_major_lsm) {
@@ -428,6 +483,9 @@ static void __init ordered_lsm_init(void)
 	init_debug("tun device blob size = %d\n", blob_sizes.lbs_tun_dev);
 	init_debug("xattr slots          = %d\n", blob_sizes.lbs_xattr_count);
 	init_debug("bdev blob size       = %d\n", blob_sizes.lbs_bdev);
+	init_debug("bpf map blob size    = %d\n", blob_sizes.lbs_bpf_map);
+	init_debug("bpf prog blob size   = %d\n", blob_sizes.lbs_bpf_prog);
+	init_debug("bpf token blob size  = %d\n", blob_sizes.lbs_bpf_token);
 
 	/*
 	 * Create any kmem_caches needed for blobs
@@ -445,18 +503,11 @@ static void __init ordered_lsm_init(void)
 	lsm_early_task(current);
 	for (lsm = ordered_lsms; *lsm; lsm++)
 		initialize_lsm(*lsm);
-
-	kfree(ordered_lsms);
 }
 
 int __init early_security_init(void)
 {
 	struct lsm_info *lsm;
-
-#define LSM_HOOK(RET, DEFAULT, NAME, ...) \
-	INIT_HLIST_HEAD(&security_hook_heads.NAME);
-#include "linux/lsm_hook_defs.h"
-#undef LSM_HOOK
 
 	for (lsm = __start_early_lsm_info; lsm < __end_early_lsm_info; lsm++) {
 		if (!lsm->enabled)
@@ -578,16 +629,14 @@ void __init security_add_hooks(struct security_hook_list *hooks, int count,
 	 * Look at the previous entry, if there is one, for duplication.
 	 */
 	if (lsm_active_cnt == 0 || lsm_idlist[lsm_active_cnt - 1] != lsmid) {
-		if (lsm_active_cnt >= LSM_CONFIG_COUNT)
+		if (lsm_active_cnt >= MAX_LSM_COUNT)
 			panic("%s Too many LSMs registered.\n", __func__);
 		lsm_idlist[lsm_active_cnt++] = lsmid;
-		if (lsmid->lsmprop)
-			lsm_prop_cnt++;
 	}
 
 	for (i = 0; i < count; i++) {
 		hooks[i].lsmid = lsmid;
-		hlist_add_tail_rcu(&hooks[i].list, hooks[i].head);
+		lsm_static_call_init(&hooks[i]);
 	}
 
 	/*
@@ -780,17 +829,50 @@ static int lsm_msg_msg_alloc(struct msg_msg *mp)
  */
 static int lsm_bdev_alloc(struct block_device *bdev)
 {
-	if (blob_sizes.lbs_bdev == 0) {
-		bdev->bd_security = NULL;
-		return 0;
-	}
-
-	bdev->bd_security = kzalloc(blob_sizes.lbs_bdev, GFP_KERNEL);
-	if (!bdev->bd_security)
-		return -ENOMEM;
-
-	return 0;
+	return lsm_blob_alloc(&bdev->bd_security, blob_sizes.lbs_bdev,
+			      GFP_KERNEL);
 }
+
+#ifdef CONFIG_BPF_SYSCALL
+/**
+ * lsm_bpf_map_alloc - allocate a composite bpf_map blob
+ * @map: the bpf_map that needs a blob
+ *
+ * Allocate the bpf_map blob for all the modules
+ *
+ * Returns 0, or -ENOMEM if memory can't be allocated.
+ */
+static int lsm_bpf_map_alloc(struct bpf_map *map)
+{
+	return lsm_blob_alloc(&map->security, blob_sizes.lbs_bpf_map, GFP_KERNEL);
+}
+
+/**
+ * lsm_bpf_prog_alloc - allocate a composite bpf_prog blob
+ * @prog: the bpf_prog that needs a blob
+ *
+ * Allocate the bpf_prog blob for all the modules
+ *
+ * Returns 0, or -ENOMEM if memory can't be allocated.
+ */
+static int lsm_bpf_prog_alloc(struct bpf_prog *prog)
+{
+	return lsm_blob_alloc(&prog->aux->security, blob_sizes.lbs_bpf_prog, GFP_KERNEL);
+}
+
+/**
+ * lsm_bpf_token_alloc - allocate a composite bpf_token blob
+ * @token: the bpf_token that needs a blob
+ *
+ * Allocate the bpf_token blob for all the modules
+ *
+ * Returns 0, or -ENOMEM if memory can't be allocated.
+ */
+static int lsm_bpf_token_alloc(struct bpf_token *token)
+{
+	return lsm_blob_alloc(&token->security, blob_sizes.lbs_bpf_token, GFP_KERNEL);
+}
+#endif /* CONFIG_BPF_SYSCALL */
 
 /**
  * lsm_early_task - during initialization allocate a composite task blob
@@ -902,28 +984,42 @@ out:
  * call_int_hook:
  *	This is a hook that returns a value.
  */
+#define __CALL_STATIC_VOID(NUM, HOOK, ...)				     \
+do {									     \
+	if (static_branch_unlikely(&SECURITY_HOOK_ACTIVE_KEY(HOOK, NUM))) {    \
+		static_call(LSM_STATIC_CALL(HOOK, NUM))(__VA_ARGS__);	     \
+	}								     \
+} while (0);
 
-#define call_void_hook(FUNC, ...)				\
-	do {							\
-		struct security_hook_list *P;			\
-								\
-		hlist_for_each_entry(P, &security_hook_heads.FUNC, list) \
-			P->hook.FUNC(__VA_ARGS__);		\
+#define call_void_hook(HOOK, ...)                                 \
+	do {                                                      \
+		LSM_LOOP_UNROLL(__CALL_STATIC_VOID, HOOK, __VA_ARGS__); \
 	} while (0)
 
-#define call_int_hook(FUNC, ...) ({				\
-	int RC = LSM_RET_DEFAULT(FUNC);				\
-	do {							\
-		struct security_hook_list *P;			\
-								\
-		hlist_for_each_entry(P, &security_hook_heads.FUNC, list) { \
-			RC = P->hook.FUNC(__VA_ARGS__);		\
-			if (RC != LSM_RET_DEFAULT(FUNC))	\
-				break;				\
-		}						\
-	} while (0);						\
-	RC;							\
+
+#define __CALL_STATIC_INT(NUM, R, HOOK, LABEL, ...)			     \
+do {									     \
+	if (static_branch_unlikely(&SECURITY_HOOK_ACTIVE_KEY(HOOK, NUM))) {  \
+		R = static_call(LSM_STATIC_CALL(HOOK, NUM))(__VA_ARGS__);    \
+		if (R != LSM_RET_DEFAULT(HOOK))				     \
+			goto LABEL;					     \
+	}								     \
+} while (0);
+
+#define call_int_hook(HOOK, ...)					\
+({									\
+	__label__ OUT;							\
+	int RC = LSM_RET_DEFAULT(HOOK);					\
+									\
+	LSM_LOOP_UNROLL(__CALL_STATIC_INT, RC, HOOK, OUT, __VA_ARGS__);	\
+OUT:									\
+	RC;								\
 })
+
+#define lsm_for_each_hook(scall, NAME)					\
+	for (scall = static_calls_table.NAME;				\
+	     scall - static_calls_table.NAME < MAX_LSM_COUNT; scall++)  \
+		if (static_key_enabled(&scall->active->key))
 
 /* Security operations */
 
@@ -939,7 +1035,6 @@ int security_binder_set_context_mgr(const struct cred *mgr)
 {
 	return call_int_hook(binder_set_context_mgr, mgr);
 }
-EXPORT_SYMBOL(security_binder_set_context_mgr);
 
 /**
  * security_binder_transaction() - Check if a binder transaction is allowed
@@ -955,7 +1050,6 @@ int security_binder_transaction(const struct cred *from,
 {
 	return call_int_hook(binder_transaction, from, to);
 }
-EXPORT_SYMBOL(security_binder_transaction);
 
 /**
  * security_binder_transfer_binder() - Check if a binder transfer is allowed
@@ -971,7 +1065,6 @@ int security_binder_transfer_binder(const struct cred *from,
 {
 	return call_int_hook(binder_transfer_binder, from, to);
 }
-EXPORT_SYMBOL(security_binder_transfer_binder);
 
 /**
  * security_binder_transfer_file() - Check if a binder file xfer is allowed
@@ -988,7 +1081,6 @@ int security_binder_transfer_file(const struct cred *from,
 {
 	return call_int_hook(binder_transfer_file, from, to, file);
 }
-EXPORT_SYMBOL(security_binder_transfer_file);
 
 /**
  * security_ptrace_access_check() - Check if tracing is allowed
@@ -1163,7 +1255,7 @@ int security_settime64(const struct timespec64 *ts, const struct timezone *tz)
  */
 int security_vm_enough_memory_mm(struct mm_struct *mm, long pages)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 	int cap_sys_admin = 1;
 	int rc;
 
@@ -1173,8 +1265,8 @@ int security_vm_enough_memory_mm(struct mm_struct *mm, long pages)
 	 * agree that it should be set it will. If any module thinks it should
 	 * not be set it won't.
 	 */
-	hlist_for_each_entry(hp, &security_hook_heads.vm_enough_memory, list) {
-		rc = hp->hook.vm_enough_memory(mm, pages);
+	lsm_for_each_hook(scall, vm_enough_memory) {
+		rc = scall->hl->hook.vm_enough_memory(mm, pages);
 		if (rc < 0) {
 			cap_sys_admin = 0;
 			break;
@@ -1327,13 +1419,12 @@ int security_fs_context_dup(struct fs_context *fc, struct fs_context *src_fc)
 int security_fs_context_parse_param(struct fs_context *fc,
 				    struct fs_parameter *param)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 	int trc;
 	int rc = -ENOPARAM;
 
-	hlist_for_each_entry(hp, &security_hook_heads.fs_context_parse_param,
-			     list) {
-		trc = hp->hook.fs_context_parse_param(fc, param);
+	lsm_for_each_hook(scall, fs_context_parse_param) {
+		trc = scall->hl->hook.fs_context_parse_param(fc, param);
 		if (trc == 0)
 			rc = 0;
 		else if (trc != -ENOPARAM)
@@ -1563,12 +1654,11 @@ int security_sb_set_mnt_opts(struct super_block *sb,
 			     unsigned long kern_flags,
 			     unsigned long *set_kern_flags)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 	int rc = mnt_opts ? -EOPNOTSUPP : LSM_RET_DEFAULT(sb_set_mnt_opts);
 
-	hlist_for_each_entry(hp, &security_hook_heads.sb_set_mnt_opts,
-			     list) {
-		rc = hp->hook.sb_set_mnt_opts(sb, mnt_opts, kern_flags,
+	lsm_for_each_hook(scall, sb_set_mnt_opts) {
+		rc = scall->hl->hook.sb_set_mnt_opts(sb, mnt_opts, kern_flags,
 					      set_kern_flags);
 		if (rc != LSM_RET_DEFAULT(sb_set_mnt_opts))
 			break;
@@ -1724,7 +1814,7 @@ EXPORT_SYMBOL(security_dentry_init_security);
  * Return: Returns 0 on success, error on failure.
  */
 int security_dentry_create_files_as(struct dentry *dentry, int mode,
-				    struct qstr *name,
+				    const struct qstr *name,
 				    const struct cred *old, struct cred *new)
 {
 	return call_int_hook(dentry_create_files_as, dentry, mode,
@@ -1763,7 +1853,7 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 const initxattrs initxattrs, void *fs_data)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 	struct xattr *new_xattrs = NULL;
 	int ret = -EOPNOTSUPP, xattr_count = 0;
 
@@ -1781,9 +1871,8 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 			return -ENOMEM;
 	}
 
-	hlist_for_each_entry(hp, &security_hook_heads.inode_init_security,
-			     list) {
-		ret = hp->hook.inode_init_security(inode, dir, qstr, new_xattrs,
+	lsm_for_each_hook(scall, inode_init_security) {
+		ret = scall->hl->hook.inode_init_security(inode, dir, qstr, new_xattrs,
 						  &xattr_count);
 		if (ret && ret != -EOPNOTSUPP)
 			goto out;
@@ -3135,7 +3224,7 @@ int security_file_truncate(struct file *file)
  *
  * Return: Returns a zero on success, negative values on failure.
  */
-int security_task_alloc(struct task_struct *task, unsigned long clone_flags)
+int security_task_alloc(struct task_struct *task, u64 clone_flags)
 {
 	int rc = lsm_task_alloc(task);
 
@@ -3674,10 +3763,10 @@ int security_task_prctl(int option, unsigned long arg2, unsigned long arg3,
 {
 	int thisrc;
 	int rc = LSM_RET_DEFAULT(task_prctl);
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 
-	hlist_for_each_entry(hp, &security_hook_heads.task_prctl, list) {
-		thisrc = hp->hook.task_prctl(option, arg2, arg3, arg4, arg5);
+	lsm_for_each_hook(scall, task_prctl) {
+		thisrc = scall->hl->hook.task_prctl(option, arg2, arg3, arg4, arg5);
 		if (thisrc != LSM_RET_DEFAULT(task_prctl)) {
 			rc = thisrc;
 			if (thisrc != 0)
@@ -4083,7 +4172,7 @@ EXPORT_SYMBOL(security_d_instantiate);
 int security_getselfattr(unsigned int attr, struct lsm_ctx __user *uctx,
 			 u32 __user *size, u32 flags)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 	struct lsm_ctx lctx = { .id = LSM_ID_UNDEF, };
 	u8 __user *base = (u8 __user *)uctx;
 	u32 entrysize;
@@ -4121,13 +4210,13 @@ int security_getselfattr(unsigned int attr, struct lsm_ctx __user *uctx,
 	 * In the usual case gather all the data from the LSMs.
 	 * In the single case only get the data from the LSM specified.
 	 */
-	hlist_for_each_entry(hp, &security_hook_heads.getselfattr, list) {
-		if (single && lctx.id != hp->lsmid->id)
+	lsm_for_each_hook(scall, getselfattr) {
+		if (single && lctx.id != scall->hl->lsmid->id)
 			continue;
 		entrysize = left;
 		if (base)
 			uctx = (struct lsm_ctx __user *)(base + total);
-		rc = hp->hook.getselfattr(attr, uctx, &entrysize, flags);
+		rc = scall->hl->hook.getselfattr(attr, uctx, &entrysize, flags);
 		if (rc == -EOPNOTSUPP)
 			continue;
 		if (rc == -E2BIG) {
@@ -4174,7 +4263,7 @@ int security_getselfattr(unsigned int attr, struct lsm_ctx __user *uctx,
 int security_setselfattr(unsigned int attr, struct lsm_ctx __user *uctx,
 			 u32 size, u32 flags)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 	struct lsm_ctx *lctx;
 	int rc = LSM_RET_DEFAULT(setselfattr);
 	u64 required_len;
@@ -4197,9 +4286,9 @@ int security_setselfattr(unsigned int attr, struct lsm_ctx __user *uctx,
 		goto free_out;
 	}
 
-	hlist_for_each_entry(hp, &security_hook_heads.setselfattr, list)
-		if ((hp->lsmid->id) == lctx->id) {
-			rc = hp->hook.setselfattr(attr, lctx, size, flags);
+	lsm_for_each_hook(scall, setselfattr)
+		if ((scall->hl->lsmid->id) == lctx->id) {
+			rc = scall->hl->hook.setselfattr(attr, lctx, size, flags);
 			break;
 		}
 
@@ -4222,12 +4311,12 @@ free_out:
 int security_getprocattr(struct task_struct *p, int lsmid, const char *name,
 			 char **value)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 
-	hlist_for_each_entry(hp, &security_hook_heads.getprocattr, list) {
-		if (lsmid != 0 && lsmid != hp->lsmid->id)
+	lsm_for_each_hook(scall, getprocattr) {
+		if (lsmid != 0 && lsmid != scall->hl->lsmid->id)
 			continue;
-		return hp->hook.getprocattr(p, name, value);
+		return scall->hl->hook.getprocattr(p, name, value);
 	}
 	return LSM_RET_DEFAULT(getprocattr);
 }
@@ -4246,12 +4335,12 @@ int security_getprocattr(struct task_struct *p, int lsmid, const char *name,
  */
 int security_setprocattr(int lsmid, const char *name, void *value, size_t size)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 
-	hlist_for_each_entry(hp, &security_hook_heads.setprocattr, list) {
-		if (lsmid != 0 && lsmid != hp->lsmid->id)
+	lsm_for_each_hook(scall, setprocattr) {
+		if (lsmid != 0 && lsmid != scall->hl->lsmid->id)
 			continue;
-		return hp->hook.setprocattr(name, value, size);
+		return scall->hl->hook.setprocattr(name, value, size);
 	}
 	return LSM_RET_DEFAULT(setprocattr);
 }
@@ -4274,7 +4363,6 @@ EXPORT_SYMBOL(security_ismaclabel);
  * security_secid_to_secctx() - Convert a secid to a secctx
  * @secid: secid
  * @cp: the LSM context
- * @lsmid: which security module to report
  *
  * Convert secid to security context.  If @cp is NULL the length of the
  * result will be returned, but no data will be returned.  This
@@ -4293,23 +4381,29 @@ EXPORT_SYMBOL(security_secid_to_secctx);
  * security_lsmprop_to_secctx() - Convert a lsm_prop to a secctx
  * @prop: lsm specific information
  * @cp: the LSM context
+ * @lsmid: which security module to report
  *
  * Convert a @prop entry to security context.  If @cp is NULL the
  * length of the result will be returned. This does mean that the
  * length could change between calls to check the length and the
  * next call which actually allocates and returns the @cp.
  *
+ * @lsmid identifies which LSM should supply the context.
+ * A value of LSM_ID_UNDEF indicates that the first LSM suppling
+ * the hook should be used. This is used in cases where the
+ * ID of the supplying LSM is unambiguous.
+ *
  * Return: Return length of data on success, error on failure.
  */
 int security_lsmprop_to_secctx(struct lsm_prop *prop, struct lsm_context *cp,
 			       int lsmid)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 
-	hlist_for_each_entry(hp, &security_hook_heads.lsmprop_to_secctx, list) {
-		if (lsmid != 0 && lsmid != hp->lsmid->id)
+	lsm_for_each_hook(scall, lsmprop_to_secctx) {
+		if (lsmid != LSM_ID_UNDEF && lsmid != scall->hl->lsmid->id)
 			continue;
-		return hp->hook.lsmprop_to_secctx(prop, cp);
+		return scall->hl->hook.lsmprop_to_secctx(prop, cp);
 	}
 	return LSM_RET_DEFAULT(lsmprop_to_secctx);
 }
@@ -4327,13 +4421,8 @@ EXPORT_SYMBOL(security_lsmprop_to_secctx);
  */
 int security_secctx_to_secid(const char *secdata, u32 seclen, u32 *secid)
 {
-	struct security_hook_list *hp;
-
 	*secid = 0;
-	hlist_for_each_entry(hp, &security_hook_heads.secctx_to_secid, list) {
-		return hp->hook.secctx_to_secid(secdata, seclen, secid);
-	}
-	return LSM_RET_DEFAULT(secctx_to_secid);
+	return call_int_hook(secctx_to_secid, secdata, seclen, secid);
 }
 EXPORT_SYMBOL(security_secctx_to_secid);
 
@@ -4794,13 +4883,8 @@ EXPORT_SYMBOL(security_sock_rcv_skb);
 int security_socket_getpeersec_stream(struct socket *sock, sockptr_t optval,
 				      sockptr_t optlen, unsigned int len)
 {
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.socket_getpeersec_stream, list) {
-		return hp->hook.socket_getpeersec_stream(sock, optval,
-							    optlen, len);
-	}
-	return LSM_RET_DEFAULT(socket_getpeersec_stream);
+	return call_int_hook(socket_getpeersec_stream, sock, optval, optlen,
+			     len);
 }
 
 /**
@@ -4820,13 +4904,7 @@ int security_socket_getpeersec_stream(struct socket *sock, sockptr_t optval,
 int security_socket_getpeersec_dgram(struct socket *sock,
 				     struct sk_buff *skb, u32 *secid)
 {
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.socket_getpeersec_dgram, list) {
-		return hp->hook.socket_getpeersec_dgram(sock, skb,
-							       secid);
-	}
-	return LSM_RET_DEFAULT(socket_getpeersec_dgram);
+	return call_int_hook(socket_getpeersec_dgram, sock, skb, secid);
 }
 EXPORT_SYMBOL(security_socket_getpeersec_dgram);
 
@@ -5425,7 +5503,7 @@ int security_xfrm_state_pol_flow_match(struct xfrm_state *x,
 				       struct xfrm_policy *xp,
 				       const struct flowi_common *flic)
 {
-	struct security_hook_list *hp;
+	struct lsm_static_call *scall;
 	int rc = LSM_RET_DEFAULT(xfrm_state_pol_flow_match);
 
 	/*
@@ -5437,9 +5515,8 @@ int security_xfrm_state_pol_flow_match(struct xfrm_state *x,
 	 * For speed optimization, we explicitly break the loop rather than
 	 * using the macro
 	 */
-	hlist_for_each_entry(hp, &security_hook_heads.xfrm_state_pol_flow_match,
-			     list) {
-		rc = hp->hook.xfrm_state_pol_flow_match(x, xp, flic);
+	lsm_for_each_hook(scall, xfrm_state_pol_flow_match) {
+		rc = scall->hl->hook.xfrm_state_pol_flow_match(x, xp, flic);
 		break;
 	}
 	return rc;
@@ -5578,13 +5655,7 @@ void security_key_post_create_or_update(struct key *keyring, struct key *key,
 int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule,
 			     gfp_t gfp)
 {
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.audit_rule_init, list) {
-		return hp->hook.audit_rule_init(field, op, rulestr,
-						       lsmrule, gfp);
-	}
-	return LSM_RET_DEFAULT(audit_rule_init);
+	return call_int_hook(audit_rule_init, field, op, rulestr, lsmrule, gfp);
 }
 
 /**
@@ -5598,12 +5669,7 @@ int security_audit_rule_init(u32 field, u32 op, char *rulestr, void **lsmrule,
  */
 int security_audit_rule_known(struct audit_krule *krule)
 {
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.audit_rule_known, list) {
-		return hp->hook.audit_rule_known(krule);
-	}
-	return LSM_RET_DEFAULT(audit_rule_known);
+	return call_int_hook(audit_rule_known, krule);
 }
 
 /**
@@ -5615,12 +5681,7 @@ int security_audit_rule_known(struct audit_krule *krule)
  */
 void security_audit_rule_free(void *lsmrule)
 {
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.audit_rule_free, list) {
-		hp->hook.audit_rule_free(lsmrule);
-		return;
-	}
+	call_void_hook(audit_rule_free, lsmrule);
 }
 
 /**
@@ -5639,13 +5700,7 @@ void security_audit_rule_free(void *lsmrule)
 int security_audit_rule_match(struct lsm_prop *prop, u32 field, u32 op,
 			      void *lsmrule)
 {
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.audit_rule_match, list) {
-		return hp->hook.audit_rule_match(prop, field, op,
-							lsmrule);
-	}
-	return LSM_RET_DEFAULT(audit_rule_match);
+	return call_int_hook(audit_rule_match, prop, field, op, lsmrule);
 }
 #endif /* CONFIG_AUDIT */
 
@@ -5712,7 +5767,16 @@ int security_bpf_prog(struct bpf_prog *prog)
 int security_bpf_map_create(struct bpf_map *map, union bpf_attr *attr,
 			    struct bpf_token *token, bool kernel)
 {
-	return call_int_hook(bpf_map_create, map, attr, token, kernel);
+	int rc;
+
+	rc = lsm_bpf_map_alloc(map);
+	if (unlikely(rc))
+		return rc;
+
+	rc = call_int_hook(bpf_map_create, map, attr, token, kernel);
+	if (unlikely(rc))
+		security_bpf_map_free(map);
+	return rc;
 }
 
 /**
@@ -5731,7 +5795,16 @@ int security_bpf_map_create(struct bpf_map *map, union bpf_attr *attr,
 int security_bpf_prog_load(struct bpf_prog *prog, union bpf_attr *attr,
 			   struct bpf_token *token, bool kernel)
 {
-	return call_int_hook(bpf_prog_load, prog, attr, token, kernel);
+	int rc;
+
+	rc = lsm_bpf_prog_alloc(prog);
+	if (unlikely(rc))
+		return rc;
+
+	rc = call_int_hook(bpf_prog_load, prog, attr, token, kernel);
+	if (unlikely(rc))
+		security_bpf_prog_free(prog);
+	return rc;
 }
 
 /**
@@ -5748,7 +5821,16 @@ int security_bpf_prog_load(struct bpf_prog *prog, union bpf_attr *attr,
 int security_bpf_token_create(struct bpf_token *token, union bpf_attr *attr,
 			      const struct path *path)
 {
-	return call_int_hook(bpf_token_create, token, attr, path);
+	int rc;
+
+	rc = lsm_bpf_token_alloc(token);
+	if (unlikely(rc))
+		return rc;
+
+	rc = call_int_hook(bpf_token_create, token, attr, path);
+	if (unlikely(rc))
+		security_bpf_token_free(token);
+	return rc;
 }
 
 /**
@@ -5792,6 +5874,8 @@ int security_bpf_token_capable(const struct bpf_token *token, int cap)
 void security_bpf_map_free(struct bpf_map *map)
 {
 	call_void_hook(bpf_map_free, map);
+	kfree(map->security);
+	map->security = NULL;
 }
 
 /**
@@ -5803,6 +5887,8 @@ void security_bpf_map_free(struct bpf_map *map)
 void security_bpf_prog_free(struct bpf_prog *prog)
 {
 	call_void_hook(bpf_prog_free, prog);
+	kfree(prog->aux->security);
+	prog->aux->security = NULL;
 }
 
 /**
@@ -5814,6 +5900,8 @@ void security_bpf_prog_free(struct bpf_prog *prog)
 void security_bpf_token_free(struct bpf_token *token)
 {
 	call_void_hook(bpf_token_free, token);
+	kfree(token->security);
+	token->security = NULL;
 }
 #endif /* CONFIG_BPF_SYSCALL */
 
@@ -5910,12 +5998,6 @@ int security_bdev_setintegrity(struct block_device *bdev,
 	return call_int_hook(bdev_setintegrity, bdev, type, value, size);
 }
 EXPORT_SYMBOL(security_bdev_setintegrity);
-
-int security_lock_kernel_down(const char *where, enum lockdown_reason level)
-{
-	return call_int_hook(lock_kernel_down, where, level);
-}
-EXPORT_SYMBOL(security_lock_kernel_down);
 
 #ifdef CONFIG_PERF_EVENTS
 /**

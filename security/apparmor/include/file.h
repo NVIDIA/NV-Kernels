@@ -75,7 +75,7 @@ int aa_audit_file(const struct cred *cred,
 		  struct aa_profile *profile, struct aa_perms *perms,
 		  const char *op, u32 request, const char *name,
 		  const char *target, struct aa_label *tlabel, kuid_t ouid,
-		  const char *info, int error, bool prompt);
+		  const char *info, int error);
 
 struct aa_perms *aa_lookup_condperms(kuid_t subj_uid,
 				     struct aa_policydb *file_rules,
@@ -87,11 +87,10 @@ aa_state_t aa_str_perms(struct aa_policydb *file_rules, aa_state_t start,
 int __aa_path_perm(const char *op, const struct cred *subj_cred,
 		   struct aa_profile *profile, const char *name,
 		   u32 request, struct path_cond *cond, int flags,
-		   struct aa_perms *perms, bool prompt);
+		   struct aa_perms *perms);
 int aa_path_perm(const char *op, const struct cred *subj_cred,
 		 struct aa_label *label, const struct path *path,
-		 int flags, u32 request, struct path_cond *cond,
-		 u32 *allow);
+		 int flags, u32 request, struct path_cond *cond);
 
 int aa_path_link(const struct cred *subj_cred, struct aa_label *label,
 		 struct dentry *old_dentry, const struct path *new_dir,

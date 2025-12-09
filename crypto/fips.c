@@ -15,8 +15,7 @@
 #include <linux/string_choices.h>
 #include <generated/utsrelease.h>
 
-/* LP: #2049082 UBUNTU: SAUCE: FIPS kernels default to FIPS mode */
-int fips_enabled = 1;
+int fips_enabled;
 EXPORT_SYMBOL_GPL(fips_enabled);
 
 ATOMIC_NOTIFIER_HEAD(fips_fail_notif_chain);

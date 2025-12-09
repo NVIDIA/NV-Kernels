@@ -33,7 +33,6 @@
 #include <linux/bitfield.h>
 #include <linux/of.h>
 #include <linux/sfp.h>
-#include <linux/dmi.h>
 
 #include <linux/io.h>
 #include <asm/irq.h>
@@ -355,16 +354,6 @@ struct marvell_priv {
 	u32 step;
 	s8 pair;
 	u8 vct_phase;
-};
-
-static const struct dmi_system_id skip_config_led_tbl[] = {
-	{
-		.matches = {
-			DMI_MATCH(DMI_BOARD_VENDOR, "Dell EMC"),
-			DMI_MATCH(DMI_BOARD_NAME, "0d370eed-89ca-4dc0-a365-e9904c4c62bb"),
-		},
-	},
-	{}
 };
 
 static int marvell_read_page(struct phy_device *phydev)
@@ -855,9 +844,6 @@ static void marvell_config_led(struct phy_device *phydev)
 {
 	u16 def_config;
 	int err;
-
-	if (dmi_check_system(skip_config_led_tbl))
-		return;
 
 	switch (MARVELL_PHY_FAMILY_ID(phydev->phy_id)) {
 	/* Default PHY LED config: LED[0] .. Link, LED[1] .. Activity */
@@ -1913,6 +1899,43 @@ static int marvell_resume(struct phy_device *phydev)
 
 error:
 	marvell_set_page(phydev, MII_MARVELL_COPPER_PAGE);
+	return err;
+}
+
+/* m88e1510_resume
+ *
+ * The 88e1510 PHY has an erratum where the phy downshift counter is not cleared
+ * after phy being suspended(BMCR_PDOWN set) and then later resumed(BMCR_PDOWN
+ * cleared). This can cause the link to intermittently downshift to a lower speed.
+ *
+ * Disabling and re-enabling the downshift feature clears the counter, allowing
+ * the PHY to retry gigabit link negotiation up to the programmed retry count
+ * before downshifting. This behavior has been observed on copper links.
+ */
+static int m88e1510_resume(struct phy_device *phydev)
+{
+	int err;
+	u8 cnt = 0;
+
+	err = marvell_resume(phydev);
+	if (err < 0)
+		return err;
+
+	/* read downshift counter value */
+	err = m88e1011_get_downshift(phydev, &cnt);
+	if (err < 0)
+		return err;
+
+	if (cnt) {
+		/* downshift disabled */
+		err = m88e1011_set_downshift(phydev, 0);
+		if (err < 0)
+			return err;
+
+		/* downshift enabled, with previous counter value */
+		err = m88e1011_set_downshift(phydev, cnt);
+	}
+
 	return err;
 }
 
@@ -3577,20 +3600,18 @@ static int marvell_probe(struct phy_device *phydev)
 
 static int m88e1510_sfp_insert(void *upstream, const struct sfp_eeprom_id *id)
 {
-	DECLARE_PHY_INTERFACE_MASK(interfaces);
 	struct phy_device *phydev = upstream;
+	const struct sfp_module_caps *caps;
 	phy_interface_t interface;
 	struct device *dev;
 	int oldpage;
 	int ret = 0;
 	u16 mode;
 
-	__ETHTOOL_DECLARE_LINK_MODE_MASK(supported) = { 0, };
-
 	dev = &phydev->mdio.dev;
 
-	sfp_parse_support(phydev->sfp_bus, id, supported, interfaces);
-	interface = sfp_select_interface(phydev->sfp_bus, supported);
+	caps = sfp_get_module_caps(phydev->sfp_bus);
+	interface = sfp_select_interface(phydev->sfp_bus, caps->link_modes);
 
 	dev_info(dev, "%s SFP module inserted\n", phy_modes(interface));
 
@@ -3937,7 +3958,7 @@ static struct phy_driver marvell_drivers[] = {
 		.handle_interrupt = marvell_handle_interrupt,
 		.get_wol = m88e1318_get_wol,
 		.set_wol = m88e1318_set_wol,
-		.resume = marvell_resume,
+		.resume = m88e1510_resume,
 		.suspend = marvell_suspend,
 		.read_page = marvell_read_page,
 		.write_page = marvell_write_page,

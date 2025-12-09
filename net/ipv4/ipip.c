@@ -101,8 +101,6 @@
 #include <linux/init.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/if_ether.h>
-#include <linux/inetdevice.h>
-#include <linux/rculist.h>
 
 #include <net/sock.h>
 #include <net/ip.h>
@@ -277,147 +275,6 @@ static int mplsip_rcv(struct sk_buff *skb)
 }
 #endif
 
-static struct ip_fan_map *ipip_fan_find_map(struct ip_tunnel *t, __be32 daddr)
-{
-	struct ip_fan_map *fan_map;
-
-	rcu_read_lock();
-	list_for_each_entry_rcu(fan_map, &t->fan.fan_maps, list) {
-		if (fan_map->overlay ==
-		    (daddr & inet_make_mask(fan_map->overlay_prefix))) {
-			rcu_read_unlock();
-			return fan_map;
-		}
-	}
-	rcu_read_unlock();
-
-	return NULL;
-}
-
-/* Determine fan tunnel endpoint to send packet to, based on the inner IP
- * address.  
- *
- * Given a /8 overlay and /16 underlay, for an overlay (inner) address
- * Y.A.B.C, the transformation is F.G.A.B, where "F" and "G" are the first
- * two octets of the underlay network (the network portion of a /16), "A"
- * and "B" are the low order two octets of the underlay network host (the
- * host portion of a /16), and "Y" is a configured first octet of the
- * overlay network.
- *
- * E.g., underlay host 10.88.3.4/16 with an overlay of 99.0.0.0/8 would
- * host overlay subnet 99.3.4.0/24.  An overlay network datagram from
- * 99.3.4.5 to 99.6.7.8, would be directed to underlay host 10.88.6.7,
- * which hosts overlay network subnet 99.6.7.0/24.  This transformation is
- * described in detail further below.
- *
- * Using netmasks for the overlay and underlay other than /8 and /16, as
- * shown above, can yield larger (or smaller) overlay subnets, with the
- * trade-off of allowing fewer (or more) underlay hosts to participate.
- *
- * The size of each overlay network subnet is defined by the total of the
- * network mask of the overlay plus the size of host portion of the
- * underlay network. In the above example, /8 + /16 = /24.
- *
- * E.g., consider underlay host 10.99.238.5/20 and overlay 99.0.0.0/8. In
- * this case, the network portion of the underlay is 10.99.224.0/20, and
- * the host portion is 0.0.14.5 (12 bits).  To determine the overlay
- * network subnet, the 12 bits of host portion are left shifted 12 bits
- * (/20 - /8) and ORed with the overlay subnet prefix.  This yields an
- * overlay subnet of 99.224.80/20, composed of 8 bits overlay, followed by
- * 12 bits underlay.  This yields 12 bits in the overlay network portion,
- * allowing for 4094 addresses in each overlay network subnet.  The
- * trade-off is that fewer hosts may participate in the underlay network,
- * as its host address size has shrunk from 16 bits (65534 addresses) in
- * the first example to 12 bits (4094 addresses) here.
- *
- * For fewer hosts per overlay subnet (permitting a larger number of
- * underlay hosts to participate), the underlay netmask may be made
- * smaller.
- *
- * E.g., underlay host 10.111.1.2/12 (network 10.96.0.0/12, host portion
- * is 0.15.1.2, 20 bits) with an overlay of 33.0.0.0/8 would left shift
- * the 20 bits of host by 4 (so that it's highest order bit is adjacent to
- * the lowest order bit of the /8 overlay).  This yields an overlay subnet
- * of 33.240.16.32/28 (8 bits overlay, 20 bits from the host portion of
- * the underlay).  This provides more addresses for the underlay network
- * (approximately 2^20), but each host's segment of the overlay provides
- * only 4 bits of addresses (14 usable).
- *
- * It is also possible to adjust the overlay subnet.
- *
- * For an overlay of 240.0.0.0/5 and underlay of 10.88.0.0/20, consider
- * underlay host 10.88.129.2; the 12 bits of host, 0.0.1.2, are left
- * shifted 15 bits (/20 - /5), yielding an overlay network of
- * 240.129.0.0/17.  An underlay host of 10.88.244.215 would yield an
- * overlay network of 242.107.128.0/17.
- *
- * For an overlay of 100.64.0.0/10 and underlay of 10.224.220.0/24, for
- * underlay host 10.224.220.10, the underlay host portion (.10) is left
- * shifted 14 bits, yielding an overlay network subnet of 100.66.128.0/18.
- * This would permit 254 addresses on the underlay, with each overlay
- * segment providing approximately 2^14 - 2 addresses (16382).
- *
- * For packets being encapsulated, the overlay network destination IP
- * address is deconstructed into its overlay and underlay-derived
- * portions.  The underlay portion (determined by the overlay mask and
- * overlay subnet mask) is right shifted according to the size of the
- * underlay network mask.  This value is then ORed with the network
- * portion of the underlay network to produce the underlay network
- * destination for the encapsulated datagram.
- *
- * For example, using the initial example of underlay 10.88.3.4/16 and
- * overlay 99.0.0.0/8, with underlay host 10.88.3.4/16 providing overlay
- * subnet 99.3.4.0/24 with specfic host 99.3.4.5.  A datagram from
- * 99.3.4.5 to 99.6.7.8 would first have the underlay host derived portion
- * of the address extracted.  This is a number of bits equal to underlay
- * network host portion.  In the destination address, the highest order of
- * these bits is one bit lower than the lowest order bit from the overlay
- * network mask.
- *
- * Using the sample value, 99.6.7.8, the overlay mask is /8, and the
- * underlay mask is /16 (leaving 16 bits for the host portion).  The bits
- * to be shifted are the middle two octets, 0.6.7.0, as this is 99.6.7.8
- * ANDed with the mask 0x00ffff00 (which is 16 bits, the highest order of
- * which is 1 bit lower than the lowest order overlay address bit).
- *
- * These octets, 0.6.7.0, are then right shifted 8 bits, yielding 0.0.6.7.
- * This value is then ORed with the underlay network portion,
- * 10.88.0.0/16, providing 10.88.6.7 as the final underlay destination for
- * the encapuslated datagram.
- *
- * Another transform using the final example: overlay 100.64.0.0/10 and
- * underlay 10.224.220.0/24.  Consider overlay address 100.66.128.1
- * sending a datagram to 100.66.200.5.  In this case, 8 bits (the host
- * portion size of 10.224.220.0/24) beginning after the 100.64/10 overlay
- * prefix are masked off, yielding 0.2.192.0.  This is right shifted 14
- * (32 - 10 - (32 - 24), i.e., the number of bits between the overlay
- * network portion and the underlay host portion) bits, yielding 0.0.0.11.
- * This is ORed with the underlay network portion, 10.224.220.0/24, giving
- * the underlay destination of 10.224.220.11 for overlay destination
- * 100.66.200.5.
- */
-static int ipip_build_fan_iphdr(struct ip_tunnel *tunnel, struct sk_buff *skb, struct iphdr *iph)
-{
-	struct ip_fan_map *f_map;
-	u32 daddr, underlay;
-
-	f_map = ipip_fan_find_map(tunnel, ip_hdr(skb)->daddr);
-	if (!f_map)
-		return -ENOENT;
-
-	daddr = ntohl(ip_hdr(skb)->daddr);
-	underlay = ntohl(f_map->underlay);
-	if (!underlay)
-		return -EINVAL;
-
-	*iph = tunnel->parms.iph;
-	iph->daddr = htonl(underlay |
-			   ((daddr & ~f_map->overlay_mask) >>
-			    (32 - f_map->overlay_prefix -
-			     (32 - f_map->underlay_prefix))));
-	return 0;
-}
-
 /*
  *	This function assumes it is being called from dev_queue_xmit()
  *	and that skb is filled properly by that function.
@@ -428,7 +285,6 @@ static netdev_tx_t ipip_tunnel_xmit(struct sk_buff *skb,
 	struct ip_tunnel *tunnel = netdev_priv(dev);
 	const struct iphdr  *tiph = &tunnel->parms.iph;
 	u8 ipproto;
-	struct iphdr fiph;
 
 	if (!pskb_inet_may_pull(skb))
 		goto tx_error;
@@ -451,14 +307,6 @@ static netdev_tx_t ipip_tunnel_xmit(struct sk_buff *skb,
 
 	if (iptunnel_handle_offloads(skb, SKB_GSO_IPXIP4))
 		goto tx_error;
-
-	if (fan_has_map(&tunnel->fan)) {
-		if (ipip_build_fan_iphdr(tunnel, skb, &fiph))
-			goto tx_error;
-		tiph = &fiph;
-	} else {
-		tiph = &tunnel->parms.iph;
-	}
 
 	skb_set_inner_ipproto(skb, ipproto);
 
@@ -524,8 +372,6 @@ static const struct net_device_ops ipip_netdev_ops = {
 
 static void ipip_tunnel_setup(struct net_device *dev)
 {
-	struct ip_tunnel *t = netdev_priv(dev);
-
 	dev->netdev_ops		= &ipip_netdev_ops;
 	dev->header_ops		= &ip_tunnel_header_ops;
 
@@ -538,7 +384,6 @@ static void ipip_tunnel_setup(struct net_device *dev)
 	dev->features		|= IPIP_FEATURES;
 	dev->hw_features	|= IPIP_FEATURES;
 	ip_tunnel_setup(dev, ipip_net_id);
-	INIT_LIST_HEAD(&t->fan.fan_maps);
 }
 
 static int ipip_tunnel_init(struct net_device *dev)
@@ -591,92 +436,6 @@ static void ipip_netlink_parms(struct nlattr *data[],
 		*fwmark = nla_get_u32(data[IFLA_IPTUN_FWMARK]);
 }
 
-static void ipip_fan_flush_map(struct ip_tunnel *t)
-{
-	struct ip_fan_map *fan_map;
-
-	list_for_each_entry_rcu(fan_map, &t->fan.fan_maps, list) {
-		list_del_rcu(&fan_map->list);
-		kfree_rcu(fan_map, rcu);
-	}
-}
-
-static int ipip_fan_del_map(struct ip_tunnel *t, __be32 overlay)
-{
-	struct ip_fan_map *fan_map;
-
-	fan_map = ipip_fan_find_map(t, overlay);
-	if (!fan_map)
-		return -ENOENT;
-
-	list_del_rcu(&fan_map->list);
-	kfree_rcu(fan_map, rcu);
-
-	return 0;
-}
-
-static int ipip_fan_add_map(struct ip_tunnel *t, struct ifla_fan_map *map)
-{
-	__be32 overlay_mask, underlay_mask;
-	struct ip_fan_map *fan_map;
-
-	overlay_mask = inet_make_mask(map->overlay_prefix);
-	underlay_mask = inet_make_mask(map->underlay_prefix);
-
-	if ((map->overlay & ~overlay_mask) || (map->underlay & ~underlay_mask))
-		return -EINVAL;
-
-	if (!(map->overlay & overlay_mask) && (map->underlay & underlay_mask))
-		return -EINVAL;
-
-	/* Special case: overlay 0 and underlay 0: flush all mappings */
-	if (!map->overlay && !map->underlay) {
-		ipip_fan_flush_map(t);
-		return 0;
-	}
-	
-	/* Special case: overlay set and underlay 0: clear map for overlay */
-	if (!map->underlay)
-		return ipip_fan_del_map(t, map->overlay);
-
-	if (ipip_fan_find_map(t, map->overlay))
-		return -EEXIST;
-
-	fan_map = kmalloc(sizeof(*fan_map), GFP_KERNEL);
-	fan_map->underlay = map->underlay;
-	fan_map->overlay = map->overlay;
-	fan_map->underlay_prefix = map->underlay_prefix;
-	fan_map->overlay_mask = ntohl(overlay_mask);
-	fan_map->overlay_prefix = map->overlay_prefix;
-
-	list_add_tail_rcu(&fan_map->list, &t->fan.fan_maps);
-
-	return 0;
-}
-
-static int ipip_netlink_fan(struct nlattr *data[], struct ip_tunnel *t,
-			    struct ip_tunnel_parm_kern *parms)
-{
-	struct ifla_fan_map *map;
-	struct nlattr *attr;
-	int rem, rv;
-
-	if (data == NULL || !data[IFLA_IPTUN_FAN_MAP])
-		return 0;
-
-	if (parms->iph.daddr)
-		return -EINVAL;
-
-	nla_for_each_nested(attr, data[IFLA_IPTUN_FAN_MAP], rem) {
-		map = nla_data(attr);
-		rv = ipip_fan_add_map(t, map);
-		if (rv)
-			return rv;
-	}
-
-	return 0;
-}
-
 static int ipip_newlink(struct net_device *dev,
 			struct rtnl_newlink_params *params,
 			struct netlink_ext_ack *extack)
@@ -687,19 +446,15 @@ static int ipip_newlink(struct net_device *dev,
 	struct ip_tunnel_encap ipencap;
 	struct ip_tunnel_parm_kern p;
 	__u32 fwmark = 0;
-	int err;
 
 	if (ip_tunnel_netlink_encap_parms(data, &ipencap)) {
-		err = ip_tunnel_encap_setup(t, &ipencap);
+		int err = ip_tunnel_encap_setup(t, &ipencap);
 
 		if (err < 0)
 			return err;
 	}
 
 	ipip_netlink_parms(data, &p, &t->collect_md, &fwmark);
-	err = ipip_netlink_fan(data, t, &p);
-	if (err < 0)
-		return err;
 	return ip_tunnel_newlink(params->link_net ? : dev_net(dev), dev, tb, &p,
 				 fwmark);
 }
@@ -713,10 +468,9 @@ static int ipip_changelink(struct net_device *dev, struct nlattr *tb[],
 	struct ip_tunnel_parm_kern p;
 	bool collect_md;
 	__u32 fwmark = t->fwmark;
-	int err;
 
 	if (ip_tunnel_netlink_encap_parms(data, &ipencap)) {
-		err = ip_tunnel_encap_setup(t, &ipencap);
+		int err = ip_tunnel_encap_setup(t, &ipencap);
 
 		if (err < 0)
 			return err;
@@ -725,9 +479,6 @@ static int ipip_changelink(struct net_device *dev, struct nlattr *tb[],
 	ipip_netlink_parms(data, &p, &collect_md, &fwmark);
 	if (collect_md)
 		return -EINVAL;
-	err = ipip_netlink_fan(data, t, &p);
-	if (err < 0)
-		return err;
 
 	if (((dev->flags & IFF_POINTOPOINT) && !p.iph.daddr) ||
 	    (!(dev->flags & IFF_POINTOPOINT) && p.iph.daddr))
@@ -765,8 +516,6 @@ static size_t ipip_get_size(const struct net_device *dev)
 		nla_total_size(0) +
 		/* IFLA_IPTUN_FWMARK */
 		nla_total_size(4) +
-		/* IFLA_IPTUN_FAN_MAP */
-		nla_total_size(sizeof(struct ifla_fan_map)) * 256 +
 		0;
 }
 
@@ -799,26 +548,6 @@ static int ipip_fill_info(struct sk_buff *skb, const struct net_device *dev)
 	if (tunnel->collect_md)
 		if (nla_put_flag(skb, IFLA_IPTUN_COLLECT_METADATA))
 			goto nla_put_failure;
-	if (fan_has_map(&tunnel->fan)) {
-		struct nlattr *fan_nest;
-		struct ip_fan_map *fan_map;
-
-		fan_nest = nla_nest_start(skb, IFLA_IPTUN_FAN_MAP);
-		if (!fan_nest)
-			goto nla_put_failure;
-		list_for_each_entry_rcu(fan_map, &tunnel->fan.fan_maps, list) {
-			struct ifla_fan_map map;
-
-			map.underlay = fan_map->underlay;
-			map.underlay_prefix = fan_map->underlay_prefix;
-			map.overlay = fan_map->overlay;
-			map.overlay_prefix = fan_map->overlay_prefix;
-			if (nla_put(skb, IFLA_FAN_MAPPING, sizeof(map), &map))
-				goto nla_put_failure;
-		}
-		nla_nest_end(skb, fan_nest);
-	}
-
 	return 0;
 
 nla_put_failure:
@@ -839,9 +568,6 @@ static const struct nla_policy ipip_policy[IFLA_IPTUN_MAX + 1] = {
 	[IFLA_IPTUN_ENCAP_DPORT]	= { .type = NLA_U16 },
 	[IFLA_IPTUN_COLLECT_METADATA]	= { .type = NLA_FLAG },
 	[IFLA_IPTUN_FWMARK]		= { .type = NLA_U32 },
-
-	[__IFLA_IPTUN_VENDOR_BREAK ... IFLA_IPTUN_MAX]	= { .type = NLA_BINARY },
-	[IFLA_IPTUN_FAN_MAP]		= { .type = NLA_NESTED },
 };
 
 static struct rtnl_link_ops ipip_link_ops __read_mostly = {
@@ -891,22 +617,6 @@ static struct pernet_operations ipip_net_ops = {
 	.size = sizeof(struct ip_tunnel_net),
 };
 
-#ifdef CONFIG_SYSCTL
-static struct ctl_table_header *ipip_fan_header;
-static unsigned int ipip_fan_version = 3;
-
-static struct ctl_table ipip_fan_sysctls[] = {
-	{
-		.procname	= "version",
-		.data		= &ipip_fan_version,
-		.maxlen		= sizeof(ipip_fan_version),
-		.mode		= 0444,
-		.proc_handler	= proc_dointvec,
-	},
-};
-
-#endif /* CONFIG_SYSCTL */
-
 static int __init ipip_init(void)
 {
 	int err;
@@ -932,22 +642,9 @@ static int __init ipip_init(void)
 	if (err < 0)
 		goto rtnl_link_failed;
 
-#ifdef CONFIG_SYSCTL
-	ipip_fan_header = register_net_sysctl(&init_net, "net/fan",
-					      ipip_fan_sysctls);
-	if (!ipip_fan_header) {
-		err = -ENOMEM;
-		goto sysctl_failed;
-	}
-#endif /* CONFIG_SYSCTL */
-
 out:
 	return err;
 
-#ifdef CONFIG_SYSCTL
-sysctl_failed:
-	rtnl_link_unregister(&ipip_link_ops);
-#endif /* CONFIG_SYSCTL */
 rtnl_link_failed:
 #if IS_ENABLED(CONFIG_MPLS)
 	xfrm4_tunnel_deregister(&mplsip_handler, AF_MPLS);
@@ -962,9 +659,6 @@ xfrm_tunnel_ipip_failed:
 
 static void __exit ipip_fini(void)
 {
-#ifdef CONFIG_SYSCTL
-	unregister_net_sysctl_table(ipip_fan_header);
-#endif /* CONFIG_SYSCTL */
 	rtnl_link_unregister(&ipip_link_ops);
 	if (xfrm4_tunnel_deregister(&ipip_handler, AF_INET))
 		pr_info("%s: can't deregister tunnel\n", __func__);

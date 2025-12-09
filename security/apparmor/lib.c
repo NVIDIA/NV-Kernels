@@ -44,9 +44,6 @@ static struct val_table_ent debug_values_table[] = {
 	{ "domain", DEBUG_DOMAIN },
 	{ "policy", DEBUG_POLICY },
 	{ "interface", DEBUG_INTERFACE },
-	{ "upcall", DEBUG_UPCALL },
-	{ "unpack", DEBUG_UNPACK },
-	{ "tags", DEBUG_TAGS },
 	{ NULL, 0 }
 };
 
@@ -121,7 +118,7 @@ int aa_print_debug_params(char *buffer)
 
 bool aa_resize_str_table(struct aa_str_table *t, int newsize, gfp_t gfp)
 {
-	struct aa_str_table_ent *n;
+	char **n;
 	int i;
 
 	if (t->size == newsize)
@@ -132,7 +129,7 @@ bool aa_resize_str_table(struct aa_str_table *t, int newsize, gfp_t gfp)
 	for (i = 0; i < min(t->size, newsize); i++)
 		n[i] = t->table[i];
 	for (; i < t->size; i++)
-		kfree_sensitive(t->table[i].strs);
+		kfree_sensitive(t->table[i]);
 	if (newsize > t->size)
 		memset(&n[t->size], 0, (newsize-t->size)*sizeof(*n));
 	kfree_sensitive(t->table);
@@ -143,10 +140,10 @@ bool aa_resize_str_table(struct aa_str_table *t, int newsize, gfp_t gfp)
 }
 
 /**
- * aa_destroy_str_table - free entries str table
+ * aa_free_str_table - free entries str table
  * @t: the string table to free  (MAYBE NULL)
  */
-void aa_destroy_str_table(struct aa_str_table *t)
+void aa_free_str_table(struct aa_str_table *t)
 {
 	int i;
 
@@ -154,9 +151,8 @@ void aa_destroy_str_table(struct aa_str_table *t)
 		if (!t->table)
 			return;
 
-		for (i = 0; i < t->size; i++) {
-			kfree_sensitive(t->table[i].strs);
-		}
+		for (i = 0; i < t->size; i++)
+			kfree_sensitive(t->table[i]);
 		kfree_sensitive(t->table);
 		t->table = NULL;
 		t->size = 0;
@@ -252,7 +248,7 @@ void aa_str_kref(struct kref *kref)
 
 
 const char aa_file_perm_chrs[] = "xwracd         km l     ";
-static const char * const aa_base_perm_names[] = {
+const char *aa_file_perm_names[] = {
 	"exec",
 	"write",
 	"read",
@@ -342,10 +338,6 @@ void aa_audit_perm_mask(struct audit_buffer *ab, u32 mask, const char *chrs,
 {
 	char str[33];
 
-	if (!chrs)
-		chrs = aa_file_perm_chrs;
-	if (!names)
-		names = aa_base_perm_names;
 	audit_log_format(ab, "\"");
 	if ((mask & chrsmask) && chrs) {
 		aa_perm_mask_to_str(str, sizeof(str), chrs, mask & chrsmask);
@@ -357,22 +349,6 @@ void aa_audit_perm_mask(struct audit_buffer *ab, u32 mask, const char *chrs,
 	if ((mask & namesmask) && names)
 		aa_audit_perm_names(ab, names, mask & namesmask);
 	audit_log_format(ab, "\"");
-}
-
-void aa_audit_perms(struct audit_buffer *ab, struct apparmor_audit_data *ad,
-		    const char *chrs, u32 chrsmask, const char * const *names,
-		    u32 namesmask)
-{
-	if (ad->request) {
-		audit_log_format(ab, " requested=");
-		aa_audit_perm_mask(ab, ad->request, chrs, chrsmask,
-				   names, namesmask);
-	}
-	if (ad->denied) {
-		audit_log_format(ab, " denied=");
-		aa_audit_perm_mask(ab, ad->denied, chrs, chrsmask,
-				   names, namesmask);
-	}
 }
 
 /**
@@ -444,7 +420,7 @@ int aa_check_perms(struct aa_profile *profile, struct aa_perms *perms,
 		   void (*cb)(struct audit_buffer *, void *))
 {
 	int type, error;
-	u32 denied = denied_perms(perms, request);
+	u32 denied = request & (~perms->allow | perms->deny);
 
 	if (likely(!denied)) {
 		/* mask off perms that are not being force audited */
@@ -473,7 +449,6 @@ int aa_check_perms(struct aa_profile *profile, struct aa_perms *perms,
 	}
 
 	if (ad) {
-		// do_notification()
 		ad->subj_label = &profile->label;
 		ad->request = request;
 		ad->denied = denied;

@@ -240,7 +240,6 @@ int mt7925_init_mlo_caps(struct mt792x_phy *phy)
 {
 	struct wiphy *wiphy = phy->mt76->hw->wiphy;
 	static const u8 ext_capa_sta[] = {
-		[0] = WLAN_EXT_CAPA1_EXT_CHANNEL_SWITCHING,
 		[2] = WLAN_EXT_CAPA3_MULTI_BSSID_SUPPORT,
 		[7] = WLAN_EXT_CAPA8_OPMODE_NOTIF,
 	};
@@ -312,7 +311,6 @@ void mt7925_set_stream_he_eht_caps(struct mt792x_phy *phy)
 int __mt7925_start(struct mt792x_phy *phy)
 {
 	struct mt76_phy *mphy = phy->mt76;
-	struct mt792x_dev *dev = phy->dev;
 	int err;
 
 	err = mt7925_mcu_set_channel_domain(mphy);
@@ -322,13 +320,6 @@ int __mt7925_start(struct mt792x_phy *phy)
 	err = mt7925_mcu_set_rts_thresh(phy, 0x92b);
 	if (err)
 		return err;
-
-	if (!dev->sar_inited) {
-		err = mt7925_set_tx_sar_pwr(mphy->hw, NULL);
-		if (err)
-			return err;
-		dev->sar_inited = true;
-	}
 
 	mt792x_mac_reset_counters(phy);
 	set_bit(MT76_STATE_RUNNING, &mphy->state);
@@ -439,9 +430,6 @@ mt7925_add_interface(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
 		goto out;
 
 	vif->driver_flags |= IEEE80211_VIF_BEACON_FILTER;
-
-	INIT_WORK(&mvif->csa_work, mt7925_csa_work);
-	timer_setup(&mvif->csa_timer, mt792x_csa_timer, 0);
 out:
 	mt792x_mutex_release(dev);
 
@@ -992,56 +980,6 @@ int mt7925_mac_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
 }
 EXPORT_SYMBOL_GPL(mt7925_mac_sta_add);
 
-static u16
-mt7925_mac_select_links(struct mt76_dev *mdev, struct ieee80211_vif *vif)
-{
-	unsigned long usable_links = ieee80211_vif_usable_links(vif);
-	struct  {
-		u8 link_id;
-		enum nl80211_band band;
-	} data[IEEE80211_MLD_MAX_NUM_LINKS];
-	u8 link_id, i, j, n_data = 0;
-	u16 sel_links = 0;
-
-	if (!ieee80211_vif_is_mld(vif))
-		return 0;
-
-	if (vif->active_links == usable_links)
-		return vif->active_links;
-
-	rcu_read_lock();
-	for_each_set_bit(link_id, &usable_links, IEEE80211_MLD_MAX_NUM_LINKS) {
-		struct ieee80211_bss_conf *link_conf =
-			rcu_dereference(vif->link_conf[link_id]);
-
-		if (WARN_ON_ONCE(!link_conf))
-			continue;
-
-		data[n_data].link_id = link_id;
-		data[n_data].band = link_conf->chanreq.oper.chan->band;
-		n_data++;
-	}
-	rcu_read_unlock();
-
-	for (i = 0; i < n_data; i++) {
-		if (!(BIT(data[i].link_id) & vif->active_links))
-			continue;
-
-		sel_links = BIT(data[i].link_id);
-
-		for (j = 0; j < n_data; j++) {
-			if (data[i].band != data[j].band) {
-				sel_links |= BIT(data[j].link_id);
-				break;
-			}
-		}
-
-		break;
-	}
-
-	return sel_links;
-}
-
 static void
 mt7925_mac_set_links(struct mt76_dev *mdev, struct ieee80211_vif *vif)
 {
@@ -1052,7 +990,7 @@ mt7925_mac_set_links(struct mt76_dev *mdev, struct ieee80211_vif *vif)
 	struct cfg80211_chan_def *chandef = &link_conf->chanreq.oper;
 	enum nl80211_band band = chandef->chan->band, secondary_band;
 
-	u16 sel_links = mt7925_mac_select_links(mdev, vif);
+	u16 sel_links = mt76_select_links(vif, 2);
 	u8 secondary_link_id = __ffs(~BIT(mvif->deflink_id) & sel_links);
 
 	if (!ieee80211_vif_is_mld(vif) || hweight16(sel_links) < 2)
@@ -1391,11 +1329,9 @@ static bool is_valid_alpha2(const char *alpha2)
 void mt7925_scan_work(struct work_struct *work)
 {
 	struct mt792x_phy *phy;
-	struct wiphy *wiphy;
 
 	phy = (struct mt792x_phy *)container_of(work, struct mt792x_phy,
 						scan_work.work);
-	wiphy = phy->mt76->hw->wiphy;
 
 	while (true) {
 		struct mt76_dev *mdev = &phy->dev->mt76;
@@ -1434,10 +1370,10 @@ void mt7925_scan_work(struct work_struct *work)
 
 				mt7925_regd_be_ctrl(phy->dev, evt->alpha2);
 
-				if (!memcmp(mdev->alpha2, evt->alpha2, 2))
+				if (mdev->alpha2[0] != '0' && mdev->alpha2[1] != '0')
 					break;
 
-				regulatory_hint(wiphy, evt->alpha2);
+				mt7925_mcu_set_clc(phy->dev, evt->alpha2, ENVIRON_INDOOR);
 
 				break;
 			case UNI_EVENT_SCAN_DONE_NLO:
@@ -1738,13 +1674,7 @@ static int mt7925_set_sar_specs(struct ieee80211_hw *hw,
 	int err;
 
 	mt792x_mutex_acquire(dev);
-	err = mt7925_mcu_set_clc(dev, dev->mt76.alpha2,
-				 dev->country_ie_env);
-	if (err < 0)
-		goto out;
-
 	err = mt7925_set_tx_sar_pwr(hw, sar);
-out:
 	mt792x_mutex_release(dev);
 
 	return err;
@@ -1834,10 +1764,6 @@ static int
 mt7925_add_chanctx(struct ieee80211_hw *hw,
 		   struct ieee80211_chanctx_conf *ctx)
 {
-	struct mt792x_dev *dev = mt792x_hw_dev(hw);
-
-	dev->new_ctx = ctx;
-
 	return 0;
 }
 
@@ -1845,11 +1771,6 @@ static void
 mt7925_remove_chanctx(struct ieee80211_hw *hw,
 		      struct ieee80211_chanctx_conf *ctx)
 {
-	struct mt792x_dev *dev = mt792x_hw_dev(hw);
-
-	if (dev->new_ctx == ctx)
-		dev->new_ctx = NULL;
-
 }
 
 static void
@@ -2235,11 +2156,6 @@ static void mt7925_unassign_vif_chanctx(struct ieee80211_hw *hw,
 	mctx->bss_conf = NULL;
 	mconf->mt76.ctx = NULL;
 	mutex_unlock(&dev->mt76.mutex);
-
-	if (link_conf->csa_active) {
-		timer_delete_sync(&mvif->csa_timer);
-		cancel_work_sync(&mvif->csa_work);
-	}
 }
 
 static void mt7925_rfkill_poll(struct ieee80211_hw *hw)
@@ -2252,121 +2168,6 @@ static void mt7925_rfkill_poll(struct ieee80211_hw *hw)
 	mt792x_mutex_release(phy->dev);
 
 	wiphy_rfkill_set_hw_state(hw->wiphy, ret == 0);
-}
-
-static int mt7925_switch_vif_chanctx(struct ieee80211_hw *hw,
-				     struct ieee80211_vif_chanctx_switch *vifs,
-				     int n_vifs,
-				     enum ieee80211_chanctx_switch_mode mode)
-{
-	return mt7925_assign_vif_chanctx(hw, vifs->vif, vifs->link_conf,
-					 vifs->new_ctx);
-}
-
-void mt7925_csa_work(struct work_struct *work)
-{
-	struct mt792x_vif *mvif;
-	struct mt792x_dev *dev;
-	struct ieee80211_vif *vif;
-	struct ieee80211_bss_conf *link_conf;
-	struct mt792x_bss_conf *mconf;
-	u8 link_id, roc_rtype;
-	int ret = 0;
-
-	mvif = (struct mt792x_vif *)container_of(work, struct mt792x_vif,
-						csa_work);
-	dev = mvif->phy->dev;
-	vif = container_of((void *)mvif, struct ieee80211_vif, drv_priv);
-
-	if (ieee80211_vif_is_mld(vif))
-		return;
-
-	if (!dev->new_ctx)
-		return;
-
-	link_id = 0;
-	mconf = &mvif->bss_conf;
-	link_conf = &vif->bss_conf;
-	roc_rtype = MT7925_ROC_REQ_JOIN;
-
-	mt792x_mutex_acquire(dev);
-	ret = mt7925_set_roc(mvif->phy, mconf, dev->new_ctx->def.chan,
-			     4000, roc_rtype);
-	mt792x_mutex_release(dev);
-	if (!ret) {
-		mt792x_mutex_acquire(dev);
-		ret = mt7925_mcu_set_chctx(mvif->phy->mt76, &mconf->mt76, link_conf,
-					   dev->new_ctx);
-		mt792x_mutex_release(dev);
-
-		mt7925_abort_roc(mvif->phy, mconf);
-	}
-
-	ieee80211_chswitch_done(vif, !ret, link_id);
-}
-
-static int mt7925_pre_channel_switch(struct ieee80211_hw *hw,
-				     struct ieee80211_vif *vif,
-				     struct ieee80211_channel_switch *chsw)
-{
-	if (ieee80211_vif_is_mld(vif))
-		return -EOPNOTSUPP;
-
-	if (vif->type != NL80211_IFTYPE_STATION || !vif->cfg.assoc)
-		return -EOPNOTSUPP;
-
-	if (!cfg80211_chandef_usable(hw->wiphy, &chsw->chandef,
-				     IEEE80211_CHAN_DISABLED))
-		return -EOPNOTSUPP;
-
-	return 0;
-}
-
-static void mt7925_channel_switch(struct ieee80211_hw *hw,
-				  struct ieee80211_vif *vif,
-				  struct ieee80211_channel_switch *chsw)
-{
-	struct mt792x_vif *mvif = (struct mt792x_vif *)vif->drv_priv;
-	u16 beacon_interval;
-
-	if (ieee80211_vif_is_mld(vif))
-		return;
-
-	beacon_interval = vif->bss_conf.beacon_int;
-
-	mvif->csa_timer.expires = TU_TO_EXP_TIME(beacon_interval * chsw->count);
-	add_timer(&mvif->csa_timer);
-}
-
-static void mt7925_abort_channel_switch(struct ieee80211_hw *hw,
-					struct ieee80211_vif *vif,
-					struct ieee80211_bss_conf *link_conf)
-{
-	struct mt792x_vif *mvif = (struct mt792x_vif *)vif->drv_priv;
-
-	timer_delete_sync(&mvif->csa_timer);
-	cancel_work_sync(&mvif->csa_work);
-}
-
-static void mt7925_channel_switch_rx_beacon(struct ieee80211_hw *hw,
-					    struct ieee80211_vif *vif,
-					    struct ieee80211_channel_switch *chsw)
-{
-	struct mt792x_dev *dev = mt792x_hw_dev(hw);
-	struct mt792x_vif *mvif = (struct mt792x_vif *)vif->drv_priv;
-	u16 beacon_interval;
-
-	if (ieee80211_vif_is_mld(vif))
-		return;
-
-	beacon_interval = vif->bss_conf.beacon_int;
-
-	if (cfg80211_chandef_identical(&chsw->chandef,
-				       &dev->new_ctx->def) &&
-				       chsw->count) {
-		mod_timer(&mvif->csa_timer,
-			  TU_TO_EXP_TIME(beacon_interval * chsw->count));
-	}
 }
 
 const struct ieee80211_ops mt7925_ops = {
@@ -2432,12 +2233,6 @@ const struct ieee80211_ops mt7925_ops = {
 	.change_vif_links = mt7925_change_vif_links,
 	.change_sta_links = mt7925_change_sta_links,
 	.rfkill_poll = mt7925_rfkill_poll,
-
-	.switch_vif_chanctx = mt7925_switch_vif_chanctx,
-	.pre_channel_switch = mt7925_pre_channel_switch,
-	.channel_switch = mt7925_channel_switch,
-	.abort_channel_switch = mt7925_abort_channel_switch,
-	.channel_switch_rx_beacon = mt7925_channel_switch_rx_beacon,
 };
 EXPORT_SYMBOL_GPL(mt7925_ops);
 

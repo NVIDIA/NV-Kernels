@@ -26,7 +26,7 @@ static unsigned int smack_ip_output(void *priv,
 	struct socket_smack *ssp;
 	struct smack_known *skp;
 
-	if (smack_secmark() && sk) {
+	if (sk) {
 		ssp = smack_sock(sk);
 		skp = ssp->smk_out;
 		skb->secmark = skp->smk_secid;
@@ -54,18 +54,12 @@ static const struct nf_hook_ops smack_nf_ops[] = {
 
 static int __net_init smack_nf_register(struct net *net)
 {
-	if (!smack_secmark())
-		return 0;
-
 	return nf_register_net_hooks(net, smack_nf_ops,
 				     ARRAY_SIZE(smack_nf_ops));
 }
 
 static void __net_exit smack_nf_unregister(struct net *net)
 {
-	if (!smack_secmark())
-		return;
-
 	nf_unregister_net_hooks(net, smack_nf_ops, ARRAY_SIZE(smack_nf_ops));
 }
 
@@ -76,7 +70,7 @@ static struct pernet_operations smack_net_ops = {
 
 static int __init smack_nf_ip_init(void)
 {
-	if (smack_enabled == 0 || !smack_secmark())
+	if (smack_enabled == 0)
 		return 0;
 
 	printk(KERN_DEBUG "Smack: Registering netfilter hooks\n");

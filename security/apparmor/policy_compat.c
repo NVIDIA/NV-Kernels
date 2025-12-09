@@ -107,8 +107,6 @@ static void compute_fperms_allow(struct aa_perms *perms, struct aa_dfa *dfa,
 		perms->allow |= AA_MAY_CHANGE_PROFILE;
 	if (ACCEPT_TABLE(dfa)[state] & 0x40000000)
 		perms->allow |= AA_MAY_ONEXEC;
-	if (ACCEPT_TABLE(dfa)[state] & 0x10000000)
-		perms->allow |= AA_CONT_MATCH;
 }
 
 static struct aa_perms compute_fperms_user(struct aa_dfa *dfa,
@@ -218,8 +216,6 @@ static struct aa_perms compute_perms_entry(struct aa_dfa *dfa,
 	perms.allow = dfa_user_allow(dfa, state);
 	perms.audit = dfa_user_audit(dfa, state);
 	perms.quiet = dfa_user_quiet(dfa, state);
-	if (ACCEPT_TABLE(dfa)[state] & 0x10000000)
-		perms.allow |= AA_CONT_MATCH;
 
 	/*
 	 * This mapping is convulated due to history.
@@ -267,10 +263,9 @@ static struct aa_perms *compute_perms(struct aa_dfa *dfa, u32 version,
 	*size = state_count;
 
 	/* zero init so skip the trap state (state == 0) */
-	for (state = 1; state < state_count; state++) {
+	for (state = 1; state < state_count; state++)
 		table[state] = compute_perms_entry(dfa, state, version);
-		AA_DEBUG(DEBUG_UNPACK, "[%d]: (0x%x/0x%x/0x%x//0x%x/0x%x//0x%x), converted from accept1: 0x%x, accept2: 0x%x", state, table[state].allow, table[state].deny, table[state].prompt, table[state].audit, table[state].quiet, table[state].xindex, ACCEPT_TABLE(dfa)[state], ACCEPT_TABLE2(dfa)[state]);
-	}
+
 	return table;
 }
 

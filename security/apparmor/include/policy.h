@@ -34,11 +34,7 @@
 struct aa_ns;
 
 extern int unprivileged_userns_apparmor_policy;
-extern int aa_unprivileged_userns_restricted;
-extern int aa_unprivileged_userns_restricted_force;
-extern int aa_unprivileged_userns_restricted_complain;
 extern int aa_unprivileged_unconfined_restricted;
-extern int aa_unprivileged_uring_restricted;
 
 extern const char *const aa_profile_mode_names[];
 #define APPARMOR_MODE_NAMES_MAX_INDEX 4
@@ -83,32 +79,11 @@ enum profile_mode {
 };
 
 
-struct aa_tags_header {
-	u32 mask;	/* bit mask matching permissions */
-	u32 count;	/* number of strings per entry */
-	u32 size;	/* size of all strings covered by count */
-	u32 tags;	/* index into string table */
-};
-
-struct aa_tags_struct {
-	struct {
-		u32 size;		/* number of entries in tagsets */
-		u32 *table;		/* indexes into headers & strs */
-	} sets;
-	struct {
-		u32 size;	/* number of headres == num of strs */
-		struct aa_tags_header *table;
-	} hdrs;
-	struct aa_str_table strs;
-};
-
 /* struct aa_policydb - match engine for a policy
  * count: refcount for the pdb
  * dfa: dfa pattern match
  * perms: table of permissions
  * strs: table of strings, index by x
- * tags: table of tags that perms->tag indexes
- * tags_count: numer of tagsets
  * start: set of start states for the different classes of data
  */
 struct aa_policydb {
@@ -119,13 +94,11 @@ struct aa_policydb {
 		u32 size;
 	};
 	struct aa_str_table trans;
-	struct aa_tags_struct tags;
 	aa_state_t start[AA_CLASS_LAST + 1];
 };
 
 extern struct aa_policydb *nullpdb;
 
-void aa_destroy_tags(struct aa_tags_struct *tags);
 struct aa_policydb *aa_alloc_pdb(gfp_t gfp);
 void aa_pdb_free_kref(struct kref *kref);
 
@@ -205,9 +178,6 @@ struct aa_ruleset {
 	struct aa_secmark *secmark;
 };
 
-void aa_free_ruleset(struct aa_ruleset *rules);
-struct aa_ruleset *aa_new_ruleset(gfp_t gfp);
-struct aa_ruleset *aa_clone_ruleset(struct aa_ruleset *rules);
 
 /* struct aa_attachment - data and rules for a profiles attachment
  * @list:
@@ -238,7 +208,6 @@ struct aa_attachment {
  * @disconnected: what to prepend if attach_disconnected is specified
  * @attach: attachment rules for the profile
  * @rules: rules to be enforced
- * @net_compat: v2 compat network controls for the profile
  *
  * learning_cache: the accesses learned in complain mode
  * raw_data: rawdata of the loaded profile policy
@@ -274,12 +243,8 @@ struct aa_profile {
 	u32 path_flags;
 	int signal;
 	const char *disconnected;
-	const char *disconnected_ipc;
 
 	struct aa_attachment attach;
-	struct aa_net_compat *net_compat;
-
-	struct aa_audit_cache learning_cache;
 
 	struct aa_loaddata *rawdata;
 	unsigned char *hash;
@@ -362,23 +327,7 @@ static inline aa_state_t RULE_MEDIATES_NET(struct aa_ruleset *rules)
 	/* fallback and check v7/8 if v9 is NOT mediated */
 	if (!state)
 		state = RULE_MEDIATES(rules, AA_CLASS_NET);
-	return state;
-}
 
-static inline aa_state_t RULE_MEDIATES_UNIX(struct aa_ruleset *rules)
-{
-	/* can not use RULE_MEDIATE_v9AF here, because AF match fail
-	 * can not be distiguished from class match fail, and we only
-	 * fallback to checking older class on class match failure
-	 */
-	aa_state_t state = RULE_MEDIATES(rules, AA_CLASS_NETV9);
-
-	/* fallback and check v7/8 if v9 is NOT mediated */
-	if (!state) {
-		state = RULE_MEDIATES(rules, AA_CLASS_NET);
-		if (!state)
-			state = RULE_MEDIATES(rules, AA_CLASS_NET_COMPAT);
-	}
 	return state;
 }
 
