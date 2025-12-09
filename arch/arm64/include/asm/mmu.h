@@ -106,11 +106,5 @@ static inline bool kaslr_requires_kpti(void)
 	return true;
 }
 
-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-void kpti_install_ng_mappings(void);
-#else
-static inline void kpti_install_ng_mappings(void) {}
-#endif
-
 #endif	/* !__ASSEMBLY__ */
 #endif
