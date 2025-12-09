@@ -99,12 +99,11 @@ jobs:
           ./scripts/config --set-str LOCALVERSION "${{ env.KERNEL_LOCALVERSION }}"
           ./scripts/config --disable LOCALVERSION_AUTO
 
-          # Critical: Enable module signing for NVIDIA driver compatibility
-          ./scripts/config --enable MODULE_SIG
-          ./scripts/config --enable MODULE_SIG_ALL
-          ./scripts/config --disable MODULE_SIG_FORCE
-          ./scripts/config --set-str MODULE_SIG_KEY "certs/signing_key.pem"
-          ./scripts/config --set-str MODULE_SIG_HASH "sha512"
+          # Disable module signing to simplify build (can be enabled later)
+          ./scripts/config --disable MODULE_SIG
+          ./scripts/config --disable MODULE_SIG_ALL
+          ./scripts/config --set-str SYSTEM_TRUSTED_KEYS ""
+          ./scripts/config --set-str SYSTEM_REVOCATION_KEYS ""
 
           # Enable important features for DGX Spark
           ./scripts/config --enable NVIDIA_WMI_EC_BACKLIGHT
