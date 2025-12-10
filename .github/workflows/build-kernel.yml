@@ -160,16 +160,36 @@ jobs:
           echo "=== Starting full kernel build ==="
           echo "Using $(nproc) cores"
 
-          # Build kernel image
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz
+          # Build kernel image with error capture
+          echo "=== Building Image.gz ==="
+          if ! make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tee build-image.log; then
+            echo "=== Image.gz build FAILED - Last 100 lines of log: ==="
+            tail -100 build-image.log
+            exit 1
+          fi
+          echo "=== Image.gz build complete ==="
 
-          # Build modules
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) modules
+          # Build modules with error capture
+          echo "=== Building modules ==="
+          if ! make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) modules 2>&1 | tee build-modules.log; then
+            echo "=== Modules build FAILED - Last 100 lines of log: ==="
+            tail -100 build-modules.log
+            echo "=== Grep for errors: ==="
+            grep -i "error\|undefined\|fatal" build-modules.log | tail -50 || true
+            exit 1
+          fi
+          echo "=== Modules build complete ==="
 
-          # Build DTBs
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs
+          # Build DTBs with error capture
+          echo "=== Building DTBs ==="
+          if ! make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tee build-dtbs.log; then
+            echo "=== DTBs build FAILED - Last 100 lines of log: ==="
+            tail -100 build-dtbs.log
+            exit 1
+          fi
+          echo "=== DTBs build complete ==="
 
-          echo "=== Build complete ==="
+          echo "=== Full kernel build complete ==="
 
       - name: Create Debian packages
         if: github.event.inputs.build_type != 'quick-test'
