@@ -2235,7 +2235,10 @@ static bool has_bbml2_noabort(const struct arm64_cpu_capabilities *caps, int sco
 	static const struct midr_range supports_bbml2_noabort_list[] = {
 		MIDR_REV_RANGE(MIDR_CORTEX_X4, 0, 3, 0xf),
 		MIDR_REV_RANGE(MIDR_NEOVERSE_V3, 0, 2, 0xf),
+		MIDR_REV_RANGE(MIDR_NEOVERSE_V3AE, 0, 2, 0xf),
 		MIDR_ALL_VERSIONS(MIDR_NVIDIA_OLYMPUS),
+		MIDR_ALL_VERSIONS(MIDR_AMPERE1),
+		MIDR_ALL_VERSIONS(MIDR_AMPERE1A),
 		{}
 	};
 
@@ -2249,6 +2252,15 @@ static bool has_bbml2_noabort(const struct arm64_cpu_capabilities *caps, int sco
 	 */
 
 	return true;
+}
+
+/*
+ * Public function to check if CPU supports BBML2 without TLB conflict aborts.
+ * Called before system capabilities are finalized.
+ */
+bool cpu_supports_bbml2_noabort(void)
+{
+	return has_bbml2_noabort(NULL, SCOPE_LOCAL_CPU);
 }
 
 #ifdef CONFIG_ARM64_PAN
