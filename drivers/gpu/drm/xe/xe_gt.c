@@ -579,9 +579,6 @@ static int do_gt_restart(struct xe_gt *gt)
 		xe_lmtt_init_hw(&gt_to_tile(gt)->sriov.pf.lmtt);
 
 	xe_mocs_init(gt);
-	err = xe_uc_start(&gt->uc);
-	if (err)
-		return err;
 
 	for_each_hw_engine(hwe, gt, id) {
 		xe_reg_sr_apply_mmio(&hwe->reg_sr, gt);
@@ -590,6 +587,10 @@ static int do_gt_restart(struct xe_gt *gt)
 
 	/* Get CCS mode in sync between sw/hw */
 	xe_gt_apply_ccs_mode(gt);
+
+	err = xe_uc_start(&gt->uc);
+	if (err)
+		return err;
 
 	return 0;
 }
