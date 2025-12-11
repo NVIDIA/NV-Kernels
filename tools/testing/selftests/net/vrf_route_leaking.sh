@@ -58,6 +58,7 @@
 # to send an ICMP error back to the source when the ttl of a packet reaches 1
 # while it is forwarded between different vrfs.
 
+source lib.sh
 VERBOSE=0
 PAUSE_ON_FAIL=no
 DEFAULT_TTYPE=sym
@@ -281,7 +282,7 @@ setup_sym()
 
 
 	# Wait for ip config to settle
-	sleep 2
+	slowwait 5 ip netns exec $h1 "${ping6}" -c1 -w1 ${H2_N2_IP6} >/dev/null 2>&1
 }
 
 setup_asym()
@@ -379,7 +380,7 @@ setup_asym()
 	ip -netns r2 -6 addr add dev eth1 ${R2_N2_IP6}/64 nodad
 
 	# Wait for ip config to settle
-	sleep 2
+	slowwait 5 ip netns exec $h1 "${ping6}" -c1 -w1 ${H2_N2_IP6} >/dev/null 2>&1
 }
 
 check_connectivity()
