@@ -1585,6 +1585,13 @@ int ocfs2_validate_inode_block(struct super_block *sb,
 		goto bail;
 	}
 
+	if ((le16_to_cpu(di->i_dyn_features) & OCFS2_HAS_REFCOUNT_FL) &&
+	    !di->i_refcount_loc) {
+		rc = ocfs2_error(sb, "Inode #%llu has refcount flag but no i_refcount_loc\n",
+				(unsigned long long)bh->b_blocknr);
+		goto bail;
+	}
+
 	if (S_ISLNK(le16_to_cpu(di->i_mode)) &&
 	    !le32_to_cpu(di->i_clusters)) {
 		int max_inline = ocfs2_fast_symlink_chars(sb);
