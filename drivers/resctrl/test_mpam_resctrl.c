@@ -250,7 +250,7 @@ static void test_percent_to_mbw_max(struct kunit *test)
 		KUNIT_EXPECT_EQ(test, res.value, res.max_value << res.shift);
 }
 
-static const void *test_all_bwa_wd_gen_params(struct kunit *test, const void *prev,
+static const void *test_all_bwa_wd_gen_params(const void *prev,
 					      char *desc)
 {
 	uintptr_t param = (uintptr_t)prev;
