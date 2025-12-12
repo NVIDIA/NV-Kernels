@@ -748,8 +748,13 @@ void rtl8127_ptp_init(struct rtl8127_private *tp)
 
         /* init a hrtimer for pps */
         tp->pps_enable = 0;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,15,0)
+	hrtimer_setup(&tp->pps_timer, rtl8127_hrtimer_for_pps, CLOCK_MONOTONIC,
+		      HRTIMER_MODE_REL);
+#else
         hrtimer_init(&tp->pps_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
         tp->pps_timer.function = rtl8127_hrtimer_for_pps;
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(6,15,0) */
 
         tp->hwtstamp_config.rx_filter = HWTSTAMP_FILTER_NONE;
         tp->hwtstamp_config.tx_type = HWTSTAMP_TX_OFF;
