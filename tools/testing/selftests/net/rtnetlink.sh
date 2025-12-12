@@ -739,7 +739,14 @@ kci_test_ipsec()
 kci_test_ipsec_offload()
 {
 	local ret=0
-	algo="aead rfc4106(gcm(aes)) 0x3132333435363738393031323334353664636261 128"
+	lscpu | grep "Byte Order" | grep "Big" > /dev/null
+	isLittleEndian=$?
+	# If Big Endian invert key elements to use the same parsing for both endiannesses
+	if [ "$isLittleEndian" == "1" ]; then
+		algo="aead rfc4106(gcm(aes)) 0x3132333435363738393031323334353664636261 128"
+	else
+		algo="aead rfc4106(gcm(aes)) 0x3433323138373635323130393635343361626364 128"
+	fi
 	srcip=192.168.123.3
 	dstip=192.168.123.4
 	sysfsd=/sys/kernel/debug/netdevsim/netdevsim0/ports/0/
