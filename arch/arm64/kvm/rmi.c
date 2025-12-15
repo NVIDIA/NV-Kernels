@@ -600,6 +600,42 @@ free_rd:
 	return r;
 }
 
+/* Protects access to rmi_vmid_bitmap */
+static DEFINE_SPINLOCK(rmi_vmid_lock);
+static unsigned long *rmi_vmid_bitmap;
+
+static int rmi_vmid_init(void)
+{
+	unsigned int vmid_count = 1 << kvm_get_vmid_bits();
+
+	rmi_vmid_bitmap = bitmap_zalloc(vmid_count, GFP_KERNEL);
+	if (!rmi_vmid_bitmap) {
+		kvm_err("%s: Couldn't allocate rmi vmid bitmap\n", __func__);
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int rmi_vmid_reserve(void)
+{
+	int ret;
+	unsigned int vmid_count = 1 << kvm_get_vmid_bits();
+
+	spin_lock(&rmi_vmid_lock);
+	ret = bitmap_find_free_region(rmi_vmid_bitmap, vmid_count, 0);
+	spin_unlock(&rmi_vmid_lock);
+
+	return ret;
+}
+
+static void rmi_vmid_release(unsigned int vmid)
+{
+	spin_lock(&rmi_vmid_lock);
+	bitmap_release_region(rmi_vmid_bitmap, vmid, 0);
+	spin_unlock(&rmi_vmid_lock);
+}
+
 static int realm_unmap_private_page(struct realm *realm,
 				    unsigned long ipa,
 				    unsigned long *next_addr)
@@ -903,6 +939,7 @@ static int realm_init_ipa_state(struct kvm *kvm,
 
 static int realm_ensure_created(struct kvm *kvm)
 {
+	struct realm *realm = &kvm->arch.realm;
 	int ret;
 
 	switch (kvm_realm_state(kvm)) {
@@ -916,7 +953,13 @@ static int realm_ensure_created(struct kvm *kvm)
 		return -EBUSY;
 	}
 
+	ret = rmi_vmid_reserve();
+	if (ret < 0)
+		return ret;
+	realm->vmid = ret;
 	ret = realm_create_rd(kvm);
+	if (ret)
+		rmi_vmid_release(realm->vmid);
 	return ret;
 }
 
@@ -1307,6 +1350,8 @@ void kvm_destroy_realm(struct kvm *kvm)
 		realm->rd = NULL;
 	}
 
+	rmi_vmid_release(realm->vmid);
+
 	for (i = 0; i < pgd_size; i += RMM_PAGE_SIZE) {
 		phys_addr_t pgd_phys = kvm->arch.mmu.pgd_phys + i;
 
@@ -1340,6 +1385,9 @@ void kvm_init_rmi(void)
 		return;
 
 	if (WARN_ON(rmi_features(0, &rmm_feat_reg0)))
+		return;
+
+	if (rmi_vmid_init())
 		return;
 
 	/* Future patch will enable static branch kvm_rmi_is_available */
