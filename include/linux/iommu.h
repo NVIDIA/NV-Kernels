@@ -1205,6 +1205,10 @@ int iommu_group_set_qos_params(struct iommu_group *group,
 			       u16 partition, u8 perf_mon_grp);
 int iommu_group_get_qos_params(struct iommu_group *group,
 			       u16 *partition, u8 *perf_mon_grp);
+
+/* PCI device reset functions */
+int pci_dev_reset_iommu_prepare(struct pci_dev *pdev);
+void pci_dev_reset_iommu_done(struct pci_dev *pdev);
 #else /* CONFIG_IOMMU_API */
 
 struct iommu_ops {};
@@ -1553,6 +1557,15 @@ static inline int iommu_group_get_qos_params(struct iommu_group *group,
 					     u16 *partition, u8 *perf_mon_grp)
 {
 	return -ENODEV;
+}
+
+static inline int pci_dev_reset_iommu_prepare(struct pci_dev *pdev)
+{
+	return 0;
+}
+
+static inline void pci_dev_reset_iommu_done(struct pci_dev *pdev)
+{
 }
 #endif /* CONFIG_IOMMU_API */
 
