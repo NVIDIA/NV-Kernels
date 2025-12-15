@@ -1659,5 +1659,5 @@ void kvm_init_rmi(void)
 	if (rmi_vmid_init())
 		return;
 
-	/* Future patch will enable static branch kvm_rmi_is_available */
+	static_branch_enable(&kvm_rmi_is_available);
 }
