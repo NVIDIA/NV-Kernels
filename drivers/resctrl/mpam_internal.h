@@ -256,7 +256,7 @@ struct mpam_props {
  * removed, and will false-positive if the compiler introduces padding that
  * isn't cleared during sanitisation.
  */
-} PACKED_FOR_KUNIT;
+} PACKED_FOR_KUNIT __aligned(__alignof__(unsigned long));
 
 #define mpam_has_feature(_feat, x)	test_bit(_feat, (x)->features)
 #define mpam_set_feature(_feat, x)	set_bit(_feat, (x)->features)
