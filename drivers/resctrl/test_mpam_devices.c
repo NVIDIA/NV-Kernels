@@ -12,17 +12,19 @@ static void test__props_mismatch(struct kunit *test)
 {
 	struct mpam_props parent = { 0 };
 	struct mpam_props child;
+	size_t props_bytes = offsetof(struct mpam_props, num_mbwu_mon) +
+			    sizeof(parent.num_mbwu_mon);
 
 	memset(&child, 0xff, sizeof(child));
 	__props_mismatch(&parent, &child, false);
 
 	memset(&child, 0, sizeof(child));
-	KUNIT_EXPECT_EQ(test, memcmp(&parent, &child, sizeof(child)), 0);
+	KUNIT_EXPECT_EQ(test, memcmp(&parent, &child, props_bytes), 0);
 
 	memset(&child, 0xff, sizeof(child));
 	__props_mismatch(&parent, &child, true);
 
-	KUNIT_EXPECT_EQ(test, memcmp(&parent, &child, sizeof(child)), 0);
+	KUNIT_EXPECT_EQ(test, memcmp(&parent, &child, props_bytes), 0);
 }
 
 static struct list_head fake_classes_list;
