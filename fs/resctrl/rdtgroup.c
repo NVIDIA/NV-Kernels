@@ -4360,26 +4360,24 @@ void resctrl_offline_mon_domain(struct rdt_resource *r, struct rdt_domain_hdr *h
 {
 	struct rdt_l3_mon_domain *d;
 
-	d = container_of(hdr, struct rdt_l3_mon_domain, hdr);
-
-	/*
-	 * Called by architecture under CPU hotplug lock as it prepares to remove
-	 * the domain which is guaranteed to be accessible here.
-	 * The domain has been unlinked from the RCU list and a grace period
-	 * has elapsed, so no new worker can be scheduled. Drain any worker that
-	 * is in flight or pending before letting architecture proceed to free
-	 * the domain that has the workers' struct delayed_work embedded.
-	 * Do so before taking rdtgroup_mutex since the workers also acquire it.
-	 */
-	if (resctrl_is_mbm_enabled())
-		cancel_delayed_work_sync(&d->mbm_over);
-	if (resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID))
-		cancel_delayed_work_sync(&d->cqm_limbo);
+	if (r->rid == RDT_RESOURCE_L3) {
+		d = container_of(hdr, struct rdt_l3_mon_domain, hdr);
+		/*
+		 * Called by architecture under CPU hotplug lock as it prepares to remove
+		 * the domain which is guaranteed to be accessible here.
+		 * The domain has been unlinked from the RCU list and a grace period
+		 * has elapsed, so no new worker can be scheduled. Drain any worker that
+		 * is in flight or pending before letting architecture proceed to free
+		 * the domain that has the workers' struct delayed_work embedded.
+		 * Do so before taking rdtgroup_mutex since the workers also acquire it.
+		 */
+		if (resctrl_is_mbm_enabled())
+			cancel_delayed_work_sync(&d->mbm_over);
+		if (resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID))
+			cancel_delayed_work_sync(&d->cqm_limbo);
+	}
 
 	mutex_lock(&rdtgroup_mutex);
-
-	if (!domain_header_is_valid(hdr, RESCTRL_MON_DOMAIN, RDT_RESOURCE_L3))
-		goto out_unlock;
 
 	/*
 	 * If resctrl is mounted, remove all the
@@ -4387,6 +4385,12 @@ void resctrl_offline_mon_domain(struct rdt_resource *r, struct rdt_domain_hdr *h
 	 */
 	if (resctrl_mounted && resctrl_arch_mon_capable())
 		rmdir_mondata_subdir_allrdtgrp(r, hdr);
+
+	if (r->rid != RDT_RESOURCE_L3)
+		goto out_unlock;
+
+	if (!domain_header_is_valid(hdr, RESCTRL_MON_DOMAIN, RDT_RESOURCE_L3))
+		goto out_unlock;
 
 	if (resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID) && has_busy_rmid(d)) {
 		/*
@@ -4482,6 +4486,9 @@ int resctrl_online_mon_domain(struct rdt_resource *r, struct rdt_domain_hdr *hdr
 
 	mutex_lock(&rdtgroup_mutex);
 
+	if (r->rid != RDT_RESOURCE_L3)
+		goto mkdir;
+
 	if (!domain_header_is_valid(hdr, RESCTRL_MON_DOMAIN, RDT_RESOURCE_L3))
 		goto out_unlock;
 
@@ -4499,6 +4506,8 @@ int resctrl_online_mon_domain(struct rdt_resource *r, struct rdt_domain_hdr *hdr
 	if (resctrl_is_mon_event_enabled(QOS_L3_OCCUP_EVENT_ID))
 		INIT_DELAYED_WORK(&d->cqm_limbo, cqm_handle_limbo);
 
+mkdir:
+	err = 0;
 	/*
 	 * If the filesystem is not mounted then only the default resource group
 	 * exists. Creation of its directories is deferred until mount time
