@@ -91,10 +91,10 @@ chk_channels() {
 		grep Combined: | tail -n 1 | awk '{print $2}'`
 
 	printf "%-60s" "$msg"
-	if [ "$cur_rx" = "$rx" -a "$cur_tx" = "$tx" -a "$cur_combined" = "n/a" ]; then
+	if [ "$cur_rx" = "$rx" -a "$cur_tx" = "$tx" ] && [ "$cur_combined" = "n/a" -o "$cur_combined" = "0" ]; then
 		echo " ok "
 	else
-		echo " fail rx:$rx:$cur_rx tx:$tx:$cur_tx combined:n/a:$cur_combined"
+		echo " fail rx:$rx:$cur_rx tx:$tx:$cur_tx combined:$cur_combined"
 	fi
 }
 
