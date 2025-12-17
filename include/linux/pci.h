@@ -249,6 +249,11 @@ enum pci_dev_flags {
 	PCI_DEV_FLAGS_MSIX_TOUCH_ENTRY_DATA_FIRST = (__force pci_dev_flags_t) (1 << 13),
 	/* Do not use Configuration Request Retry Status polling in pci_dev_wait() */
 	PCI_DEV_FLAGS_NO_RRS_SV = (__force pci_dev_flags_t) (1 << 14),
+	/*
+	 * PCIe to PCI bridge does not create RID aliases because the bridge is
+	 * integrated with the downstream devices and doesn't use real PCI.
+	 */
+	PCI_DEV_FLAGS_PCI_BRIDGE_NO_ALIASES = (__force pci_dev_flags_t) (1 << 15),
 };
 
 enum pci_irq_reroute_variant {
