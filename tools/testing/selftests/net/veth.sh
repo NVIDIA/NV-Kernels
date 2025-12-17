@@ -248,7 +248,7 @@ cleanup
 create_ns
 ip -n $NS_DST link set dev veth$DST up
 ip -n $NS_DST link set dev veth$DST xdp object ../bpf/xdp_dummy.o section xdp
-ip netns exec $NS_DST ethtool -K veth$DST generic-receive-offload on
+ip netns exec $NS_DST ethtool -K veth$DST gro on
 chk_gro_flag "gro vs xdp while down - gro flag on" $DST on
 ip -n $NS_DST link set dev veth$DST down
 chk_gro_flag "                      - after down" $DST on
@@ -333,7 +333,7 @@ chk_tso_flag "        - tso flag" $SRC off
 chk_tso_flag "        - peer tso flag" $DST on
 ip netns exec $NS_DST ethtool -K veth$DST rx-udp-gro-forwarding on
 chk_gro "        - no aggregation" 10
-ip netns exec $NS_DST ethtool -K veth$DST generic-receive-offload on
+ip netns exec $NS_DST ethtool -K veth$DST gro on
 chk_gro_flag "        - gro flag with GRO on" $DST on
 chk_gro "        - aggregation" 1
 
