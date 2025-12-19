@@ -1429,7 +1429,7 @@ static void __ris_msmon_read(void *arg)
 	int ret;
 	u32 now32;
 	bool config_mismatch;
-	bool overflow;
+	bool overflow = false;
 	struct mon_read *m = arg;
 	struct mon_cfg *ctx = m->ctx;
 	bool reset_on_next_read = false;
