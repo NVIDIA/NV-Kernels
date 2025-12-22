@@ -8,6 +8,7 @@ config CEPH_LIB
 	select CRYPTO_GCM
 	select CRYPTO_HMAC
 	select CRYPTO_SHA256
+	select CRYPTO_KRB5
 	select CRYPTO
 	select KEYS
 	default n
