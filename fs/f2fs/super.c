@@ -4777,10 +4777,10 @@ reset_checkpoint:
 			goto free_meta;
 	}
 
-	f2fs_init_inmem_curseg(sbi);
-
 	/* f2fs_recover_fsync_data() cleared this already */
 	clear_sbi_flag(sbi, SBI_POR_DOING);
+
+	f2fs_init_inmem_curseg(sbi);
 
 	if (test_opt(sbi, DISABLE_CHECKPOINT))
 		err = f2fs_disable_checkpoint(sbi);
