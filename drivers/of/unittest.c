@@ -1759,6 +1759,7 @@ static int __init unittest_data_add(void)
 	if (rc) {
 		pr_err("%s: Failed to resolve phandles (rc=%i)\n", __func__, rc);
 		of_overlay_mutex_unlock();
+		kfree(unittest_data);
 		return -EINVAL;
 	}
 
