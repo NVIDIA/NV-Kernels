@@ -14298,7 +14298,7 @@ rtl8127_init_one(struct pci_dev *pdev,
         rtl8127_sysfs_init(dev);
 #endif /* ENABLE_R8127_SYSFS */
 
-        printk("%s", GPL_CLAIM);
+        printk(KERN_INFO "%s", GPL_CLAIM);
 
 out:
         return rc;
