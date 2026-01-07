@@ -140,3 +140,4 @@ MODULE_ALIAS("platform:leds-aaeon");
 MODULE_DESCRIPTION("AAEON LED Driver");
 MODULE_AUTHOR("Kunyang Fan <kunyang_fan@asus.com>");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS("ASUS_WMI");
