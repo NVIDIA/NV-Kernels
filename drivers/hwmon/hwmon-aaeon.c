@@ -566,3 +566,4 @@ MODULE_DESCRIPTION("AAEON Hardware Monitoring Driver");
 MODULE_AUTHOR("Edward Lin <edward1_lin@aaeon.com.tw>");
 MODULE_AUTHOR("Kunyang Fan <kunyang_fan@aaeon.com.tw>");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS("ASUS_WMI");
