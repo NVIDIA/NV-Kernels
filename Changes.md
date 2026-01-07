@@ -50,3 +50,14 @@ Others:
  - UBUNTU: SAUCE: riscv: dts: microchip: Disable PCIe on the Icicle Kit
  - UBUNTU: SAUCE: audit: fix skb leak when audit rate limit is exceeded
  - UBUNTU: SAUCE: (no-up) mei_me: Add module parameter to disable MSI
+
+6.19:
+ - UBUNTU: SAUCE: media: Support ov05c10 camera sensor
+ - UBUNTU: SAUCE: drm/dp: clamp PWM bit count to advertised MIN and MAX capabilities
+ - UBUNTU: SAUCE: arm64: dts: qcom: x1e80100-asus-zenbook-a14: Enable WiFi, Bluetooth
+ - UBUNTU: SAUCE: leds: lp55xx -- do not force use of the fallback loader
+ - UBUNTU: SAUCE: phy: qcom-qmp-combo: drop regulator loads
+ - UBUNTU: SAUCE: phy: qcom: qmp-combo: get default qmpphy_mode from DT
+ - UBUNTU: SAUCE: dt-bindings: arm: qcom: Add Asus Zenbook A14 UX3407QA LCD/OLED variants
+ - UBUNTU: SAUCE: arm64: dts: qcom: Rework X1-based Asus Zenbook A14's displays
+ - Dropped lsm reverts due to fixing lockdown
