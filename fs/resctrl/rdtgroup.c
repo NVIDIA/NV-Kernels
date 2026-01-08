@@ -19,6 +19,7 @@
 #include <linux/iommu.h>
 #include <linux/sysfs.h>
 #include <linux/kernfs.h>
+#include <linux/once.h>
 #include <linux/resctrl.h>
 #include <linux/seq_buf.h>
 #include <linux/seq_file.h>
@@ -2957,6 +2958,8 @@ static int rdt_get_tree(struct fs_context *fc)
 	struct rdt_l3_mon_domain *dom;
 	struct rdt_resource *r;
 	int ret;
+
+	DO_ONCE_SLEEPABLE(resctrl_arch_pre_mount);
 
 	if (ctx->enable_abi_playground)
 		enable_abi_playground();
