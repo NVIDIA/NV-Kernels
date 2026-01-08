@@ -857,7 +857,7 @@ CONFIG_6PACK                                    policy<{'amd64': 'm', 'arm64': '
 CONFIG_8139CP                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_8139TOO                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_8139TOO_8129                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y'}>
-CONFIG_8139TOO_PIO                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y'}>
+CONFIG_8139TOO_PIO                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': '-', 'ppc64el': 'y'}>
 CONFIG_8139TOO_TUNE_TWISTER                     policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n'}>
 CONFIG_8139_OLD_RX_RESET                        policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n'}>
 CONFIG_842_COMPRESS                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
