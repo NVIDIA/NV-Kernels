@@ -95,4 +95,6 @@ config NVIDIA_FFA_EC
 
 	 Say M or Y here to include this support.
 
+source "drivers/platform/arm64/nvidia/Kconfig"
+
 endif # ARM64_PLATFORM_DEVICES
