@@ -141,6 +141,9 @@ CONFIG_MICROSOFT_MANA                           note<'LP: #2084598'>
 CONFIG_MTD                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_MTD                                      note<'Essential for boot on ARM64'>
 
+CONFIG_MTK_PCIE_HOTPLUG                         policy<{'arm64': 'm'}>
+CONFIG_MTK_PCIE_HOTPLUG                         note<'CX7 PCIe hotplug driver for NVIDIA DGX Spark systems with GB10 SoC.'>
+
 CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_NOUVEAU_DEBUG                            note<'Disable nouveau for NVIDIA kernels'>
 
