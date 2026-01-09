@@ -124,8 +124,6 @@ nvgrace_gpu_vfio_pci_register_pfn_range(struct mem_region *region,
 	return ret;
 }
 
-extern struct vfio_device *vfio_device_from_file(struct file *file);
-
 static vm_fault_t nvgrace_gpu_vfio_pci_fault(struct vm_fault *vmf)
 {
 	unsigned long mem_offset = vmf->pgoff - vmf->vma->vm_pgoff;
