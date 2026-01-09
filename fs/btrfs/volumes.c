@@ -1321,8 +1321,9 @@ static struct btrfs_super_block *btrfs_read_disk_super(struct block_device *bdev
 		return ERR_PTR(-EINVAL);
 
 	/* pull in the page with our super */
+	filemap_invalidate_lock(bdev->bd_inode->i_mapping);
 	page = read_cache_page_gfp(bdev->bd_inode->i_mapping, index, GFP_KERNEL);
-
+	filemap_invalidate_unlock(bdev->bd_inode->i_mapping);
 	if (IS_ERR(page))
 		return ERR_CAST(page);
 
