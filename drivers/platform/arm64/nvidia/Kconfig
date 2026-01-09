@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# NVIDIA ARM64 Platform-Specific Device Drivers
+#
+
+config MTK_PCIE_HOTPLUG
+	tristate "CX7 PCIe Hotplug Driver"
+	depends on EINT_MTK
+	depends on PCI && ACPI
+	help
+	  Say Y here to support PCIe device plug in/out detection.
+	  It will disable PCIe link when plug out and enable
+	  PCIe link after plug in.
+
+	  This is particularly useful for GB10 SoC.
+
+	  If unsure, say N.
