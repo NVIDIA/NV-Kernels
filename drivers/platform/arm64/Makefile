@@ -11,3 +11,4 @@ obj-$(CONFIG_EC_LENOVO_YOGA_C630) += lenovo-yoga-c630.o
 obj-$(CONFIG_EC_LENOVO_THINKPAD_T14S) += lenovo-thinkpad-t14s.o
 obj-$(CONFIG_EC_LENOVO_YOGA_SLIM7X) += lenovo-yoga-slim7x.o
 obj-$(CONFIG_NVIDIA_FFA_EC) += nvidia-ffa-ec.o
+obj-y += nvidia/
