@@ -1757,6 +1757,8 @@ static DEFINE_MUTEX(vmap_purge_lock);
 /* for per-CPU blocks */
 static void purge_fragmented_blocks_allcpus(void);
 
+#define KASAN_RELEASE_BATCH_SIZE 32
+
 /*
  * Purges all lazily-freed vmap areas.
  */
@@ -1764,6 +1766,7 @@ static bool __purge_vmap_area_lazy(unsigned long start, unsigned long end)
 {
 	unsigned long resched_threshold;
 	unsigned int num_purged_areas = 0;
+	unsigned int batch_count = 0;
 	struct list_head local_purge_list;
 	struct vmap_area *va, *n_va;
 
@@ -1808,6 +1811,18 @@ static bool __purge_vmap_area_lazy(unsigned long start, unsigned long end)
 		if (is_vmalloc_or_module_addr((void *)orig_start))
 			kasan_release_vmalloc(orig_start, orig_end,
 					      va->va_start, va->va_end);
+
+		/*
+		 * Freeing KASAN shadow pages can be expensive (e.g. stack
+		 * unwinding under page_owner). Yield periodically to avoid
+		 * RCU stalls. free_vmap_area_lock is held here, so drop and
+		 * reacquire it via cond_resched_lock() instead of a bare
+		 * cond_resched().
+		 */
+		if (need_resched() || (++batch_count >= KASAN_RELEASE_BATCH_SIZE)) {
+			cond_resched_lock(&free_vmap_area_lock);
+			batch_count = 0;
+		}
 
 		atomic_long_sub(nr, &vmap_lazy_nr);
 		num_purged_areas++;
