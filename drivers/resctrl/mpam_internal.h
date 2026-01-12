@@ -13,7 +13,6 @@
 #include <linux/llist.h>
 #include <linux/mailbox_client.h>
 #include <linux/mutex.h>
-#include <linux/srcu.h>
 #include <linux/resctrl.h>
 #include <linux/spinlock.h>
 #include <linux/srcu.h>
