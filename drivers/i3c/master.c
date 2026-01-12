@@ -2808,7 +2808,6 @@ int i3c_master_register(struct i3c_master_controller *master,
 	INIT_LIST_HEAD(&master->boardinfo.i3c);
 
 	device_initialize(&master->dev);
-	dev_set_name(&master->dev, "i3c-%d", i3cbus->id);
 
 	master->dev.dma_mask = parent->dma_mask;
 	master->dev.coherent_dma_mask = parent->coherent_dma_mask;
@@ -2817,6 +2816,8 @@ int i3c_master_register(struct i3c_master_controller *master,
 	ret = i3c_bus_init(i3cbus, master->dev.of_node);
 	if (ret)
 		goto err_put_dev;
+
+	dev_set_name(&master->dev, "i3c-%d", i3cbus->id);
 
 	ret = of_populate_i3c_bus(master);
 	if (ret)
