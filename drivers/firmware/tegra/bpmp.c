@@ -1000,6 +1000,13 @@ static const struct tegra_bpmp_soc tegra210_soc = {
 };
 #endif
 
+#if IS_ENABLED(CONFIG_ARCH_TEGRA_241_SOC)
+static const struct tegra_bpmp_soc tegra410_soc = {
+	.ops = &tegra410_bpmp_ops,
+};
+#endif
+
+
 static const struct of_device_id tegra_bpmp_match[] = {
 #if IS_ENABLED(CONFIG_ARCH_TEGRA_186_SOC) || \
     IS_ENABLED(CONFIG_ARCH_TEGRA_194_SOC) || \
@@ -1013,10 +1020,18 @@ static const struct of_device_id tegra_bpmp_match[] = {
 	{ }
 };
 
+static const struct acpi_device_id tegra_bpmp_acpi_match[] = {
+#if IS_ENABLED(CONFIG_ARCH_TEGRA_241_SOC)
+	{.id = "NVDA3001", .driver_data = (kernel_ulong_t)&tegra410_soc},
+#endif
+	{ }
+};
+
 static struct platform_driver tegra_bpmp_driver = {
 	.driver = {
 		.name = "tegra-bpmp",
 		.of_match_table = tegra_bpmp_match,
+		.acpi_match_table = tegra_bpmp_acpi_match,
 		.pm = &tegra_bpmp_pm_ops,
 		.suppress_bind_attrs = true,
 	},
