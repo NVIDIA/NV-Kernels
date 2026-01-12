@@ -96,6 +96,9 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'LP: #2028576: Perf governo
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           note<'LP: #2028576: Perf governor required for NVIDIA workloads'>
 
+CONFIG_CXL_MEM_RAW_COMMANDS                     policy<{'amd64': 'n', 'arm64': 'y'}>
+CONFIG_CXL_MEM_RAW_COMMANDS                     note<'Enable CXL raw commands for memory devices'>
+
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
 
