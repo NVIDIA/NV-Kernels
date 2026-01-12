@@ -1840,6 +1840,54 @@ static void apparmor_sock_graft(struct sock *sk, struct socket *parent)
 }
 
 #ifdef CONFIG_NETWORK_SECMARK
+
+/* secmark reference count */
+static atomic_t apparmor_secmark_refcount = ATOMIC_INIT(0);
+
+
+/* count of rules using secmark that have been loaded into netfilter
+ * would be nice if it was per packet, or least per secid so we know which ids
+ * to pin
+ */
+static void apparmor_secmark_refcount_inc(void)
+{
+	atomic_inc(&apparmor_secmark_refcount);
+}
+
+/* rule using secmark has been removed from netfilter */
+static void apparmor_secmark_refcount_dec(void)
+{
+	atomic_dec(&apparmor_secmark_refcount);
+}
+
+static inline bool aa_secmark_enabled(void)
+{
+	return (aa_secmark() && aa_skb_packet_mediation);
+}
+
+static inline bool aa_mediates_secmark(struct aa_label *label)
+{
+	return aa_secmark_enabled() &&
+		(label_mediates(label, AA_CLASS_NETV9_SKB) ||
+		 atomic_read(&apparmor_secmark_refcount));
+}
+
+/* check if current process can use secmark to set a label on the packet
+ * only done in mangle or security tables
+ * @sid is the label that is going to be set
+ */
+static int apparmor_secmark_relabel_packet(u32 sid)
+{
+	if (!aa_secmark_enabled())
+		return 0;
+
+	return aa_secmark_relabel_packet(sid);
+}
+
+#endif /* CONFIG_NETWROK_SECMARK */
+
+
+
 /**
  * apparmor_socket_sock_rcv_skb - check perms before associating skb to sk
  * @sk: sk to associate @skb with
@@ -1853,9 +1901,10 @@ static void apparmor_sock_graft(struct sock *sk, struct socket *parent)
 static int apparmor_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct aa_sk_ctx *ctx = aa_sock(sk);
-	int error;
+	struct aa_label *label;
+	int error = 0;
 
-	if (!aa_secmark() || !skb->secmark)
+	if (!aa_secmark_enabled())
 		return 0;
 	if (sk->sk_family != PF_INET && sk->sk_family != PF_INET6)
 		return 0;
@@ -1868,76 +1917,210 @@ static int apparmor_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		return -EACCES;
 
 	rcu_read_lock();
-	error = apparmor_secmark_check(rcu_dereference(ctx->label), OP_RECVMSG,
-				       AA_MAY_RECEIVE, skb->secmark, sk);
+	label = rcu_dereference(ctx->label);
+	if (label_mediates(label, AA_CLASS_NETV9_SKB) || skb->secmark)
+		/* receive uses socket label as proxy
+		 * may do interface processing without SECMARK
+		 */
+		error = __aa_sock_rcv_skb(label, sk, skb);
+	/* else none of the profiles in label mediate skbs &&
+	 * the skb is unlabeled
+	 */
 	rcu_read_unlock();
 
 	return error;
 }
 
-static int apparmor_inet_conn_request(const struct sock *sk, struct sk_buff *skb,
+/* Accept an incoming connection request
+ */
+static int apparmor_inet_conn_request(const struct sock *sk,
+				      struct sk_buff *skb,
 				      struct request_sock *req)
 {
 	struct aa_sk_ctx *ctx = aa_sock(sk);
-	int error;
+	struct aa_label *label;
+	int error = 0;
 
-	if (!aa_secmark() || !skb->secmark)
+	if (!aa_secmark_enabled())
 		return 0;
 
 	rcu_read_lock();
-	error = apparmor_secmark_check(rcu_dereference(ctx->label), OP_CONNECT,
-				       AA_MAY_CONNECT, skb->secmark, sk);
+	label = rcu_dereference(ctx->label);
+	if (label_mediates(label, AA_CLASS_NETV9_SKB) || skb->secmark)
+		/* receive uses socket label as proxy
+		 * may do interface processing without SECMARK
+		 */
+		error = __aa_inet_conn_request(label, sk, skb, req);
+	/* else none of the profiles in label mediate skbs &&
+	 * the skb is unlabeled
+	 */
 	rcu_read_unlock();
 
 	return error;
 }
-#endif
 
-#if defined(CONFIG_NETFILTER) && defined(CONFIG_NETWORK_SECMARK)
+
+#ifdef CONFIG_NETFILTER
+
 static unsigned int apparmor_ip_postroute(void *priv,
 					  struct sk_buff *skb,
 					  const struct nf_hook_state *state)
 {
 	struct aa_sk_ctx *ctx;
+	struct aa_label *label;
 	struct sock *sk;
-	int error;
+	int error = 0;
 
-	if (!aa_secmark() || !skb->secmark)
+	/* we need the secmark for postroute mediation */
+	if (!aa_secmark_enabled() || !skb->secmark)
 		return NF_ACCEPT;
 
 	sk = skb_to_full_sk(skb);
-	if (sk == NULL)
-		return NF_ACCEPT;
+	if (sk == NULL) {
+		if (skb->skb_iif)
+			/* Forwarded packet, not handled atm */
+			return NF_ACCEPT;
+		/* kernel sending a packet - no need to look at secmark */
+		label = kernel_t;
+	} else if (sk_listener(sk)) {
+		/* locally generated SYN_ACK - regenerate below using ctx */
+	} else {
+		/* locally generated packet - look at skb and ctx below*/
+	}
 
 	ctx = aa_sock(sk);
 	rcu_read_lock();
-	error = apparmor_secmark_check(rcu_dereference(ctx->label), OP_SENDMSG,
-				       AA_MAY_SEND, skb->secmark, sk);
+	if (!label)
+		label = aa_secid_to_label(skb->secmark); /* may be NULL */
+	if (!label)
+		label = rcu_dereference(ctx->label);
+	if (label && label_mediates(label, AA_CLASS_NETV9_SKB))
+		error = __aa_ip_postroute(label, sk, skb, state);
 	rcu_read_unlock();
-	if (!error)
-		return NF_ACCEPT;
 
-	return NF_DROP_ERR(-ECONNREFUSED);
+	if (error)
+		return NF_DROP_ERR(-ECONNREFUSED);
 
+	return NF_ACCEPT;
 }
 
+
+static unsigned int apparmor_ip_localout(void *priv, struct sk_buff *skb,
+				       const struct nf_hook_state *state)
+{
+	struct aa_label *label, *out;
+	bool needput;
+
+	if (!aa_secmark_enabled())
+		return NF_ACCEPT;
+
+	label = __begin_current_label_crit_section(&needput);
+	if (!label_mediates(label, AA_CLASS_NETV9_SKB)) {
+		/* apparmor isn't going to do iface or packet based
+		 * filtering so bail.
+		 */
+		AA_DEBUG_LABEL(label, DEBUG_SKB, "label does not mediate skb");
+		end_current_label_crit_section(label);
+		return NF_ACCEPT;
+	}
+
+	struct sock *sk = skb_to_full_sk(skb);
+
+	if (sk) {
+		if (sk_listener(sk)) {
+			/* socket is in listening state, packet is a SYN-ACK
+			 * If using socket as proxy would need conn/request
+			 * socket, but only have parent.
+			 * However unless socket perms are delegated not
+			 * labeling based on socket but sending task
+			 */
+			if (aa_g_debug & DEBUG_SKB) {
+				rcu_read_lock();
+				struct aa_label *sklabel = aa_get_label(aa_sock(sk)->label);
+
+				rcu_read_unlock();
+				aa_put_label(sklabel);
+
+			}
+			AA_DEBUG_LABEL(label, DEBUG_SKB, "sk_listener");
+			return NF_ACCEPT;
+		}
+		/* TODO: support delegation via socket label instead of
+		 * task
+		 */
+		out = __aa_ip_localout(label, sk, skb);
+	} else {
+		out = kernel_t;
+	}
+	__end_current_label_crit_section(label, needput);
+
+	if (IS_ERR(out))
+		return NF_DROP_ERR(PTR_ERR(out));
+
+	if (!out)
+		/* all profiles decline to provide a label */
+		out = unlabeled_t;
+
+	/* put mark on packet */
+	aa_pin_secid(out);
+	skb->secmark = out->secid;
+	if (out != unlabeled_t && out != kernel_t)
+		aa_put_label(out);
+
+	return NF_ACCEPT;
+}
+
+/* HOOKS requiring NETFILTER, and may require SECMARK */
 static const struct nf_hook_ops apparmor_nf_ops[] = {
+	{
+		.hook =         apparmor_ip_localout,
+		.pf =           NFPROTO_IPV4,
+		.hooknum =      NF_INET_LOCAL_OUT,
+		.priority =     NF_IP_PRI_SELINUX_FIRST,
+	},
+#ifdef CONFIG_NETWORK_SECMARK
 	{
 		.hook =         apparmor_ip_postroute,
 		.pf =           NFPROTO_IPV4,
 		.hooknum =      NF_INET_POST_ROUTING,
 		.priority =     NF_IP_PRI_SELINUX_FIRST,
 	},
+	/* ip_forward goes here is apparmor ever supports it
+	 *{
+	 *	.hook =		apparmor_ip_forward,
+	 *	.pf =		NFPROTO_IPV4,
+	 *	.hooknum =	NF_INET_FORWARD,
+	 *	.priority =	NF_IP_PRI_SELINUX_FIRST,
+	 *},
+	 */
+#endif /* CONFIG_NETWORK_SECMARK */
+
 #if IS_ENABLED(CONFIG_IPV6)
+	{
+		.hook =         apparmor_ip_localout,
+		.pf =           NFPROTO_IPV6,
+		.hooknum =      NF_INET_LOCAL_OUT,
+		.priority =     NF_IP6_PRI_SELINUX_FIRST,
+	},
+#ifdef CONFIG_NETWORK_SECMARK
 	{
 		.hook =         apparmor_ip_postroute,
 		.pf =           NFPROTO_IPV6,
 		.hooknum =      NF_INET_POST_ROUTING,
 		.priority =     NF_IP6_PRI_SELINUX_FIRST,
 	},
-#endif
+	/* ip_forward goes here is apparmor ever supports it
+	 *{
+	 *	.hook =		apparmor_ip_forward,
+	 *	.pf =		NFPROTO_IPV6,
+	 *	.hooknum =	NF_INET_FORWARD,
+	 *	.priority =	NF_IP6_PRI_SELINUX_FIRST,
+	 *},
+	 */
+#endif /* CONFIG_NETWORK_SECMARK */
+#endif /* IS_ENABLED(CONFIG_IPV6) */
 };
-#endif
+#endif /* CONFIG_NETFILTER */
 
 /*
  * The cred blob is a pointer to, not an instance of, an aa_label.
@@ -2028,17 +2211,18 @@ static struct security_hook_list apparmor_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(socket_getsockopt, apparmor_socket_getsockopt),
 	LSM_HOOK_INIT(socket_setsockopt, apparmor_socket_setsockopt),
 	LSM_HOOK_INIT(socket_shutdown, apparmor_socket_shutdown),
-#ifdef CONFIG_NETWORK_SECMARK
 	LSM_HOOK_INIT(socket_sock_rcv_skb, apparmor_socket_sock_rcv_skb),
+#ifdef CONFIG_NETWORK_SECMARK
+	LSM_HOOK_INIT(secmark_relabel_packet, apparmor_secmark_relabel_packet),
+	LSM_HOOK_INIT(secmark_refcount_inc, apparmor_secmark_refcount_inc),
+	LSM_HOOK_INIT(secmark_refcount_dec, apparmor_secmark_refcount_dec),
 #endif
 	LSM_HOOK_INIT(socket_getpeersec_stream,
 		      apparmor_socket_getpeersec_stream),
 	LSM_HOOK_INIT(socket_getpeersec_dgram,
 		      apparmor_socket_getpeersec_dgram),
 	LSM_HOOK_INIT(sock_graft, apparmor_sock_graft),
-#ifdef CONFIG_NETWORK_SECMARK
 	LSM_HOOK_INIT(inet_conn_request, apparmor_inet_conn_request),
-#endif
 
 	LSM_HOOK_INIT(cred_alloc_blank, apparmor_cred_alloc_blank),
 	LSM_HOOK_INIT(cred_free, apparmor_cred_free),
@@ -2706,6 +2890,13 @@ static const struct ctl_table apparmor_sysctl_table[] = {
 		.mode           = 0600,
 		.proc_handler   = apparmor_dointvec,
 	},
+	{
+		.procname       = "apparmor_packet_mediation",
+		.data           = &aa_skb_packet_mediation,
+		.maxlen         = sizeof(int),
+		.mode           = 0600,
+		.proc_handler   = apparmor_dointvec,
+	},
 };
 
 static int __init apparmor_init_sysctl(void)
@@ -2875,6 +3066,18 @@ static int __init apparmor_init(void)
 	else
 		aa_info_message("AppArmor initialized");
 
+	if (aa_secmark()) {
+		if (aa_skb_packet_mediation)
+			aa_info_message("AppArmor secmark mediation enabled");
+		else
+			aa_info_message("AppArmor secmark mediation reserved: ready to be enabled");
+	} else {
+#ifdef CONFIG_NETWORK_SECMARK
+		aa_info_message("AppArmor secmark mediation disabled - failed to register");
+#else
+		aa_info_message("AppArmor secmark mediation disabled by config");
+#endif /* CONFIG_NETWORK_SECMARK */
+	}
 	return error;
 
 buffers_out:
