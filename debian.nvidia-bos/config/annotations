@@ -39,6 +39,9 @@ CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE note<'Required for Grace enablem
 CONFIG_ARM_FFA_TRANSPORT                        policy<{'arm64': 'y'}>
 CONFIG_ARM_FFA_TRANSPORT                        note<'LP: #2111511'>
 
+CONFIG_ARM_LFA                                  policy<{'arm64': 'y'}>
+CONFIG_ARM_LFA                                  note<'LP: #2138342'>
+
 CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      note<'LP: #2095028'>
 
