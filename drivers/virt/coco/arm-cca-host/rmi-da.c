@@ -17,20 +17,32 @@
 
 #include "rmi-da.h"
 
-static int pci_ide_aassoc_register_to_pdev_addr(struct rmi_pdev_addr_range *pdev_addr,
-						unsigned int naddr, struct pci_ide_partner *partner)
+static int pci_dev_addr_range(struct pci_dev *pdev,
+			      struct rmi_pdev_addr_range *pdev_addr)
 {
-	pdev_addr[0].base = partner->mem_assoc.start;
-	pdev_addr[0].top  = partner->mem_assoc.end + 1;
-	naddr--;
+	int naddr = 0;
+	struct pci_dev *br;
+	struct resource *mem, *pref;
 
-	if (!naddr)
-		return 1;
+	br = pci_upstream_bridge(pdev);
+	if (!br)
+		return 0;
 
-	pdev_addr[1].base = partner->pref_assoc.start;
-	pdev_addr[1].top  = partner->pref_assoc.end + 1;
+	mem = pci_resource_n(br, PCI_BRIDGE_MEM_WINDOW);
+	if (resource_assigned(mem)) {
+		pdev_addr[naddr].base = mem->start;
+		pdev_addr[naddr].top  = mem->end + 1;
+		naddr++;
+	}
 
-	return 2;
+	pref = pci_resource_n(br, PCI_BRIDGE_PREF_MEM_WINDOW);
+	if (resource_assigned(pref)) {
+		pdev_addr[naddr].base = pref->start;
+		pdev_addr[naddr].top  = pref->end + 1;
+		naddr++;
+	}
+
+	return naddr;
 }
 
 static void free_aux_pages(int cnt, void *aux[])
@@ -69,9 +81,7 @@ static int init_pdev_params(struct pci_dev *pdev, struct rmi_pdev_params *params
 	params->root_id = pci_dev_id(pcie_find_root_port(pdev));
 
 	params->ncoh_num_addr_range =
-		pci_ide_aassoc_register_to_pdev_addr(params->ncoh_addr_range,
-						     ARRAY_SIZE(params->ncoh_addr_range),
-						     &ide->partner[PCI_IDE_RP]);
+		pci_dev_addr_range(pdev, params->ncoh_addr_range);
 
 	rmi_pdev_aux_count(params->flags, &params->num_aux);
 	pf0_dsc->num_aux = params->num_aux;
