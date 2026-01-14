@@ -596,6 +596,7 @@ operations:
         request:
           attributes:
             - id
+            - mode
         reply: &pin-attrs
           attributes:
             - id
