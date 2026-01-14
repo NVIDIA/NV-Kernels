@@ -218,12 +218,12 @@ static bool pci_cxl_ats_always_on(struct pci_dev *pdev)
 	u16 cap;
 
 	offset = pci_find_dvsec_capability(pdev, PCI_VENDOR_ID_CXL,
-					   CXL_DVSEC_PCIE_DEVICE);
+					   PCI_DVSEC_CXL_DEVICE);
 	if (!offset)
 		return false;
 
-	pci_read_config_word(pdev, offset + CXL_DVSEC_CAP_OFFSET, &cap);
-	if (cap & CXL_DVSEC_CACHE_CAPABLE)
+	pci_read_config_word(pdev, offset + PCI_DVSEC_CXL_CAP, &cap);
+	if (cap & PCI_DVSEC_CXL_CACHE_CAPABLE)
 		return true;
 
 	return false;
