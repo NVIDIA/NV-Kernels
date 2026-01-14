@@ -395,7 +395,7 @@ static int mpr_probe(struct i2c_client *client)
 
 	if (data->irq > 0) {
 		ret = devm_request_irq(dev, data->irq, mpr_eoc_handler,
-				IRQF_TRIGGER_RISING, client->name, data);
+				0, client->name, data);
 		if (ret)
 			return dev_err_probe(dev, ret,
 				"request irq %d failed\n", data->irq);
