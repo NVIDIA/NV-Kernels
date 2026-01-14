@@ -258,6 +258,7 @@ struct md_cluster_info;
  * @MD_DELETED: This device is being deleted
  * @MD_HAS_SUPERBLOCK: There is persistence sb in member disks.
  * @MD_FAILLAST_DEV: Allow last rdev to be removed.
+ * @MD_SERIALIZE_POLICY: Enforce write IO is not reordered, just used by raid1.
  *
  * change UNSUPPORTED_MDDEV_FLAGS for each array type if new flag is added
  */
@@ -275,6 +276,7 @@ enum mddev_flags {
 	MD_DELETED,
 	MD_HAS_SUPERBLOCK,
 	MD_FAILLAST_DEV,
+	MD_SERIALIZE_POLICY,
 };
 
 enum mddev_sb_flags {
@@ -547,8 +549,6 @@ struct mddev {
 	struct mutex			sync_mutex;
 	/* The sequence number for sync thread */
 	atomic_t sync_seq;
-
-	bool	serialize_policy:1;
 };
 
 enum recovery_flags {
