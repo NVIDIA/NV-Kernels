@@ -894,6 +894,13 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
 		if (!unpack_u32(e, &profile->policy.start[0], "start"))
 			/* default start state */
 			profile->policy.start[0] = DFA_START;
+
+		if (profile->policy.start[0] >=
+		    profile->policy.dfa->tables[YYTD_ID_BASE]->td_lolen) {
+			info = "invalid dfa start state";
+			goto fail;
+		}
+
 		/* setup class index */
 		for (i = AA_CLASS_FILE; i <= AA_CLASS_LAST; i++) {
 			profile->policy.start[i] =
@@ -917,6 +924,12 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
 		if (!unpack_u32(e, &profile->file.start, "dfa_start"))
 			/* default start state */
 			profile->file.start = DFA_START;
+
+		if (profile->file.start >=
+		    profile->file.dfa->tables[YYTD_ID_BASE]->td_lolen) {
+			info = "invalid dfa start state";
+			goto fail;
+		}
 	} else if (profile->policy.dfa &&
 		   profile->policy.start[AA_CLASS_FILE]) {
 		profile->file.dfa = aa_get_dfa(profile->policy.dfa);
