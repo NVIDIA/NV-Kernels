@@ -11,8 +11,8 @@ CONFIG_CPUSETS_V1                               note<'Leave cpuset v1 enabled on
 CONFIG_MEMCG_V1                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_MEMCG_V1                                 note<'Leave memcg v1 enabled on HWE kernels 6.12+ -- LP: #2122368'>
 
-CONFIG_QCS_GCC_615                              policy<{'arm64': 'm', 'armhf': '-'}>
-CONFIG_QCS_GCC_615                              note<'Depends on ARM64'>
+CONFIG_QCS_GCC_615                              policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_QCS_GCC_615                              note<'TODO: update note'>
 
 CONFIG_QCS_GPUCC_615                            policy<{'arm64': 'm', 'armhf': 'n'}>
 CONFIG_QCS_GPUCC_615                            note<'Dependency change to arm64 only'>

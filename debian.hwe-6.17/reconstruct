@@ -1,6 +1,4 @@
 # Recreate any symlinks created since the orig.
-chmod +x 'debian.hwe-6.17/scripts/helpers/copy-files'
-chmod +x 'debian.hwe-6.17/scripts/helpers/local-mangle'
 chmod +x 'debian/cloud-tools/hv_get_dhcp_info'
 chmod +x 'debian/cloud-tools/hv_get_dns_info'
 chmod +x 'debian/cloud-tools/hv_set_ifconfig'
@@ -21,7 +19,6 @@ chmod +x 'debian/scripts/misc/git-ubuntu-log'
 chmod +x 'debian/scripts/misc/insert-changes'
 chmod +x 'debian/scripts/misc/insert-ubuntu-changes'
 chmod +x 'debian/scripts/misc/kernelconfig'
-chmod +x 'debian/scripts/module-inclusion'
 chmod +x 'debian/scripts/sign-module'
 chmod +x 'debian/templates/extra.postinst.in'
 chmod +x 'debian/templates/extra.postrm.in'
@@ -32,5 +29,8 @@ chmod +x 'debian/templates/image.preinst.in'
 chmod +x 'debian/templates/image.prerm.in'
 chmod +x 'debian/tests/rebuild'
 chmod +x 'debian/tests/ubuntu-regression-suite'
+chmod -x 'drivers/edac/ecs.c'
+chmod -x 'drivers/edac/mem_repair.c'
+chmod -x 'drivers/edac/scrub.c'
 # Remove any files deleted from the orig.
 exit 0
