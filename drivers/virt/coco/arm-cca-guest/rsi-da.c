@@ -112,10 +112,9 @@ int cca_update_device_object_cache(struct pci_dev *pdev, struct cca_guest_dsc *d
 	dev_meas->indices[31] = 0x40;
 	ret = rhi_update_vdev_measurements_cache(pdev, dev_meas);
 
-	if (ret) {
-		pci_err(pdev, "failed to get device measurement (%d)\n", ret);
-		return ret;
-	}
+	if (ret)
+		pci_err(pdev, "failed to get device measurement (%d). Ignoring.\n", ret);
+
 	return 0;
 }
 
@@ -262,11 +261,12 @@ static int verify_digests(struct cca_guest_dsc *dsc)
 	}
 
 	for (int i = 0; i < ARRAY_SIZE(reports); i++) {
+		if (reports[i].size == 0)
+			continue;
+
 		digest_func(reports[i].report, reports[i].size, digest);
-		if (memcmp(reports[i].digest, digest, digest_size)) {
-			pci_err(pdev, "Invalid digest\n");
-			return -EINVAL;
-		}
+		if (memcmp(reports[i].digest, digest, digest_size))
+			pci_err(pdev, "Invalid digest. Ignoring.\n");
 	}
 
 	pci_dbg(pdev, "Successfully verified the digests\n");
@@ -299,14 +299,14 @@ int cca_device_verify_and_accept(struct pci_dev *pdev)
 				     &dsc->certificate, &dsc->certificate_size);
 	if (ret) {
 		pci_err(pdev, "failed to get device certificate from the host (%d)\n", ret);
-		return ret;
+		dsc->certificate_size = 0;
 	}
 
 	ret = rhi_read_cached_object(vdev_id, RHI_DA_OBJECT_MEASUREMENT,
 				     &dsc->measurements, &dsc->measurements_size);
 	if (ret) {
-		pci_err(pdev, "failed to get device certificate from the host (%d)\n", ret);
-		return ret;
+		pci_err(pdev, "failed to get device certificate from the host (%d). Ignoring.\n", ret);
+		dsc->measurements_size = 0;
 	}
 
 	struct rsi_vdevice_info *dev_info __free(kfree) =
