@@ -7,6 +7,8 @@
 #include <linux/hashtable.h>
 #include <linux/egm.h>
 #include <linux/nvgrace-egm.h>
+#include <linux/memory-failure.h>
+#include <linux/vmalloc.h>
 
 #define MAX_EGM_NODES 256
 
@@ -25,6 +27,7 @@ struct egm_region {
 	struct cdev cdev;
 	struct list_head gpus;
 	DECLARE_HASHTABLE(htbl, 0x10);
+	struct pfn_address_space pfn_address_space;
 };
 
 struct h_node {
@@ -36,11 +39,97 @@ static dev_t dev;
 static struct class *class;
 static struct list_head egm_list;
 
+static int pfn_memregion_offset(struct egm_region *region,
+				unsigned long pfn,
+				pgoff_t *pfn_offset_in_region)
+{
+	unsigned long start_pfn, num_pages;
+
+	start_pfn = PHYS_PFN(region->egmphys);
+	num_pages = region->egmlength >> PAGE_SHIFT;
+
+	if (pfn < start_pfn || pfn >= start_pfn + num_pages)
+		return -EFAULT;
+
+	*pfn_offset_in_region = pfn - start_pfn;
+
+	return 0;
+}
+
+static int track_ecc_offset(struct egm_region *region,
+			    unsigned long mem_offset)
+{
+	struct h_node *cur_page, *ecc_page;
+	unsigned long bkt;
+
+	hash_for_each(region->htbl, bkt, cur_page, node) {
+		if (cur_page->mem_offset == mem_offset)
+			return 0;
+	}
+
+	ecc_page = (struct h_node *)(vzalloc(sizeof(struct h_node)));
+	if (!ecc_page)
+		return -ENOMEM;
+
+	ecc_page->mem_offset = mem_offset;
+
+	hash_add(region->htbl, &ecc_page->node, ecc_page->mem_offset);
+
+	return 0;
+}
+
+static int nvgrace_egm_pfn_to_vma_pgoff(struct vm_area_struct *vma,
+					unsigned long pfn,
+					pgoff_t *pgoff)
+{
+	struct egm_region *region = vma->vm_file->private_data;
+	pgoff_t vma_offset_in_region = vma->vm_pgoff &
+		((1U << (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT)) - 1);
+	pgoff_t pfn_offset_in_region;
+	int ret;
+
+	ret = pfn_memregion_offset(region, pfn, &pfn_offset_in_region);
+	if (ret)
+		return ret;
+
+	/* Ensure PFN is not before VMA's start within the region */
+	if (pfn_offset_in_region < vma_offset_in_region)
+		return -EFAULT;
+
+	/* Calculate offset from VMA start */
+	*pgoff = vma->vm_pgoff +
+		 (pfn_offset_in_region - vma_offset_in_region);
+
+	/* Track and save the poisoned offset */
+	return track_ecc_offset(region, *pgoff << PAGE_SHIFT);
+}
+
+static int
+nvgrace_egm_vfio_pci_register_pfn_range(struct inode *inode,
+					struct egm_region *region)
+{
+	int ret;
+	unsigned long pfn, nr_pages;
+
+	pfn = PHYS_PFN(region->egmphys);
+	nr_pages = region->egmlength >> PAGE_SHIFT;
+
+	region->pfn_address_space.node.start = pfn;
+	region->pfn_address_space.node.last = pfn + nr_pages - 1;
+	region->pfn_address_space.mapping = inode->i_mapping;
+	region->pfn_address_space.pfn_to_vma_pgoff = nvgrace_egm_pfn_to_vma_pgoff;
+
+	ret = register_pfn_address_space(&region->pfn_address_space);
+
+	return ret;
+}
+
 static int nvgrace_egm_open(struct inode *inode, struct file *file)
 {
 	void *memaddr;
 	struct egm_region *region = container_of(inode->i_cdev,
 						 struct egm_region, cdev);
+	int ret;
 
 	if (!region)
 		return -EINVAL;
@@ -58,6 +147,12 @@ static int nvgrace_egm_open(struct inode *inode, struct file *file)
 	memunmap(memaddr);
 	file->private_data = region;
 
+	ret = nvgrace_egm_vfio_pci_register_pfn_range(inode, region);
+	if (ret && ret != -EOPNOTSUPP) {
+		file->private_data = NULL;
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -69,8 +164,11 @@ static int nvgrace_egm_release(struct inode *inode, struct file *file)
 	if (!region)
 		return -EINVAL;
 
-	if (atomic_dec_and_test(&region->open_count))
+	if (atomic_dec_and_test(&region->open_count)) {
+		unregister_pfn_address_space(&region->pfn_address_space);
+
 		file->private_data = NULL;
+	}
 
 	return 0;
 }
