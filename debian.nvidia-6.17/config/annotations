@@ -117,6 +117,9 @@ CONFIG_DRM_NOUVEAU_SVM                          note<'Disable nouveau for NVIDIA
 CONFIG_EFI_CAPSULE_LOADER                       policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_EFI_CAPSULE_LOADER                       note<'LP: #2067111'>
 
+CONFIG_EFI_SECRET                               policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_EFI_SECRET                               note<'Required for confidential computing guest secrets'>
+
 CONFIG_ETM4X_IMPDEF_FEATURE                     policy<{'arm64': 'n'}>
 CONFIG_ETM4X_IMPDEF_FEATURE                     note<'Required for Grace enablement'>
 
@@ -236,6 +239,9 @@ CONFIG_EC_HUAWEI_GAOKUN                         policy<{'arm64': 'n'}>
 CONFIG_GCC_VERSION                              policy<{'amd64': '130300', 'arm64': '130300'}>
 CONFIG_HAVE_RUST                                policy<{'amd64': 'y', 'arm64': '-'}>
 CONFIG_IOMMUFD_VFIO_CONTAINER                   policy<{'arm64': 'y'}>
+CONFIG_KVM_GENERIC_MEMORY_ATTRIBUTES            policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_KVM_GENERIC_PRIVATE_MEM                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_KVM_PRIVATE_MEM                          policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_NVGRACE_EGM                              policy<{'arm64': 'm'}>
