@@ -237,8 +237,7 @@ static void nvgrace_gpu_close_device(struct vfio_device *core_vdev)
 	mutex_destroy(&nvdev->remap_lock);
 
 #ifdef CONFIG_MEMORY_FAILURE
-	if (nvdev->resmem.memlength)
-		unregister_pfn_address_space(&nvdev->resmem.pfn_address_space);
+	unregister_pfn_address_space(&nvdev->resmem.pfn_address_space);
 	unregister_pfn_address_space(&nvdev->usemem.pfn_address_space);
 #endif
 	vfio_pci_core_close_device(core_vdev);
@@ -319,10 +318,9 @@ static int nvgrace_gpu_mmap(struct vfio_device *core_vdev,
 #ifdef CONFIG_MEMORY_FAILURE
 	vma->vm_ops = &nvgrace_gpu_vfio_pci_mmap_ops;
 
-	if (index == VFIO_PCI_BAR2_REGION_INDEX) {
-		WARN_ON_ONCE(!nvdev->has_mig_hw_bug);
+	if (index == VFIO_PCI_BAR2_REGION_INDEX)
 		ret = nvgrace_gpu_vfio_pci_register_pfn_range(&nvdev->resmem, vma);
-	} else
+	else
 		ret = nvgrace_gpu_vfio_pci_register_pfn_range(&nvdev->usemem, vma);
 #endif
 
