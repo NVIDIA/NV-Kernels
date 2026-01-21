@@ -1619,7 +1619,7 @@ retry:
 	}
 
 	if (ret & VM_FAULT_ERROR) {
-		int err = vm_fault_to_errno(ret, FOLL_HWPOISON);
+		int err = vm_fault_to_errno(ret, 0);
 
 		if (err)
 			return err;
