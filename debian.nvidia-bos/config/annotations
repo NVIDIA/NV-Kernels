@@ -57,6 +57,9 @@ CONFIG_ARM64_MPAM_RESCTRL_FS                    note<'LP: #2122432'>
 CONFIG_ARM64_SME                                policy<{'arm64': 'y'}>
 CONFIG_ARM64_SME                                note<'LP: #2122432'>
 
+CONFIG_ARM64_WORKAROUND_NC_TO_NGNRE             policy<{'arm64': 'y'}>
+CONFIG_ARM64_WORKAROUND_NC_TO_NGNRE             note<'Required for Vera enablement'>
+
 CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE note<'Required for Grace enablement'>
 
