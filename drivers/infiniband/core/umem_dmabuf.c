@@ -129,7 +129,7 @@ ib_umem_dmabuf_get_with_dma_device(struct ib_device *device,
 	if (check_add_overflow(offset, (unsigned long)size, &end))
 		return ret;
 
-	if (unlikely(!ops || !ops->move_notify))
+	if (unlikely(!ops || !ops->invalidate_mappings))
 		return ret;
 
 	dmabuf = dma_buf_get(fd);
@@ -195,7 +195,7 @@ ib_umem_dmabuf_unsupported_move_notify(struct dma_buf_attachment *attach)
 
 static struct dma_buf_attach_ops ib_umem_dmabuf_attach_pinned_ops = {
 	.allow_peer2peer = true,
-	.move_notify = ib_umem_dmabuf_unsupported_move_notify,
+	.invalidate_mappings = ib_umem_dmabuf_unsupported_move_notify,
 };
 
 static void ib_umem_dmabuf_revoke_locked(struct dma_buf_attachment *attach)
@@ -220,7 +220,7 @@ static void ib_umem_dmabuf_revoke_locked(struct dma_buf_attachment *attach)
 
 static struct dma_buf_attach_ops ib_umem_dmabuf_attach_pinned_revocable_ops = {
 	.allow_peer2peer = true,
-	.move_notify = ib_umem_dmabuf_revoke_locked,
+	.invalidate_mappings = ib_umem_dmabuf_revoke_locked,
 };
 
 static struct ib_umem_dmabuf *
