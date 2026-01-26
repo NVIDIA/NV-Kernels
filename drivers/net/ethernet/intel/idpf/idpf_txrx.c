@@ -3545,7 +3545,7 @@ static int idpf_vport_intr_req_irq(struct idpf_vport *vport)
 			continue;
 
 		q_vector->name = kasprintf(GFP_KERNEL, "%s-%s-%s-%d", drv_name,
-					   if_name, vec_name, vidx);
+					   if_name, vec_name, vector);
 
 		err = request_irq(irq_num, idpf_vport_intr_clean_queues, 0,
 				  q_vector->name, q_vector);
