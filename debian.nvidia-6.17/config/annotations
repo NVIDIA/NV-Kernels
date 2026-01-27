@@ -239,6 +239,8 @@ CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_NVGRACE_EGM                              policy<{'arm64': 'm'}>
 CONFIG_NVIDIA_FFA_EC                            policy<{'arm64': 'y'}>
+CONFIG_NVIDIA_TEGRA410_C2C_PMU                  policy<{'arm64': 'm'}>
+CONFIG_NVIDIA_TEGRA410_CMEM_LATENCY_PMU         policy<{'arm64': 'm'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125'}>
 CONFIG_PINCTRL_MT8901                           policy<{'arm64': 'y'}>
 CONFIG_PROC_CPU_RESCTRL                         policy<{'amd64': 'y', 'arm64': 'y'}>
