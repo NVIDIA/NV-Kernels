@@ -1,0 +1,134 @@
+[
+    {
+        "ArchStdEvent": "L2D_CACHE",
+        "PublicDescription": "The Event counts accesses to the L2 cache due to Data accesses. L2 cache is a unified cache for Data and Instruction accesses. Accesses are for misses in the L1 D-cache or translation resolutions due to accesses. This Event also counts Write back of dirty Data from L1 D-cache to the L2 cache. This CPU includes I-cache accesses in this counter as L2I equivalent Event was not implemented. This Event is the sum of the L2D_CACHE_RD, L2D_CACHE_WR, L2D_CACHE_PRFM, and L2D_CACHE_HWPRF Events."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_REFILL",
+        "PublicDescription": "The Event counts cache line refills into the L2 cache. L2 cache is a unified cache for Data and Instruction accesses. Accesses are for misses in the L1 D-cache or translation resolutions due to accesses. This CPU includes I-cache refills in this counter as L2I equivalent Event was not implemented. This Event is the sum of L2D_CACHE_REFILL_RD, L2D_CACHE_REFILL_WR, L2D_CACHE_REFILL_HWPRF, and L2D_CACHE_REFILL_PRFM."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_WB",
+        "PublicDescription": "The Event counts Write-backs of Data from the L2 cache to outside the CPU. This includes snoops to the L2 (from other CPUs) which return Data even if the snoops cause an invalidation. L2 cache line invalidations which do not write Data outside the CPU and snoops which return Data from an L1 cache are not counted. Data would not be written outside the cache when invalidating a clean cache line. This Event is the sum of the L2D_CACHE_WB_VICTIM and L2D_CACHE_WB_CLEAN Events."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_RD",
+        "PublicDescription": "The Event counts L2 D-cache accesses due to memory Read operations. L2 cache is a unified cache for Data and Instruction accesses, accesses are for misses in the L1 D-cache or translation resolutions due to accesses. This CPU includes I-cache accesses in this counter as L2I equivalent Event was not implemented. This Event is a subset of the L2D_CACHE Event, but this Event only counts memory Read operations."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_WR",
+        "PublicDescription": "The Event counts L2 cache accesses due to memory Write operations. L2 cache is a unified cache for Data and Instruction accesses, accesses are for misses in the L1 D-cache or translation resolutions due to accesses. This Event is a subset of the L2D_CACHE Event, but this Event only counts memory Write operations."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_REFILL_RD",
+        "PublicDescription": "The Event counts refills for memory accesses due to memory Read operation counted by L2D_CACHE_RD. L2 cache is a unified cache for Data and Instruction accesses, accesses are for misses in the L1 D-cache or translation resolutions due to accesses. This CPU includes I-cache refills in this counter as L2I equivalent Event was not implemented. This Event is a subset of the L2D_CACHE_REFILL Event. This Event does not count L2 refills caused by stashes into L2. This count includes demand requests that encounter an L2 prefetch request or an L2 software prefetch request to the same cache line, which is still pending in the L2 LFB."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_REFILL_WR",
+        "PublicDescription": "The Event counts refills for memory accesses due to memory Write operation counted by L2D_CACHE_WR. L2 cache is a unified cache for Data and Instruction accesses, accesses are for misses in the L1 D-cache or translation resolutions due to accesses. This count includes demand requests that encounter an L2 prefetch request or an L2 software prefetch request to the same cache line, which is still pending in the L2 LFB."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_WB_VICTIM",
+        "PublicDescription": "The Event counts evictions from the L2 cache because of a line being allocated into the L2 cache. This Event is a subset of the L2D_CACHE_WB Event."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_WB_CLEAN",
+        "PublicDescription": "The Event counts Write-backs from the L2 cache that are a result of any of the following: * Cache maintenance operations, * Snoop responses or, * Direct cache transfers to another CPU due to a forwarding snoop request. This Event is a subset of the L2D_CACHE_WB Event."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_INVAL",
+        "PublicDescription": "The Event counts each explicit invalidation of a cache line in the L2 cache by cache maintenance operations that operate by a virtual address, or by external coherency operations. This Event does not count if either: * A cache refill invalidates a cache line, or * A cache Maintenance Operation (CMO), which invalidates a cache line specified by Set/Way, is executed on that CPU. CMOs that operate by Set/Way cannot be broadcast from one CPU to another."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_LMISS_RD",
+        "PublicDescription": "The Event counts cache line refills into the L2 unified cache from any memory Read operations that incurred additional latency. Counts the same as L2D_CACHE_REFILL_RD in this CPU"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_RW",
+        "PublicDescription": "The Event counts L2 cache demand accesses from any Load/Store operations. L2 cache is a unified cache for Data and Instruction accesses, accesses are for misses in the L1 D-cache or translation resolutions due to accesses. This CPU includes I-cache accesses in this counter as L2I equivalent Event was not implemented. This Event is the sum of the L2D_CACHE_RD and L2D_CACHE_WR Events."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_PRFM",
+        "PublicDescription": "The Event counts L2 D-cache accesses generated by software preload or prefetch Instructions with target = L1/L2/L3 cache. Note that a software preload or prefetch Instructions with (target = L1/L2/L3) that hits in L1D will not result in an L2 D-cache access. Therefore, such a software preload or prefetch Instructions will not be counted by this Event."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_MISS",
+        "PublicDescription": "The Event counts cache line misses in the L2 cache. L2 cache is a unified cache for Data and Instruction accesses. Accesses are for misses in the L1 D-cache or translation resolutions due to accesses. Counts same as L2D_CACHE_REFILL_RD in this CPU"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_REFILL_PRFM",
+        "PublicDescription": "The Event counts refills due to accesses generated as a result of software preload or prefetch Instructions as counted by L2D_CACHE_PRFM. This CPU includes I-cache refills in this counter as L2I equivalent Event was not implemented."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_REFILL_HWPRF",
+        "PublicDescription": "The Event counts each hardware prefetch access counted by L2D_CACHE_HWPRF that causes a refill of the L2 cache, or any L1 Data, or Instruction of this PE, from outside of those caches. This does not include prefetch requests pending waiting for a refill in LFB and a new demand request to the same cache line hitting the LFB entry. All such refills are counted as L2D_LFB_HIT_RWL1PRF_FHWPRF."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_REFILL_PRF",
+        "PublicDescription": "The Event counts each access to L2 Cache due to a prefetch Instruction, or hardware prefetch that causes a refill of the L2 or any Level 1, from outside of those caches."
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_HWPRF",
+        "PublicDescription": "The Event counts the L2 D-cache access caused by L1 or L2 hardware prefetcher."
+    },
+    {
+        "EventCode": "0x0108",
+        "EventName": "L2D_CACHE_IF_REFILL",
+        "PublicDescription": "L2 D-cache refill, Instruction fetch. The Event counts demand Instruction fetch that causes a refill of the L2 cache or L1 cache of this PE, from outside of those caches."
+    },
+    {
+        "EventCode": "0x0109",
+        "EventName": "L2D_CACHE_TBW_REFILL",
+        "PublicDescription": "L2 D-cache refill, Page table walk. The Event counts demand translation table walk that causes a refill of the L2 cache or L1 cache of this PE, from outside of those caches."
+    },
+    {
+        "EventCode": "0x010a",
+        "EventName": "L2D_CACHE_PF_REFILL",
+        "PublicDescription": "L2 D-cache refill, prefetch. The Event counts L1 or L2 hardware or software prefetch accesses that causes a refill of the L2 cache or L1 cache of this PE, from outside of those caches."
+    },
+    {
+        "EventCode": "0x0201",
+        "EventName": "L2D_CACHE_BACKSNOOP_L1D_VIRT_ALIASING",
+        "PublicDescription": "The Event counts when the L2 D-cache sends an invalidating back-snoop to the L1 D for an access initiated by the L1 D, where the corresponding line is already present in the L1 D-cache. The L2 D-cache line tags the PE that refilled the line. It also retains specific bits of the VA to identify virtually aliased addresses. The L1 D request requiring a back-snoop can originate either from the same PE that refilled the L2 D line or from a different PE. In either case, this Event only counts those back snoop where the requested VA mismatch the VA stored in the L2 D tag. This Event is counted only by PE that initiated the original request necessitating a back-snoop. Note : The L1 D is VIPT, it identifies this access as a miss. Conversely, as L2 is PIPT, it identifies this as a hit. L2 D utilizes the back-snoop mechanism to refill L1 D with the snooped Data."
+    },
+    {
+        "EventCode": "0x0179",
+        "EventName": "L2D_CACHE_HIT_RWL1PRF_FHWPRF",
+        "PublicDescription": "L2 D-cache demand Read, demand Write and L1 prefetch hit, fetched by hardware prefetch.. The Event counts each demand Read, demand Write and L1 hardware or software prefetch request that hit an L2 D-cache line that was refilled into L2 D-cache in response to an L2 hardware prefetch. Only the first hit is counted. After this Event is generated for a cache line, the Event is not generated again for the same cache line while it remains in the cache."
+    },
+    {
+        "EventCode": "0x020c",
+        "EventName": "L2D_CACHE_HIT_RWL1PRF_FPRFM",
+        "PublicDescription": "L2 D-cache demand Read, demand Write and L1 prefetch hit, fetched by software prefetch. The Event counts each demand Read, demand Write and L1 hardware or software prefetch request that hit an L2 D-cache line that was refilled into L2 D-cache in response to an L2 software prefetch. Only the first hit is counted. After this Event is generated for a cache line, the Event is not generated again for the same cache line while it remains in the cache."
+    },
+    {
+        "EventCode": "0x020e",
+        "EventName": "L2D_CACHE_HIT_RWL1PRF_FPRF",
+        "PublicDescription": "L2 D-cache demand Read, demand Write and L1 prefetch hit, fetched by software or hardware prefetch. The Event counts each demand Read, demand Write and L1 hardware or software prefetch request that hit an L2 D-cache line that was refilled into L2 D-cache in response to an L2 hardware prefetch or software prefetch. Only the first hit is counted. After this Event is generated for a cache line, the Event is not generated again for the same cache line while it remains in the cache."
+    },
+    {
+        "EventCode": "0x010b",
+        "EventName": "L2D_LFB_HIT_RWL1PRF_FHWPRF",
+        "PublicDescription": "L2 line fill buffer demand Read, demand Write or L1 prefetch first hit, fetched by hardware prefetch. The Event counts each of the following access that hit the line-fill buffer when the same cache line is already being fetched due to an L2 hardware prefetcher. * Demand Read or Write * L1I-HWPRF * L1D-HWPRF * L1I PRFM * L1D PRFM These accesses hit a cache line that is currently being loaded into the L2 cache as a result of a hardware prefetcher to the same line. Consequently, this access does not initiate a new refill but waits for the completion of the previous refill. Only the first hit is counted. After this Event is generated for a cache line, the Event is not generated again for the same cache line while it remains in the cache."
+    },
+    {
+        "EventCode": "0x01b9",
+        "EventName": "L2D_CACHE_REFILL_L1PRF",
+        "PublicDescription": "L2 D-cache refill, L1 hardware or software prefetch. The Event counts each access counted by L2D_CACHE_L1PRF that causes a refill of the L2 cache or any L1 cache of this PE, from outside of those caches."
+    },
+    {
+        "EventCode": "0x020a",
+        "EventName": "L2D_CACHE_REFILL_RWL1PRF",
+        "PublicDescription": "L2 D-cache refill, demand Read, demand Write or L1 hardware or software prefetch. The Event counts each access counted by L2D_CACHE_RWL1PRF that causes a refill of the L2 cache, or any L1 cache of this PE, from outside of those caches."
+    },
+    {
+        "EventCode": "0x01b8",
+        "EventName": "L2D_CACHE_L1PRF",
+        "PublicDescription": "L2 D-cache access, L1 hardware or software prefetch. The Event counts L1 Hardware or software prefetch access to L2 D-cache."
+    },
+    {
+        "EventCode": "0x0208",
+        "EventName": "L2D_CACHE_RWL1PRF",
+        "PublicDescription": "L2 D-cache access, demand Read, demand Write or L1 hardware or software prefetch. The Event counts each access to L2 D-cache due to the following: * Demand Read or Write. * L1 Hardware or software prefetch."
+    }
+]
