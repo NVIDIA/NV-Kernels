@@ -1251,9 +1251,9 @@ static void mpam_resctrl_pick_counters(void)
 					update_rmid_limits(cache_size);
 
 				counter_update_class(QOS_L3_OCCUP_EVENT_ID, class);
-				return;
+				break;
 			default:
-				return;
+				break;
 			}
 		}
 
