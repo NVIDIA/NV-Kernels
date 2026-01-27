@@ -1,0 +1,230 @@
+[
+    {
+        "ArchStdEvent": "INST_SPEC",
+        "PublicDescription": "The Event counts operations that have been speculatively executed."
+    },
+    {
+        "ArchStdEvent": "OP_SPEC",
+        "PublicDescription": "The Event counts micro-operations speculatively executed. This is the count of the number of micro-operations dispatched in a cycle."
+    },
+    {
+        "ArchStdEvent": "UNALIGNED_LD_SPEC",
+        "PublicDescription": "The Event counts unaligned memory Read operations issued by the CPU. This Event counts unaligned accesses (as defined by the actual Instruction), even if they are subsequently issued as multiple aligned accesses. The Event does not count preload operations (PLD, PLI). This Event is a subset of the UNALIGNED_LDST_SPEC Event."
+    },
+    {
+        "ArchStdEvent": "UNALIGNED_ST_SPEC",
+        "PublicDescription": "The Event counts unaligned memory Write operations issued by the CPU. This Event counts unaligned accesses (as defined by the actual Instruction), even if they are subsequently issued as multiple aligned accesses. This Event is a subset of the UNALIGNED_LDST_SPEC Event."
+    },
+    {
+        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
+        "PublicDescription": "The Event counts unaligned memory operations issued by the CPU. This Event counts unaligned accesses (as defined by the actual Instruction), even if they are subsequently issued as multiple aligned accesses. This Event is the sum of the UNALIGNED_ST_SPEC and UNALIGNED_LD_SPEC Events."
+    },
+    {
+        "ArchStdEvent": "LDREX_SPEC",
+        "PublicDescription": "The Event counts Load-Exclusive operations that have been speculatively executed. For example: LDREX, LDX"
+    },
+    {
+        "ArchStdEvent": "STREX_PASS_SPEC",
+        "PublicDescription": "The Event counts Store-exclusive operations that have been speculatively executed and have successfully completed the Store operation."
+    },
+    {
+        "ArchStdEvent": "STREX_FAIL_SPEC",
+        "PublicDescription": "The Event counts Store-exclusive operations that have been speculatively executed and have not successfully completed the Store operation."
+    },
+    {
+        "ArchStdEvent": "STREX_SPEC",
+        "PublicDescription": "The Event counts Store-exclusive operations that have been speculatively executed. This Event is the sum of STREX_PASS_SPEC and STREX_FAIL_SPEC Events."
+    },
+    {
+        "ArchStdEvent": "LD_SPEC",
+        "PublicDescription": "The Event counts speculatively executed Load operations including Single Instruction Multiple Data (SIMD) Load operations."
+    },
+    {
+        "ArchStdEvent": "ST_SPEC",
+        "PublicDescription": "The Event counts speculatively executed Store operations including Single Instruction Multiple Data (SIMD) Store operations."
+    },
+    {
+        "ArchStdEvent": "LDST_SPEC",
+        "PublicDescription": "The Event counts Load and Store operations that have been speculatively executed."
+    },
+    {
+        "ArchStdEvent": "DP_SPEC",
+        "PublicDescription": "The Event counts speculatively executed logical or arithmetic Instructions such as MOV/MVN operations."
+    },
+    {
+        "ArchStdEvent": "ASE_SPEC",
+        "PublicDescription": "The Event counts speculatively executed Advanced SIMD operations excluding Load, Store, and Move micro-operations that move Data to or from SIMD (vector) registers."
+    },
+    {
+        "ArchStdEvent": "VFP_SPEC",
+        "PublicDescription": "The Event counts speculatively executed floating point operations. This Event does not count operations that move Data to or from floating point (vector) registers."
+    },
+    {
+        "ArchStdEvent": "PC_WRITE_SPEC",
+        "PublicDescription": "The Event counts speculatively executed operations which cause software changes of the PC. Those operations include all taken Branch operations."
+    },
+    {
+        "ArchStdEvent": "CRYPTO_SPEC",
+        "PublicDescription": "The Event counts speculatively executed cryptographic operations except for PMULL and VMULL operations."
+    },
+    {
+        "ArchStdEvent": "BR_IMMED_SPEC",
+        "PublicDescription": "The Event counts direct Branch operations which are speculatively executed."
+    },
+    {
+        "ArchStdEvent": "BR_RETURN_SPEC",
+        "PublicDescription": "The Event counts procedure return operations (RET, RETAA and RETAB) which are speculatively executed."
+    },
+    {
+        "ArchStdEvent": "BR_INDIRECT_SPEC",
+        "PublicDescription": "The Event counts indirect branch operations including procedure returns, which are speculatively executed. This includes operations that force a software change of the PC, other than exception-generating operations and direct Branch Instructions. Some examples of the Instructions counted by this Event include BR Xn, RET, etc."
+    },
+    {
+        "ArchStdEvent": "ISB_SPEC",
+        "PublicDescription": "The Event counts ISB operations that are executed."
+    },
+    {
+        "ArchStdEvent": "DSB_SPEC",
+        "PublicDescription": "The Event counts DSB operations that are speculatively issued to Load/Store unit in the CPU."
+    },
+    {
+        "ArchStdEvent": "DMB_SPEC",
+        "PublicDescription": "The Event counts DMB operations that are speculatively issued to the Load/Store unit in the CPU. This Event does not count implied barriers from Load-acquire/Store-release operations."
+    },
+    {
+        "ArchStdEvent": "CSDB_SPEC",
+        "PublicDescription": "The Event counts CSDB operations that are speculatively issued to the Load/Store unit in the CPU. This Event does not count implied barriers from Load-acquire/Store-release operations."
+    },
+    {
+        "ArchStdEvent": "RC_LD_SPEC",
+        "PublicDescription": "The Event counts any Load acquire operations that are speculatively executed. For example: LDAR, LDARH, LDARB"
+    },
+    {
+        "ArchStdEvent": "RC_ST_SPEC",
+        "PublicDescription": "The Event counts any Store release operations that are speculatively executed. For example: STLR, STLRH, STLRB"
+    },
+    {
+        "ArchStdEvent": "SIMD_INST_SPEC",
+        "PublicDescription": "The Event counts speculatively executed operations that are SIMD or SVE vector operations or Advanced SIMD non-scalar operations."
+    },
+    {
+        "ArchStdEvent": "ASE_INST_SPEC",
+        "PublicDescription": "The Event counts speculatively executed Advanced SIMD operations."
+    },
+    {
+        "ArchStdEvent": "SVE_INST_SPEC",
+        "PublicDescription": "The Event counts speculatively executed operations that are SVE operations."
+    },
+    {
+        "ArchStdEvent": "INT_SPEC",
+        "PublicDescription": "The Event counts speculatively executed integer arithmetic operations."
+    },
+    {
+        "ArchStdEvent": "SVE_PRED_SPEC",
+        "PublicDescription": "The Event counts speculatively executed predicated SVE operations. This counter also counts SVE operation due to Instruction with Governing predicate operand that determines the Active elements that do not write to any SVE Z vector destination register using either zeroing or merging predicate. Thus, the operations due to Instructions such as INCP, DECP, UQINCP, UQDECP, SQINCP, SQDECP and PNEXT, are counted by the SVE_PRED_* Events."
+    },
+    {
+        "ArchStdEvent": "SVE_PRED_EMPTY_SPEC",
+        "PublicDescription": "The Event counts speculatively executed predicated SVE operations with no active predicate elements. This counter also counts SVE operation due to Instruction with Governing predicate operand that determines the Active elements that do not write to any SVE Z vector destination register using either zeroing or merging predicate. Thus, the operations due to Instructions such as INCP, DECP, UQINCP, UQDECP, SQINCP, SQDECP and PNEXT, are counted by the SVE_PRED_* Events."
+    },
+    {
+        "ArchStdEvent": "SVE_PRED_FULL_SPEC",
+        "PublicDescription": "The Event counts speculatively executed predicated SVE operations with all predicate elements active. This counter also counts SVE operation due to Instruction with Governing predicate operand that determines the Active elements that do not write to any SVE Z vector destination register using either zeroing or merging predicate. Thus, the operations due to Instructions such as INCP, DECP, UQINCP, UQDECP, SQINCP, SQDECP and PNEXT, are counted by the SVE_PRED_* Events."
+    },
+    {
+        "ArchStdEvent": "SVE_PRED_PARTIAL_SPEC",
+        "PublicDescription": "The Event counts speculatively executed predicated SVE operations with at least one but not all active predicate elements. This counter also counts SVE operation due to Instruction with Governing predicate operand that determines the Active elements that do not write to any SVE Z vector destination register using either zeroing or merging predicate. Thus, the operations due to Instructions such as INCP, DECP, UQINCP, UQDECP, SQINCP, SQDECP and PNEXT, are counted by the SVE_PRED_* Events."
+    },
+    {
+        "ArchStdEvent": "SVE_PRED_NOT_FULL_SPEC",
+        "PublicDescription": "The Event counts speculatively executed predicated SVE operations with at least one non active predicate elements. This counter also counts SVE operation due to Instruction with Governing predicate operand that determines the Active elements that do not write to any SVE Z vector destination register using either zeroing or merging predicate. Thus, the operations due to Instructions such as INCP, DECP, UQINCP, UQDECP, SQINCP, SQDECP and PNEXT, are counted by the SVE_PRED_* Events."
+    },
+    {
+        "ArchStdEvent": "PRF_SPEC",
+        "PublicDescription": "The Event counts speculatively executed operations that prefetch memory. For example, Scalar: PRFM, SVE: PRFB, PRFD, PRFH, or PRFW."
+    },
+    {
+        "ArchStdEvent": "SVE_LDFF_SPEC",
+        "PublicDescription": "The Event counts speculatively executed SVE first fault or non-fault Load operations."
+    },
+    {
+        "ArchStdEvent": "SVE_LDFF_FAULT_SPEC",
+        "PublicDescription": "The Event counts speculatively executed SVE first fault or non-fault Load operations that clear at least one bit in the FFR."
+    },
+    {
+        "ArchStdEvent": "ASE_SVE_INT8_SPEC",
+        "PublicDescription": "The Event counts speculatively executed Advanced SIMD or SVE integer operations with the largest Data type an 8-bit integer."
+    },
+    {
+        "ArchStdEvent": "ASE_SVE_INT16_SPEC",
+        "PublicDescription": "The Event counts speculatively executed Advanced SIMD or SVE integer operations with the largest Data type a 16-bit integer."
+    },
+    {
+        "ArchStdEvent": "ASE_SVE_INT32_SPEC",
+        "PublicDescription": "The Event counts speculatively executed Advanced SIMD or SVE integer operations with the largest Data type a 32-bit integer."
+    },
+    {
+        "ArchStdEvent": "ASE_SVE_INT64_SPEC",
+        "PublicDescription": "The Event counts speculatively executed Advanced SIMD or SVE integer operations with the largest Data type a 64-bit integer."
+    },
+    {
+        "EventCode": "0x011d",
+        "EventName": "SPEC_RET_STACK_FULL",
+        "PublicDescription": "The Event counts predict pipe stalls due to speculative return address predictor full."
+    },
+    {
+        "EventCode": "0x011f",
+        "EventName": "MOPS_SPEC",
+        "PublicDescription": "Macro-ops speculatively decoded."
+    },
+    {
+        "EventCode": "0x0180",
+        "EventName": "BR_SPEC_PRED_TAKEN",
+        "PublicDescription": "Number of Predicted Taken from Branch Predictor."
+    },
+    {
+        "EventCode": "0x0181",
+        "EventName": "BR_SPEC_PRED_TAKEN_FROM_L2BTB",
+        "PublicDescription": "Number of Predicted Taken Branch from L2 BTB."
+    },
+    {
+        "EventCode": "0x0182",
+        "EventName": "BR_SPEC_PRED_TAKEN_MULTI",
+        "PublicDescription": "Number of Predicted Taken for Polymorphic Branch."
+    },
+    {
+        "EventCode": "0x0185",
+        "EventName": "BR_SPEC_PRED_STATIC",
+        "PublicDescription": "Number of post fetch prediction."
+    },
+    {
+        "EventCode": "0x01d0",
+        "EventName": "TLBI_LOCAL_SPEC",
+        "PublicDescription": "A non-broadcast TLBI Instruction executed (Speculatively or otherwise) on *this* PE."
+    },
+    {
+        "EventCode": "0x01d1",
+        "EventName": "TLBI_BROADCAST_SPEC",
+        "PublicDescription": "A broadcast TLBI Instruction executed (Speculatively or otherwise) on *this* PE."
+    },
+    {
+        "EventCode": "0x0200",
+        "EventName": "SIMD_CRYPTO_INST_SPEC",
+        "PublicDescription": "SIMD, SVE, and CRYPTO Instructions speculatively decoded."
+    },
+    {
+        "EventCode": "0x01e7",
+        "EventName": "BR_SPEC_PRED_ALN_REDIR",
+        "PublicDescription": "BPU predict pipe align redirect (either AL-APQ hit/miss)."
+    },
+    {
+        "EventCode": "0x022e",
+        "EventName": "VPRED_LD_SPEC",
+        "PublicDescription": "The Event counts the number of Speculatively-executed-Load operations with addresses produced by the value-prediction mechanism. The loaded Data might be discarded if the predicted address differs from the actual address."
+    },
+    {
+        "EventCode": "0x022f",
+        "EventName": "VPRED_LD_SPEC_MISMATCH",
+        "PublicDescription": "The Event counts a subset of VPRED_LD_SPEC where the predicted Load address and the actual address mismatched."
+    }
+]
