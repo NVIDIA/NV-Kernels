@@ -183,6 +183,12 @@ CONFIG_NVGRACE_EGM                              note<'LP: #2119656'>
 CONFIG_NVIDIA_FFA_EC                            policy<{'arm64': 'y'}>
 CONFIG_NVIDIA_FFA_EC                            note<'LP: #2114230'>
 
+CONFIG_NVIDIA_TEGRA410_C2C_PMU                  policy<{'arm64': 'm'}>
+CONFIG_NVIDIA_TEGRA410_C2C_PMU                  note<'LP: #2139315'>
+
+CONFIG_NVIDIA_TEGRA410_CMEM_LATENCY_PMU         policy<{'arm64': 'm'}>
+CONFIG_NVIDIA_TEGRA410_CMEM_LATENCY_PMU         note<'LP: #2139315'>
+
 CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
 
