@@ -1364,18 +1364,13 @@ static void tegra_xhci_id_work(struct work_struct *work)
 	u32 status;
 	int ret;
 
-	mutex_lock(&tegra->lock);
-
 	host_mode = tegra->host_mode;
-
 	dev_dbg(tegra->dev, "host mode %s\n", str_on_off(host_mode));
 
 	if (host_mode)
 		phy_set_mode_ext(phy, PHY_MODE_USB_OTG, USB_ROLE_HOST);
 	else
 		phy_set_mode_ext(phy, PHY_MODE_USB_OTG, USB_ROLE_NONE);
-
-	mutex_unlock(&tegra->lock);
 
 	tegra->otg_usb3_port = tegra_xusb_padctl_get_usb3_companion(tegra->padctl,
 								    tegra->otg_usb2_port);
