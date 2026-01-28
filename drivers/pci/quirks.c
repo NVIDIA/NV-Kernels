@@ -6410,3 +6410,36 @@ static void pci_mask_replay_timer_timeout(struct pci_dev *pdev)
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_GLI, 0x9750, pci_mask_replay_timer_timeout);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_GLI, 0x9755, pci_mask_replay_timer_timeout);
 #endif
+
+/*
+ * Pericom PI7C9X2G608GP PCIe switch with bus holes (unpopulated downstream
+ * ports) generates spurious Advisory Non-Fatal correctable errors during
+ * device enumeration (e.g., lspci). Mask these errors at the switch only so
+ * they do not propagate to the root port.
+ *
+ * Advisory Non-Fatal Error (bit 13) indicates a correctable error that was
+ * originally classified as uncorrectable but has been masked to be advisory.
+ * This commonly occurs with bus holes where config reads to non-existent
+ * devices return all-1s.
+ */
+static void quirk_pericom_mask_aer_adv_nonfatal(struct pci_dev *pdev)
+{
+	int aer_pos;
+	u32 val;
+
+	aer_pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ERR);
+	if (!aer_pos)
+		return;
+
+	pci_read_config_dword(pdev, aer_pos + PCI_ERR_COR_MASK, &val);
+	if (!(val & PCI_ERR_COR_ADV_NFAT)) {
+		val |= PCI_ERR_COR_ADV_NFAT;
+		pci_write_config_dword(pdev, aer_pos + PCI_ERR_COR_MASK, val);
+		pci_info(pdev, "Masked Advisory Non-Fatal AER errors\n");
+	}
+}
+/* PI7C9X2G608GP 6-Port/8-Lane Packet Switch */
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_PERICOM, 0x2608,
+			quirk_pericom_mask_aer_adv_nonfatal);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_PERICOM, 0x2608,
+			 quirk_pericom_mask_aer_adv_nonfatal);
