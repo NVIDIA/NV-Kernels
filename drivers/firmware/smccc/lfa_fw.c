@@ -20,7 +20,10 @@
 #include <linux/nmi.h>
 #include <linux/ktime.h>
 #include <linux/delay.h>
+#include <linux/acpi.h>
+#include <linux/platform_device.h>
 
+#define DRIVER_NAME	"ARM_LFA"
 #undef pr_fmt
 #define pr_fmt(fmt) "Arm LFA: " fmt
 
@@ -284,26 +287,7 @@ static int activate_fw_image(struct image_props *attrs)
 		return lfa_cancel(attrs);
 	}
 
-	/*
-	 * Invalidate fw_seq_ids (-1) for all images as the seq_ids and the
-	 * number of firmware images in the LFA agent may change after a
-	 * successful activation attempt. Negate all image flags as well.
-	 */
-	attrs = NULL;
-	list_for_each_entry(attrs, &lfa_fw_images, image_node) {
-		set_image_flags(attrs, -1, 0b1000, 0, 0);
-	}
-
 	update_fw_images_tree();
-
-	/*
-	 * Removing non-valid image directories at the end of an activation.
-	 * We can't remove the sysfs attributes while in the respective
-	 * _store() handler, so have to postpone the list removal to a
-	 * workqueue.
-	 */
-	INIT_WORK(&fw_images_update_work, remove_invalid_fw_images);
-	queue_work(fw_images_update_wq, &fw_images_update_work);
 	mutex_unlock(&lfa_lock);
 
 	return ret;
@@ -627,6 +611,7 @@ static int update_fw_images_tree(void)
 {
 	struct arm_smccc_1_2_regs reg = { 0 };
 	struct uuid_regs image_uuid;
+	struct image_props *attrs;
 	char image_id_str[40];
 	int ret, num_of_components;
 
@@ -634,6 +619,15 @@ static int update_fw_images_tree(void)
 	if (num_of_components <= 0) {
 		pr_err("Error getting number of LFA components\n");
 		return -ENODEV;
+	}
+
+	/*
+	 * Invalidate fw_seq_ids (-1) for all images as the seq_ids and the
+	 * number of firmware images in the LFA agent may change after a
+	 * successful activation attempt. Negate all image flags as well.
+	 */
+	list_for_each_entry(attrs, &lfa_fw_images, image_node) {
+		set_image_flags(attrs, -1, 0b1000, 0, 0);
 	}
 
 	for (int i = 0; i < num_of_components; i++) {
@@ -653,8 +647,120 @@ static int update_fw_images_tree(void)
 		}
 	}
 
+	/*
+	 * Removing non-valid image directories at the end of an activation.
+	 * We can't remove the sysfs attributes while in the respective
+	 * _store() handler, so have to postpone the list removal to a
+	 * workqueue.
+	 */
+	INIT_WORK(&fw_images_update_work, remove_invalid_fw_images);
+	queue_work(fw_images_update_wq, &fw_images_update_work);
+
 	return 0;
 }
+
+#if defined(CONFIG_ACPI)
+static void lfa_notify_handler(acpi_handle handle, u32 event, void *data)
+{
+	struct image_props *attrs = NULL;
+	int ret;
+	bool found_activable_image = false;
+
+	/* Get latest FW inventory */
+	mutex_lock(&lfa_lock);
+	ret = update_fw_images_tree();
+	mutex_unlock(&lfa_lock);
+	if (ret != 0) {
+		pr_err("FW images tree update failed");
+		return;
+	}
+
+	/*
+	 * Go through all FW images in a loop and trigger activation
+	 * of all activable and pending images.
+	 */
+	do {
+		/* Reset activable image flag */
+		found_activable_image = false;
+		list_for_each_entry(attrs, &lfa_fw_images, image_node) {
+			if (attrs->fw_seq_id == -1)
+				continue; /* Invalid FW component */
+
+			if ((!attrs->activation_capable) || (!attrs->activation_pending))
+				continue; /* FW component is not activable */
+
+			/*
+			 * Found an image that is activable.
+			 * As the FW images tree is revised after activation, it is
+			 * not ideal to invoke activation from inside
+			 * list_for_each_entry() loop.
+			 * So, set the flasg and exit loop.
+			 */
+			found_activable_image = true;
+			break;
+		}
+
+		if (found_activable_image) {
+			ret = prime_fw_image(attrs);
+			if (ret) {
+				pr_err("Firmware prime failed: %s\n",
+					lfa_error_strings[-ret]);
+				return;
+			}
+
+			ret = activate_fw_image(attrs);
+			if (ret) {
+				pr_err("Firmware activation failed: %s\n",
+					lfa_error_strings[-ret]);
+				return;
+			}
+
+			pr_info("Firmware %s activation succeeded", attrs->image_name);
+		}
+	} while(found_activable_image);
+
+	return;
+}
+
+static int lfa_probe(struct platform_device *pdev)
+{
+	acpi_status status;
+	acpi_handle handle = ACPI_HANDLE(&pdev->dev);
+	if (!handle)
+		return -ENODEV;
+
+	/* Register notify handler that indicates if LFA updates are available */
+	status = acpi_install_notify_handler(handle,
+		ACPI_DEVICE_NOTIFY, lfa_notify_handler, pdev);
+	if (ACPI_FAILURE(status))
+		return -EIO;
+
+	return 0;
+}
+
+static void lfa_remove(struct platform_device *pdev) {
+	acpi_handle handle = ACPI_HANDLE(&pdev->dev);
+
+	if (handle)
+		acpi_remove_notify_handler(handle,
+			ACPI_DEVICE_NOTIFY, lfa_notify_handler);
+}
+
+static const struct acpi_device_id lfa_acpi_ids[] = {
+	{"ARML0003"},
+	{},
+};
+MODULE_DEVICE_TABLE(acpi, lfa_acpi_ids);
+
+static struct platform_driver lfa_driver = {
+	.probe = lfa_probe,
+	.remove = lfa_remove,
+	.driver = {
+		.name = DRIVER_NAME,
+		.acpi_match_table = ACPI_PTR(lfa_acpi_ids),
+	},
+};
+#endif
 
 static int __init lfa_init(void)
 {
@@ -678,6 +784,12 @@ static int __init lfa_init(void)
 
 	pr_info("Live Firmware Activation: detected v%ld.%ld\n",
 		reg.a0 >> 16, reg.a0 & 0xffff);
+
+#if defined(CONFIG_ACPI)
+	err = platform_driver_register(&lfa_driver);
+	if (err < 0)
+		pr_err("Platform driver register failed");
+#endif
 
 	lfa_dir = kobject_create_and_add("lfa", firmware_kobj);
 	if (!lfa_dir)
@@ -703,6 +815,9 @@ static void __exit lfa_exit(void)
 	mutex_unlock(&lfa_lock);
 
 	kobject_put(lfa_dir);
+#if defined(CONFIG_ACPI)
+	platform_driver_unregister(&lfa_driver);
+#endif
 }
 module_exit(lfa_exit);
 
