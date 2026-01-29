@@ -1098,7 +1098,7 @@ int efi_status_to_err(efi_status_t status)
 	size_t num = sizeof(efi_error_codes) / sizeof(struct efi_error_code);
 
 	found = bsearch((void *)(uintptr_t)status, efi_error_codes,
-			sizeof(struct efi_error_code), num,
+			num, sizeof(struct efi_error_code),
 			efi_status_cmp_bsearch);
 	if (!found)
 		return -EINVAL;
@@ -1112,7 +1112,7 @@ efi_status_to_str(efi_status_t status)
 	size_t num = sizeof(efi_error_codes) / sizeof(struct efi_error_code);
 
 	found = bsearch((void *)(uintptr_t)status, efi_error_codes,
-			sizeof(struct efi_error_code), num,
+			num, sizeof(struct efi_error_code),
 			efi_status_cmp_bsearch);
 	if (!found)
 		return "Unknown error code";
