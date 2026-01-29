@@ -1109,6 +1109,12 @@ static int nvgrace_gpu_probe(struct pci_dev *pdev,
 		nvdev->core_device.pci_ops = &nvgrace_gpu_pci_dev_core_ops;
 	}
 
+	pdev->resource[PCI_COHERENT_RESOURCE] =
+		DEFINE_RES_NAMED_DESC(nvdev->usemem.memphys, nvdev->usemem.memlength,
+				     "GPU coherent memory",
+				     IORESOURCE_MEM,
+				     IORES_DESC_NONE);
+
 	ret = vfio_pci_core_register_device(&nvdev->core_device);
 	if (ret)
 		goto out_put_vdev;

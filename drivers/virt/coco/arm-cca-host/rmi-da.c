@@ -97,6 +97,15 @@ static int init_pdev_params(struct pci_dev *pdev, struct rmi_pdev_params *params
 				   pdev->resource,
 				   DEVICE_COUNT_RESOURCE);
 
+	if (pdev->resource[PCI_COHERENT_RESOURCE].flags & IORESOURCE_MEM) {
+		params->coh_addr_range[0].base =
+			pdev->resource[PCI_COHERENT_RESOURCE].start;
+		params->coh_addr_range[0].top =
+			pdev->resource[PCI_COHERENT_RESOURCE].end + 1;
+		params->coh_num_addr_range = 1;
+		params->flags |= RMI_PDEV_FLAGS_COH_ADDR;
+	}
+
 	rmi_pdev_aux_count(params->flags, &params->num_aux);
 	pf0_dsc->num_aux = params->num_aux;
 	for (i = 0; i < params->num_aux; i++) {

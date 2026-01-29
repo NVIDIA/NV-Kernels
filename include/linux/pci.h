@@ -127,6 +127,9 @@ enum {
 	PCI_BRIDGE_RESOURCE_END = PCI_BRIDGE_RESOURCES +
 				  PCI_BRIDGE_RESOURCE_NUM - 1,
 
+	/* Some devices contain non-standard CPU coherent resources */
+	PCI_COHERENT_RESOURCE,
+
 	/* Total resources associated with a PCI device */
 	PCI_NUM_RESOURCES,
 
