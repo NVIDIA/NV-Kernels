@@ -1748,6 +1748,50 @@ int cppc_set_auto_sel(int cpu, bool enable)
 EXPORT_SYMBOL_GPL(cppc_set_auto_sel);
 
 /**
+ * cppc_get_min_perf - Read minimum performance register.
+ * @cpu: CPU from which to read register.
+ * @min_perf: Return address.
+ */
+int cppc_get_min_perf(int cpu, u64 *min_perf)
+{
+	return cppc_get_reg_val(cpu, MIN_PERF, min_perf);
+}
+EXPORT_SYMBOL_GPL(cppc_get_min_perf);
+
+/**
+ * cppc_set_min_perf - Write minimum performance register.
+ * @cpu: CPU to which to write register.
+ * @min_perf: the desired minimum performance value to be updated.
+ */
+int cppc_set_min_perf(int cpu, u32 min_perf)
+{
+	return cppc_set_reg_val(cpu, MIN_PERF, min_perf);
+}
+EXPORT_SYMBOL_GPL(cppc_set_min_perf);
+
+/**
+ * cppc_get_max_perf - Read maximum performance register.
+ * @cpu: CPU from which to read register.
+ * @max_perf: Return address.
+ */
+int cppc_get_max_perf(int cpu, u64 *max_perf)
+{
+	return cppc_get_reg_val(cpu, MAX_PERF, max_perf);
+}
+EXPORT_SYMBOL_GPL(cppc_get_max_perf);
+
+/**
+ * cppc_set_max_perf - Write maximum performance register.
+ * @cpu: CPU to which to write register.
+ * @max_perf: the desired maximum performance value to be updated.
+ */
+int cppc_set_max_perf(int cpu, u32 max_perf)
+{
+	return cppc_set_reg_val(cpu, MAX_PERF, max_perf);
+}
+EXPORT_SYMBOL_GPL(cppc_set_max_perf);
+
+/**
  * cppc_set_enable - Set to enable CPPC on the processor by writing the
  * Continuous Performance Control package EnableRegister field.
  * @cpu: CPU for which to enable CPPC register.
