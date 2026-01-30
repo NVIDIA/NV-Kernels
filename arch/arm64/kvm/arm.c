@@ -50,6 +50,16 @@
 
 #include "sys_regs.h"
 
+/*
+ * Expose KVM_CAP_ARM_RME capability number via sysfs so userspace (QEMU)
+ * can discover it at runtime. This is needed because the capability number
+ * is not yet stable upstream and can shift when other patches are merged.
+ * Exposed at: /sys/module/kvm/parameters/kvm_cap_arm_rme
+ */
+static int kvm_cap_arm_rme = KVM_CAP_ARM_RME;
+module_param(kvm_cap_arm_rme, int, 0444);
+MODULE_PARM_DESC(kvm_cap_arm_rme, "KVM capability number for ARM RME");
+
 static enum kvm_mode kvm_mode = KVM_MODE_DEFAULT;
 
 enum kvm_wfx_trap_policy {
