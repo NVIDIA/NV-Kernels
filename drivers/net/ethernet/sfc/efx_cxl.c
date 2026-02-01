@@ -134,6 +134,14 @@ int efx_cxl_init(struct efx_probe_data *probe_data)
 			cxl_put_root_decoder(cxl->cxlrd);
 			return PTR_ERR(cxl->cxled);
 		}
+
+		cxl->efx_region = cxl_create_region(cxl->cxlrd, &cxl->cxled, 1);
+		if (IS_ERR(cxl->efx_region)) {
+			pci_err(pci_dev, "CXL accel create region failed");
+			cxl_put_root_decoder(cxl->cxlrd);
+			cxl_dpa_free(cxl->cxled);
+			return PTR_ERR(cxl->efx_region);
+		}
 	}
 
 	probe_data->cxl = cxl;
@@ -147,11 +155,11 @@ void efx_cxl_exit(struct efx_probe_data *probe_data)
 
 	if (probe_data->cxl->hdm_was_committed) {
 		iounmap(probe_data->cxl->ctpio_cxl);
-		cxl_unregister_region(probe_data->cxl->efx_region);
 	} else {
 		cxl_dpa_free(probe_data->cxl->cxled);
 		cxl_put_root_decoder(probe_data->cxl->cxlrd);
 	}
+	cxl_unregister_region(probe_data->cxl->efx_region);
 }
 
 MODULE_IMPORT_NS("CXL");
