@@ -18,6 +18,7 @@ int efx_cxl_init(struct efx_probe_data *probe_data)
 {
 	struct efx_nic *efx = &probe_data->efx;
 	struct pci_dev *pci_dev = efx->pci_dev;
+	resource_size_t max_size;
 	struct efx_cxl *cxl;
 	struct range range;
 	u16 dvsec;
@@ -110,9 +111,24 @@ int efx_cxl_init(struct efx_probe_data *probe_data)
 			return -ENOMEM;
 		}
 
-		probe_data->cxl = cxl;
+		cxl->hdm_was_committed = true;
+	} else {
+		cxl->cxlrd = cxl_get_hpa_freespace(cxl->cxlmd, 1, CXL_DECODER_F_RAM |
+						   CXL_DECODER_F_TYPE2, &max_size);
+		if (IS_ERR(cxl->cxlrd)) {
+			dev_err(&pci_dev->dev, "cxl_get_hpa_freespace failed\n");
+			return PTR_ERR(cxl->cxlrd);
+		}
+
+		if (max_size < EFX_CTPIO_BUFFER_SIZE) {
+			dev_err(&pci_dev->dev, "%s: not enough free HPA space %pap < %u\n",
+				__func__, &max_size, EFX_CTPIO_BUFFER_SIZE);
+			cxl_put_root_decoder(cxl->cxlrd);
+			return -ENOSPC;
+		}
 	}
 
+	probe_data->cxl = cxl;
 	return 0;
 }
 
@@ -121,8 +137,12 @@ void efx_cxl_exit(struct efx_probe_data *probe_data)
 	if (!probe_data->cxl)
 		return;
 
-	iounmap(probe_data->cxl->ctpio_cxl);
-	cxl_unregister_region(probe_data->cxl->efx_region);
+	if (probe_data->cxl->hdm_was_committed) {
+		iounmap(probe_data->cxl->ctpio_cxl);
+		cxl_unregister_region(probe_data->cxl->efx_region);
+	} else {
+		cxl_put_root_decoder(probe_data->cxl->cxlrd);
+	}
 }
 
 MODULE_IMPORT_NS("CXL");

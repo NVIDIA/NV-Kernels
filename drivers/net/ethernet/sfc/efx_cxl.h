@@ -27,6 +27,7 @@ struct efx_cxl {
 	struct cxl_root_decoder *cxlrd;
 	struct cxl_port *endpoint;
 	struct cxl_endpoint_decoder *cxled;
+	bool hdm_was_committed;
 	struct cxl_region *efx_region;
 	void __iomem *ctpio_cxl;
 };
