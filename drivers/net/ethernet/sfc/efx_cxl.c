@@ -19,6 +19,7 @@ int efx_cxl_init(struct efx_probe_data *probe_data)
 	struct efx_nic *efx = &probe_data->efx;
 	struct pci_dev *pci_dev = efx->pci_dev;
 	struct efx_cxl *cxl;
+	struct range range;
 	u16 dvsec;
 	int rc;
 
@@ -90,13 +91,38 @@ int efx_cxl_init(struct efx_probe_data *probe_data)
 		return PTR_ERR(cxl->cxlmd);
 	}
 
-	probe_data->cxl = cxl;
+	cxl->cxled = cxl_get_committed_decoder(cxl->cxlmd, &cxl->efx_region);
+	if (cxl->cxled) {
+		if (!cxl->efx_region) {
+			pci_err(pci_dev, "CXL found committed decoder without a region");
+			return -ENODEV;
+		}
+		rc = cxl_get_region_range(cxl->efx_region, &range);
+		if (rc) {
+			pci_err(pci_dev,
+				"CXL getting regions params from a committed decoder failed");
+			return rc;
+		}
+
+		cxl->ctpio_cxl = ioremap(range.start, range.end - range.start + 1);
+		if (!cxl->ctpio_cxl) {
+			pci_err(pci_dev, "CXL ioremap region (%pra) failed", &range);
+			return -ENOMEM;
+		}
+
+		probe_data->cxl = cxl;
+	}
 
 	return 0;
 }
 
 void efx_cxl_exit(struct efx_probe_data *probe_data)
 {
+	if (!probe_data->cxl)
+		return;
+
+	iounmap(probe_data->cxl->ctpio_cxl);
+	cxl_unregister_region(probe_data->cxl->efx_region);
 }
 
 MODULE_IMPORT_NS("CXL");
