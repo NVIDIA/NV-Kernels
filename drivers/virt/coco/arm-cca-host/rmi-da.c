@@ -686,6 +686,29 @@ static unsigned long pci_get_tdi_id(struct pci_dev *pdev)
 	return pci_dev_id(pdev);
 }
 
+static int prune_resource_list(struct resource *res_out,
+			       unsigned int n_res_out,
+			       struct resource *res_in,
+			       unsigned int n_res_in)
+{
+	int i, j;
+
+	if (!res_in)
+		return 0;
+
+	for (i = 0, j = 0; i < n_res_out && j < n_res_in; j++) {
+		if (res_in[j].flags & IORESOURCE_MEM) {
+			res_out[i] = res_in[j];
+			i++;
+		}
+	}
+
+	if (j != n_res_in)
+		return -ENOMEM;
+
+	return i;
+}
+
 void *cca_vdev_create(struct realm *realm, struct pci_dev *pdev,
 		      struct pci_dev *pf0_dev, u32 guest_rid)
 {
@@ -754,6 +777,19 @@ void *cca_vdev_create(struct realm *realm, struct pci_dev *pdev,
 	if (ret)
 		goto err_vdev_comm;
 
+	struct resource vdev_resources[DEVICE_COUNT_RESOURCE];
+
+	ret = prune_resource_list(vdev_resources,
+				  ARRAY_SIZE(vdev_resources),
+				  pdev->resource,
+				  DEVICE_COUNT_RESOURCE);
+	if (ret < 0) {
+		pr_err("Insufficient resources for dev mem\n");
+		ret = 0;
+	}
+
+	kvm_realm_register_vdev(host_tdi->tdi.kvm, rmm_vdev_phys, ret, vdev_resources);
+
 	free_page((unsigned long)params);
 	return rmm_vdev;
 
@@ -802,6 +838,9 @@ void cca_vdev_unlock_and_destroy(struct realm *realm,
 
 	if (!rmi_granule_undelegate(rmm_vdev_phys))
 		free_page((unsigned long)host_tdi->rmm_vdev);
+
+	kvm_realm_unregister_vdev(host_tdi->tdi.kvm, rmm_vdev_phys);
+
 	host_tdi->rmm_vdev = NULL;
 	host_tdi->realm = NULL;
 }
