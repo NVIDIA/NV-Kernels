@@ -452,6 +452,30 @@ void kvm_realm_destroy_rtts(struct kvm *kvm)
 	WARN_ON(realm_tear_down_rtt_range(realm, 0, (1UL << ia_bits)));
 }
 
+static int kvm_realm_vdev_from_range(struct realm *realm,
+				     unsigned long addr,
+				     phys_addr_t *vdev_phys)
+{
+	struct realm_vdev *vdev;
+	int ret = -EINVAL;
+	size_t i;
+
+	mutex_lock(&realm->vdevs_lock);
+	list_for_each_entry(vdev, &realm->vdevs_list, list) {
+		for (i = 0; i < vdev->n_resources; i++) {
+			struct resource *res = &vdev->resources[i];
+			if (addr >= res->start && addr <= res->end) {
+				*vdev_phys = vdev->vdev_phys;
+				ret = 0;
+				break;
+			}
+		}
+	}
+	mutex_unlock(&realm->vdevs_lock);
+
+	return ret;
+}
+
 static int realm_destroy_private_granule(struct realm *realm,
 					 unsigned long ipa,
 					 unsigned long *next_addr)
@@ -468,10 +492,18 @@ static int realm_destroy_private_granule(struct realm *realm,
 		return -ENXIO;
 
 retry:
-	if (rtt_entry.ripas == RMI_DEV)
-		ret = rmi_vdev_mem_unmap(rd, ipa, RMM_RTT_MAX_LEVEL, &phy_addr, next_addr);
-	else
+	if (rtt_entry.ripas == RMI_DEV) {
+		phys_addr_t vdev_phys;
+		ret = kvm_realm_vdev_from_range(realm, rtt_entry.desc, &vdev_phys);
+		if (WARN_ON(ret))
+			return -EINVAL;
+
+		ret = rmi_vdev_mem_unmap(rd, vdev_phys, ipa,
+					 RMM_RTT_MAX_LEVEL, &phy_addr,
+					 next_addr);
+	} else {
 		ret = rmi_data_destroy(rd, ipa, &phy_addr, next_addr);
+	}
 
 	if (RMI_RETURN_STATUS(ret) == RMI_ERROR_RTT) {
 		if (*next_addr > ipa)
@@ -1469,7 +1501,7 @@ int realm_dev_mem_map(struct kvm *kvm, unsigned long rec_phys,
 			start_pa -= PAGE_SIZE;
 			start_ipa -= PAGE_SIZE;
 
-			WARN_ON(rmi_vdev_mem_unmap(rd_phys, start_ipa,
+			WARN_ON(rmi_vdev_mem_unmap(rd_phys, vdev_phys, start_ipa,
 					RMM_RTT_MAX_LEVEL, &out_pa, &out_ipa));
 
 			WARN_ON(start_pa != out_pa);
@@ -1804,6 +1836,10 @@ int kvm_init_realm_vm(struct kvm *kvm)
 
 	if (!kvm->arch.realm.params)
 		return -ENOMEM;
+
+	INIT_LIST_HEAD(&kvm->arch.realm.vdevs_list);
+	mutex_init(&kvm->arch.realm.vdevs_lock);
+
 	return 0;
 }
 
@@ -1831,3 +1867,60 @@ void kvm_init_rmi(void)
 
 	static_branch_enable(&kvm_rmi_is_available);
 }
+
+int kvm_realm_register_vdev(struct kvm *kvm,
+			    phys_addr_t vdev_phys,
+			    size_t n_resources,
+			    struct resource *resources)
+{
+	struct realm *realm = &kvm->arch.realm;
+	struct realm_vdev *vdev;
+	int ret = 0;
+
+	if (n_resources > (MAX_IOCOH_ADDR_RANGE + MAX_FCOH_ADDR_RANGE)) {
+		return -EINVAL;
+	}
+
+	mutex_lock(&realm->vdevs_lock);
+	list_for_each_entry(vdev, &realm->vdevs_list, list) {
+		if (vdev->vdev_phys == vdev_phys) {
+			ret = -EEXIST;
+			goto out_unlock;
+		}
+	}
+
+	vdev = kzalloc(sizeof(*vdev), GFP_KERNEL);
+	if (!vdev) {
+		ret = -ENOMEM;
+		goto out_unlock;
+	}
+
+	INIT_LIST_HEAD(&vdev->list);
+	vdev->vdev_phys = vdev_phys;
+	vdev->n_resources = n_resources;
+	memcpy(vdev->resources, resources, n_resources * sizeof(struct resource));
+	list_add_tail(&vdev->list, &realm->vdevs_list);
+
+out_unlock:
+	mutex_unlock(&realm->vdevs_lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(kvm_realm_register_vdev);
+
+void kvm_realm_unregister_vdev(struct kvm *kvm,
+			       phys_addr_t vdev_phys)
+{
+	struct realm *realm = &kvm->arch.realm;
+	struct realm_vdev *vdev;
+
+	mutex_lock(&realm->vdevs_lock);
+	list_for_each_entry(vdev, &realm->vdevs_list, list) {
+		if (vdev->vdev_phys == vdev_phys) {
+			list_del(&vdev->list);
+			kfree(vdev);
+			break;
+		}
+	}
+	mutex_unlock(&realm->vdevs_lock);
+}
+EXPORT_SYMBOL_GPL(kvm_realm_unregister_vdev);

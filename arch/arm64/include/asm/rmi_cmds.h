@@ -731,12 +731,13 @@ static inline int rmi_vdev_mem_map(unsigned long rd, unsigned long vdev_phys,
 	return res.a0;
 }
 
-static inline int rmi_vdev_mem_unmap(unsigned long rd, unsigned long ipa, unsigned long level,
+static inline int rmi_vdev_mem_unmap(unsigned long rd, unsigned long vdev_phys,
+				     unsigned long ipa, unsigned long level,
 				     unsigned long *out_pa, unsigned long *out_ipa)
 {
 	struct arm_smccc_res res;
 
-	arm_smccc_1_1_invoke(SMC_RMI_VDEV_MEM_UNMAP, rd, ipa, level, &res);
+	arm_smccc_1_1_invoke(SMC_RMI_VDEV_MEM_UNMAP, rd, vdev_phys, ipa, level, &res);
 
 	if (out_pa)
 		*out_pa = res.a1;

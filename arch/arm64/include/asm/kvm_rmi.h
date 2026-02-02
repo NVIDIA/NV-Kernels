@@ -63,6 +63,9 @@ struct realm {
 	unsigned long num_aux;
 	unsigned int vmid;
 	unsigned int ia_bits;
+
+	struct list_head vdevs_list;
+	struct mutex vdevs_lock;
 };
 
 /**
@@ -83,6 +86,20 @@ struct realm_rec {
 	 */
 	struct page *aux_pages[(REC_PARAMS_AUX_GRANULES * SZ_4K) >> PAGE_SHIFT];
 	struct rec_run *run;
+};
+
+/**
+ * struct realm_vdev - VDEV mapping data
+ *
+ * @list: The list of attached drivers
+ * @vdev_phys: VDEV physical address
+ * @resources: A list of resources covered by this VDEV
+ */
+struct realm_vdev {
+	struct list_head list;
+	phys_addr_t vdev_phys;
+	size_t n_resources;
+	struct resource resources[MAX_IOCOH_ADDR_RANGE + MAX_FCOH_ADDR_RANGE];
 };
 
 void kvm_init_rmi(void);
@@ -139,4 +156,11 @@ int realm_dev_mem_map(struct kvm *kvm, unsigned long rec_phys,
 		      unsigned long pdev_phys, unsigned long vdev_phys,
 		      unsigned long start_ipa, unsigned long end_ipa,
 		      unsigned long start_pa);
+int kvm_realm_register_vdev(struct kvm *kvm,
+			    phys_addr_t vdev_phys,
+			    size_t n_resources,
+			    struct resource *resources);
+void kvm_realm_unregister_vdev(struct kvm *kvm,
+			       phys_addr_t vdev_phys);
+
 #endif /* __ASM_KVM_RMI_H */
