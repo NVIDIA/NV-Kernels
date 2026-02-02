@@ -808,6 +808,78 @@ static ssize_t unlock_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_WO(unlock);
 
+static ssize_t enable_spdm_show(struct device *dev, struct device_attribute *attr,
+				char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sysfs_emit(buf, "%d\n", pdev->enable_spdm);
+}
+
+static ssize_t enable_spdm_store(struct device *dev, struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	bool val;
+	int err;
+
+	err = kstrtobool(buf, &val);
+	if (err)
+		return err;
+
+	pdev->enable_spdm = val;
+	return count;
+}
+static DEVICE_ATTR_RW(enable_spdm);
+
+static ssize_t enable_link_ide_show(struct device *dev, struct device_attribute *attr,
+				    char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sysfs_emit(buf, "%d\n", pdev->enable_link_ide);
+}
+
+static ssize_t enable_link_ide_store(struct device *dev, struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	bool val;
+	int err;
+
+	err = kstrtobool(buf, &val);
+	if (err)
+		return err;
+
+	pdev->enable_link_ide = val;
+	return count;
+}
+static DEVICE_ATTR_RW(enable_link_ide);
+
+static ssize_t enable_sel_ide_show(struct device *dev, struct device_attribute *attr,
+				   char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sysfs_emit(buf, "%d\n", pdev->enable_sel_ide);
+}
+
+static ssize_t enable_sel_ide_store(struct device *dev, struct device_attribute *attr,
+				    const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	bool val;
+	int err;
+
+	err = kstrtobool(buf, &val);
+	if (err)
+		return err;
+
+	pdev->enable_sel_ide = val;
+	return count;
+}
+static DEVICE_ATTR_RW(enable_sel_ide);
+
 /* The 'authenticated' attribute is exclusive to the presence of a 'link' TSM */
 static bool pci_tsm_link_group_visible(struct kobject *kobj)
 {
@@ -865,6 +937,10 @@ static umode_t pci_tsm_attr_visible(struct kobject *kobj,
 		}
 
 		if (attr == &dev_attr_connect.attr ||
+		    attr == &dev_attr_disconnect.attr ||
+		    attr == &dev_attr_enable_spdm.attr ||
+		    attr == &dev_attr_enable_link_ide.attr ||
+		    attr == &dev_attr_enable_sel_ide.attr ||
 		    attr == &dev_attr_disconnect.attr) {
 			if (is_pci_tsm_pf0(pdev))
 				return attr->mode;
@@ -896,6 +972,9 @@ static struct attribute *pci_tsm_attrs[] = {
 	&dev_attr_accept.attr,
 	&dev_attr_lock.attr,
 	&dev_attr_unlock.attr,
+	&dev_attr_enable_spdm.attr,
+	&dev_attr_enable_link_ide.attr,
+	&dev_attr_enable_sel_ide.attr,
 	NULL
 };
 
@@ -1184,6 +1263,11 @@ void pci_tsm_init(struct pci_dev *pdev)
 	 */
 	if (pdev->tsm)
 		return;
+
+	/* Default settings */
+	pdev->enable_spdm = true;
+	pdev->enable_link_ide = false;
+	pdev->enable_sel_ide = true;
 
 	if (pci_tsm_link_count) {
 		struct pci_dev *dsm = find_dsm_dev(pdev);

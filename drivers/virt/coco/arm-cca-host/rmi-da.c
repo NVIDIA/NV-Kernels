@@ -17,6 +17,9 @@
 
 #include "rmi-da.h"
 
+#define RMI_PDEV_PARAMS_DISABLE_SEL_IDE		(1UL << 62)
+#define RMI_PDEV_PARAMS_DISABLE_LINK_IDE	(1UL << 63)
+
 static int pci_dev_addr_range(struct pci_dev *pdev,
 			      struct rmi_pdev_addr_range *pdev_addr)
 {
@@ -70,8 +73,14 @@ static int init_pdev_params(struct pci_dev *pdev, struct rmi_pdev_params *params
 	/* slot number for certificate chain */
 	params->cert_id = 0;
 	/* io coherent spdm/ide and non p2p */
-	params->flags = RMI_PDEV_FLAGS_SPDM | RMI_PDEV_FLAGS_NCOH_IDE |
-			RMI_PDEV_FLAGS_NCOH_ADDR;
+	params->flags = RMI_PDEV_FLAGS_NCOH_ADDR;
+	params->flags |= pdev->enable_spdm ? RMI_PDEV_FLAGS_SPDM : 0;
+	params->flags |= (pdev->enable_sel_ide || pdev->enable_link_ide) ?
+			 RMI_PDEV_FLAGS_NCOH_IDE : 0;
+	params->flags |= (!pdev->enable_sel_ide && pdev->enable_link_ide) ?
+			 RMI_PDEV_PARAMS_DISABLE_SEL_IDE : 0;
+	params->flags |= (pdev->enable_sel_ide && !pdev->enable_link_ide) ?
+			 RMI_PDEV_PARAMS_DISABLE_LINK_IDE : 0;
 	params->ncoh_ide_sid = ide->stream_id;
 	params->hash_algo = RMI_HASH_SHA_256;
 	/* use the rid and MMIO resources of the end point pdev */
@@ -385,7 +394,8 @@ static int do_dev_communicate(enum dev_comm_type type,
 }
 
 static int wait_for_dev_state(enum dev_comm_type type, struct pci_tsm *tsm,
-			      unsigned long target_state,
+			      unsigned long target_state0,
+			      unsigned long target_state1,
 			      unsigned long error_state)
 {
 	int state;
@@ -393,7 +403,9 @@ static int wait_for_dev_state(enum dev_comm_type type, struct pci_tsm *tsm,
 	do {
 		state = do_dev_communicate(type, tsm, error_state);
 
-		if (state == target_state || state == error_state)
+		if (state == target_state0 ||
+		    state == target_state1 ||
+		    state == error_state)
 			return state;
 	} while (1);
 
@@ -401,9 +413,13 @@ static int wait_for_dev_state(enum dev_comm_type type, struct pci_tsm *tsm,
 	return error_state;
 }
 
-static int wait_for_pdev_state(struct pci_tsm *tsm, enum rmi_pdev_state target_state)
+static int wait_for_pdev_state(struct pci_tsm *tsm,
+			       enum rmi_pdev_state target_state0,
+			       enum rmi_pdev_state target_state1)
 {
-	return wait_for_dev_state(PDEV_COMMUNICATE, tsm, target_state, RMI_PDEV_ERROR);
+	return wait_for_dev_state(PDEV_COMMUNICATE, tsm,
+				  target_state0, target_state1,
+				  RMI_PDEV_ERROR);
 }
 
 static int parse_certificate_chain(struct pci_tsm *tsm)
@@ -540,13 +556,17 @@ static void pdev_state_transition_workfn(struct work_struct *work)
 	pf0_dsc = to_cca_pf0_dsc(tsm->dsm_dev);
 
 	guard(mutex)(&pf0_dsc->object_lock);
-	state = wait_for_pdev_state(tsm, setup_work->target_state);
-	WARN_ON(state != setup_work->target_state);
+	state = wait_for_pdev_state(tsm, setup_work->target_state0,
+				    setup_work->target_state1);
+	WARN_ON(state != setup_work->target_state0 &&
+		state != setup_work->target_state1);
 
 	complete(&setup_work->complete);
 }
 
-static int submit_pdev_state_transition_work(struct pci_dev *pdev, int target_state)
+static int submit_pdev_state_transition_work(struct pci_dev *pdev,
+					     int target_state0,
+					     int target_state1)
 {
 	enum rmi_pdev_state state;
 	struct dev_comm_work comm_work;
@@ -556,7 +576,8 @@ static int submit_pdev_state_transition_work(struct pci_dev *pdev, int target_st
 	INIT_WORK_ONSTACK(&comm_work.work, pdev_state_transition_workfn);
 	init_completion(&comm_work.complete);
 	comm_work.tsm = pdev->tsm;
-	comm_work.target_state = target_state;
+	comm_work.target_state0 = target_state0;
+	comm_work.target_state1 = target_state1;
 
 	queue_work(comm_data->work_queue, &comm_work.work);
 
@@ -567,7 +588,8 @@ static int submit_pdev_state_transition_work(struct pci_dev *pdev, int target_st
 	if (rmi_pdev_get_state(virt_to_phys(pf0_dsc->rmm_pdev), &state))
 		return -ENXIO;
 
-	if (state != target_state)
+	if (state != target_state0 &&
+	    state != target_state1)
 		/* no specific error for this */
 		return -1;
 	return 0;
@@ -575,11 +597,20 @@ static int submit_pdev_state_transition_work(struct pci_dev *pdev, int target_st
 
 int cca_pdev_ide_setup(struct pci_dev *pdev)
 {
+	struct cca_host_pf0_dsc *pf0_dsc = to_cca_pf0_dsc(pdev);
+	enum rmi_pdev_state state;
 	int ret;
 
-	ret = submit_pdev_state_transition_work(pdev, RMI_PDEV_NEEDS_KEY);
+	ret = submit_pdev_state_transition_work(pdev, RMI_PDEV_NEEDS_KEY, RMI_PDEV_READY);
 	if (ret)
 		return ret;
+
+	if (rmi_pdev_get_state(virt_to_phys(pf0_dsc->rmm_pdev), &state))
+		return -ENXIO;
+
+	if (state == RMI_PDEV_READY)
+		return 0;
+
 	/*
 	 * we now have certificate chain in dsm->cert_chain. Parse that and set
          * the pubkey.
@@ -592,7 +623,7 @@ int cca_pdev_ide_setup(struct pci_dev *pdev)
 	if (ret)
 		return ret;
 
-	return submit_pdev_state_transition_work(pdev, RMI_PDEV_READY);
+	return submit_pdev_state_transition_work(pdev, RMI_PDEV_READY, -1);
 }
 
 void cca_pdev_stop_and_destroy(struct pci_dev *pdev)
@@ -604,7 +635,7 @@ void cca_pdev_stop_and_destroy(struct pci_dev *pdev)
 	if (WARN_ON(rmi_pdev_stop(rmm_pdev_phys)))
 		return;
 
-	ret = submit_pdev_state_transition_work(pdev, RMI_PDEV_STOPPED);
+	ret = submit_pdev_state_transition_work(pdev, RMI_PDEV_STOPPED, -1);
 	if (ret)
 		return;
 
@@ -625,9 +656,13 @@ void cca_pdev_stop_and_destroy(struct pci_dev *pdev)
 	pf0_dsc->rmm_pdev = NULL;
 }
 
-static int wait_for_vdev_state(struct pci_tsm *tsm, enum rmi_vdev_state target_state)
+static int wait_for_vdev_state(struct pci_tsm *tsm,
+			       enum rmi_vdev_state target_state0,
+			       enum rmi_vdev_state target_state1)
 {
-	return wait_for_dev_state(VDEV_COMMUNICATE, tsm, target_state, RMI_VDEV_ERROR);
+	return wait_for_dev_state(VDEV_COMMUNICATE, tsm,
+				  target_state0, target_state1,
+				  RMI_VDEV_ERROR);
 }
 
 static void vdev_state_transition_workfn(struct work_struct *work)
@@ -643,13 +678,17 @@ static void vdev_state_transition_workfn(struct work_struct *work)
 	pf0_dsc = to_cca_pf0_dsc(tsm->dsm_dev);
 	guard(mutex)(&pf0_dsc->object_lock);
 
-	state = wait_for_vdev_state(tsm, setup_work->target_state);
-	WARN_ON(state != setup_work->target_state);
+	state = wait_for_vdev_state(tsm, setup_work->target_state0,
+				    setup_work->target_state1);
+	WARN_ON(state != setup_work->target_state0 &&
+		state != setup_work->target_state1);
 
 	complete(&setup_work->complete);
 }
 
-static int submit_vdev_state_transition_work(struct pci_dev *pdev, int target_state)
+static int submit_vdev_state_transition_work(struct pci_dev *pdev,
+					     int target_state0,
+					     int target_state1)
 {
 	enum rmi_vdev_state state;
 	struct dev_comm_work comm_work;
@@ -659,7 +698,8 @@ static int submit_vdev_state_transition_work(struct pci_dev *pdev, int target_st
 	INIT_WORK_ONSTACK(&comm_work.work, vdev_state_transition_workfn);
 	init_completion(&comm_work.complete);
 	comm_work.tsm = pdev->tsm;
-	comm_work.target_state = target_state;
+	comm_work.target_state0 = target_state0;
+	comm_work.target_state1 = target_state1;
 
 	queue_work(comm_data->work_queue, &comm_work.work);
 
@@ -670,9 +710,11 @@ static int submit_vdev_state_transition_work(struct pci_dev *pdev, int target_st
 	if (rmi_vdev_get_state(virt_to_phys(host_tdi->rmm_vdev), &state))
 		return -ENXIO;
 
-	if (state != target_state)
+	if (state != target_state0 &&
+	    state != target_state1)
 		/* no specific error for this */
 		return -1;
+
 	return 0;
 }
 
@@ -759,7 +801,7 @@ void *cca_vdev_create(struct realm *realm, struct pci_dev *pdev,
 	host_tdi->rmm_vdev = rmm_vdev;
 	host_tdi->realm = realm;
 
-	ret = submit_vdev_state_transition_work(pdev, RMI_VDEV_UNLOCKED);
+	ret = submit_vdev_state_transition_work(pdev, RMI_VDEV_UNLOCKED, -1);
 	/* failure is treated as rmi_vdev_create failure */
 	if (ret)
 		goto err_vdev_comm;
@@ -769,7 +811,7 @@ void *cca_vdev_create(struct realm *realm, struct pci_dev *pdev,
 		goto err_vdev_comm;
 	}
 
-	ret = submit_vdev_state_transition_work(pdev, RMI_VDEV_LOCKED);
+	ret = submit_vdev_state_transition_work(pdev, RMI_VDEV_LOCKED, -1);
 	if (ret)
 		goto err_vdev_comm;
 
@@ -823,7 +865,7 @@ void cca_vdev_unlock_and_destroy(struct realm *realm,
 		return;
 	}
 
-	ret = submit_vdev_state_transition_work(pdev, RMI_VDEV_UNLOCKED);
+	ret = submit_vdev_state_transition_work(pdev, RMI_VDEV_UNLOCKED, -1);
 	if (ret) {
 		pci_err(pdev, "failed to unlock vdev (%d)\n", ret);
 		return;
@@ -831,6 +873,12 @@ void cca_vdev_unlock_and_destroy(struct realm *realm,
 
 	if (rmi_vdev_destroy(rd_phys, rmm_pdev_phys, rmm_vdev_phys))
 		pci_err(pdev, "failed to destroy vdev\n");
+
+	/* Disable EP IDE at this point if SPDM is unsupported */
+	if (pdev->enable_sel_ide && !pdev->enable_spdm) {
+		struct pci_ide *ide = pf0_dsc->sel_stream;
+		pci_ide_stream_disable(pdev, ide);
+	}
 
 	if (!rmi_granule_undelegate(rmm_vdev_phys))
 		free_page((unsigned long)host_tdi->rmm_vdev);
@@ -1159,6 +1207,7 @@ int cca_vdev_device_start(struct pci_dev *pdev)
 	struct cca_host_tdi *host_tdi;
 	struct realm *realm;
 	phys_addr_t rd_phys;
+	int ret;
 
 	host_tdi = to_cca_host_tdi(pdev);
 	rmm_vdev_phys = virt_to_phys(host_tdi->rmm_vdev);
@@ -1170,5 +1219,16 @@ int cca_vdev_device_start(struct pci_dev *pdev)
 
 	if (rmi_vdev_start(rd_phys, rmm_pdev_phys, rmm_vdev_phys))
 		return -ENXIO;
-	return submit_vdev_state_transition_work(pdev, RMI_VDEV_STARTED);
+
+	ret = submit_vdev_state_transition_work(pdev, RMI_VDEV_STARTED, -1);
+	if (ret)
+		return ret;
+
+	/* Enable EP IDE at this point if SPDM is unsupported */
+	if (pdev->enable_sel_ide && !pdev->enable_spdm) {
+		struct pci_ide *ide = pf0_dsc->sel_stream;
+		pci_ide_stream_enable(pdev, ide);
+	}
+
+	return 0;
 }

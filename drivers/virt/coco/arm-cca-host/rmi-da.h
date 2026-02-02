@@ -23,7 +23,8 @@ struct cache_object {
 
 struct dev_comm_work {
 	struct pci_tsm *tsm;
-	int target_state;
+	int target_state0;
+	int target_state1;
 	u8 *cache_buf;
 	int *cache_offset;
 	int cache_size;
@@ -159,4 +160,5 @@ int cca_vdev_device_map_validate(struct pci_dev *pdev, unsigned long vcpu_fd,
 				 unsigned long gpa_base, unsigned long gpa_top,
 				 unsigned long pa_base);
 int cca_vdev_device_start(struct pci_dev *pdev);
+
 #endif

@@ -20,7 +20,6 @@
 /* Total number of stream id supported at root port level */
 #define MAX_STREAM_ID	256
 
-
 static struct pci_tsm *cca_tsm_pci_probe(struct tsm_dev *tsm_dev, struct pci_dev *pdev)
 {
 	int rc;
@@ -177,7 +176,8 @@ static int cca_tsm_connect(struct pci_dev *pdev)
 	 * Once ide is setup, enable the stream at the endpoint
 	 * Root port will be done by RMM
 	 */
-	pci_ide_stream_enable(pdev, ide);
+	if (pdev->enable_sel_ide && pdev->enable_spdm)
+		pci_ide_stream_enable(pdev, ide);
 	return 0;
 
 err_ide_setup:
