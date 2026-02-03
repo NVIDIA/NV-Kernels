@@ -186,11 +186,7 @@ static int doe_send_req_resp(struct pci_tsm *tsm)
 
 static inline bool pending_dev_communicate(struct rmi_dev_comm_exit *io_exit)
 {
-	bool pending = io_exit->flags & (RMI_DEV_COMM_EXIT_CACHE_REQ |
-					 RMI_DEV_COMM_EXIT_CACHE_RSP |
-					 RMI_DEV_COMM_EXIT_SEND |
-					 RMI_DEV_COMM_EXIT_WAIT |
-					 RMI_DEV_COMM_EXIT_MULTI);
+	bool pending = io_exit->flags & RMI_DEV_COMM_EXIT_MULTI;
 	return pending;
 }
 
