@@ -625,7 +625,7 @@ ifeq ($(do_tools_cpupower),true)
 endif
 ifeq ($(do_tools_perf),true)
 	cd $(builddirpa)/tools/perf && \
-		LLVM_CONFIG=llvm-config-$(LLVM_VERSION) $(kmake) prefix=/usr HAVE_CPLUS_DEMANGLE_SUPPORT=1 CROSS_COMPILE=$(CROSS_COMPILE) NO_LIBPERL=1 WERROR=0
+		LLVM_CONFIG=llvm-config-$(LLVM_VERSION) $(kmake) prefix=/usr HAVE_CPLUS_DEMANGLE_SUPPORT=1 CROSS_COMPILE=$(CROSS_COMPILE) NO_LIBPERL=1 WERROR=0 $(if $(filter arm64,$(build_arch)),CORESIGHT=1)
 endif
 ifeq ($(do_tools_bpftool),true)
 	$(kmake) CROSS_COMPILE=$(CROSS_COMPILE) -C $(builddirpa)/tools/bpf/bpftool
