@@ -4310,7 +4310,7 @@ CONFIG_DRM_GEM_DMA_HELPER                       policy<{'amd64': 'm', 'arm64': '
 CONFIG_DRM_GEM_SHMEM_HELPER                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'm'}>
 CONFIG_DRM_GM12U320                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_DRM_GMA500                               policy<{'amd64': 'm'}>
-CONFIG_DRM_GPUSVM                               policy<{'amd64': 'm', 'arm64': 'm', 'arm64-generic-64k': '-', 'ppc64el': '-', 'riscv64': 'm'}>
+CONFIG_DRM_GPUSVM                               policy<{'amd64': 'm', 'arm64': 'm', 'arm64-generic-64k': '-', 'armhf': 'm', 'ppc64el': '-', 'riscv64': 'm'}>
 CONFIG_DRM_GPUVM                                policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_DRM_GUD                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_DRM_HDLCD                                policy<{'arm64': 'm', 'armhf': 'm'}>
@@ -4664,7 +4664,7 @@ CONFIG_DRM_XE_PREEMPT_TIMEOUT_MAX               policy<{'amd64': '10000000', 'ar
 CONFIG_DRM_XE_PREEMPT_TIMEOUT_MIN               policy<{'amd64': '1', 'arm64': '1', 'arm64-generic-64k': '-', 'armhf': '1', 'ppc64el': '-', 'riscv64': '1'}>
 CONFIG_DRM_XE_TIMESLICE_MAX                     policy<{'amd64': '10000000', 'arm64': '10000000', 'arm64-generic-64k': '-', 'armhf': '10000000', 'ppc64el': '-', 'riscv64': '10000000'}>
 CONFIG_DRM_XE_TIMESLICE_MIN                     policy<{'amd64': '1', 'arm64': '1', 'arm64-generic-64k': '-', 'armhf': '1', 'ppc64el': '-', 'riscv64': '1'}>
-CONFIG_DRM_XE_USERPTR_INVAL_INJECT              policy<{'amd64': 'n', 'arm64': 'n', 'arm64-generic-64k': '-', 'armhf': '-', 'ppc64el': '-', 'riscv64': 'n'}>
+CONFIG_DRM_XE_USERPTR_INVAL_INJECT              policy<{'amd64': 'n', 'arm64': 'n', 'arm64-generic-64k': '-', 'armhf': 'n', 'ppc64el': '-', 'riscv64': 'n'}>
 CONFIG_DRM_XE_WERROR                            policy<{'amd64': 'n', 'arm64': 'n', 'arm64-generic-64k': '-', 'armhf': 'n', 'ppc64el': '-', 'riscv64': 'n'}>
 CONFIG_DRM_ZYNQMP_DPSUB                         policy<{'arm64': 'm'}>
 CONFIG_DRM_ZYNQMP_DPSUB_AUDIO                   policy<{'arm64': 'y'}>
@@ -10788,7 +10788,6 @@ CONFIG_PINCTRL_SM8150                           policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8250                           policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8250_LPASS_LPI                 policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8350                           policy<{'arm64': 'm'}>
-CONFIG_PINCTRL_SM8350_LPASS_LPI                 policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8450                           policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8450_LPASS_LPI                 policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8550                           policy<{'arm64': 'm'}>
