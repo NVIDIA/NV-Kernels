@@ -108,7 +108,7 @@ struct apparmor_tags_header_v5 {
 	__u32 mask;
 	__u32 count;
 	__u32 tagset;
-};
+} __attribute__((packed));
 
 // v3 doesn't have tags but this just adds padding to the data section
 struct apparmor_notif_file {
