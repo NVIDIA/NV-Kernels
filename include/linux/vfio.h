@@ -337,7 +337,6 @@ static inline bool vfio_file_has_dev(struct file *file, struct vfio_device *devi
 	return false;
 }
 #endif
-struct vfio_device *vfio_device_from_file(struct file *file);
 bool vfio_file_is_valid(struct file *file);
 bool vfio_file_enforced_coherent(struct file *file);
 void vfio_file_set_kvm(struct file *file, struct kvm *kvm);
