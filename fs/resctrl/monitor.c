@@ -1612,7 +1612,7 @@ int mbm_L3_assignments_show(struct kernfs_open_file *of, struct seq_file *s, voi
 	}
 
 	for_each_mon_event(mevt) {
-		if (mevt->rid != r->rid || !mevt->enabled || !resctrl_is_mbm_event(mevt->evtid))
+		if (!mon_event_belongs_to_resource(mevt, r) || !mevt->enabled || !resctrl_is_mbm_event(mevt->evtid))
 			continue;
 
 		sep = false;
@@ -1646,7 +1646,7 @@ static struct mon_evt *mbm_get_mon_event_by_name(struct rdt_resource *r, char *n
 	struct mon_evt *mevt;
 
 	for_each_mon_event(mevt) {
-		if (mevt->rid == r->rid && mevt->enabled &&
+		if (mon_event_belongs_to_resource(mevt, r) && mevt->enabled &&
 		    resctrl_is_mbm_event(mevt->evtid) &&
 		    !strcmp(mevt->name, name))
 			return mevt;

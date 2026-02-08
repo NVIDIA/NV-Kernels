@@ -80,6 +80,34 @@ extern struct mon_evt mon_event_all[QOS_NUM_EVENTS];
 				      mevt < &mon_event_all[QOS_NUM_EVENTS]; mevt++)
 
 /**
+ * mon_event_belongs_to_resource - Check if a monitoring event belongs to a resource
+ * @mevt:	The monitoring event to check
+ * @r:		The resource to check against
+ *
+ * Returns true if the event belongs to the resource. MBM events are moved from
+ * L3 to MBA resource when MBA uses NUMA node scope (for memory bandwidth
+ * monitoring on systems where MPAM memory controllers are enumerated separately
+ * from L3).
+ */
+static inline bool mon_event_belongs_to_resource(struct mon_evt *mevt,
+						 struct rdt_resource *r)
+{
+	struct rdt_resource *mba_r;
+
+	/* For MBM events, check if they should be moved to MBA resource */
+	if (resctrl_is_mbm_event(mevt->evtid)) {
+		mba_r = resctrl_arch_get_resource(RDT_RESOURCE_MBA);
+		if (mba_r && mba_r->mon_capable &&
+		    mba_r->mon_scope == RESCTRL_NUMA_NODE) {
+			/* MBM events belong to MBA, not L3 */
+			return r->rid == RDT_RESOURCE_MBA;
+		}
+	}
+
+	return mevt->rid == r->rid;
+}
+
+/**
  * struct mon_data - Monitoring details for each event file.
  * @list:            Member of the global @mon_data_kn_priv_list list.
  * @rid:             Resource id associated with the event file.

@@ -1258,7 +1258,8 @@ static void mpam_resctrl_pick_counters(void)
 		}
 
 		has_mbwu = class_has_usable_mbwu(class);
-		if (has_mbwu && topology_matches_l3(class)) {
+		if (has_mbwu && ((class->type == MPAM_CLASS_MEMORY) ||
+		    topology_matches_l3(class))) {
 			pr_debug("class %u has usable MBWU, and matches L3 topology", class->level);
 
 			/*
@@ -1477,7 +1478,10 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 			r->alloc_capable = true;
 
 		r->schema_fmt = RESCTRL_SCHEMA_PERCENT;
-		r->ctrl_scope = RESCTRL_L3_CACHE;
+		if ((class->type == MPAM_CLASS_MEMORY) && (class->level > 3))
+			r->ctrl_scope = RESCTRL_NUMA_NODE;
+		else
+			r->ctrl_scope = RESCTRL_L3_CACHE;
 
 		r->mba.delay_linear = true;
 		r->mba.throttle_mode = THREAD_THROTTLE_UNDEFINED;
@@ -1495,7 +1499,10 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 	case RDT_RESOURCE_MBA_MIN:
 		r->alloc_capable = true;
 		r->schema_fmt = RESCTRL_SCHEMA_PERCENT;
-		r->ctrl_scope = RESCTRL_L3_CACHE;
+		if ((class->type == MPAM_CLASS_MEMORY) && (class->level > 3))
+			r->ctrl_scope = RESCTRL_NUMA_NODE;
+		else
+			r->ctrl_scope = RESCTRL_L3_CACHE;
 
 		r->mba.delay_linear = true;
 		r->mba.throttle_mode = THREAD_THROTTLE_UNDEFINED;
@@ -1636,10 +1643,26 @@ int resctrl_arch_set_mb_uses_numa_nid(bool enabled)
 static void mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 				      enum resctrl_event_id type)
 {
-	struct mpam_resctrl_res *res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
-	struct rdt_resource *l3 = &res->resctrl_res;
+	struct mpam_class *class = mon->class;
+	struct mpam_resctrl_res *res;
+	struct rdt_resource *r;
 
 	lockdep_assert_cpus_held();
+
+	/* Did we find anything for this monitor type? */
+	if (!class)
+		return;
+
+	/*
+	 * For memory class with level > 3 (i.e., memory controllers),
+	 * use the MBA resource. Otherwise use L3.
+	 */
+	if ((class->type == MPAM_CLASS_MEMORY) && (class->level > 3))
+		res = &mpam_resctrl_controls[RDT_RESOURCE_MBA];
+	else
+		res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
+
+	r = &res->resctrl_res;
 
 	/* There also needs to be an L3 cache present */
 	if (get_cpu_cacheinfo_id(smp_processor_id(), 3) == -1)
@@ -1652,16 +1675,21 @@ static void mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 	 */
 	if (!res->class) {
 		pr_warn_once("Faking L3 MSC to enable counters.\n");
-		res->class = mpam_resctrl_counters[type].class;
+		res->class = class;
 	}
 
 	/* Called multiple times!, once per event type */
 	if (exposed_mon_capable) {
-		l3->mon_capable = true;
+		r->mon_capable = true;
 
 		/* Setting name is necessary on monitor only platforms */
-		l3->name = "L3";
-		l3->mon_scope = RESCTRL_L3_CACHE;
+		if ((class->type == MPAM_CLASS_MEMORY) && (class->level > 3)) {
+			r->name = "MB";
+			r->mon_scope = RESCTRL_NUMA_NODE;
+		} else {
+			r->name = "L3";
+			r->mon_scope = RESCTRL_L3_CACHE;
+		}
 
 		resctrl_enable_mon_event(type);
 
@@ -1678,13 +1706,13 @@ static void mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 		 * here.  But the pmgs corresponding to the parent control
 		 * group can be allocated freely:
 		 */
-		l3->mon.num_rmid = mpam_pmg_max + 1;;
+		r->mon.num_rmid = mpam_pmg_max + 1;
 
 		switch (type) {
 		case QOS_L3_MBM_LOCAL_EVENT_ID:
 		case QOS_L3_MBM_TOTAL_EVENT_ID:
 			mpam_resctrl_monitor_init_abmc(mon);
-			l3->mon.mbm_cfg_mask = MPAM_RESTRL_EVT_CONFIG_VALID;
+			r->mon.mbm_cfg_mask = MPAM_RESTRL_EVT_CONFIG_VALID;
 
 			return;
 		default:

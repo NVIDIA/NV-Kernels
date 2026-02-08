@@ -1248,7 +1248,7 @@ static int rdt_mon_features_show(struct kernfs_open_file *of,
 	struct mon_evt *mevt;
 
 	for_each_mon_event(mevt) {
-		if (mevt->rid != r->rid || !mevt->enabled)
+		if (!mon_event_belongs_to_resource(mevt, r) || !mevt->enabled)
 			continue;
 		seq_printf(seq, "%s\n", mevt->name);
 		if (mevt->configurable &&
@@ -2489,7 +2489,7 @@ static int resctrl_mkdir_event_configs(struct rdt_resource *r, struct kernfs_nod
 		return ret;
 
 	for_each_mon_event(mevt) {
-		if (mevt->rid != r->rid || !mevt->enabled || !resctrl_is_mbm_event(mevt->evtid))
+		if (!mon_event_belongs_to_resource(mevt, r) || !mevt->enabled || !resctrl_is_mbm_event(mevt->evtid))
 			continue;
 
 		kn_subdir2 = kernfs_create_dir(kn_subdir, mevt->name, kn_subdir->mode, mevt);
@@ -3546,7 +3546,7 @@ static int mon_add_all_files(struct kernfs_node *kn, struct rdt_mon_domain *d,
 	int ret, domid;
 
 	for_each_mon_event(mevt) {
-		if (mevt->rid != r->rid || !mevt->enabled)
+		if (!mon_event_belongs_to_resource(mevt, r) || !mevt->enabled)
 			continue;
 		domid = do_sum ? d->ci_id : d->hdr.id;
 		priv = mon_get_kn_priv(r->rid, domid, mevt, do_sum);
