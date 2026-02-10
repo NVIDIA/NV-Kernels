@@ -3,6 +3,7 @@
 #include <linux/memregion.h>
 #include <linux/module.h>
 #include <linux/dax.h>
+#include <cxl/cxl.h>
 #include "../bus.h"
 
 static bool region_idle;
@@ -69,8 +70,18 @@ static int hmem_register_device(struct device *host, int target_nid,
 	if (IS_ENABLED(CONFIG_DEV_DAX_CXL) &&
 	    region_intersects(res->start, resource_size(res), IORESOURCE_MEM,
 			      IORES_DESC_CXL) != REGION_DISJOINT) {
-		dev_dbg(host, "deferring range to CXL: %pr\n", res);
-		return 0;
+		switch (dax_cxl_mode) {
+		case DAX_CXL_MODE_DEFER:
+			dev_dbg(host, "deferring range to CXL: %pr\n", res);
+			dax_hmem_queue_work();
+			return 0;
+		case DAX_CXL_MODE_REGISTER:
+			dev_dbg(host, "registering CXL range: %pr\n", res);
+			break;
+		case DAX_CXL_MODE_DROP:
+			dev_dbg(host, "dropping CXL range: %pr\n", res);
+			return 0;
+		}
 	}
 
 	rc = region_intersects_soft_reserve(res->start, resource_size(res));
@@ -123,8 +134,70 @@ out_put:
 	return rc;
 }
 
+static int hmem_register_cxl_device(struct device *host, int target_nid,
+				    const struct resource *res)
+{
+	if (region_intersects(res->start, resource_size(res), IORESOURCE_MEM,
+			      IORES_DESC_CXL) != REGION_DISJOINT)
+		return hmem_register_device(host, target_nid, res);
+
+	return 0;
+}
+
+static int soft_reserve_has_cxl_match(struct device *host, int target_nid,
+				      const struct resource *res)
+{
+	if (region_intersects(res->start, resource_size(res), IORESOURCE_MEM,
+			      IORES_DESC_CXL) != REGION_DISJOINT) {
+		if (!cxl_region_contains_soft_reserve((struct resource *)res))
+			return 1;
+	}
+
+	return 0;
+}
+
+static void process_defer_work(void *data)
+{
+	struct platform_device *pdev = data;
+	int rc;
+
+	/* relies on cxl_acpi and cxl_pci having had a chance to load */
+	wait_for_device_probe();
+
+	rc = walk_hmem_resources(&pdev->dev, soft_reserve_has_cxl_match);
+
+	if (!rc) {
+		dax_cxl_mode = DAX_CXL_MODE_DROP;
+		dev_dbg(&pdev->dev, "All Soft Reserved ranges claimed by CXL\n");
+	} else {
+		dax_cxl_mode = DAX_CXL_MODE_REGISTER;
+		dev_warn(&pdev->dev,
+			 "Soft Reserved not fully contained in CXL; using HMEM\n");
+	}
+
+	walk_hmem_resources(&pdev->dev, hmem_register_cxl_device);
+}
+
+static void kill_defer_work(void *data)
+{
+	struct platform_device *pdev = data;
+
+	dax_hmem_flush_work();
+	dax_hmem_unregister_work(process_defer_work, pdev);
+}
+
 static int dax_hmem_platform_probe(struct platform_device *pdev)
 {
+	int rc;
+
+	rc = dax_hmem_register_work(process_defer_work, pdev);
+	if (rc)
+		return rc;
+
+	rc = devm_add_action_or_reset(&pdev->dev, kill_defer_work, pdev);
+	if (rc)
+		return rc;
+
 	return walk_hmem_resources(&pdev->dev, hmem_register_device);
 }
 
@@ -174,3 +247,4 @@ MODULE_ALIAS("platform:hmem_platform*");
 MODULE_DESCRIPTION("HMEM DAX: direct access to 'specific purpose' memory");
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Intel Corporation");
+MODULE_IMPORT_NS("CXL");

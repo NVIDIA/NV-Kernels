@@ -25,6 +25,9 @@ DECLARE_RWSEM(dax_region_rwsem);
  */
 DECLARE_RWSEM(dax_dev_rwsem);
 
+enum dax_cxl_mode dax_cxl_mode = DAX_CXL_MODE_DEFER;
+EXPORT_SYMBOL_NS_GPL(dax_cxl_mode, "CXL");
+
 static DEFINE_MUTEX(dax_hmem_lock);
 static dax_hmem_deferred_fn hmem_deferred_fn;
 static void *dax_hmem_data;
