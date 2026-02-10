@@ -2178,7 +2178,9 @@ __cxl_decoder_detach(struct cxl_region *cxlr,
 		cxled->part = -1;
 
 	if (p->state > CXL_CONFIG_ACTIVE) {
-		cxl_region_decode_reset(cxlr, p->interleave_ways);
+		if (!test_bit(CXL_REGION_F_AUTO, &cxlr->flags))
+			cxl_region_decode_reset(cxlr, p->interleave_ways);
+
 		p->state = CXL_CONFIG_ACTIVE;
 	}
 
