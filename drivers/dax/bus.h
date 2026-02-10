@@ -41,6 +41,25 @@ struct dax_device_driver {
 	void (*remove)(struct dev_dax *dev);
 };
 
+/*
+ * enum dax_cxl_mode - State machine to determine ownership for CXL
+ * tagged Soft Reserved memory ranges.
+ * @DAX_CXL_MODE_DEFER: Ownership resolution pending. Set while waiting
+ * for CXL enumeration and region assembly to complete.
+ * @DAX_CXL_MODE_REGISTER: CXL regions do not fully cover Soft Reserved
+ * ranges. Fall back to registering those ranges via dax_hmem.
+ * @DAX_CXL_MODE_DROP: All Soft Reserved ranges intersecting CXL windows
+ * are fully contained within committed CXL regions. Drop HMEM handling
+ * and allow dax_cxl to bind.
+ */
+enum dax_cxl_mode {
+	DAX_CXL_MODE_DEFER,
+	DAX_CXL_MODE_REGISTER,
+	DAX_CXL_MODE_DROP,
+};
+
+extern enum dax_cxl_mode dax_cxl_mode;
+
 typedef void (*dax_hmem_deferred_fn)(void *data);
 
 int dax_hmem_register_work(dax_hmem_deferred_fn fn, void *data);
