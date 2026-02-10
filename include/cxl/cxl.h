@@ -248,4 +248,13 @@ struct cxl_memdev *devm_cxl_add_memdev(struct cxl_dev_state *cxlds,
 				       const struct cxl_memdev_attach *attach);
 struct cxl_region;
 int cxl_memdev_attach_region(struct cxl_memdev *cxlmd, struct cxl_attach_region *attach);
+
+#ifdef CONFIG_CXL_REGION
+bool cxl_region_contains_soft_reserve(struct resource *res);
+#else
+static inline bool cxl_region_contains_soft_reserve(struct resource *res)
+{
+	return false;
+}
+#endif
 #endif /* __CXL_CXL_H__ */
