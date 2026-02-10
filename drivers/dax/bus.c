@@ -25,6 +25,64 @@ DECLARE_RWSEM(dax_region_rwsem);
  */
 DECLARE_RWSEM(dax_dev_rwsem);
 
+static DEFINE_MUTEX(dax_hmem_lock);
+static dax_hmem_deferred_fn hmem_deferred_fn;
+static void *dax_hmem_data;
+
+static void hmem_deferred_work(struct work_struct *work)
+{
+	dax_hmem_deferred_fn fn;
+	void *data;
+
+	scoped_guard(mutex, &dax_hmem_lock) {
+		fn = hmem_deferred_fn;
+		data = dax_hmem_data;
+	}
+
+	if (fn)
+		fn(data);
+}
+
+static DECLARE_WORK(dax_hmem_work, hmem_deferred_work);
+
+int dax_hmem_register_work(dax_hmem_deferred_fn fn, void *data)
+{
+	guard(mutex)(&dax_hmem_lock);
+
+	if (hmem_deferred_fn)
+		return -EINVAL;
+
+	hmem_deferred_fn = fn;
+	dax_hmem_data = data;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(dax_hmem_register_work);
+
+int dax_hmem_unregister_work(dax_hmem_deferred_fn fn, void *data)
+{
+	guard(mutex)(&dax_hmem_lock);
+
+	if (hmem_deferred_fn != fn || dax_hmem_data != data)
+		return -EINVAL;
+
+	hmem_deferred_fn = NULL;
+	dax_hmem_data = NULL;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(dax_hmem_unregister_work);
+
+void dax_hmem_queue_work(void)
+{
+	queue_work(system_long_wq, &dax_hmem_work);
+}
+EXPORT_SYMBOL_GPL(dax_hmem_queue_work);
+
+void dax_hmem_flush_work(void)
+{
+	flush_work(&dax_hmem_work);
+}
+EXPORT_SYMBOL_GPL(dax_hmem_flush_work);
+
 #define DAX_NAME_LEN 30
 struct dax_id {
 	struct list_head list;
