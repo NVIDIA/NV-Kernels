@@ -41,6 +41,13 @@ struct dax_device_driver {
 	void (*remove)(struct dev_dax *dev);
 };
 
+typedef void (*dax_hmem_deferred_fn)(void *data);
+
+int dax_hmem_register_work(dax_hmem_deferred_fn fn, void *data);
+int dax_hmem_unregister_work(dax_hmem_deferred_fn fn, void *data);
+void dax_hmem_queue_work(void);
+void dax_hmem_flush_work(void);
+
 int __dax_driver_register(struct dax_device_driver *dax_drv,
 		struct module *module, const char *mod_name);
 #define dax_driver_register(driver) \
