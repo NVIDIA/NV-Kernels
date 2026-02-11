@@ -1056,7 +1056,12 @@ static void mpam_resctrl_pick_mba(void)
 			continue;
 		}
 
-		if (!cpumask_equal(&class->affinity, cpu_possible_mask)) {
+		/*
+		 * For memory classes, allow CPU-less components (memory-only NUMA nodes).
+		 * For other classes, require all CPUs to be covered.
+		 */
+		if (class->type != MPAM_CLASS_MEMORY &&
+		    !cpumask_equal(&class->affinity, cpu_possible_mask)) {
 			pr_debug("class %u has missing CPUs\n", class->level);
 			continue;
 		}
@@ -1095,7 +1100,9 @@ static void mpam_resctrl_pick_mba(void)
 	}
 
 	if (candidate_class) {
-		pr_debug("selected class %u to back MBA\n", candidate_class->level);
+		pr_info("MPAM: selected class %u type %u to back MBA (l3_id=%d, numa_nid=%d)\n",
+			candidate_class->level, candidate_class->type,
+			mb_l3_cache_id_possible, mb_numa_nid_possible);
 		res = &mpam_resctrl_controls[RDT_RESOURCE_MBA];
 		res->class = candidate_class;
 		exposed_alloc_capable = true;
@@ -1597,8 +1604,12 @@ bool resctrl_arch_get_mb_uses_numa_nid(void)
 	return mb_uses_numa_nid;
 }
 
+static int mpam_resctrl_online_node(unsigned int nid);
+static int mpam_resctrl_offline_node(unsigned int nid);
+
 int resctrl_arch_set_mb_uses_numa_nid(bool enabled)
 {
+	int nid;
 	struct rdt_resource *r;
 	struct mpam_resctrl_res *res;
 	struct mpam_resctrl_dom *dom;
@@ -1628,7 +1639,38 @@ int resctrl_arch_set_mb_uses_numa_nid(bool enabled)
 		ctrl_d->hdr.id = mpam_resctrl_pick_domain_id(cpu, dom->ctrl_comp);
 	}
 
-	/* monitor domains are unaffected and should continue to use the L3 */
+	/*
+	 * Create domains for CPU-less NUMA nodes when enabling NUMA node IDs.
+	 * Nodes with CPUs already have domains created via CPU online callbacks.
+	 * Iterate over memory class components since hot-pluggable memory nodes
+	 * might not be in N_MEMORY state yet.
+	 *
+	 * When disabling (unmount path), do NOT call mpam_resctrl_offline_node()
+	 * because rdt_kill_sb() already handles domain cleanup while holding
+	 * rdtgroup_mutex. Calling resctrl_offline_ctrl_domain() here would
+	 * cause a deadlock.
+	 */
+	if (enabled && res->class->type == MPAM_CLASS_MEMORY) {
+		struct mpam_component *comp;
+		int idx;
+
+		pr_info("MPAM: mb_uses_numa_nid=%d, iterating memory class components\n", enabled);
+		idx = srcu_read_lock(&mpam_srcu);
+		list_for_each_entry_srcu(comp, &res->class->components, class_list,
+					 srcu_read_lock_held(&mpam_srcu)) {
+			nid = comp->comp_id;
+			pr_info("MPAM: component nid=%d cpumask_empty=%d\n", nid,
+				cpumask_empty(cpumask_of_node(nid)));
+			if (!cpumask_empty(cpumask_of_node(nid)))
+				continue;  /* Skip nodes with CPUs */
+
+			{
+				int ret = mpam_resctrl_online_node(nid);
+				pr_info("MPAM: online_node(%d) returned %d\n", nid, ret);
+			}
+		}
+		srcu_read_unlock(&mpam_srcu, idx);
+	}
 
 	if (!enabled && mb_l3_cache_id_possible)
 		r->alloc_capable = true;
@@ -2001,6 +2043,26 @@ static struct mpam_component *find_component(struct mpam_class *victim,
 	return NULL;
 }
 
+/*
+ * Find a component in @victim class that has the same affinity as @ref_comp.
+ * This is used to find the equivalent monitor component for a control component.
+ */
+static struct mpam_component *
+find_equivalent_component(struct mpam_component *ref_comp,
+			  struct mpam_class *victim)
+{
+	struct mpam_component *victim_comp;
+
+	guard(srcu)(&mpam_srcu);
+	list_for_each_entry_srcu(victim_comp, &victim->components, class_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
+		if (cpumask_equal(&ref_comp->affinity, &victim_comp->affinity))
+			return victim_comp;
+	}
+
+	return NULL;
+}
+
 static void mpam_resctrl_domain_insert(struct list_head *list,
 				       struct rdt_domain_hdr *new)
 {
@@ -2051,14 +2113,13 @@ mpam_resctrl_alloc_domain(const struct cpumask *onlined_cpus, int nid,
 
 	if (exposed_mon_capable) {
 		int i;
-		struct mpam_component *mon_comp, *any_mon_comp;
+		struct mpam_component *mon_comp, *any_mon_comp = NULL;
 
 		/*
 		 * Even if the monitor domain is backed by a different component,
-		 * the L3 component IDs need to be used... only there may be no
-		 * ctrl_comp for the L3.
-		 * Search each event's class list for a component with overlapping
-		 * CPUs and set up the dom->mon_comp array.
+		 * the control component's affinity is used to find the equivalent
+		 * monitor component in each event's class.
+		 * For monitor-only platforms, fall back to CPU-based search.
 		 */
 		for (i = 0; i < QOS_NUM_EVENTS; i++) {
 			struct mpam_resctrl_mon *mon;
@@ -2067,7 +2128,21 @@ mpam_resctrl_alloc_domain(const struct cpumask *onlined_cpus, int nid,
 			if (!mon->class)
 				continue;       // dummy resource
 
-			mon_comp = find_component(mon->class, onlined_cpus);
+			/*
+			 * If we have a control component, find the equivalent
+			 * monitor component by matching affinity. This ensures
+			 * the correct component is used for each domain,
+			 * especially for CPU-less NUMA nodes.
+			 */
+			if (ctrl_comp) {
+				if (mon->class == ctrl_comp->class)
+					mon_comp = ctrl_comp;
+				else
+					mon_comp = find_equivalent_component(
+							ctrl_comp, mon->class);
+			} else {
+				mon_comp = find_component(mon->class, onlined_cpus);
+			}
 			dom->mon_comp[i] = mon_comp;
 			if (mon_comp)
 				any_mon_comp = mon_comp;
@@ -2077,7 +2152,13 @@ mpam_resctrl_alloc_domain(const struct cpumask *onlined_cpus, int nid,
 		dom->mbm_local_evt_cfg = MPAM_RESTRL_EVT_CONFIG_VALID;
 
 		mon_d = &dom->resctrl_mon_dom;
-		mpam_resctrl_domain_hdr_init(onlined_cpus, any_mon_comp,
+		/*
+		 * Use the control component for the monitor domain header
+		 * to ensure the domain ID matches. Fall back to any_mon_comp
+		 * for monitor-only platforms.
+		 */
+		mpam_resctrl_domain_hdr_init(onlined_cpus,
+					     ctrl_comp ? ctrl_comp : any_mon_comp,
 					     &mon_d->hdr);
 		mon_d->hdr.type = RESCTRL_MON_DOMAIN;
 		mpam_resctrl_domain_insert(&r->mon_domains, &mon_d->hdr);
@@ -2131,45 +2212,6 @@ static struct mpam_resctrl_dom *mpam_resctrl_get_mon_domain_from_cpu(int cpu)
 	return NULL;
 }
 
-/**
- * mpam_resctrl_get_domain_from_cpu() - find the mpam domain structure
- * @cpu:       The CPU that is going online/offline.
- * @res:       The resctrl resource the domain should belong to.
- *
- * The component structures must be used to identify the CPU may be marked
- * offline in the resctrl structures. However the resctrl domain list is
- * used to search as this is also used to determine if resctrl thinks the
- * domain is online.
- * For platforms with controls, this is easy as each resource has one control
- * component.
- * For the monitors, we need to search the list of events...
- */
-static struct mpam_resctrl_dom *
-mpam_resctrl_alloc_domain_cpu(int cpu, struct mpam_resctrl_res *res)
-{
-	struct mpam_component *comp_iter, *ctrl_comp;
-	struct mpam_class *class = res->class;
-	int idx;
-
-	ctrl_comp = NULL;
-	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_srcu(comp_iter, &class->components, class_list,
-				 srcu_read_lock_held(&mpam_srcu)) {
-		if (cpumask_test_cpu(cpu, &comp_iter->affinity)) {
-			ctrl_comp = comp_iter;
-			break;
-		}
-	}
-	srcu_read_unlock(&mpam_srcu, idx);
-
-	/* cpu with unknown exported component? */
-	if (WARN_ON_ONCE(!ctrl_comp))
-		return ERR_PTR(-EINVAL);
-
-	return mpam_resctrl_alloc_domain(cpumask_of(cpu), cpu_to_node(cpu),
-					 ctrl_comp, res);
-}
-
 static struct mpam_resctrl_dom *
 mpam_resctrl_alloc_domain_nid(int nid, struct mpam_resctrl_res *res)
 {
@@ -2178,13 +2220,18 @@ mpam_resctrl_alloc_domain_nid(int nid, struct mpam_resctrl_res *res)
 	int idx;
 
 	/* Only the memory class uses comp_id as nid */
-	if (class->type != MPAM_CLASS_MEMORY)
+	if (class->type != MPAM_CLASS_MEMORY) {
+		pr_info("MPAM: alloc_domain_nid(%d): class type %u is not MEMORY\n",
+			nid, class->type);
 		return ERR_PTR(-EINVAL);
+	}
 
 	ctrl_comp = NULL;
 	idx = srcu_read_lock(&mpam_srcu);
 	list_for_each_entry_srcu(comp_iter, &class->components, class_list,
 				 srcu_read_lock_held(&mpam_srcu)) {
+		pr_info("MPAM: alloc_domain_nid(%d): checking comp_id=%u\n",
+			nid, comp_iter->comp_id);
 		if (comp_iter->comp_id == nid) {
 			ctrl_comp = comp_iter;
 			break;
@@ -2193,9 +2240,12 @@ mpam_resctrl_alloc_domain_nid(int nid, struct mpam_resctrl_res *res)
 	srcu_read_unlock(&mpam_srcu, idx);
 
 	/* cpu with unknown exported component? */
-	if (WARN_ON_ONCE(!ctrl_comp))
+	if (WARN_ON_ONCE(!ctrl_comp)) {
+		pr_info("MPAM: alloc_domain_nid(%d): no component found\n", nid);
 		return ERR_PTR(-EINVAL);
+	}
 
+	pr_info("MPAM: alloc_domain_nid(%d): found component, creating domain\n", nid);
 	return mpam_resctrl_alloc_domain(cpu_possible_mask, nid, ctrl_comp, res);
 }
 
@@ -2263,10 +2313,21 @@ int mpam_resctrl_online_cpu(unsigned int cpu)
 				continue;
 
 			dom = mpam_get_ctrl_domain_from_cpu(cpu, res, comp);
-			if (!dom)
-				dom = mpam_resctrl_alloc_domain_cpu(cpu, res);
-			if (IS_ERR(dom))
+			if (!dom) {
+				/*
+				 * Pass the component directly to ensure
+				 * correct domain creation for each component.
+				 * The domain ID is determined by the component
+				 * via mpam_resctrl_pick_domain_id().
+				 */
+				dom = mpam_resctrl_alloc_domain(cpumask_of(cpu),
+								cpu_to_node(cpu),
+								comp, res);
+			}
+			if (IS_ERR(dom)) {
+				mutex_unlock(&domain_list_lock);
 				return PTR_ERR(dom);
+			}
 
 			cpumask_set_cpu(cpu, &dom->resctrl_ctrl_dom.hdr.cpu_mask);
 			cpumask_set_cpu(cpu, &dom->resctrl_mon_dom.hdr.cpu_mask);
@@ -2333,19 +2394,33 @@ static int mpam_resctrl_online_node(unsigned int nid)
 {
 	struct mpam_resctrl_dom *dom;
 	struct mpam_resctrl_res *res;
+	int ret = 0;
 
 	/* Domain IDs as NUMA nid is only defined for MBA */
 	res = &mpam_resctrl_controls[RDT_RESOURCE_MBA];
-	if (!res->class)
+	if (!res->class) {
+		pr_info("MPAM: online_node(%u): no class for MBA\n", nid);
 		return 0;	// dummy_resource;
+	}
 
+	pr_info("MPAM: online_node(%u): MBA class type=%u level=%u\n",
+		nid, res->class->type, res->class->level);
+
+	mutex_lock(&domain_list_lock);
 	dom = mpam_get_domain_from_nid(nid, res);
-	if (!dom)
+	if (!dom) {
+		pr_info("MPAM: online_node(%u): no existing domain, allocating\n", nid);
 		dom = mpam_resctrl_alloc_domain_nid(nid, res);
-	if (IS_ERR(dom))
-		return PTR_ERR(dom);
+	}
+	if (IS_ERR(dom)) {
+		pr_info("MPAM: online_node(%u): alloc failed with %ld\n", nid, PTR_ERR(dom));
+		ret = PTR_ERR(dom);
+	} else {
+		pr_info("MPAM: online_node(%u): success\n", nid);
+	}
+	mutex_unlock(&domain_list_lock);
 
-	return 0;
+	return ret;
 }
 
 static int mpam_resctrl_offline_node(unsigned int nid)
@@ -2360,22 +2435,30 @@ static int mpam_resctrl_offline_node(unsigned int nid)
 	if (!res->class)
 		return 0;	// dummy_resource;
 
+	mutex_lock(&domain_list_lock);
 	dom = mpam_get_domain_from_nid(nid, res);
-	if (WARN_ON_ONCE(!dom))
+	if (WARN_ON_ONCE(!dom)) {
+		mutex_unlock(&domain_list_lock);
 		return 0;
+	}
 
 	ctrl_d = &dom->resctrl_ctrl_dom;
 	resctrl_offline_ctrl_domain(&res->resctrl_res, ctrl_d);
-	if (!mpam_resctrl_offline_domain_hdr(cpu_possible_mask, &ctrl_d->hdr))
+	if (!mpam_resctrl_offline_domain_hdr(cpu_possible_mask, &ctrl_d->hdr)) {
+		mutex_unlock(&domain_list_lock);
 		return 0;
+	}
 
 	// TODO: skip monitor domains if there are no monitors for this resource
 	mon_d = &dom->resctrl_mon_dom;
 	resctrl_offline_mon_domain(&res->resctrl_res, mon_d);
-	if (!mpam_resctrl_offline_domain_hdr(cpu_possible_mask, &mon_d->hdr))
+	if (!mpam_resctrl_offline_domain_hdr(cpu_possible_mask, &mon_d->hdr)) {
+		mutex_unlock(&domain_list_lock);
 		return 0;
+	}
 
 	kfree(dom);
+	mutex_unlock(&domain_list_lock);
 
 	return 0;
 }
