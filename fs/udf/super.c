@@ -2302,8 +2302,11 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 
 error_out:
 	iput(sbi->s_vat_inode);
+	unload_nls(sbi->s_nls_map);
+	goto cleanup;
 parse_options_failure:
 	unload_nls(uopt.nls_map);
+cleanup:
 	if (lvid_open)
 		udf_close_lvid(sb);
 	brelse(sbi->s_lvid_bh);
