@@ -27,6 +27,8 @@
 #include "label.h"
 #include "match.h"
 
+extern int aa_cache_timeout;
+
 struct aa_ns;
 struct aa_audit_node;
 struct apparmor_audit_data;

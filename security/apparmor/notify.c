@@ -26,6 +26,9 @@
 #include "include/policy_ns.h"
 
 
+#define DEFAULT_TEMPORAL_CACHE_TIMEOUT 5
+
+int aa_cache_timeout = DEFAULT_TEMPORAL_CACHE_TIMEOUT;
 
 static DEFINE_SPINLOCK(notif_lock);
 static u64 g_listener_id = 1;
@@ -808,6 +811,52 @@ static bool response_is_valid(union apparmor_notif_resp *reply,
 }
 
 
+static bool insert_in_cache(struct aa_knotif *knotif)
+{
+	struct aa_audit_node *node = container_of(knotif,
+						  struct aa_audit_node,
+							  knotif);
+	struct aa_audit_node *hit;
+	struct aa_profile *profile = labels_profile(node->data.subj_label);
+
+	AA_DEBUG(DEBUG_UPCALL, "id %lld: inserting cache entry requ 0x%x  denied 0x%x",
+		 knotif->id, node->data.request, node->data.denied);
+	hit = aa_audit_cache_insert(&profile->learning_cache,
+					    node);
+	AA_DEBUG(DEBUG_UPCALL,
+		 "id %lld: (node %p, hit %p) cache insert %s: name %s node %s\n",
+		 knotif->id, node, hit, hit != node ? "entry already exists" : "",
+		 hit->data.name, node->data.name);
+	if (hit != node) {
+		AA_DEBUG(DEBUG_UPCALL,
+			 "id %lld: updating existing cache entry",
+			 knotif->id);
+		aa_audit_cache_update_ent(&profile->learning_cache,
+					  hit, &node->data);
+		aa_put_audit_node(hit);
+
+		return false;
+	}
+
+	AA_DEBUG(DEBUG_UPCALL, "inserted into cache");
+	return true;
+}
+
+static void audit_cache_work_function(struct work_struct *t)
+{
+	struct aa_audit_node *node = from_delayed_work(node, t, work);
+	struct aa_profile *profile = labels_profile(node->data.subj_label);
+
+	AA_DEBUG(DEBUG_UPCALL, "node reclaim timer fired. Removing node %llu", node->knotif.id);
+
+	aa_audit_cache_remove(&profile->learning_cache, node);
+	/* ref is put so can't rely on it being live here 
+	AA_DEBUG(DEBUG_UPCALL, "id %lld: (node %p) cache remove %s\n",
+		 node->knotif.id, node, node->data.name);
+	*/
+}
+
+
 /* copy uresponse into knotif */
 static void knotif_update_from_uresp_perm(struct aa_knotif *knotif,
 				     struct apparmor_notif_resp_perm *uresp)
@@ -845,32 +894,21 @@ static void knotif_update_from_uresp_perm(struct aa_knotif *knotif,
 
 	if (!(flags & URESPONSE_NO_CACHE)) {
 		/* cache of response requested */
+		insert_in_cache(knotif);
+		/* now to audit */
+	} else if (aa_cache_timeout > 0) {
+		/* caching off of file is not enough because of other
+		 * types of acces, cache for a short time for decision to
+		 * cover immediate following accesses
+		 */
 		struct aa_audit_node *node = container_of(knotif,
 							  struct aa_audit_node,
 							  knotif);
-		struct aa_audit_node *hit;
-		struct aa_profile *profile = labels_profile(node->data.subj_label);
 
-		AA_DEBUG(DEBUG_UPCALL, "id %lld: inserting cache entry requ 0x%x  denied 0x%x",
-			 knotif->id, node->data.request, node->data.denied);
-		hit = aa_audit_cache_insert(&profile->learning_cache,
-					    node);
-		AA_DEBUG(DEBUG_UPCALL,
-			 "id %lld: (node %p, hit %p) cache insert %s: name %s node %s\n",
-			 knotif->id, node, hit, hit != node ? "entry already exists" : "",
-			 hit->data.name, node->data.name);
-		if (hit != node) {
-			AA_DEBUG(DEBUG_UPCALL,
-				 "id %lld: updating existing cache entry",
-				 knotif->id);
-			aa_audit_cache_update_ent(&profile->learning_cache,
-						  hit, &node->data);
-			aa_put_audit_node(hit);
-		} else {
-
-			AA_DEBUG(DEBUG_UPCALL, "inserted into cache");
-		}
-		/* now to audit */
+		insert_in_cache(knotif);
+		INIT_DELAYED_WORK(&node->work, audit_cache_work_function);
+		schedule_delayed_work(&node->work,
+				      secs_to_jiffies(aa_cache_timeout));
 	} /* cache_response */
 }
 

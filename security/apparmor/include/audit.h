@@ -187,6 +187,10 @@ struct aa_audit_node {
 	struct apparmor_audit_data data;
 	struct list_head list;
 	struct aa_knotif knotif;
+	union {
+		struct delayed_work work;
+		struct rcu_head rcu;
+	};
 };
 extern struct kmem_cache *aa_audit_slab;
 
@@ -216,6 +220,8 @@ struct aa_audit_node *aa_audit_cache_insert(struct aa_audit_cache *cache,
 void aa_audit_cache_update_ent(struct aa_audit_cache *cache,
 			       struct aa_audit_node *node,
 			       struct apparmor_audit_data *data);
+void aa_audit_cache_remove(struct aa_audit_cache *cache,
+			   struct aa_audit_node *node);
 void aa_audit_cache_destroy(struct aa_audit_cache *cache);
 
 
