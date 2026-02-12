@@ -18,7 +18,7 @@
 #include "include/apparmor.h"
 #include "include/file.h"
 #include "include/label.h"
-#include "include/path.h"
+#include "include/net.h"
 #include "include/policy.h"
 #include "include/cred.h"
 

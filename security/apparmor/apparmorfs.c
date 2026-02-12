@@ -33,6 +33,7 @@
 #include "include/crypto.h"
 #include "include/ipc.h"
 #include "include/label.h"
+#include "include/net.h"
 #include "include/lib.h"
 #include "include/policy.h"
 #include "include/policy_ns.h"
