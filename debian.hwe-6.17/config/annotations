@@ -32,6 +32,7 @@ CONFIG_SM_VIDEOCC_6350                          note<'Dependency change to arm64
 
 # ---- Annotations without notes ----
 
+CONFIG_AMCC_QT2025_PHY                          policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_AS_VERSION                               policy<{'amd64': '24200', 'arm64': '24200', 'armhf': '24200', 'ppc64el': '24200', 'riscv64': '24200', 's390x': '24200'}>
 CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '"bindgen 0.65.1"', 'arm64': '"bindgen 0.65.1"'}>
