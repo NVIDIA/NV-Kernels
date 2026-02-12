@@ -768,9 +768,17 @@ static inline bool force_pte_mapping(void)
 
 	if (debug_pagealloc_enabled())
 		return true;
+	/*
+	 * Realm guests require page-level mappings so that memory encryption
+	 * attributes (shared/private) can be changed at page granularity.
+	 * The set_memory_{en,de}crypted() path does not support splitting
+	 * block mappings, so they must be page-level from the start.
+	 */
+	if (is_realm_world())
+		return true;
 	if (bbml2)
 		return false;
-	return rodata_full || arm64_kfence_can_set_direct_map() || is_realm_world();
+	return rodata_full || arm64_kfence_can_set_direct_map();
 }
 
 static inline bool split_leaf_mapping_possible(void)
