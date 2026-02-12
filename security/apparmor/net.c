@@ -338,7 +338,8 @@ static int aa_label_sk_perm(const struct cred *subj_cred,
 
 		ad.subj_cred = subj_cred;
 		error = fn_for_each_confined(label, profile,
-			    aa_profile_af_sk_perm(profile, &ad, request, sk));
+			    profile_af_perm(profile, &ad, request, sk->sk_family,
+					    sk->sk_type, sk->sk_protocol));
 	}
 
 	return error;
