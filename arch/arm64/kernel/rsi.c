@@ -5,7 +5,6 @@
 
 #include <linux/jump_label.h>
 #include <linux/memblock.h>
-#include <linux/psci.h>
 #include <linux/swiotlb.h>
 #include <linux/cc_platform.h>
 #include <linux/platform_device.h>
@@ -141,8 +140,6 @@ static int realm_ioremap_hook(phys_addr_t phys, size_t size, pgprot_t *prot)
 
 void __init arm64_rsi_init(void)
 {
-	if (arm_smccc_1_1_get_conduit() != SMCCC_CONDUIT_SMC)
-		return;
 	if (!rsi_version_matches())
 		return;
 	if (WARN_ON(rsi_get_realm_config(&config)))

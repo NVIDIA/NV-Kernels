@@ -331,6 +331,18 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	arm64_memblock_init();
 
+	/*
+	 * Initialise RSI before paging_init() so that is_realm_world() is
+	 * available when the linear map is created. Realm guests require
+	 * page-level mappings for memory encryption attribute changes, and
+	 * force_pte_mapping() needs to know realm status to avoid creating
+	 * block mappings that cannot be split at early boot.
+	 *
+	 * RSI uses raw SMC calls and memblock iteration, neither of which
+	 * depends on PSCI or the SMCCC conduit being initialised.
+	 */
+	arm64_rsi_init();
+
 	paging_init();
 
 	acpi_table_upgrade();
@@ -353,8 +365,6 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 		psci_dt_init();
 	else
 		psci_acpi_init();
-
-	arm64_rsi_init();
 
 	init_bootcpu_ops();
 	smp_init_cpus();
