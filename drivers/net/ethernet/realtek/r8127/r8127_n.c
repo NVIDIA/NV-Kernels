@@ -14334,9 +14334,6 @@ rtl8127_remove_one(struct pci_dev *pdev)
 
         rtl8127_cancel_all_schedule_work(tp);
 
-#ifdef  CONFIG_R8127_NAPI
-        rtl8127_del_napi(tp);
-#endif
         if (HW_DASH_SUPPORT_DASH(tp))
                 rtl8127_driver_stop(tp);
 
@@ -14347,6 +14344,9 @@ rtl8127_remove_one(struct pci_dev *pdev)
 #endif //ENABLE_R8127_SYSFS
 
         unregister_netdev(dev);
+#ifdef  CONFIG_R8127_NAPI
+        rtl8127_del_napi(tp);
+#endif
         rtl8127_disable_msi(pdev, tp);
 #ifdef ENABLE_R8127_PROCFS
         rtl8127_proc_remove(dev);
