@@ -1,4 +1,4 @@
 zfs-linux 2.3.4-1ubuntu2 modulename=zfs debpath=pool/universe/z/%package%/zfs-dkms_%version%_all.deb arch=amd64 arch=arm64 arch=ppc64el arch=s390x arch=riscv64 rprovides=spl-modules rprovides=spl-dkms rprovides=zfs-modules rprovides=zfs-dkms
-v4l2loopback 0.15.0-0ubuntu2 modulename=v4l2loopback debpath=pool/universe/v/%package%/v4l2loopback-dkms_%version%_all.deb arch=amd64 rprovides=v4l2loopback-modules rprovides=v4l2loopback-dkms
+v4l2loopback 0.15.0-0ubuntu2.1 modulename=v4l2loopback debpath=pool/universe/v/%package%/v4l2loopback-dkms_%version%_all.deb arch=amd64 rprovides=v4l2loopback-modules rprovides=v4l2loopback-dkms
 mstflint 4.26.0-1 modulename=mstflint_access debpath=pool/universe/m/%package%/mstflint-dkms_%version%_all.deb         arch=amd64 arch=arm64              rprovides=mstflint-modules rprovides=mstflint-dkms
 nvidia-fs 2.28.0-1 modulename=nvidia-fs debpath=pool/universe/n/%package%/nvidia-fs-dkms_%version%_amd64.deb arch=amd64 arch=arm64 rprovides=nvidia-fs-modules rprovides=nvidia-fs-dkms type=standalone
