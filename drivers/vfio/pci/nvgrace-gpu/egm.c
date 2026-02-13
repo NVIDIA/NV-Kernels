@@ -140,7 +140,20 @@ static int nvgrace_egm_open(struct inode *inode, struct file *file)
 		return -EINVAL;
 	}
 
-	memset((u8 *)memaddr, 0, region->egmlength);
+	{
+		size_t remaining = region->egmlength;
+		u8 *chunk_addr = (u8 *)memaddr;
+		size_t chunk_size;
+
+		while (remaining > 0) {
+			chunk_size = min(remaining, SZ_1G);
+			memset(chunk_addr, 0, chunk_size);
+			cond_resched();
+			chunk_addr += chunk_size;
+			remaining -= chunk_size;
+		}
+	}
+
 	memunmap(memaddr);
 	file->private_data = region;
 
