@@ -11,6 +11,7 @@
 #ifndef __AA_CAPABILITY_H
 #define __AA_CAPABILITY_H
 
+#include <linux/capability.h>
 #include <linux/sched.h>
 
 #include "apparmorfs.h"

@@ -16,6 +16,7 @@
 #include <linux/dcache.h>
 #include <linux/workqueue.h>
 
+#include "lib.h"
 
 struct aa_load_ent {
 	struct list_head list;

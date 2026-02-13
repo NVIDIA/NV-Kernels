@@ -13,6 +13,7 @@
 
 #include <linux/msg.h>
 #include <linux/sched.h>
+#include "audit.h"
 #include "inode.h"
 #include "perms.h"
 
