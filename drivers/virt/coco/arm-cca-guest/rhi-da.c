@@ -293,9 +293,9 @@ int rhi_read_cached_object(int vdev_id, int da_object_type, void **object, int *
 	rhicall->gprs[0] = RHI_DA_OBJECT_READ;
 	rhicall->gprs[1] = vdev_id;
 	rhicall->gprs[2] = da_object_type;
-	rhicall->gprs[3] = 0; /* offset within the data buffer */
+	rhicall->gprs[3] = virt_to_phys(data_buf_shared);
 	rhicall->gprs[4] = max_data_len;
-	rhicall->gprs[5] = virt_to_phys(data_buf_shared);
+	rhicall->gprs[5] = 0; /* offset within the data buffer */
 	ret = rsi_host_call(rhicall);
 	if (ret != RSI_SUCCESS || rhicall->gprs[0] != RHI_DA_SUCCESS) {
 		free_shared_pages(shared_pages, max_data_len);
