@@ -54,6 +54,7 @@ Build-Depends:
  bpftool:native [amd64 arm64] <!stage1 cross>,
  nvidia-dkms-580-open [amd64 arm64] <!stage1>,
  nvidia-kernel-source-580-open [amd64 arm64] <!stage1>,
+ libopencsd-dev [arm64] <!stage1>,
 Build-Depends-Indep:
  asciidoc <!stage1>,
  bzip2 <!stage1>,
