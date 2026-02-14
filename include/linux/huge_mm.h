@@ -6,6 +6,7 @@
 #include <linux/mm_types.h>
 
 #include <linux/fs.h> /* only for vma_is_dax() */
+#include <linux/secretmem.h>
 
 vm_fault_t do_huge_pmd_anonymous_page(struct vm_fault *vmf);
 int copy_huge_pmd(struct mm_struct *dst_mm, struct mm_struct *src_mm,
@@ -198,6 +199,9 @@ static inline bool file_thp_enabled(struct vm_area_struct *vma)
 		return false;
 
 	inode = vma->vm_file->f_inode;
+
+	if (secretmem_mapping(inode->i_mapping))
+		return false;
 
 	return (IS_ENABLED(CONFIG_READ_ONLY_THP_FOR_FS)) &&
 	       !inode_is_open_for_write(inode) && S_ISREG(inode->i_mode);
