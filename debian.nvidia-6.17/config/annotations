@@ -204,6 +204,37 @@ CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM dri
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
 
+CONFIG_CXL_BUS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_BUS                                  note<'Changed to bool for CXL Type-2 device support'>
+
+CONFIG_CXL_PCI                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_PCI                                  note<'Changed to bool for CXL Type-2 device support'>
+
+CONFIG_CXL_MEM                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_MEM                                  note<'Changed to y due to CXL_BUS being bool'>
+
+CONFIG_CXL_PORT                                 policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_PORT                                 note<'Changed to y due to CXL_BUS being bool'>
+
+CONFIG_FWCTL                                    policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_FWCTL                                    note<'Selected by CXL_BUS when bool'>
+
+CONFIG_CXL_RAS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_RAS                                  note<'CXL RAS error handling support'>
+
+CONFIG_CXL_RCH_RAS                              policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_CXL_RCH_RAS                              note<'RAS support for Restricted CXL Host defined in CXL1.1'>
+
+CONFIG_SFC_CXL                                  policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_SFC_CXL                                  note<'Solarflare SFC9100-family CXL Type-2 device support'>
+
+CONFIG_ACPI_APEI_EINJ                           policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ACPI_APEI_EINJ                           note<'Required for CONFIG_ACPI_APEI_EINJ_CXL'>
+
+
+CONFIG_ACPI_APEI_EINJ_CXL                       policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ACPI_APEI_EINJ_CXL                       note<'CXL protocol error injection support via APEI EINJ'>
+
 
 # ---- Annotations without notes ----
 
