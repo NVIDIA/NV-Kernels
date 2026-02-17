@@ -685,20 +685,20 @@ static void nvme_free_descriptors(struct request *req)
 	}
 }
 
-static void nvme_free_prps(struct request *req, unsigned int attrs)
+static void nvme_free_prps(struct request *req)
 {
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
 	struct nvme_queue *nvmeq = req->mq_hctx->driver_data;
 	unsigned int i;
 
 	for (i = 0; i < iod->nr_dma_vecs; i++)
-		dma_unmap_phys(nvmeq->dev->dev, iod->dma_vecs[i].addr,
-			       iod->dma_vecs[i].len, rq_dma_dir(req), attrs);
+		dma_unmap_page(nvmeq->dev->dev, iod->dma_vecs[i].addr,
+				iod->dma_vecs[i].len, rq_dma_dir(req));
 	mempool_free(iod->dma_vecs, nvmeq->dev->dmavec_mempool);
 }
 
 static void nvme_free_sgls(struct request *req, struct nvme_sgl_desc *sge,
-		struct nvme_sgl_desc *sg_list, unsigned int attrs)
+		struct nvme_sgl_desc *sg_list)
 {
 	struct nvme_queue *nvmeq = req->mq_hctx->driver_data;
 	enum dma_data_direction dir = rq_dma_dir(req);
@@ -707,14 +707,13 @@ static void nvme_free_sgls(struct request *req, struct nvme_sgl_desc *sge,
 	unsigned int i;
 
 	if (sge->type == (NVME_SGL_FMT_DATA_DESC << 4)) {
-		dma_unmap_phys(dma_dev, le64_to_cpu(sge->addr), len, dir,
-			       attrs);
+		dma_unmap_page(dma_dev, le64_to_cpu(sge->addr), len, dir);
 		return;
 	}
 
 	for (i = 0; i < len / sizeof(*sg_list); i++)
-		dma_unmap_phys(dma_dev, le64_to_cpu(sg_list[i].addr),
-			le32_to_cpu(sg_list[i].length), dir, attrs);
+		dma_unmap_page(dma_dev, le64_to_cpu(sg_list[i].addr),
+			le32_to_cpu(sg_list[i].length), dir);
 }
 
 static void nvme_unmap_metadata(struct request *req)
@@ -735,10 +734,10 @@ static void nvme_unmap_metadata(struct request *req)
 	if (!blk_rq_integrity_dma_unmap(req, dma_dev, &iod->meta_dma_state,
 					iod->meta_total_len)) {
 		if (nvme_pci_cmd_use_meta_sgl(&iod->cmd))
-			nvme_free_sgls(req, sge, &sge[1], 0);
+			nvme_free_sgls(req, sge, &sge[1]);
 		else
-			dma_unmap_phys(dma_dev, iod->meta_dma,
-				       iod->meta_total_len, dir, 0);
+			dma_unmap_page(dma_dev, iod->meta_dma,
+				       iod->meta_total_len, dir);
 	}
 
 	if (iod->meta_descriptor)
@@ -763,9 +762,9 @@ static void nvme_unmap_data(struct request *req)
 	if (!blk_rq_dma_unmap(req, dma_dev, &iod->dma_state, iod->total_len)) {
 		if (nvme_pci_cmd_use_sgl(&iod->cmd))
 			nvme_free_sgls(req, iod->descriptors[0],
-				       &iod->cmd.common.dptr.sgl, 0);
+				       &iod->cmd.common.dptr.sgl);
 		else
-			nvme_free_prps(req, 0);
+			nvme_free_prps(req);
 	}
 
 	if (iod->nr_descriptors)
