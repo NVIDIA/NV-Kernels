@@ -863,6 +863,15 @@ audit:
 }
 
 /* ensure none ns domain transitions are correctly applied with onexec */
+static struct aa_label *label_merge_wrap(struct aa_label *a, struct aa_label *b,
+					 gfp_t gfp)
+{
+	struct aa_label *label = aa_label_merge(a, b, gfp);
+
+	if (!label)
+		return ERR_PTR(-ENOMEM);
+	return label;
+}
 
 static struct aa_label *handle_onexec(const struct cred *subj_cred,
 				      struct aa_label *label,
@@ -890,12 +899,12 @@ static struct aa_label *handle_onexec(const struct cred *subj_cred,
 		return ERR_PTR(error);
 
 	new = fn_label_build_in_scope(label, profile, GFP_KERNEL,
-			stack ? aa_label_merge(&profile->label, onexec,
-					       GFP_KERNEL)
+			stack ? label_merge_wrap(&profile->label, onexec,
+						 GFP_KERNEL)
 			      : aa_get_newest_label(onexec),
 			profile_transition(subj_cred, profile, bprm,
 					   buffer, cond, unsafe));
-	if (new)
+	if (!IS_ERR_OR_NULL(new))
 		return new;
 
 	/* TODO: get rid of GLOBAL_ROOT_UID */
@@ -968,7 +977,6 @@ int apparmor_bprm_creds_for_exec(struct linux_binprm *bprm)
 						   buffer,
 						   &cond, &unsafe));
 
-	AA_BUG(!new);
 	if (IS_ERR(new)) {
 		error = PTR_ERR(new);
 		goto done;
@@ -1223,12 +1231,10 @@ build:
 				   build_change_hat(subj_cred, profile, name,
 						    sibling),
 				   aa_get_label(&profile->label));
-	if (!new) {
-		info = "label build failed";
-		error = -ENOMEM;
-		goto fail;
-	} /* else if (IS_ERR) build_change_hat has logged error so return new */
 	mutex_unlock(&ns->lock);
+	AA_BUG(!new);
+	/* return new label or error ptr */
+
 	return new;
 }
 
@@ -1557,6 +1563,11 @@ check:
 		new = fn_label_build_in_scope(label, profile, GFP_KERNEL,
 					   aa_get_label(target),
 					   aa_get_label(&profile->label));
+		if (IS_ERR(new)) {
+			error = PTR_ERR(new);
+			new = NULL;
+			goto out;
+		}
 		/*
 		 * no new privs prevents domain transitions that would
 		 * reduce restrictions.
@@ -1587,10 +1598,9 @@ check:
 		}
 		error = aa_replace_current_label(new);
 	} else {
-		if (new) {
-			aa_put_label(new);
-			new = NULL;
-		}
+		/* new will be recomputed so at exec time. So discard */
+		aa_put_label(new);
+		new = NULL;
 
 		/* full transition will be built in exec path */
 		aa_set_current_onexec(target, stack);

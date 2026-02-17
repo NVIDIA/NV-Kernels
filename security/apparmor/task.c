@@ -502,6 +502,11 @@ hard_coded:
 	if (error) {
 		aa_put_label(new);
 		return ERR_PTR(error);
+	} else if (!new) {
+		/* would only happen if complain mode changed error,
+		 * which should not happen.
+		 */
+		return ERR_PTR(ad->error);
 	}
 	return new;
 }
