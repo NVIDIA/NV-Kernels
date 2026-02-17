@@ -532,7 +532,7 @@ typedef unsigned long space_t;
  * sba_io_pdir_entry - fill in one IO PDIR entry
  * @pdir_ptr:  pointer to IO PDIR entry
  * @sid: process Space ID - currently only support KERNEL_SPACE
- * @pba: Physical address of buffer to map
+ * @vba: Virtual CPU address of buffer to map
  * @hint: DMA hint set to use for this mapping
  *
  * SBA Mapping Routine
@@ -569,17 +569,20 @@ typedef unsigned long space_t;
  */
 
 static void
-sba_io_pdir_entry(__le64 *pdir_ptr, space_t sid, phys_addr_t pba,
+sba_io_pdir_entry(__le64 *pdir_ptr, space_t sid, unsigned long vba,
 		  unsigned long hint)
 {
+	u64 pa; /* physical address */
 	register unsigned ci; /* coherent index */
 
-	asm("lci 0(%1), %0" : "=r" (ci) : "r" (phys_to_virt(pba)));
-	pba &= IOVP_MASK;
-	pba |= (ci >> PAGE_SHIFT) & 0xff;  /* move CI (8 bits) into lowest byte */
+	pa = lpa(vba);
+	pa &= IOVP_MASK;
 
-	pba |= SBA_PDIR_VALID_BIT;	/* set "valid" bit */
-	*pdir_ptr = cpu_to_le64(pba);	/* swap and store into I/O Pdir */
+	asm("lci 0(%1), %0" : "=r" (ci) : "r" (vba));
+	pa |= (ci >> PAGE_SHIFT) & 0xff;  /* move CI (8 bits) into lowest byte */
+
+	pa |= SBA_PDIR_VALID_BIT;	/* set "valid" bit */
+	*pdir_ptr = cpu_to_le64(pa);	/* swap and store into I/O Pdir */
 
 	/*
 	 * If the PDC_MODEL capabilities has Non-coherent IO-PDIR bit set
@@ -704,7 +707,7 @@ static int sba_dma_supported( struct device *dev, u64 mask)
  * See Documentation/core-api/dma-api-howto.rst
  */
 static dma_addr_t
-sba_map_single(struct device *dev, phys_addr_t addr, size_t size,
+sba_map_single(struct device *dev, void *addr, size_t size,
 	       enum dma_data_direction direction)
 {
 	struct ioc *ioc;
@@ -719,7 +722,7 @@ sba_map_single(struct device *dev, phys_addr_t addr, size_t size,
 		return DMA_MAPPING_ERROR;
 
 	/* save offset bits */
-	offset = offset_in_page(addr);
+	offset = ((dma_addr_t) (long) addr) & ~IOVP_MASK;
 
 	/* round up to nearest IOVP_SIZE */
 	size = (size + offset + ~IOVP_MASK) & IOVP_MASK;
@@ -736,13 +739,13 @@ sba_map_single(struct device *dev, phys_addr_t addr, size_t size,
 	pide = sba_alloc_range(ioc, dev, size);
 	iovp = (dma_addr_t) pide << IOVP_SHIFT;
 
-	DBG_RUN("%s() 0x%pa -> 0x%lx\n",
-		__func__, &addr, (long) iovp | offset);
+	DBG_RUN("%s() 0x%p -> 0x%lx\n",
+		__func__, addr, (long) iovp | offset);
 
 	pdir_start = &(ioc->pdir_base[pide]);
 
 	while (size > 0) {
-		sba_io_pdir_entry(pdir_start, KERNEL_SPACE, addr, 0);
+		sba_io_pdir_entry(pdir_start, KERNEL_SPACE, (unsigned long) addr, 0);
 
 		DBG_RUN("	pdir 0x%p %02x%02x%02x%02x%02x%02x%02x%02x\n",
 			pdir_start,
@@ -775,18 +778,17 @@ sba_map_single(struct device *dev, phys_addr_t addr, size_t size,
 
 
 static dma_addr_t
-sba_map_phys(struct device *dev, phys_addr_t phys, size_t size,
-		enum dma_data_direction direction, unsigned long attrs)
+sba_map_page(struct device *dev, struct page *page, unsigned long offset,
+		size_t size, enum dma_data_direction direction,
+		unsigned long attrs)
 {
-	if (unlikely(attrs & DMA_ATTR_MMIO))
-		return DMA_MAPPING_ERROR;
-
-	return sba_map_single(dev, phys, size, direction);
+	return sba_map_single(dev, page_address(page) + offset, size,
+			direction);
 }
 
 
 /**
- * sba_unmap_phys - unmap one IOVA and free resources
+ * sba_unmap_page - unmap one IOVA and free resources
  * @dev: instance of PCI owned by the driver that's asking.
  * @iova:  IOVA of driver buffer previously mapped.
  * @size:  number of bytes mapped in driver buffer.
@@ -796,7 +798,7 @@ sba_map_phys(struct device *dev, phys_addr_t phys, size_t size,
  * See Documentation/core-api/dma-api-howto.rst
  */
 static void
-sba_unmap_phys(struct device *dev, dma_addr_t iova, size_t size,
+sba_unmap_page(struct device *dev, dma_addr_t iova, size_t size,
 		enum dma_data_direction direction, unsigned long attrs)
 {
 	struct ioc *ioc;
@@ -891,7 +893,7 @@ static void *sba_alloc(struct device *hwdev, size_t size, dma_addr_t *dma_handle
 
 	if (ret) {
 		memset(ret, 0, size);
-		*dma_handle = sba_map_single(hwdev, virt_to_phys(ret), size, 0);
+		*dma_handle = sba_map_single(hwdev, ret, size, 0);
 	}
 
 	return ret;
@@ -912,7 +914,7 @@ static void
 sba_free(struct device *hwdev, size_t size, void *vaddr,
 		    dma_addr_t dma_handle, unsigned long attrs)
 {
-	sba_unmap_phys(hwdev, dma_handle, size, 0, 0);
+	sba_unmap_page(hwdev, dma_handle, size, 0, 0);
 	free_pages((unsigned long) vaddr, get_order(size));
 }
 
@@ -960,7 +962,7 @@ sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
 
 	/* Fast path single entry scatterlists. */
 	if (nents == 1) {
-		sg_dma_address(sglist) = sba_map_single(dev, sg_phys(sglist),
+		sg_dma_address(sglist) = sba_map_single(dev, sg_virt(sglist),
 						sglist->length, direction);
 		sg_dma_len(sglist)     = sglist->length;
 		return 1;
@@ -1059,7 +1061,7 @@ sba_unmap_sg(struct device *dev, struct scatterlist *sglist, int nents,
 
 	while (nents && sg_dma_len(sglist)) {
 
-		sba_unmap_phys(dev, sg_dma_address(sglist), sg_dma_len(sglist),
+		sba_unmap_page(dev, sg_dma_address(sglist), sg_dma_len(sglist),
 				direction, 0);
 #ifdef SBA_COLLECT_STATS
 		ioc->usg_pages += ((sg_dma_address(sglist) & ~IOVP_MASK) + sg_dma_len(sglist) + IOVP_SIZE - 1) >> PAGE_SHIFT;
@@ -1083,8 +1085,8 @@ static const struct dma_map_ops sba_ops = {
 	.dma_supported =	sba_dma_supported,
 	.alloc =		sba_alloc,
 	.free =			sba_free,
-	.map_phys =		sba_map_phys,
-	.unmap_phys =		sba_unmap_phys,
+	.map_page =		sba_map_page,
+	.unmap_page =		sba_unmap_page,
 	.map_sg =		sba_map_sg,
 	.unmap_sg =		sba_unmap_sg,
 	.get_sgtable =		dma_common_get_sgtable,
