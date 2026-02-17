@@ -41,11 +41,6 @@ struct virtqueue {
 	void *priv;
 };
 
-union virtio_map {
-	/* Device that performs DMA */
-	struct device *dma_dev;
-};
-
 int virtqueue_add_outbuf(struct virtqueue *vq,
 			 struct scatterlist sg[], unsigned int num,
 			 void *data,
