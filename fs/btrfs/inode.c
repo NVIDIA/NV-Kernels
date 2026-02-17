@@ -4609,7 +4609,7 @@ int btrfs_delete_subvolume(struct btrfs_inode *dir, struct dentry *dentry)
 		spin_unlock(&dest->root_item_lock);
 		btrfs_warn(fs_info,
 			   "attempt to delete subvolume %llu with active swapfile",
-			   root->root_key.objectid);
+			   dest->root_key.objectid);
 		ret = -EPERM;
 		goto out_up_write;
 	}
