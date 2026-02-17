@@ -8,7 +8,6 @@
 struct blk_map_iter {
 	struct bvec_iter		iter;
 	struct bio			*bio;
-	struct bio_vec			*bvecs;
 };
 
 struct blk_dma_iter {
