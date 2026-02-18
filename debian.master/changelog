@@ -1,4 +1,4 @@
-linux (6.19.0-6.6) resolute; urgency=medium
+linux-unstable (6.19.0-6.6) resolute; urgency=medium
 
   * resolute/linux: 6.19.0-6.6 -proposed tracker (LP: #2142114)
 
