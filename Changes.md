@@ -61,3 +61,11 @@ Others:
  - UBUNTU: SAUCE: dt-bindings: arm: qcom: Add Asus Zenbook A14 UX3407QA LCD/OLED variants
  - UBUNTU: SAUCE: arm64: dts: qcom: Rework X1-based Asus Zenbook A14's displays
  - Dropped lsm reverts due to fixing lockdown
+
+7.0:
+ - UBUNTU: SAUCE: arm64: dts: qcom: x1e80100-asus-vivobook: Introduce retimers, external DP
+ - UBUNTU: SAUCE: net: qrtr: mhi: synchronize qrtr and mhi preparation
+ - UBUNTU: SAUCE: wip: arm64: dts: qcom: x1e78100-t14s: enable bluetooth
+ - UBUNTU: SAUCE: arm64: dts: qcom: x1e78100-lenovo-thinkpad-t14s: add HDMI nodes
+ - UBUNTU: SAUCE: arm64: dts: qcom: x1e80100: move remaining dp0/1/2 data-lanes to SoC dtsi
+ - UBUNTU: SAUCE: PCI: Disable RRS polling for Intel SSDPE2KX020T8 nvme
