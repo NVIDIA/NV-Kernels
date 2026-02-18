@@ -1392,11 +1392,9 @@ static bool is_valid_alpha2(const char *alpha2)
 void mt7925_scan_work(struct work_struct *work)
 {
 	struct mt792x_phy *phy;
-	struct wiphy *wiphy;
 
 	phy = (struct mt792x_phy *)container_of(work, struct mt792x_phy,
 						scan_work.work);
-	wiphy = phy->mt76->hw->wiphy;
 
 	while (true) {
 		struct mt76_dev *mdev = &phy->dev->mt76;
@@ -1438,8 +1436,7 @@ void mt7925_scan_work(struct work_struct *work)
 				if (mdev->alpha2[0] != '0' && mdev->alpha2[1] != '0')
 					break;
 
-				wiphy->regulatory_flags |= REGULATORY_COUNTRY_IE_IGNORE;
-				regulatory_hint(wiphy, evt->alpha2);
+				mt7925_mcu_set_clc(phy->dev, evt->alpha2, ENVIRON_INDOOR);
 
 				break;
 			case UNI_EVENT_SCAN_DONE_NLO:
