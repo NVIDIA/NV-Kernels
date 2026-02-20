@@ -92,7 +92,7 @@
 #define INA226_ALERT_FUNCTION_FLAG	BIT(4)
 
 /* common attrs, ina226 attrs and NULL */
-#define INA2XX_MAX_ATTRIBUTE_GROUPS	4
+#define INA2XX_MAX_ATTRIBUTE_GROUPS	5
 
 /*
  * Both bus voltage and shunt voltage conversion times for ina226 are set
@@ -105,13 +105,19 @@ static struct regmap_config ina2xx_regmap_config = {
 	.val_bits = 16,
 };
 
-enum ina2xx_ids { ina219, ina226, ina260, sy24655 };
+enum ina2xx_ids {
+	ina219,
+	ina226,
+	ina260,
+	sy24655
+};
 
 struct ina2xx_config {
 	u16 config_default;
 	bool has_alerts;	/* chip supports alerts and limits */
 	bool has_ishunt;	/* chip has internal shunt resistor */
-	bool has_power_average;
+	bool has_power_average;	/* chip supports average power */
+	bool has_update_interval;
 	int calibration_value;
 	int registers;
 	int shunt_div;
@@ -145,6 +151,7 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.has_alerts = false,
 		.has_ishunt = false,
 		.has_power_average = false,
+		.has_update_interval = false,
 	},
 	[ina226] = {
 		.config_default = INA226_CONFIG_DEFAULT,
@@ -157,6 +164,7 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.has_alerts = true,
 		.has_ishunt = false,
 		.has_power_average = false,
+		.has_update_interval = true,
 	},
 	[ina260] = {
 		.config_default = INA260_CONFIG_DEFAULT,
@@ -168,6 +176,7 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.has_alerts = true,
 		.has_ishunt = true,
 		.has_power_average = false,
+		.has_update_interval = true,
 	},
 	[sy24655] = {
 		.config_default = INA226_CONFIG_DEFAULT,
@@ -180,6 +189,7 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.has_alerts = true,
 		.has_ishunt = false,
 		.has_power_average = true,
+		.has_update_interval = false,
 	},
 };
 
@@ -693,12 +703,20 @@ static struct attribute *ina226_attrs[] = {
 	&sensor_dev_attr_in1_lcrit_alarm.dev_attr.attr,
 	&sensor_dev_attr_power1_crit.dev_attr.attr,
 	&sensor_dev_attr_power1_crit_alarm.dev_attr.attr,
-	&sensor_dev_attr_update_interval.dev_attr.attr,
 	NULL,
 };
 
 static const struct attribute_group ina226_group = {
 	.attrs = ina226_attrs,
+};
+
+static struct attribute *ina226_interval_attrs[] = {
+	&sensor_dev_attr_update_interval.dev_attr.attr,
+	NULL,
+};
+
+static const struct attribute_group ina226_interval_group = {
+	.attrs = ina226_interval_attrs,
 };
 
 static struct attribute *sy24655_attrs[] = {
@@ -770,6 +788,8 @@ static int ina2xx_probe(struct i2c_client *client)
 				&ina260_group : &ina2xx_group;
 	if (data->config->has_alerts)
 		data->groups[group++] = &ina226_group;
+	if (data->config->has_update_interval)
+		data->groups[group++] = &ina226_interval_group;
 	if (data->config->has_power_average)
 		data->groups[group++] = &sy24655_group;
 

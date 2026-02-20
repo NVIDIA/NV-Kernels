@@ -123,8 +123,16 @@ power1_input		Power(uW) measurement channel
 shunt_resistor		Shunt resistance(uOhm) channel (not for ina260)
 ======================= ===============================
 
-Sysfs entries for ina226, ina230, ina231, ina260, and sy24655
--------------------------------------------------------------
+Additional sysfs entries
+------------------------
+
+Additional entries are available for the following chips:
+
+  * ina226
+  * ina230
+  * ina231
+  * ina260
+  * sy24655
 
 ======================= ====================================================
 
