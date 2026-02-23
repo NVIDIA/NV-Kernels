@@ -1945,6 +1945,45 @@ static void mpam_wa_t241_force_mbw_min_to_one(struct mpam_config *cfg,
 	cfg->mbw_min = min_hw_granule + 1;
 }
 
+static u16 mpam_wa_t241_calc_min_from_max(struct mpam_config *cfg)
+{
+	u16 val = 0;
+
+	if (mpam_has_feature(mpam_feat_mbw_max, cfg)) {
+		u16 delta = ((5 * MPAMCFG_MBW_MAX_MAX) / 100) - 1;
+
+		if (cfg->mbw_max > delta)
+			val = cfg->mbw_max - delta;
+	}
+
+	return val;
+}
+
+/*
+ * Based on T241-MPAM-4 erratum, need to avoid to enter a throttled state
+ * when mbw_min is 0 and set mbw_min to 95% of mbw_max.
+ *
+ * The workaround of the erratum:
+ *
+ * 1. Set mbw_min to 95% of mbw_max so memory bandwidth will be used as
+ *    much as possible.
+ * 2. If for any reason, the calculation of 95% of mbw_max is smaller than 1,
+ *    mbw_min is forced to 1 to avoid to enter the throttled state.
+ */
+static void mpam_wa_t241_set_mbw_min(struct mpam_config *cfg,
+				     struct mpam_props *props)
+{
+	u16 val = 0;
+
+	/* cfg->mbw_min is fored to 1 */
+	mpam_wa_t241_force_mbw_min_to_one(cfg, props);
+	val = mpam_wa_t241_calc_min_from_max(cfg);
+
+	/* If 95% of mbw_max is bigger than 1, set mbw_min to 95% of mbw_max */
+	if (val > cfg->mbw_min)
+		cfg->mbw_min = val;
+}
+
 /*
  * Called via smp_call_on_cpu() to prevent migration, while still being
  * pre-emptible. Caller must hold mpam_srcu.
@@ -1961,7 +2000,7 @@ static int mpam_reset_ris(void *arg)
 
 	mpam_init_reset_cfg(&reset_cfg);
 	if (mpam_has_quirk(T241_FORCE_MBW_MIN_TO_ONE, msc))
-		mpam_wa_t241_force_mbw_min_to_one(&reset_cfg, &ris->props);
+		mpam_wa_t241_set_mbw_min(&reset_cfg, &ris->props);
 
 	reprogram_arg.ris = ris;
 	reprogram_arg.cfg = &reset_cfg;
@@ -3028,8 +3067,7 @@ static void mpam_reset_component_cfg(struct mpam_component *comp)
 	for (i = 0; i < mpam_partid_max + 1; i++) {
 		mpam_init_reset_cfg(&comp->cfg[i]);
 		if (mpam_has_quirk(T241_FORCE_MBW_MIN_TO_ONE, class))
-			mpam_wa_t241_force_mbw_min_to_one(&comp->cfg[i],
-							  &class->props);
+			mpam_wa_t241_set_mbw_min(&comp->cfg[i], &class->props);
 	}
 }
 
