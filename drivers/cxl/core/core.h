@@ -144,6 +144,24 @@ int cxl_pci_get_bandwidth(struct pci_dev *pdev, struct access_coordinate *c);
 int cxl_port_get_switch_dport_bandwidth(struct cxl_port *port,
 					struct access_coordinate *c);
 
+static inline struct device *port_to_host(struct cxl_port *port)
+{
+	struct cxl_port *parent = is_cxl_root(port) ? NULL :
+				  to_cxl_port(port->dev.parent);
+
+	/*
+	 * The host of CXL root port and the first level of ports is
+	 * the platform firmware device, the host of all other ports
+	 * is their parent port.
+	 */
+	if (!parent)
+		return port->uport_dev;
+	else if (is_cxl_root(parent))
+		return parent->uport_dev;
+	else
+		return &parent->dev;
+}
+
 int cxl_ras_init(void);
 void cxl_ras_exit(void);
 int cxl_gpf_port_setup(struct cxl_dport *dport);
