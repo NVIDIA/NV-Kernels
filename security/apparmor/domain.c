@@ -904,7 +904,8 @@ static struct aa_label *handle_onexec(const struct cred *subj_cred,
 			      : aa_get_newest_label(onexec),
 			profile_transition(subj_cred, profile, bprm,
 					   buffer, cond, unsafe));
-	if (!IS_ERR_OR_NULL(new))
+	AA_BUG(!new);
+	if (!IS_ERR(new))
 		return new;
 
 	/* TODO: get rid of GLOBAL_ROOT_UID */
@@ -913,7 +914,8 @@ static struct aa_label *handle_onexec(const struct cred *subj_cred,
 				      OP_CHANGE_ONEXEC,
 				      AA_MAY_ONEXEC, bprm->filename, NULL,
 				      onexec, GLOBAL_ROOT_UID,
-				      "failed to build target label", -ENOMEM, false));
+				      "failed to build target label",
+				      PTR_ERR(new), false));
 	return ERR_PTR(error);
 }
 
@@ -979,9 +981,6 @@ int apparmor_bprm_creds_for_exec(struct linux_binprm *bprm)
 
 	if (IS_ERR(new)) {
 		error = PTR_ERR(new);
-		goto done;
-	} else if (!new) {
-		error = -ENOMEM;
 		goto done;
 	}
 
@@ -1563,6 +1562,7 @@ check:
 		new = fn_label_build_in_scope(label, profile, GFP_KERNEL,
 					   aa_get_label(target),
 					   aa_get_label(&profile->label));
+		AA_BUG(!new);
 		if (IS_ERR(new)) {
 			error = PTR_ERR(new);
 			new = NULL;
