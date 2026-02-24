@@ -995,6 +995,7 @@ int btmtk_usb_setup(struct hci_dev *hdev)
 	case 0x7922:
 	case 0x7961:
 	case 0x7925:
+	case 0x7902:
 		/* Reset the device to ensure it's in the initial state before
 		 * downloading the firmware to ensure.
 		 */
