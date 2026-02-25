@@ -34,6 +34,12 @@
 #define HBM_TRAINING_BAR0_OFFSET 0x200BC
 #define STATUS_READY 0xFF
 
+#define CXL_DEVICE_DVSEC_ID       0
+#define CXL_DVSEC_RANGE_1_LOW             0x1C
+#define CXL_DVSEC_MEMORY_VALID            BIT(0)
+#define CXL_DVSEC_MEMORY_ACTIVE           BIT(1)
+#define CXL_DVSEC_MEMORY_ACTIVE_TIMEOUT   GENMASK(15, 13)
+
 #define POLL_QUANTUM_MS 1000
 #define POLL_TIMEOUT_MS (30 * 1000)
 
@@ -245,7 +251,7 @@ static void nvgrace_gpu_close_device(struct vfio_device *core_vdev)
 	vfio_pci_core_close_device(core_vdev);
 }
 
-static int nvgrace_gpu_wait_device_ready(void __iomem *io)
+static int nvgrace_gpu_wait_device_ready_legacy(void __iomem *io)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(POLL_TIMEOUT_MS);
 
@@ -257,6 +263,75 @@ static int nvgrace_gpu_wait_device_ready(void __iomem *io)
 	} while (!time_after(jiffies, timeout));
 
 	return -ETIME;
+}
+
+/*
+ * Decode the 3-bit Memory_Active_Timeout field from CXL DVSEC Range 1 Low
+ * (bits 15:13) into milliseconds. Encoding per CXL spec r3.1 sec 8.1.3.8.2:
+ * 000b = 1s, 001b = 4s, 010b = 16s, 011b = 64s, 100b = 256s,
+ * 101b-111b = reserved.
+ * Reserved values fall back to the maximum defined timeout (256s).
+ */
+static unsigned long nvgrace_gpu_cxl_mem_active_timeout_ms(u8 timeout)
+{
+	static const unsigned long timeout_ms[] = {
+		1000,    /* 000b: 1s */
+		4000,    /* 001b: 4s */
+		16000,   /* 010b: 16s */
+		64000,   /* 011b: 64s */
+		256000,  /* 100b: 256s */
+	};
+
+	if (timeout >= ARRAY_SIZE(timeout_ms))
+		return timeout_ms[ARRAY_SIZE(timeout_ms) - 1];
+
+	return timeout_ms[timeout];
+}
+
+static int nvgrace_gpu_wait_device_ready_bw_next(struct pci_dev *pdev,
+						 int pcie_dvsec)
+{
+	unsigned long timeout;
+	u32 dvsec_memory_status;
+	u8 mem_active_timeout;
+
+	pci_read_config_dword(pdev, pcie_dvsec + CXL_DVSEC_RANGE_1_LOW,
+			      &dvsec_memory_status);
+
+	if (!(dvsec_memory_status & CXL_DVSEC_MEMORY_VALID))
+		return -ENODEV;
+
+	mem_active_timeout = FIELD_GET(CXL_DVSEC_MEMORY_ACTIVE_TIMEOUT,
+				       dvsec_memory_status);
+
+	timeout = jiffies +
+		  msecs_to_jiffies(nvgrace_gpu_cxl_mem_active_timeout_ms(mem_active_timeout));
+
+	do {
+		pci_read_config_dword(pdev,
+				      pcie_dvsec + CXL_DVSEC_RANGE_1_LOW,
+				      &dvsec_memory_status);
+
+		if (dvsec_memory_status & CXL_DVSEC_MEMORY_ACTIVE)
+			return 0;
+
+		msleep(POLL_QUANTUM_MS);
+	} while (!time_after(jiffies, timeout));
+
+	return -ETIME;
+}
+
+static int nvgrace_gpu_wait_device_ready(struct pci_dev *pdev,
+					 void __iomem *io)
+{
+	int pcie_dvsec;
+
+	pcie_dvsec = pci_find_dvsec_capability(pdev, PCI_VENDOR_ID_CXL,
+					       CXL_DEVICE_DVSEC_ID);
+	if (pcie_dvsec)
+		return nvgrace_gpu_wait_device_ready_bw_next(pdev, pcie_dvsec);
+
+	return nvgrace_gpu_wait_device_ready_legacy(io);
 }
 
 /*
@@ -278,7 +353,7 @@ nvgrace_gpu_check_device_ready(struct nvgrace_gpu_pci_core_device *nvdev)
 	if (!__vfio_pci_memory_enabled(vdev))
 		return -EIO;
 
-	ret = nvgrace_gpu_wait_device_ready(vdev->barmap[0]);
+	ret = nvgrace_gpu_wait_device_ready(vdev->pdev, vdev->barmap[0]);
 	if (ret)
 		return ret;
 
@@ -1156,7 +1231,7 @@ static int nvgrace_gpu_probe_check_device_ready(struct pci_dev *pdev)
 		goto iomap_exit;
 	}
 
-	ret = nvgrace_gpu_wait_device_ready(io);
+	ret = nvgrace_gpu_wait_device_ready(pdev, io);
 
 	pci_iounmap(pdev, io);
 iomap_exit:
