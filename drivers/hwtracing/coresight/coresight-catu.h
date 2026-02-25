@@ -62,7 +62,6 @@
 
 struct catu_drvdata {
 	struct clk *pclk;
-	struct clk *atclk;
 	void __iomem *base;
 	struct coresight_device *csdev;
 	int irq;
