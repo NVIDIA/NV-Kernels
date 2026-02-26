@@ -28,6 +28,10 @@ mkdir -p "${destdir}"
 		echo tools/objtool/objtool
 	fi
 
+	if is_enabled CONFIG_DEBUG_INFO_BTF_MODULES; then
+		echo tools/bpf/resolve_btfids/resolve_btfids
+	fi
+
 	find "arch/${SRCARCH}/include" Module.symvers include scripts -type f
 
 	if is_enabled CONFIG_GCC_PLUGINS; then
