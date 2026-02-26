@@ -1479,8 +1479,8 @@ static void cxl_detach_ep(void *data)
 				dev_name(&port->dev));
 			delete_switch_port(port);
 		}
-		put_device(&port->dev);
 		device_unlock(&parent_port->dev);
+		put_device(&port->dev);
 	}
 }
 
