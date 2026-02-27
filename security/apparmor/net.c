@@ -373,8 +373,15 @@ int aa_sock_file_perm(const struct cred *subj_cred, struct aa_label *label,
 	if (!sock || !sock->sk)
 		return 0;
 
-	if (sock->sk->sk_family == PF_UNIX)
+	switch (sock->sk->sk_family) {
+	case PF_UNIX:
 		return aa_unix_file_perm(subj_cred, label, op, request, file);
+		break;
+	case PF_INET:
+	case PF_INET6:
+		return aa_inet_file_perm(subj_cred, label, op, request, sock);
+		break;
+	}
 	return aa_label_sk_perm(subj_cred, label, op, request, sock->sk);
 }
 
