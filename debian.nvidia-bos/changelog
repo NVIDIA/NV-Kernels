@@ -1,0 +1,77 @@
+linux-nvidia-bos (6.19.0-2000.0) resolute; urgency=medium
+
+  * Initial changelog entry.
+
+ -- Jacob Martin <jacob.martin@canonical.com>  Fri, 27 Feb 2026 14:49:42 -0600
+
+linux (6.19.0-6.6) resolute; urgency=medium
+
+  * resolute/linux: 6.19.0-6.6 -proposed tracker (LP: #2142114)
+
+  * Resolute update: v6.19.2 upstream stable release (LP: #2142112)
+    - Revert "driver core: enforce device_lock for driver_match_device()"
+    - Linux 6.19.2
+
+  * Resolute update: v6.19.1 upstream stable release (LP: #2142111)
+    - io_uring/io-wq: add exit-on-idle state
+    - io_uring: allow io-wq workers to exit when unused
+    - smb: client: split cached_fid bitfields to avoid shared-byte RMW races
+    - ksmbd: fix infinite loop caused by next_smb2_rcv_hdr_off reset in error
+      paths
+    - ksmbd: add chann_lock to protect ksmbd_chann_list xarray
+    - smb: server: fix leak of active_num_conn in ksmbd_tcp_new_connection()
+    - smb: smbdirect: introduce smbdirect_socket.recv_io.credits.available
+    - smb: smbdirect: introduce smbdirect_socket.send_io.bcredits.*
+    - smb: server: make use of smbdirect_socket.recv_io.credits.available
+    - smb: server: let recv_done() queue a refill when the peer is low on
+      credits
+    - smb: server: make use of smbdirect_socket.send_io.bcredits
+    - smb: server: fix last send credit problem causing disconnects
+    - smb: server: let send_done handle a completion without IB_SEND_SIGNALED
+    - smb: client: make use of smbdirect_socket.recv_io.credits.available
+    - smb: client: let recv_done() queue a refill when the peer is low on
+      credits
+    - smb: client: let smbd_post_send() make use of request->wr
+    - smb: client: remove pointless sc->recv_io.credits.count rollback
+    - smb: client: remove pointless sc->send_io.pending handling in
+      smbd_post_send_iter()
+    - smb: client: port and use the wait_for_credits logic used by server
+    - smb: client: split out smbd_ib_post_send()
+    - smb: client: introduce and use smbd_{alloc, free}_send_io()
+    - smb: client: use smbdirect_send_batch processing
+    - smb: client: make use of smbdirect_socket.send_io.bcredits
+    - smb: client: fix last send credit problem causing disconnects
+    - smb: client: let smbd_post_send_negotiate_req() use smbd_post_send()
+    - smb: client: let send_done handle a completion without IB_SEND_SIGNALED
+    - driver core: enforce device_lock for driver_match_device()
+    - Bluetooth: btusb: Add USB ID 7392:e611 for Edimax EW-7611UXB
+    - ALSA: hda/conexant: Add quirk for HP ZBook Studio G4
+    - crypto: iaa - Fix out-of-bounds index in find_empty_iaa_compression_mode
+    - crypto: octeontx - Fix length check to avoid truncation in
+      ucode_load_store
+    - crypto: omap - Allocate OMAP_CRYPTO_FORCE_COPY scatterlists correctly
+    - crypto: virtio - Add spinlock protection with virtqueue notification
+    - crypto: virtio - Remove duplicated virtqueue_kick in
+      virtio_crypto_skcipher_crypt_req
+    - nilfs2: Fix potential block overflow that cause system hang
+    - hfs: ensure sb->s_fs_info is always cleaned up
+    - wifi: rtw88: Fix alignment fault in rtw_core_enable_beacon()
+    - scsi: qla2xxx: Validate sp before freeing associated memory
+    - scsi: qla2xxx: Allow recovery for tape devices
+    - scsi: qla2xxx: Delay module unload while fabric scan in progress
+    - scsi: qla2xxx: Free sp in error path to fix system crash
+    - scsi: qla2xxx: Query FW again before proceeding with login
+    - sched/mmcid: Don't assume CID is CPU owned on mode switch
+    - bus: fsl-mc: fix use-after-free in driver_override_show()
+    - erofs: fix UAF issue for file-backed mounts w/ directio option
+    - xfs: fix UAF in xchk_btree_check_block_owner
+    - drm/exynos: vidi: use ctx->lock to protect struct vidi_context member
+      variables related to memory alloc/free
+    - PCI: endpoint: Avoid creating sub-groups asynchronously
+    - wifi: rtl8xxxu: fix slab-out-of-bounds in rtl8xxxu_sta_add
+    - Linux 6.19.1
+
+  * AppArmor blocks write(2) to network sockets with Linux 6.19 (LP: #2141298)
+    - SAUCE: apparmor: fix aa_label_sk_perm to check for RULE_MEDIATES_NET
+
+ -- Timo Aaltonen <timo.aaltonen@canonical.com>  Wed, 18 Feb 2026 14:31:48 +0200
