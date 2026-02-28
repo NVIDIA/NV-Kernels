@@ -215,7 +215,7 @@ static int nvme_pr_read_keys(struct block_device *bdev,
 	if (rse_len > U32_MAX)
 		return -EINVAL;
 
-	rse = kzalloc(rse_len, GFP_KERNEL);
+	rse = kvzalloc(rse_len, GFP_KERNEL);
 	if (!rse)
 		return -ENOMEM;
 
@@ -240,7 +240,7 @@ static int nvme_pr_read_keys(struct block_device *bdev,
 	}
 
 free_rse:
-	kfree(rse);
+	kvfree(rse);
 	return ret;
 }
 
