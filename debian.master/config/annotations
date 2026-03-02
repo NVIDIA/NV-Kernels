@@ -11120,15 +11120,15 @@ CONFIG_PPS_GENERATOR                            policy<{'amd64': 'm', 'arm64': '
 CONFIG_PPS_GENERATOR_DUMMY                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_PPS_GENERATOR_TIO                        policy<{'amd64': 'm'}>
 CONFIG_PPTP                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
-CONFIG_PREEMPT                                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'n', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_PREEMPT                                  policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_PREEMPTION                               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': '-', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_PREEMPTIRQ_DELAY_TEST                    policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_PREEMPTIRQ_TRACEPOINTS                   policy<{'armhf': 'y'}>
 CONFIG_PREEMPT_BUILD                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': '-', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_PREEMPT_COUNT                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': '-', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
-CONFIG_PREEMPT_LAZY                             policy<{'amd64': 'n', 'arm64': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
+CONFIG_PREEMPT_LAZY                             policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_PREEMPT_NOTIFIERS                        policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
-CONFIG_PREEMPT_RCU                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': '-', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_PREEMPT_RCU                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': '-', 'ppc64el': 'y', 'riscv64': 'y', 's390x': '-'}>
 CONFIG_PREEMPT_RT                               policy<{'amd64': 'n', 'arm64': 'n', 'riscv64': 'n'}>
 CONFIG_PREEMPT_TRACER                           policy<{'amd64': 'n', 'arm64': 'n', 'armhf': '-', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_PREEMPT_VOLUNTARY                        policy<{'amd64': '-', 'arm64': '-', 'armhf': 'y', 'ppc64el': '-', 'riscv64': '-', 's390x': '-'}>
