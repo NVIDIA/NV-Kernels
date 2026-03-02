@@ -189,6 +189,7 @@ CONFIG_ULTRASOC_SMB                             note<'{Required for Grace enable
 CONFIG_AX88796B_RUST_PHY                        policy<{'amd64': '-'}>
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_BINDGEN_VERSION_TEXT                     policy<{'amd64': '-'}>
+CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"'}>
 CONFIG_CONSTRUCTORS                             policy<{'amd64': '-'}>
 CONFIG_CPUFREQ_ARCH_CUR_FREQ                    policy<{'amd64': 'y'}>
 CONFIG_EFI_CAPSULE_LOADER                       policy<{'amd64': 'm', 'arm64': 'y'}>
