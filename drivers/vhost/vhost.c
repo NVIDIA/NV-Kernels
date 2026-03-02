@@ -3100,6 +3100,7 @@ EXPORT_SYMBOL_GPL(vhost_vq_avail_empty);
 bool vhost_enable_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 {
 	__virtio16 avail_idx;
+	u16 new_avail_idx;
 	int r;
 
 	if (!(vq->used_flags & VRING_USED_F_NO_NOTIFY))
@@ -3130,8 +3131,9 @@ bool vhost_enable_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 		return false;
 	}
 
-	vq->avail_idx = vhost16_to_cpu(vq, avail_idx);
-	if (vq->avail_idx != vq->last_avail_idx) {
+	new_avail_idx = vhost16_to_cpu(vq, avail_idx);
+	if (new_avail_idx != vq->avail_idx) {
+		vq->avail_idx = new_avail_idx;
 		/* Since we have updated avail_idx, the following
 		 * call to vhost_get_vq_desc() will read available
 		 * ring entries. Make sure that read happens after
