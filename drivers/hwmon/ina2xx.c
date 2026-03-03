@@ -122,9 +122,11 @@ struct ina2xx_config {
 	int calibration_value;
 	int registers;
 	int shunt_div;
+	int shunt_voltage_shift;
 	int bus_voltage_shift;
 	int bus_voltage_lsb;	/* uV */
 	int power_lsb_factor;
+	int current_shift;
 };
 
 struct ina2xx_data {
@@ -146,12 +148,14 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.calibration_value = 4096,
 		.registers = INA219_REGISTERS,
 		.shunt_div = 100,
+		.shunt_voltage_shift = 0,
 		.bus_voltage_shift = 3,
 		.bus_voltage_lsb = 4000,
 		.power_lsb_factor = 20,
 		.has_alerts = false,
 		.has_ishunt = false,
 		.has_power_average = false,
+		.current_shift = 0,
 		.has_update_interval = false,
 	},
 	[ina226] = {
@@ -159,37 +163,43 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.calibration_value = 2048,
 		.registers = INA226_REGISTERS,
 		.shunt_div = 400,
+		.shunt_voltage_shift = 0,
 		.bus_voltage_shift = 0,
 		.bus_voltage_lsb = 1250,
 		.power_lsb_factor = 25,
 		.has_alerts = true,
 		.has_ishunt = false,
 		.has_power_average = false,
+		.current_shift = 0,
 		.has_update_interval = true,
 	},
 	[ina234] = {
 		.config_default = INA226_CONFIG_DEFAULT,
 		.calibration_value = 2048,
 		.registers = INA226_REGISTERS,
-		.shunt_div = 400,
+		.shunt_div = 25,
+		.shunt_voltage_shift = 4,
 		.bus_voltage_shift = 4,
 		.bus_voltage_lsb = 25600,
 		.power_lsb_factor = 32,
 		.has_alerts = true,
 		.has_ishunt = false,
 		.has_power_average = false,
+		.current_shift = 4,
 		.has_update_interval = true,
 	},
 	[ina260] = {
 		.config_default = INA260_CONFIG_DEFAULT,
 		.registers = INA226_REGISTERS,
 		.shunt_div = 400,
+		.shunt_voltage_shift = 0,
 		.bus_voltage_shift = 0,
 		.bus_voltage_lsb = 1250,
 		.power_lsb_factor = 8,
 		.has_alerts = true,
 		.has_ishunt = true,
 		.has_power_average = false,
+		.current_shift = 0,
 		.has_update_interval = true,
 	},
 	[sy24655] = {
@@ -197,12 +207,14 @@ static const struct ina2xx_config ina2xx_config[] = {
 		.calibration_value = 4096,
 		.registers = SY24655_ACCUM_CONFIG + 1,
 		.shunt_div = 400,
+		.shunt_voltage_shift = 0,
 		.bus_voltage_shift = 0,
 		.bus_voltage_lsb = 1250,
 		.power_lsb_factor = 25,
 		.has_alerts = true,
 		.has_ishunt = false,
 		.has_power_average = true,
+		.current_shift = 0,
 		.has_update_interval = false,
 	},
 };
@@ -347,7 +359,8 @@ static int ina2xx_get_value(struct ina2xx_data *data, u8 reg,
 	switch (reg) {
 	case INA2XX_SHUNT_VOLTAGE:
 		/* signed register */
-		val = DIV_ROUND_CLOSEST((s16)regval, data->config->shunt_div);
+		val = (s16)regval >> data->config->shunt_voltage_shift;
+		val = DIV_ROUND_CLOSEST(val, data->config->shunt_div);
 		break;
 	case INA2XX_BUS_VOLTAGE:
 		val = (regval >> data->config->bus_voltage_shift)
@@ -359,7 +372,8 @@ static int ina2xx_get_value(struct ina2xx_data *data, u8 reg,
 		break;
 	case INA2XX_CURRENT:
 		/* signed register, result in mA */
-		val = (s16)regval * data->current_lsb_uA;
+		val = ((s16)regval >> data->config->current_shift) *
+		  data->current_lsb_uA;
 		val = DIV_ROUND_CLOSEST(val, 1000);
 		break;
 	case INA2XX_CALIBRATION:
@@ -425,6 +439,7 @@ static s16 ina226_alert_to_reg(struct ina2xx_data *data, u8 bit, int val)
 	case INA226_SHUNT_OVER_VOLTAGE_BIT:
 	case INA226_SHUNT_UNDER_VOLTAGE_BIT:
 		val *= data->config->shunt_div;
+		val <<= data->config->shunt_voltage_shift;
 		return clamp_val(val, SHRT_MIN, SHRT_MAX);
 	case INA226_BUS_OVER_VOLTAGE_BIT:
 	case INA226_BUS_UNDER_VOLTAGE_BIT:
