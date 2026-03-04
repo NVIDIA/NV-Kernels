@@ -1617,34 +1617,6 @@ void mpam_msmon_reset_mbwu(struct mpam_component *comp, struct mon_cfg *ctx)
 	}
 }
 
-static void mpam_reset_msc_bitmap(struct mpam_msc *msc, u16 reg, u16 wd)
-{
-	u32 num_words, msb;
-	u32 bm = ~0;
-	int i;
-
-	lockdep_assert_held(&msc->part_sel_lock);
-
-	if (wd == 0)
-		return;
-
-	/*
-	 * Write all ~0 to all but the last 32bit-word, which may
-	 * have fewer bits...
-	 */
-	num_words = DIV_ROUND_UP(wd, 32);
-	for (i = 0; i < num_words - 1; i++, reg += sizeof(bm))
-		__mpam_write_reg(msc, reg, bm);
-
-	/*
-	 * ....and then the last (maybe) partial 32bit word. When wd is a
-	 * multiple of 32, msb should be 31 to write a full 32bit word.
-	 */
-	msb = (wd - 1) % 32;
-	bm = GENMASK(msb, 0);
-	__mpam_write_reg(msc, reg, bm);
-}
-
 static void mpam_apply_t241_erratum(struct mpam_msc_ris *ris, u16 partid)
 {
 	int sidx, i, lcount = 1000;
@@ -1719,7 +1691,6 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 				      struct mpam_config *cfg)
 {
 	u32 pri_val = 0;
-	u16 cmax = MPAMCFG_CMAX_CMAX;
 	struct mpam_msc *msc = ris->vmsc->msc;
 	struct mpam_props *rprops = &ris->props;
 	u16 dspri = GENMASK(rprops->dspri_wd, 0);
@@ -1741,22 +1712,12 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 	}
 
 	if (mpam_has_feature(mpam_feat_cpor_part, rprops) &&
-	    mpam_has_feature(mpam_feat_cpor_part, cfg)) {
-		if (cfg->reset_cpbm)
-			mpam_reset_msc_bitmap(msc, MPAMCFG_CPBM,
-					      rprops->cpbm_wd);
-		else
-			mpam_write_partsel_reg(msc, CPBM, cfg->cpbm);
-	}
+	    mpam_has_feature(mpam_feat_cpor_part, cfg))
+		mpam_write_partsel_reg(msc, CPBM, cfg->cpbm);
 
 	if (mpam_has_feature(mpam_feat_mbw_part, rprops) &&
-	    mpam_has_feature(mpam_feat_mbw_part, cfg)) {
-		if (cfg->reset_mbw_pbm)
-			mpam_reset_msc_bitmap(msc, MPAMCFG_MBW_PBM,
-					      rprops->mbw_pbm_bits);
-		else
-			mpam_write_partsel_reg(msc, MBW_PBM, cfg->mbw_pbm);
-	}
+	    mpam_has_feature(mpam_feat_mbw_part, cfg))
+		mpam_write_partsel_reg(msc, MBW_PBM, cfg->mbw_pbm);
 
 	if (mpam_has_feature(mpam_feat_mbw_min, rprops)) {
 		u16 val = 0;
@@ -1779,25 +1740,18 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 	    mpam_has_feature(mpam_feat_mbw_prop, cfg))
 		mpam_write_partsel_reg(msc, MBW_PROP, 0);
 
-	if (mpam_has_feature(mpam_feat_cmax_cmax, rprops)) {
-		if (mpam_has_feature(mpam_feat_cmax_cmax, cfg)) {
-			u32 cmax_val = cfg->cmax;
+	if (mpam_has_feature(mpam_feat_cmax_cmax, rprops) &&
+	    mpam_has_feature(mpam_feat_cmax_cmax, cfg)) {
+		u32 cmax = cfg->cmax;
 
-			if (cfg->cmax_softlim)
-				cmax_val |= MPAMCFG_CMAX_SOFTLIM;
-			mpam_write_partsel_reg(msc, CMAX, cmax_val);
-		} else {
-			mpam_write_partsel_reg(msc, CMAX, cmax);
-		}
+		if (cfg->cmax_softlim)
+			cmax |= MPAMCFG_CMAX_SOFTLIM;
+		mpam_write_partsel_reg(msc, CMAX, cmax);
 	}
 
-	if (mpam_has_feature(mpam_feat_cmax_cmin, rprops)) {
-		if (mpam_has_feature(mpam_feat_cmax_cmin, cfg)) {
-			mpam_write_partsel_reg(msc, CMIN, cfg->cmin);
-		} else {
-			mpam_write_partsel_reg(msc, CMIN, 0);
-		}
-	}
+	if (mpam_has_feature(mpam_feat_cmax_cmin, rprops) &&
+	    mpam_has_feature(mpam_feat_cmax_cmin, cfg))
+		mpam_write_partsel_reg(msc, CMIN, cfg->cmin);
 
 	if (mpam_has_feature(mpam_feat_cmax_cassoc, rprops))
 		mpam_write_partsel_reg(msc, CASSOC, MPAMCFG_CASSOC_CASSOC);
@@ -1920,17 +1874,32 @@ static int mpam_save_mbwu_state(void *arg)
 	return 0;
 }
 
-static void mpam_init_reset_cfg(struct mpam_config *reset_cfg)
+static void mpam_init_reset_cfg(struct mpam_config *reset_cfg,
+				const struct mpam_props *props)
 {
-	*reset_cfg = (struct mpam_config) {
-		.cpbm = ~0,
-		.mbw_pbm = ~0,
-		.mbw_max = MPAMCFG_MBW_MAX_MAX,
+	memset(reset_cfg, 0, sizeof(*reset_cfg));
 
-		.reset_cpbm = true,
-		.reset_mbw_pbm = true,
-	};
-	bitmap_fill(reset_cfg->features, MPAM_FEATURE_LAST);
+	/* Set features and explicit default values for controls supported by this RIS. */
+	if (mpam_has_feature(mpam_feat_cpor_part, props)) {
+		mpam_set_feature(mpam_feat_cpor_part, reset_cfg);
+		reset_cfg->cpbm = GENMASK(props->cpbm_wd - 1, 0);
+	}
+	if (mpam_has_feature(mpam_feat_mbw_part, props)) {
+		mpam_set_feature(mpam_feat_mbw_part, reset_cfg);
+		reset_cfg->mbw_pbm = GENMASK(props->mbw_pbm_bits - 1, 0);
+	}
+	if (mpam_has_feature(mpam_feat_mbw_max, props)) {
+		mpam_set_feature(mpam_feat_mbw_max, reset_cfg);
+		reset_cfg->mbw_max = MPAMCFG_MBW_MAX_MAX;
+	}
+	if (mpam_has_feature(mpam_feat_cmax_cmax, props)) {
+		mpam_set_feature(mpam_feat_cmax_cmax, reset_cfg);
+		reset_cfg->cmax = MPAMCFG_CMAX_CMAX;
+	}
+	if (mpam_has_feature(mpam_feat_cmax_cmin, props)) {
+		mpam_set_feature(mpam_feat_cmax_cmin, reset_cfg);
+		reset_cfg->cmin = 0;
+	}
 }
 
 /*
@@ -1946,7 +1915,7 @@ static int mpam_reset_ris(void *arg)
 	if (ris->in_reset_state)
 		return 0;
 
-	mpam_init_reset_cfg(&reset_cfg);
+	mpam_init_reset_cfg(&reset_cfg, &ris->props);
 
 	reprogram_arg.ris = ris;
 	reprogram_arg.cfg = &reset_cfg;
@@ -2988,14 +2957,31 @@ static void __destroy_component_cfg(struct mpam_component *comp)
 static void mpam_reset_component_cfg(struct mpam_component *comp)
 {
 	int i;
+	struct mpam_props *cprops = &comp->class->props;
 
 	mpam_assert_partid_sizes_fixed();
 
 	if (!comp->cfg)
 		return;
 
-	for (i = 0; i < mpam_partid_max + 1; i++)
-		mpam_init_reset_cfg(&comp->cfg[i]);
+	for (i = 0; i < mpam_partid_max + 1; i++) {
+		if (cprops->cpbm_wd) {
+			comp->cfg[i].cpbm = GENMASK(cprops->cpbm_wd - 1, 0);
+			mpam_set_feature(mpam_feat_cpor_part, &comp->cfg[i]);
+		}
+		if (cprops->mbw_pbm_bits) {
+			comp->cfg[i].mbw_pbm = GENMASK(cprops->mbw_pbm_bits - 1, 0);
+			mpam_set_feature(mpam_feat_mbw_part, &comp->cfg[i]);
+		}
+		if (cprops->bwa_wd) {
+			comp->cfg[i].mbw_max = MPAMCFG_MBW_MAX_MAX;
+			mpam_set_feature(mpam_feat_mbw_max, &comp->cfg[i]);
+		}
+		if (cprops->cmax_wd) {
+			comp->cfg[i].cmax = MPAMCFG_CMAX_CMAX;
+			mpam_set_feature(mpam_feat_cmax_cmax, &comp->cfg[i]);
+		}
+	}
 }
 
 static int __allocate_component_cfg(struct mpam_component *comp)
