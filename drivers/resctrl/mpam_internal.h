@@ -363,9 +363,6 @@ struct mpam_config {
 
 	bool	cmax_softlim;
 
-	bool	reset_cpbm;
-	bool	reset_mbw_pbm;
-
 	struct mpam_garbage	garbage;
 };
 
