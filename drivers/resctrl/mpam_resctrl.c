@@ -890,14 +890,7 @@ static u32 percent_to_mbw_pbm(u8 pc, struct mpam_props *cprops)
  */
 static u32 fract16_to_percent(u16 fract, u8 wd)
 {
-	u32 val = fract;
-
-	val >>= 16 - wd;
-	val += 1;
-	val *= MAX_MBA_BW;
-	val = DIV_ROUND_CLOSEST(val, 1 << wd);
-
-	return val;
+	return DIV_ROUND_CLOSEST((fract + 1) * 100, 65536);
 }
 
 /*
@@ -912,14 +905,7 @@ static u32 fract16_to_percent(u16 fract, u8 wd)
  */
 static u16 percent_to_fract16(u8 pc, u8 wd)
 {
-	u32 val = pc;
-
-	val <<= wd;
-	val = DIV_ROUND_CLOSEST(val, MAX_MBA_BW);
-	val = max(val, 1) - 1;
-	val <<= 16 - wd;
-
-	return val;
+	return pc ? (((pc * 65536) / 100) - 1) : 0;
 }
 
 static u32 mbw_max_to_percent(u16 mbw_max, struct mpam_props *cprops)
