@@ -1677,7 +1677,6 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 				      struct mpam_config *cfg)
 {
 	u32 pri_val = 0;
-	u16 cmax = MPAMCFG_CMAX_CMAX;
 	struct mpam_msc *msc = ris->vmsc->msc;
 	struct mpam_props *rprops = &ris->props;
 	u16 dspri = GENMASK(rprops->dspri_wd, 0);
@@ -1735,25 +1734,18 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 	if (mpam_has_feature(mpam_feat_mbw_prop, rprops))
 		mpam_write_partsel_reg(msc, MBW_PROP, 0);
 
-	if (mpam_has_feature(mpam_feat_cmax_cmax, rprops)) {
-		if (mpam_has_feature(mpam_feat_cmax_cmax, cfg)) {
-			u32 cmax_val = cfg->cmax;
+	if (mpam_has_feature(mpam_feat_cmax_cmax, rprops) &&
+	    mpam_has_feature(mpam_feat_cmax_cmax, cfg)) {
+		u32 cmax = cfg->cmax;
 
-			if (cfg->cmax_softlim)
-				cmax_val |= MPAMCFG_CMAX_SOFTLIM;
-			mpam_write_partsel_reg(msc, CMAX, cmax_val);
-		} else {
-			mpam_write_partsel_reg(msc, CMAX, cmax);
-		}
+		if (cfg->cmax_softlim)
+			cmax |= MPAMCFG_CMAX_SOFTLIM;
+		mpam_write_partsel_reg(msc, CMAX, cmax);
 	}
 
-	if (mpam_has_feature(mpam_feat_cmax_cmin, rprops)) {
-		if (mpam_has_feature(mpam_feat_cmax_cmin, cfg)) {
-			mpam_write_partsel_reg(msc, CMIN, cfg->cmin);
-		} else {
-			mpam_write_partsel_reg(msc, CMIN, 0);
-		}
-	}
+	if (mpam_has_feature(mpam_feat_cmax_cmin, rprops) &&
+	    mpam_has_feature(mpam_feat_cmax_cmin, cfg))
+		mpam_write_partsel_reg(msc, CMIN, cfg->cmin);
 
 	if (mpam_has_feature(mpam_feat_cmax_cassoc, rprops))
 		mpam_write_partsel_reg(msc, CASSOC, MPAMCFG_CASSOC_CASSOC);
@@ -2817,6 +2809,8 @@ static void mpam_reset_component_cfg(struct mpam_component *comp)
 			comp->cfg[i].mbw_pbm = GENMASK(cprops->mbw_pbm_bits - 1, 0);
 		if (cprops->bwa_wd)
 			comp->cfg[i].mbw_max = GENMASK(15, 16 - cprops->bwa_wd);
+		if (cprops->cmax_wd)
+			comp->cfg[i].cmax = MPAMCFG_CMAX_CMAX;
 	}
 }
 
