@@ -2688,6 +2688,8 @@ static void mpam_reset_component_cfg(struct mpam_component *comp)
 			comp->cfg[i].mbw_pbm = GENMASK(cprops->mbw_pbm_bits - 1, 0);
 		if (cprops->bwa_wd)
 			comp->cfg[i].mbw_max = GENMASK(15, 16 - cprops->bwa_wd);
+		if (cprops->cmax_wd)
+			comp->cfg[i].cmax = MPAMCFG_CMAX_CMAX;
 	}
 }
 
