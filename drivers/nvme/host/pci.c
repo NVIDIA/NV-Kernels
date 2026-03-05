@@ -41,6 +41,15 @@
 /* Optimisation for I/Os between 4k and 128k */
 #define NVME_SMALL_POOL_SIZE	256
 
+#ifdef CONFIG_NVFS
+/* GPU physical pages are minimum 64K. Worst-case SGL entries with misalignment:
+ * ceil(payload/64K) + 1. Safe payload for small pool = (entries - 1) * 64K,
+ * where entries = NVME_SMALL_POOL_SIZE / sizeof(struct nvme_sgl_desc). */
+#define NVFS_GPU_PAGE_SIZE		(64UL * 1024)
+#define NVFS_SMALL_POOL_PAYLOAD \
+	((NVME_SMALL_POOL_SIZE / sizeof(struct nvme_sgl_desc) - 1) * NVFS_GPU_PAGE_SIZE)
+#endif
+
 /*
  * Arbitrary upper bound.
  */
@@ -965,6 +974,23 @@ static blk_status_t nvme_pci_setup_data_sgl(struct request *req,
 		}
 	}
 
+#ifdef CONFIG_NVFS
+	if (iod->flags & IOD_NVFS_IO) {
+		/*
+		 * blk_rq_nr_phys_segments() reflects shadow buffer contiguity,
+		 * not GPU physical segments. GPU pages are 64K minimum; worst-case
+		 * entries with misalignment = ceil(payload/64K) + 1.
+		 * Small pool (16 entries) is safe for payload < NVFS_SMALL_POOL_PAYLOAD.
+		 * Large pool capacity = NVME_CTRL_PAGE_SIZE / sizeof(*sg_list) = 256.
+		 */
+		if (blk_rq_payload_bytes(req) < NVFS_SMALL_POOL_PAYLOAD) {
+			entries = NVME_SMALL_POOL_SIZE / sizeof(*sg_list);
+			iod->flags |= IOD_SMALL_DESCRIPTOR;
+		} else {
+			entries = NVME_CTRL_PAGE_SIZE / sizeof(*sg_list);
+		}
+	} else
+#endif
 	if (entries <= NVME_SMALL_POOL_SIZE / sizeof(*sg_list))
 		iod->flags |= IOD_SMALL_DESCRIPTOR;
 
@@ -984,8 +1010,9 @@ static blk_status_t nvme_pci_setup_data_sgl(struct request *req,
 	} while (
 #ifdef CONFIG_NVFS
 		(iod->flags & IOD_NVFS_IO) ?
-			nvfs_ops->nvfs_blk_rq_dma_map_iter_next(req, nvmeq->dev->dev,
-					&iod->dma_state, iter) :
+			(mapped < entries &&
+			 nvfs_ops->nvfs_blk_rq_dma_map_iter_next(req, nvmeq->dev->dev,
+					&iod->dma_state, iter)) :
 #endif
 		blk_rq_dma_map_iter_next(req, nvmeq->dev->dev, &iod->dma_state,
 				iter));
