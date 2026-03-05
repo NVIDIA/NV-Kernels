@@ -154,7 +154,12 @@ static inline blk_status_t nvme_nvfs_map_data(struct request *req,
 	if (!nvfs_ops->nvfs_blk_rq_dma_map_iter_start(req, dma_dev, 
 						       &iod->dma_state, &iter, &iod->nvfs_cookie)) {
 		nvfs_put_ops();
-		ret = BLK_STS_IOERR;
+		if (iter.status == BLK_STS_IOERR) {
+			/* GPU DMA error — do not fall through to CPU path */
+			*is_nvfs_io = true;
+			ret = iter.status;
+		}
+		/* else: CPU page, let caller fall through to CPU path */
 		return ret;
 	}
 
