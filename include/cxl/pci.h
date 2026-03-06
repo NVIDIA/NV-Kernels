@@ -14,8 +14,12 @@ enum cxl_regloc_type {
 	CXL_REGLOC_RBI_TYPES
 };
 
+struct pci_dev;
 struct cxl_register_map;
 
 int cxl_pci_setup_regs(struct pci_dev *pdev, enum cxl_regloc_type type,
 		       struct cxl_register_map *map);
+int cxl_find_regblock(struct pci_dev *pdev, enum cxl_regloc_type type,
+		      struct cxl_register_map *map);
+int cxl_setup_regs(struct cxl_register_map *map);
 #endif
