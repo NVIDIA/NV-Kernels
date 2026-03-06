@@ -1356,3 +1356,116 @@ out_unlock:
 
 	return rc;
 }
+
+/*
+ * CXL reset sysfs attribute management.
+ *
+ * The cxl_reset attribute is added to PCI devices that advertise CXL Reset
+ * capability. Managed entirely by the CXL module via subsys_interface on
+ * pci_bus_type, avoiding cross-module symbol dependencies between the PCI
+ * core (built-in) and CXL (potentially modular).
+ *
+ * subsys_interface handles existing devices at register time and hot-plug
+ * add/remove automatically. On unregister, remove_dev runs for all tracked
+ * devices under bus core serialization.
+ */
+
+static bool pci_cxl_reset_capable(struct pci_dev *pdev)
+{
+	int dvsec;
+	u16 cap;
+
+	dvsec = pci_find_dvsec_capability(pdev, PCI_VENDOR_ID_CXL,
+					  PCI_DVSEC_CXL_DEVICE);
+	if (!dvsec)
+		return false;
+
+	if (pci_read_config_word(pdev, dvsec + PCI_DVSEC_CXL_CAP, &cap))
+		return false;
+
+	if (!(cap & PCI_DVSEC_CXL_CACHE_CAPABLE) ||
+	    !(cap & PCI_DVSEC_CXL_MEM_CAPABLE))
+		return false;
+
+	return !!(cap & PCI_DVSEC_CXL_RST_CAPABLE);
+}
+
+static ssize_t cxl_reset_store(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	int rc;
+
+	if (!sysfs_streq(buf, "1"))
+		return -EINVAL;
+
+	rc = cxl_do_reset(pdev);
+	return rc ? rc : count;
+}
+static DEVICE_ATTR_WO(cxl_reset);
+
+static umode_t cxl_reset_attr_is_visible(struct kobject *kobj,
+					  struct attribute *a, int n)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+
+	if (!pci_cxl_reset_capable(pdev))
+		return 0;
+
+	return a->mode;
+}
+
+static struct attribute *cxl_reset_attrs[] = {
+	&dev_attr_cxl_reset.attr,
+	NULL,
+};
+
+static const struct attribute_group cxl_reset_attr_group = {
+	.attrs = cxl_reset_attrs,
+	.is_visible = cxl_reset_attr_is_visible,
+};
+
+static int cxl_reset_add_dev(struct device *dev,
+			     struct subsys_interface *sif)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	if (!pci_cxl_reset_capable(pdev))
+		return 0;
+
+	return sysfs_create_group(&dev->kobj, &cxl_reset_attr_group);
+}
+
+static void cxl_reset_remove_dev(struct device *dev,
+				 struct subsys_interface *sif)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	if (!pci_cxl_reset_capable(pdev))
+		return;
+
+	sysfs_remove_group(&dev->kobj, &cxl_reset_attr_group);
+}
+
+static struct subsys_interface cxl_reset_interface = {
+	.name		= "cxl_reset",
+	.subsys		= &pci_bus_type,
+	.add_dev	= cxl_reset_add_dev,
+	.remove_dev	= cxl_reset_remove_dev,
+};
+
+void cxl_reset_sysfs_init(void)
+{
+	int rc;
+
+	rc = subsys_interface_register(&cxl_reset_interface);
+	if (rc)
+		pr_warn("CXL: failed to register cxl_reset interface (%d)\n",
+			rc);
+}
+
+void cxl_reset_sysfs_exit(void)
+{
+	subsys_interface_unregister(&cxl_reset_interface);
+}
