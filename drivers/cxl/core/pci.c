@@ -16,6 +16,9 @@
 #include "core.h"
 #include "trace.h"
 
+/* Initial sibling array capacity: covers max non-ARI functions per slot */
+#define CXL_RESET_SIBLINGS_INIT	8
+
 /**
  * DOC: cxl core pci
  *
@@ -1041,4 +1044,138 @@ static int __maybe_unused cxl_reset_flush_cpu_caches(struct cxl_memdev *cxlmd)
 
 	device_for_each_child(&endpoint->dev, NULL, cxl_decoder_flush_cache);
 	return 0;
+}
+
+/*
+ * Serialize all CXL reset operations globally.
+ */
+static DEFINE_MUTEX(cxl_reset_mutex);
+
+struct cxl_reset_context {
+	struct pci_dev *target;
+	struct pci_dev **pci_functions;
+	int pci_func_count;
+	int pci_func_cap;
+};
+
+/*
+ * Check if a sibling function is non-CXL using the Non-CXL Function Map
+ * DVSEC. Returns true if fn is listed as non-CXL, false otherwise (including
+ * on any read failure).
+ */
+static bool cxl_is_non_cxl_function(struct pci_dev *pdev,
+				     u16 func_map_dvsec, int fn)
+{
+	int reg, bit;
+	u32 map;
+
+	if (pci_ari_enabled(pdev->bus)) {
+		reg = fn / 32;
+		bit = fn % 32;
+	} else {
+		reg = fn;
+		bit = PCI_SLOT(pdev->devfn);
+	}
+
+	if (pci_read_config_dword(pdev,
+				   func_map_dvsec + PCI_DVSEC_CXL_FUNCTION_MAP_REG + (reg * 4),
+				   &map))
+		return false;
+
+	return map & BIT(bit);
+}
+
+struct cxl_reset_walk_ctx {
+	struct cxl_reset_context *ctx;
+	u16 func_map_dvsec;
+	bool ari;
+};
+
+static int cxl_reset_collect_sibling(struct pci_dev *func, void *data)
+{
+	struct cxl_reset_walk_ctx *wctx = data;
+	struct cxl_reset_context *ctx = wctx->ctx;
+	struct pci_dev *pdev = ctx->target;
+	u16 dvsec, cap;
+	int fn;
+
+	if (func == pdev)
+		return 0;
+
+	if (!wctx->ari &&
+	    PCI_SLOT(func->devfn) != PCI_SLOT(pdev->devfn))
+		return 0;
+
+	fn = wctx->ari ? func->devfn : PCI_FUNC(func->devfn);
+	if (wctx->func_map_dvsec &&
+	    cxl_is_non_cxl_function(pdev, wctx->func_map_dvsec, fn))
+		return 0;
+
+	/* Only coordinate with siblings that have CXL.cachemem */
+	dvsec = pci_find_dvsec_capability(func, PCI_VENDOR_ID_CXL,
+					  PCI_DVSEC_CXL_DEVICE);
+	if (!dvsec)
+		return 0;
+	if (pci_read_config_word(func, dvsec + PCI_DVSEC_CXL_CAP, &cap))
+		return 0;
+	if (!(cap & (PCI_DVSEC_CXL_CACHE_CAPABLE |
+		     PCI_DVSEC_CXL_MEM_CAPABLE)))
+		return 0;
+
+	/* Grow sibling array; double capacity for ARI devices when running out of space */
+	if (ctx->pci_func_count >= ctx->pci_func_cap) {
+		struct pci_dev **new;
+		int new_cap = ctx->pci_func_cap ? ctx->pci_func_cap * 2
+						: CXL_RESET_SIBLINGS_INIT;
+
+		new = krealloc(ctx->pci_functions,
+			       new_cap * sizeof(*new), GFP_KERNEL);
+		if (!new)
+			return 1;
+		ctx->pci_functions = new;
+		ctx->pci_func_cap = new_cap;
+	}
+
+	pci_dev_get(func);
+	ctx->pci_functions[ctx->pci_func_count++] = func;
+	return 0;
+}
+
+static void __maybe_unused cxl_pci_functions_reset_prepare(struct cxl_reset_context *ctx)
+{
+	struct pci_dev *pdev = ctx->target;
+	struct cxl_reset_walk_ctx wctx;
+	int i;
+
+	ctx->pci_func_count = 0;
+	ctx->pci_functions = NULL;
+	ctx->pci_func_cap = 0;
+
+	wctx.ctx = ctx;
+	wctx.ari = pci_ari_enabled(pdev->bus);
+	wctx.func_map_dvsec = pci_find_dvsec_capability(pdev,
+			PCI_VENDOR_ID_CXL, PCI_DVSEC_CXL_FUNCTION_MAP);
+
+	/* Collect CXL.cachemem siblings under pci_bus_sem */
+	pci_walk_bus(pdev->bus, cxl_reset_collect_sibling, &wctx);
+
+	/* Lock and save/disable siblings outside pci_bus_sem */
+	for (i = 0; i < ctx->pci_func_count; i++) {
+		pci_dev_lock(ctx->pci_functions[i]);
+		pci_dev_save_and_disable(ctx->pci_functions[i]);
+	}
+}
+
+static void __maybe_unused cxl_pci_functions_reset_done(struct cxl_reset_context *ctx)
+{
+	int i;
+
+	for (i = 0; i < ctx->pci_func_count; i++) {
+		pci_dev_restore(ctx->pci_functions[i]);
+		pci_dev_unlock(ctx->pci_functions[i]);
+		pci_dev_put(ctx->pci_functions[i]);
+	}
+	kfree(ctx->pci_functions);
+	ctx->pci_functions = NULL;
+	ctx->pci_func_count = 0;
 }
