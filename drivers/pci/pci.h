@@ -119,14 +119,32 @@ struct pci_cap_saved_state {
 	struct pci_cap_saved_data	cap;
 };
 
+/*
+ * Virtual extended cap ID for CXL DVSEC state in the cap save chain.
+ */
+#define PCI_EXT_CAP_ID_CXL_DVSEC_VIRTUAL	0xFFFF
+static_assert(PCI_EXT_CAP_ID_MAX < PCI_EXT_CAP_ID_CXL_DVSEC_VIRTUAL);
+
 void pci_allocate_cap_save_buffers(struct pci_dev *dev);
 void pci_free_cap_save_buffers(struct pci_dev *dev);
 int pci_add_cap_save_buffer(struct pci_dev *dev, char cap, unsigned int size);
 int pci_add_ext_cap_save_buffer(struct pci_dev *dev,
 				u16 cap, unsigned int size);
+int pci_add_virtual_ext_cap_save_buffer(struct pci_dev *dev, u16 cap,
+					unsigned int size);
 struct pci_cap_saved_state *pci_find_saved_cap(struct pci_dev *dev, char cap);
 struct pci_cap_saved_state *pci_find_saved_ext_cap(struct pci_dev *dev,
 						   u16 cap);
+
+#ifdef CONFIG_PCI_CXL
+void pci_allocate_cxl_save_buffer(struct pci_dev *dev);
+void pci_save_cxl_state(struct pci_dev *dev);
+void pci_restore_cxl_state(struct pci_dev *dev);
+#else
+static inline void pci_allocate_cxl_save_buffer(struct pci_dev *dev) { }
+static inline void pci_save_cxl_state(struct pci_dev *dev) { }
+static inline void pci_restore_cxl_state(struct pci_dev *dev) { }
+#endif
 
 #define PCI_PM_D2_DELAY         200	/* usec; see PCIe r4.0, sec 5.9.1 */
 #define PCI_PM_D3HOT_WAIT       10	/* msec */
