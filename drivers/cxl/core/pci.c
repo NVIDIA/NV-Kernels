@@ -4,6 +4,8 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/device.h>
 #include <linux/delay.h>
+#include <linux/memory_hotplug.h>
+#include <linux/memregion.h>
 #include <linux/pci.h>
 #include <linux/pci-doe.h>
 #include <cxl/pci.h>
@@ -931,4 +933,112 @@ int cxl_port_get_possible_dports(struct cxl_port *port)
 	pci_walk_bus(bus, count_dports, &ctx);
 
 	return ctx.count;
+}
+
+/*
+ * CXL Reset support - core-provided reset logic for CXL devices.
+ *
+ * These functions implement the CXL reset sequence.
+ */
+
+/*
+ * If CXL memory backed by this decoder is online as System RAM, offline
+ * and remove it per CXL spec requirements before issuing CXL Reset.
+ * Returns 0 if memory was not online or was successfully offlined.
+ */
+static int __maybe_unused cxl_offline_memory(struct device *dev, void *data)
+{
+	struct cxl_endpoint_decoder *cxled;
+	struct cxl_region *cxlr;
+	struct cxl_region_params *p;
+	int rc;
+
+	if (!is_endpoint_decoder(dev))
+		return 0;
+
+	cxled = to_cxl_endpoint_decoder(dev);
+	cxlr = cxled->cxld.region;
+	if (!cxlr)
+		return 0;
+
+	p = &cxlr->params;
+	if (!p->res)
+		return 0;
+
+	if (walk_iomem_res_desc(IORES_DESC_NONE,
+				IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY,
+				p->res->start, p->res->end, NULL, NULL) <= 0)
+		return 0;
+
+	dev_info(dev, "Offlining CXL memory [%pr] for reset\n", p->res);
+
+#ifdef CONFIG_MEMORY_HOTREMOVE
+	rc = offline_and_remove_memory(p->res->start, resource_size(p->res));
+	if (rc) {
+		dev_err(dev,
+			"Failed to offline CXL memory [%pr]: %d\n",
+			p->res, rc);
+		return rc;
+	}
+#else
+	dev_err(dev, "Memory hotremove not supported, cannot offline CXL memory\n");
+	rc = -EOPNOTSUPP;
+	return rc;
+#endif
+
+	return 0;
+}
+
+static int __maybe_unused cxl_reset_prepare_memdev(struct cxl_memdev *cxlmd)
+{
+	struct cxl_port *endpoint;
+	struct device *dev;
+
+	if (!cxlmd || !cxlmd->cxlds)
+		return -ENODEV;
+
+	dev = cxlmd->cxlds->dev;
+	endpoint = cxlmd->endpoint;
+	if (!endpoint)
+		return 0;
+
+	return device_for_each_child(&endpoint->dev, NULL,
+				      cxl_offline_memory);
+}
+
+static int __maybe_unused cxl_decoder_flush_cache(struct device *dev, void *data)
+{
+	struct cxl_endpoint_decoder *cxled;
+	struct cxl_region *cxlr;
+	struct resource *res;
+
+	if (!is_endpoint_decoder(dev))
+		return 0;
+
+	cxled = to_cxl_endpoint_decoder(dev);
+	cxlr = cxled->cxld.region;
+	if (!cxlr || !cxlr->params.res)
+		return 0;
+
+	res = cxlr->params.res;
+	cpu_cache_invalidate_memregion(res->start, resource_size(res));
+	return 0;
+}
+
+static int __maybe_unused cxl_reset_flush_cpu_caches(struct cxl_memdev *cxlmd)
+{
+	struct cxl_port *endpoint;
+
+	if (!cxlmd)
+		return 0;
+
+	endpoint = cxlmd->endpoint;
+	if (!endpoint || IS_ERR(endpoint))
+		return 0;
+
+	if (!cpu_cache_has_invalidate_memregion())
+		return 0;
+
+	device_for_each_child(&endpoint->dev, NULL, cxl_decoder_flush_cache);
+	return 0;
 }
