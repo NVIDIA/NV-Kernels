@@ -130,6 +130,8 @@ extern struct cxl_rwsem cxl_rwsem;
 int cxl_memdev_init(void);
 void cxl_memdev_exit(void);
 void cxl_mbox_init(void);
+void cxl_reset_sysfs_init(void);
+void cxl_reset_sysfs_exit(void);
 
 enum cxl_poison_trace_type {
 	CXL_POISON_TRACE_LIST,
