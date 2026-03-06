@@ -3528,6 +3528,26 @@ int pci_add_ext_cap_save_buffer(struct pci_dev *dev, u16 cap, unsigned int size)
 	return _pci_add_cap_save_buffer(dev, cap, true, size);
 }
 
+int pci_add_virtual_ext_cap_save_buffer(struct pci_dev *dev, u16 cap,
+					unsigned int size)
+{
+	struct pci_cap_saved_state *save_state;
+
+	if (cap <= PCI_EXT_CAP_ID_MAX)
+		return -EINVAL;
+
+	save_state = kzalloc(sizeof(*save_state) + size, GFP_KERNEL);
+	if (!save_state)
+		return -ENOMEM;
+
+	save_state->cap.cap_nr = cap;
+	save_state->cap.cap_extended = true;
+	save_state->cap.size = size;
+	pci_add_saved_cap(dev, save_state);
+
+	return 0;
+}
+
 /**
  * pci_allocate_cap_save_buffers - allocate buffers for saving capabilities
  * @dev: the PCI device
