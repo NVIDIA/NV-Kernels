@@ -965,6 +965,7 @@ static void cxl_reset_done(struct pci_dev *pdev)
 {
 	struct cxl_dev_state *cxlds = pci_get_drvdata(pdev);
 	struct cxl_memdev *cxlmd = cxlds->cxlmd;
+	struct cxl_port *endpoint;
 	struct device *dev = &pdev->dev;
 
 	/*
@@ -974,8 +975,11 @@ static void cxl_reset_done(struct pci_dev *pdev)
 	 * that no longer exists.
 	 */
 	guard(device)(&cxlmd->dev);
-	if (cxlmd->endpoint &&
-	    cxl_endpoint_decoder_reset_detected(cxlmd->endpoint)) {
+	endpoint = cxlmd->endpoint;
+	if (!endpoint || IS_ERR(endpoint))
+		return;
+
+	if (cxl_endpoint_decoder_reset_detected(endpoint)) {
 		dev_crit(dev, "SBR happened without memory regions removal.\n");
 		dev_crit(dev, "System may be unstable if regions hosted system memory.\n");
 		add_taint(TAINT_USER, LOCKDEP_STILL_OK);
