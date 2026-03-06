@@ -1817,6 +1817,7 @@ int pci_save_state(struct pci_dev *dev)
 	pci_save_aer_state(dev);
 	pci_save_ptm_state(dev);
 	pci_save_tph_state(dev);
+	pci_save_cxl_state(dev);
 	return pci_save_vc_state(dev);
 }
 EXPORT_SYMBOL(pci_save_state);
@@ -1928,6 +1929,7 @@ void pci_restore_state(struct pci_dev *dev)
 	pci_restore_aer_state(dev);
 
 	pci_restore_config_space(dev);
+	pci_restore_cxl_state(dev);
 
 	pci_restore_pcix_state(dev);
 	pci_restore_msi_state(dev);
@@ -3571,6 +3573,7 @@ void pci_allocate_cap_save_buffers(struct pci_dev *dev)
 		pci_err(dev, "unable to allocate suspend buffer for LTR\n");
 
 	pci_allocate_vc_save_buffers(dev);
+	pci_allocate_cxl_save_buffer(dev);
 }
 
 void pci_free_cap_save_buffers(struct pci_dev *dev)
