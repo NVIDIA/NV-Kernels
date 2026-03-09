@@ -12272,14 +12272,16 @@ CONFIG_RT_MUTEXES                               policy<{'amd64': 'y', 'arm64': '
 CONFIG_RUNTIME_KERNEL_TESTING_MENU              policy<{'riscv64': 'n'}>
 CONFIG_RUNTIME_TESTING_MENU                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_RUSTC_HAS_COERCE_POINTEE                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_RUSTC_HAS_FILE_AS_C_STR                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_RUSTC_HAS_FILE_WITH_NUL                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_RUSTC_HAS_SLICE_AS_FLATTENED             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_RUSTC_HAS_SPAN_FILE                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_RUSTC_HAS_UNNECESSARY_TRANSMUTES         policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
-CONFIG_RUSTC_LLVM_VERSION                       policy<{'amd64': '200108', 'arm64': '200108', 'armhf': '200108', 'ppc64el': '200108', 'riscv64': '200108', 's390x': '200108'}>
+CONFIG_RUSTC_LLVM_VERSION                       policy<{'amd64': '210108', 'arm64': '210108', 'armhf': '210108', 'ppc64el': '210108', 'riscv64': '210108', 's390x': '210108'}>
 CONFIG_RUSTC_SUPPORTS_ARM64                     policy<{'arm64': 'y'}>
 CONFIG_RUSTC_SUPPORTS_RISCV                     policy<{'riscv64': 'y'}>
-CONFIG_RUSTC_VERSION                            policy<{'amd64': '108800', 'arm64': '108800', 'armhf': '108800', 'ppc64el': '108800', 'riscv64': '108800', 's390x': '108800'}>
-CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '"rustc 1.88.0 (6b00bc388 2025-06-23) (built from a source tarball)"', 'arm64': '"rustc 1.88.0 (6b00bc388 2025-06-23) (built from a source tarball)"'}>
+CONFIG_RUSTC_VERSION                            policy<{'amd64': '109200', 'arm64': '109200', 'armhf': '109200', 'ppc64el': '109200', 'riscv64': '109200', 's390x': '109200'}>
+CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '"rustc 1.92.0 (ded5c06cf 2025-12-08) (built from a source tarball)"', 'arm64': '"rustc 1.92.0 (ded5c06cf 2025-12-08) (built from a source tarball)"'}>
 CONFIG_RUST_BITMAP_HARDENED                     policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'amd64': 'n', 'arm64': 'n'}>
@@ -12890,7 +12892,6 @@ CONFIG_SENSORS_QNAP_MCU_HWMON                   policy<{'amd64': 'm', 'arm64': '
 CONFIG_SENSORS_RM3100                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SENSORS_RM3100_I2C                       policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_SENSORS_RM3100_SPI                       policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
-CONFIG_SENSORS_SA67MCU                          policy<{'arm64': 'm'}>
 CONFIG_SENSORS_SBTSI                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_SENSORS_SCH5627                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_SENSORS_SCH5636                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'riscv64': 'm', 's390x': '-'}>
