@@ -1,4 +1,4 @@
-linux-unstable (7.0.0-5.5) resolute; urgency=medium
+linux (7.0.0-5.5) resolute; urgency=medium
 
   * resolute/linux-unstable: 7.0.0-5.5 -proposed tracker (LP: #2143700)
 
