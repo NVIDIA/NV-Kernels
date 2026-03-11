@@ -334,10 +334,4 @@ extern int arch_create_linear_mapping(int nid, u64 start, u64 size,
 void arch_remove_linear_mapping(u64 start, u64 size);
 #endif /* CONFIG_MEMORY_HOTPLUG */
 
-#if defined(CONFIG_LOCKDEP) && defined(CONFIG_MEMORY_HOTPLUG)
-void lockdep_assert_mems_held(void);
-#else
-static inline void lockdep_assert_mems_held(void) { }
-#endif
-
 #endif /* __LINUX_MEMORY_HOTPLUG_H */
