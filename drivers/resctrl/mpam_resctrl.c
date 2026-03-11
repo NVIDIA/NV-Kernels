@@ -12,7 +12,6 @@
 #include <linux/limits.h>
 #include <linux/list.h>
 #include <linux/math.h>
-#include <linux/memory.h>
 #include <linux/node.h>
 #include <linux/printk.h>
 #include <linux/rculist.h>
@@ -2119,26 +2118,6 @@ mpam_resctrl_get_domain_from_cpu(int cpu, struct mpam_resctrl_res *res)
 	return mpam_resctrl_get_mon_domain_from_cpu(cpu);
 }
 
-static struct mpam_resctrl_dom *
-mpam_get_domain_from_nid(int nid, struct mpam_resctrl_res *res)
-{
-	struct rdt_ctrl_domain *d;
-	struct mpam_resctrl_dom *dom;
-
-	list_for_each_entry(d, &res->resctrl_res.ctrl_domains, hdr.list) {
-		dom = container_of(d, struct mpam_resctrl_dom, resctrl_ctrl_dom);
-
-		/* Only the memory class uses comp_id as nid */
-		if (dom->ctrl_comp->class->type != MPAM_CLASS_MEMORY)
-			continue;
-
-		if (dom->ctrl_comp->comp_id == nid)
-			return dom;
-	}
-
-	return NULL;
-}
-
 int mpam_resctrl_online_cpu(unsigned int cpu)
 {
 	int i, err = 0;
@@ -2219,88 +2198,6 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 	return 0;
 }
 
-static int mpam_resctrl_online_node(unsigned int nid)
-{
-	struct mpam_resctrl_dom *dom;
-	struct mpam_resctrl_res *res;
-
-	/* Domain IDs as NUMA nid is only defined for MBA */
-	res = &mpam_resctrl_controls[RDT_RESOURCE_MBA];
-	if (!res->class)
-		return 0;	// dummy_resource;
-
-	dom = mpam_get_domain_from_nid(nid, res);
-	if (!dom)
-		dom = mpam_resctrl_alloc_domain_nid(nid, res);
-	if (IS_ERR(dom))
-		return PTR_ERR(dom);
-
-	return 0;
-}
-
-static int mpam_resctrl_offline_node(unsigned int nid)
-{
-	struct mpam_resctrl_res *res;
-	struct mpam_resctrl_dom *dom;
-	struct rdt_mon_domain *mon_d;
-	struct rdt_ctrl_domain *ctrl_d;
-
-	/* Domain IDs as NUMA nid is only defined for MBA */
-	res = &mpam_resctrl_controls[RDT_RESOURCE_MBA];
-	if (!res->class)
-		return 0;	// dummy_resource;
-
-	dom = mpam_get_domain_from_nid(nid, res);
-	if (WARN_ON_ONCE(!dom))
-		return 0;
-
-	ctrl_d = &dom->resctrl_ctrl_dom;
-	resctrl_offline_ctrl_domain(&res->resctrl_res, ctrl_d);
-	if (!mpam_resctrl_offline_domain_hdr(cpu_possible_mask, &ctrl_d->hdr))
-		return 0;
-
-	// TODO: skip monitor domains if there are no monitors for this resource
-	mon_d = &dom->resctrl_mon_dom;
-	resctrl_offline_mon_domain(&res->resctrl_res, mon_d);
-	if (!mpam_resctrl_offline_domain_hdr(cpu_possible_mask, &mon_d->hdr))
-		return 0;
-
-	kfree(dom);
-
-	return 0;
-}
-
-static int mpam_resctrl_node_notifier(struct notifier_block *self,
-				      unsigned long action, void *arg)
-{
-	struct node_notify *nn = arg;
-
-	if (nn->nid < 0 || !mb_uses_numa_nid)
-		return NOTIFY_OK;
-
-	/*
-	 * Ignore nid that have CPUs. Resctrl needs to see the cpu offline
-	 * call for each CPU to update the CPUs in control groups. Moving
-	 * the overflow handler isn't an issue as only L3 can be mon_capable,
-	 * and NUMA nid used as domain-id are only an option for MBA.
-	 */
-	if (!cpumask_empty(cpumask_of_node(nn->nid)))
-		return NOTIFY_OK;
-
-	switch (action) {
-	case NODE_ADDED_FIRST_MEMORY:
-		mpam_resctrl_online_node(nn->nid);
-		break;
-	case NODE_REMOVED_LAST_MEMORY:
-		mpam_resctrl_offline_node(nn->nid);
-		break;
-	default:
-		/* don't care */
-	}
-
-	return NOTIFY_OK;
-}
-
 int mpam_resctrl_setup(void)
 {
 	int err = 0;
@@ -2345,11 +2242,6 @@ int mpam_resctrl_setup(void)
 			continue;	// dummy resource
 
 		mpam_resctrl_monitor_init(mon, j);
-	}
-
-	if (mb_numa_nid_possible) {
-		hotplug_node_notifier(mpam_resctrl_node_notifier,
-				      RESCTRL_CALLBACK_PRI);
 	}
 
 	cpus_read_unlock();
