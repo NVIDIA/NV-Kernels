@@ -15995,6 +15995,7 @@ CONFIG_VIDEO_AK7375                             policy<{'amd64': 'm', 'arm64': '
 CONFIG_VIDEO_AK881X                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_VIDEO_ALLEGRO_DVT                        policy<{'arm64': 'm'}>
 CONFIG_VIDEO_ALVIUM_CSI2                        policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
+CONFIG_VIDEO_AMD_ISP4_CAPTURE                   policy<{'amd64': 'm', 'arm64': 'm', 'riscv64': 'n'}>
 CONFIG_VIDEO_AMPHION_VPU                        policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_VIDEO_APTINA_PLL                         policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_VIDEO_AR0521                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
