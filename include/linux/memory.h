@@ -126,7 +126,6 @@ struct mem_section;
 #define CPUSET_CALLBACK_PRI	10
 #define MEMTIER_HOTPLUG_PRI	100
 #define KSM_CALLBACK_PRI	100
-#define RESCTRL_CALLBACK_PRI	100
 
 #ifndef CONFIG_MEMORY_HOTPLUG
 static inline void memory_dev_init(void)
