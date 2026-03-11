@@ -18,7 +18,6 @@
 #define pr_fmt(fmt)	"resctrl: " fmt
 
 #include <linux/cpu.h>
-#include <linux/memory_hotplug.h>
 #include <linux/resctrl.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
@@ -764,7 +763,6 @@ void cqm_handle_limbo(struct work_struct *work)
 	struct rdt_mon_domain *d;
 
 	cpus_read_lock();
-	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 
 	d = container_of(work, struct rdt_mon_domain, cqm_limbo.work);
@@ -779,7 +777,6 @@ void cqm_handle_limbo(struct work_struct *work)
 	}
 
 	mutex_unlock(&rdtgroup_mutex);
-	put_online_mems();
 	cpus_read_unlock();
 }
 
@@ -813,7 +810,6 @@ void mbm_handle_overflow(struct work_struct *work)
 	struct rdt_resource *r;
 
 	cpus_read_lock();
-	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 
 	/*
@@ -847,7 +843,6 @@ void mbm_handle_overflow(struct work_struct *work)
 
 out_unlock:
 	mutex_unlock(&rdtgroup_mutex);
-	put_online_mems();
 	cpus_read_unlock();
 }
 
