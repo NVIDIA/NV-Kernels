@@ -10049,7 +10049,6 @@ CONFIG_PCENGINES_APU2                           policy<{'amd64': 'm'}>
 CONFIG_PCI                                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_PCI200SYN                                policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_PCIEAER                                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': '-', 'riscv64': 'y', 's390x': 'y'}>
-CONFIG_PCIEAER_CXL                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'riscv64': 'y'}>
 CONFIG_PCIEAER_INJECT                           policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': '-', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_PCIEASPM                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_PCIEASPM_PERFORMANCE                     policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
