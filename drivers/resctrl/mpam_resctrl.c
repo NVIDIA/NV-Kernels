@@ -12,7 +12,6 @@
 #include <linux/limits.h>
 #include <linux/list.h>
 #include <linux/math.h>
-#include <linux/node.h>
 #include <linux/printk.h>
 #include <linux/rculist.h>
 #include <linux/resctrl.h>
@@ -1913,19 +1912,36 @@ static void mpam_resctrl_domain_insert(struct list_head *list,
 }
 
 static struct mpam_resctrl_dom *
-mpam_resctrl_alloc_domain(const struct cpumask *onlined_cpus, int nid,
-			  struct mpam_component *ctrl_comp,
+mpam_resctrl_alloc_domain(const struct cpumask *onlined_cpus,
 			  struct mpam_resctrl_res *res)
 {
 	int err;
 	struct mpam_resctrl_dom *dom;
 	struct rdt_mon_domain *mon_d;
 	struct rdt_ctrl_domain *ctrl_d;
+	int cpu = cpumask_any(onlined_cpus);
+	struct mpam_class *class = res->class;
+	struct mpam_component *comp_iter, *ctrl_comp;
 	struct rdt_resource *r = &res->resctrl_res;
 
 	lockdep_assert_held(&domain_list_lock);
 
-	dom = kzalloc_node(sizeof(*dom), GFP_KERNEL, nid);
+	ctrl_comp = NULL;
+	idx = srcu_read_lock(&mpam_srcu);
+	list_for_each_entry_srcu(comp_iter, &class->components, class_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
+		if (cpumask_test_cpu(cpu, &comp_iter->affinity)) {
+			ctrl_comp = comp_iter;
+			break;
+		}
+	}
+	srcu_read_unlock(&mpam_srcu, idx);
+
+	/* cpu with unknown exported component? */
+	if (WARN_ON_ONCE(!ctrl_comp))
+		return ERR_PTR(-EINVAL);
+
+	dom = kzalloc_node(sizeof(*dom), GFP_KERNEL, cpu_to_node(cpu));
 	if (!dom)
 		return ERR_PTR(-ENOMEM);
 
@@ -1933,6 +1949,7 @@ mpam_resctrl_alloc_domain(const struct cpumask *onlined_cpus, int nid,
 		dom->ctrl_comp = ctrl_comp;
 
 		ctrl_d = &dom->resctrl_ctrl_dom;
+
 		mpam_resctrl_domain_hdr_init(onlined_cpus, ctrl_comp, &ctrl_d->hdr);
 		ctrl_d->hdr.type = RESCTRL_CTRL_DOMAIN;
 		mpam_resctrl_domain_insert(&r->ctrl_domains, &ctrl_d->hdr);
@@ -2041,61 +2058,6 @@ static struct mpam_resctrl_dom *mpam_resctrl_get_mon_domain_from_cpu(int cpu)
  * For the monitors, we need to search the list of events...
  */
 static struct mpam_resctrl_dom *
-mpam_resctrl_alloc_domain_cpu(int cpu, struct mpam_resctrl_res *res)
-{
-	struct mpam_component *comp_iter, *ctrl_comp;
-	struct mpam_class *class = res->class;
-	int idx;
-
-	ctrl_comp = NULL;
-	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_srcu(comp_iter, &class->components, class_list,
-				 srcu_read_lock_held(&mpam_srcu)) {
-		if (cpumask_test_cpu(cpu, &comp_iter->affinity)) {
-			ctrl_comp = comp_iter;
-			break;
-		}
-	}
-	srcu_read_unlock(&mpam_srcu, idx);
-
-	/* cpu with unknown exported component? */
-	if (WARN_ON_ONCE(!ctrl_comp))
-		return ERR_PTR(-EINVAL);
-
-	return mpam_resctrl_alloc_domain(cpumask_of(cpu), cpu_to_node(cpu),
-					 ctrl_comp, res);
-}
-
-static struct mpam_resctrl_dom *
-mpam_resctrl_alloc_domain_nid(int nid, struct mpam_resctrl_res *res)
-{
-	struct mpam_component *comp_iter, *ctrl_comp;
-	struct mpam_class *class = res->class;
-	int idx;
-
-	/* Only the memory class uses comp_id as nid */
-	if (class->type != MPAM_CLASS_MEMORY)
-		return ERR_PTR(-EINVAL);
-
-	ctrl_comp = NULL;
-	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_srcu(comp_iter, &class->components, class_list,
-				 srcu_read_lock_held(&mpam_srcu)) {
-		if (comp_iter->comp_id == nid) {
-			ctrl_comp = comp_iter;
-			break;
-		}
-	}
-	srcu_read_unlock(&mpam_srcu, idx);
-
-	/* cpu with unknown exported component? */
-	if (WARN_ON_ONCE(!ctrl_comp))
-		return ERR_PTR(-EINVAL);
-
-	return mpam_resctrl_alloc_domain(cpu_possible_mask, nid, ctrl_comp, res);
-}
-
-static struct mpam_resctrl_dom *
 mpam_resctrl_get_domain_from_cpu(int cpu, struct mpam_resctrl_res *res)
 {
 	struct mpam_resctrl_dom *dom;
@@ -2132,7 +2094,7 @@ int mpam_resctrl_online_cpu(unsigned int cpu)
 
 		dom = mpam_resctrl_get_domain_from_cpu(cpu, res);
 		if (!dom)
-			dom = mpam_resctrl_alloc_domain_cpu(cpu, res);
+			dom = mpam_resctrl_alloc_domain(cpumask_of(cpu), res);
 		if (IS_ERR(dom)) {
 			err = PTR_ERR(dom);
 			break;
