@@ -225,6 +225,15 @@ CONFIG_CXL_RAS                                  note<'New def_bool replacing PCI
 CONFIG_SFC_CXL                                  policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_SFC_CXL                                  note<'Solarflare SFC9100-family CXL Type-2 device support; not needed for NVIDIA platforms'>
 
+CONFIG_DEV_DAX                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX                                  note<'Override debian.master m->y; required built-in for DEV_DAX_CXL=y'>
+
+CONFIG_DEV_DAX_CXL                              policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_CXL                              note<'Override debian.master m->y; CXL RAM region DAX access; depends on CXL_BUS+CXL_REGION+DEV_DAX'>
+
+CONFIG_DEV_DAX_KMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m->y; map CXL DAX devices as System-RAM'>
+
 CONFIG_ACPI_APEI_EINJ                           policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_ACPI_APEI_EINJ                           note<'Required for CONFIG_ACPI_APEI_EINJ_CXL'>
 
