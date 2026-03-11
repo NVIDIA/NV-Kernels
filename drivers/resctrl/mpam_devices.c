@@ -1552,15 +1552,15 @@ int mpam_msmon_read(struct mpam_component *comp, struct mon_cfg *ctx,
 	if (!mpam_has_feature(type, cprops))
 		return -EOPNOTSUPP;
 
+	if (type == mpam_feat_msmon_mbwu)
+		type = mpam_msmon_choose_counter(class);
+
 	arg = (struct mon_read) {
 		.ctx = ctx,
 		.type = type,
 		.val = val,
 	};
 	*val = 0;
-
-	if (type == mpam_feat_msmon_mbwu)
-		type = mpam_msmon_choose_counter(class);
 
 	err = _msmon_read(comp, &arg);
 	if (err == -EBUSY && class->nrdy_usec)
