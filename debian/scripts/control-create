@@ -100,6 +100,33 @@ gen_per_flavour () {
 	sed "${sed_common_patterns[@]}" \
 	    -e "s/ARCH/${arch}/g" \
 	    "debian/control.d/flavour-buildinfo.stub"
+
+	while read -r package version extras
+	do
+		module="$package"
+		module_type=
+
+		# Module arch parameters are skipped here, so a package section will
+		# be generated for each flavour, and its Architecture will be set to
+		# all architectures with that flavour. Even that is being generated,
+		# it doesn't follow all of them will be built. That's to work-around
+		# dkms_exclude/dkms_include that manipulates supported architectures
+		# in $(DEBIAN)/rules.d/$(arch).mk.
+		for param in $extras; do
+			case "$param" in
+				modulename=*) module="${param#modulename=}" ;;
+				type=*) module_type="${param#type=}" ;;
+				*) continue ;;
+			esac
+		done
+
+		[ "$module_type" = "standalone" ] || continue
+
+		sed "${sed_common_patterns[@]}" \
+			-e "s/ARCH/${arch}/g" \
+			-e "s/MODULE/${module}/g" \
+			debian/control.d/flavour-module.stub
+	done < "${DEBIAN}/dkms-versions"
 }
 
 gen_common
