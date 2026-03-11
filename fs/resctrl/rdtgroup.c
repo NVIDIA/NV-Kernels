@@ -19,7 +19,6 @@
 #include <linux/iommu.h>
 #include <linux/sysfs.h>
 #include <linux/kernfs.h>
-#include <linux/memory_hotplug.h>
 #include <linux/resctrl.h>
 #include <linux/seq_buf.h>
 #include <linux/seq_file.h>
@@ -1156,7 +1155,6 @@ static int rdt_bit_usage_show(struct kernfs_open_file *of,
 	u32 ctrl_val;
 
 	cpus_read_lock();
-	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 	hw_shareable = r->cache.shareable_bits;
 	list_for_each_entry(dom, &r->ctrl_domains, hdr.list) {
@@ -1217,7 +1215,6 @@ static int rdt_bit_usage_show(struct kernfs_open_file *of,
 	}
 	seq_putc(seq, '\n');
 	mutex_unlock(&rdtgroup_mutex);
-	put_online_mems();
 	cpus_read_unlock();
 	return 0;
 }
@@ -1722,7 +1719,6 @@ static int mbm_config_show(struct seq_file *s, struct rdt_resource *r, u32 evtid
 	bool sep = false;
 
 	cpus_read_lock();
-	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 
 	list_for_each_entry(dom, &r->mon_domains, hdr.list) {
@@ -1741,7 +1737,6 @@ static int mbm_config_show(struct seq_file *s, struct rdt_resource *r, u32 evtid
 	seq_puts(s, "\n");
 
 	mutex_unlock(&rdtgroup_mutex);
-	put_online_mems();
 	cpus_read_unlock();
 
 	return 0;
@@ -1886,7 +1881,6 @@ static ssize_t mbm_total_bytes_config_write(struct kernfs_open_file *of,
 		return -EINVAL;
 
 	cpus_read_lock();
-	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 
 	rdt_last_cmd_clear();
@@ -1896,7 +1890,6 @@ static ssize_t mbm_total_bytes_config_write(struct kernfs_open_file *of,
 	ret = mon_config_write(r, buf, QOS_L3_MBM_TOTAL_EVENT_ID);
 
 	mutex_unlock(&rdtgroup_mutex);
-	put_online_mems();
 	cpus_read_unlock();
 
 	return ret ?: nbytes;
@@ -1914,7 +1907,6 @@ static ssize_t mbm_local_bytes_config_write(struct kernfs_open_file *of,
 		return -EINVAL;
 
 	cpus_read_lock();
-	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 
 	rdt_last_cmd_clear();
@@ -1924,7 +1916,6 @@ static ssize_t mbm_local_bytes_config_write(struct kernfs_open_file *of,
 	ret = mon_config_write(r, buf, QOS_L3_MBM_LOCAL_EVENT_ID);
 
 	mutex_unlock(&rdtgroup_mutex);
-	put_online_mems();
 	cpus_read_unlock();
 
 	return ret ?: nbytes;
@@ -2736,7 +2727,6 @@ struct rdtgroup *rdtgroup_kn_lock_live(struct kernfs_node *kn)
 	rdtgroup_kn_get(rdtgrp, kn);
 
 	cpus_read_lock();
-	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 
 	/* Was this group deleted while we waited? */
@@ -2754,7 +2744,6 @@ void rdtgroup_kn_unlock(struct kernfs_node *kn)
 		return;
 
 	mutex_unlock(&rdtgroup_mutex);
-	put_online_mems();
 	cpus_read_unlock();
 
 	rdtgroup_kn_put(rdtgrp, kn);
@@ -2973,7 +2962,6 @@ static int rdt_get_tree(struct fs_context *fc)
 		enable_abi_playground();
 
 	cpus_read_lock();
-	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 	/*
 	 * resctrl file system can only be mounted once.
@@ -3078,7 +3066,6 @@ out_root:
 out:
 	rdt_last_cmd_clear();
 	mutex_unlock(&rdtgroup_mutex);
-	put_online_mems();
 	cpus_read_unlock();
 	return ret;
 }
@@ -3363,7 +3350,6 @@ static void rdt_kill_sb(struct super_block *sb)
 	struct rdt_resource *r;
 
 	cpus_read_lock();
-	get_online_mems();
 	mutex_lock(&rdtgroup_mutex);
 
 	rdt_disable_ctx();
@@ -3380,7 +3366,6 @@ static void rdt_kill_sb(struct super_block *sb)
 	resctrl_mounted = false;
 	kernfs_kill_sb(sb);
 	mutex_unlock(&rdtgroup_mutex);
-	put_online_mems();
 	cpus_read_unlock();
 
 	if (static_branch_unlikely(&resctrl_abi_playground))
@@ -4771,14 +4756,12 @@ static bool resctrl_online_domains_exist(void)
 void resctrl_exit(void)
 {
 	cpus_read_lock();
-	get_online_mems();
 	WARN_ON_ONCE(resctrl_online_domains_exist());
 
 	mutex_lock(&rdtgroup_mutex);
 	resctrl_fs_teardown();
 	mutex_unlock(&rdtgroup_mutex);
 
-	put_online_mems();
 	cpus_read_unlock();
 
 	debugfs_remove_recursive(debugfs_resctrl);
