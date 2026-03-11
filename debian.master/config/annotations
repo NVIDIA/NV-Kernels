@@ -9984,7 +9984,7 @@ CONFIG_OABI_COMPAT                              policy<{'armhf': 'n'}>
 CONFIG_OA_TC6                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_OBJAGG                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_OBJTOOL                                  policy<{'amd64': 'y', 'ppc64el': '-'}>
-CONFIG_OBJTOOL_WERROR                           policy<{'amd64': 'y'}>
+CONFIG_OBJTOOL_WERROR                           policy<{'amd64': 'n'}>
 CONFIG_OCFS2_DEBUG_FS                           policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_OCFS2_DEBUG_MASKLOG                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_OCFS2_FS                                 policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
