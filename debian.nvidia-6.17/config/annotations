@@ -6,6 +6,15 @@
 
 include "../../debian.master/config/annotations"
 
+CONFIG_ACPI_APEI_EINJ                           policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ACPI_APEI_EINJ                           note<'Required for CONFIG_ACPI_APEI_EINJ_CXL'>
+
+CONFIG_ACPI_APEI_EINJ_CXL                       policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ACPI_APEI_EINJ_CXL                       note<'CXL protocol error injection support via APEI EINJ'>
+
+CONFIG_ARCH_HAS_CPU_CACHE_INVALIDATE_MEMREGION  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ARCH_HAS_CPU_CACHE_INVALIDATE_MEMREGION  note<'Override debian.master amd64-only; arm64 selects this via arch/arm64/Kconfig since 4d873c5dc3ed'>
+
 CONFIG_ARM64_CONTPTE                            policy<{'arm64': 'y'}>
 CONFIG_ARM64_CONTPTE                            note<'LP: #2059316'>
 
@@ -38,6 +47,9 @@ CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE note<'Required for Grace enable
 
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE note<'Required for Grace enablement'>
+
+CONFIG_CACHEMAINT_FOR_HOTPLUG                   policy<{'amd64': '-', 'arm64': 'n'}>
+CONFIG_CACHEMAINT_FOR_HOTPLUG                   note<'Optional HiSilicon HHA cache maintenance driver; depends on GENERIC_CPU_CACHE_MAINTENANCE; not needed for NVIDIA platforms'>
 
 CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '32', 'arm64-nvidia': '128', 'arm64-nvidia-64k': '1024'}>
 CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2095028'>
@@ -99,8 +111,23 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'LP: #2028576: Perf governo
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           note<'LP: #2028576: Perf governor required for NVIDIA workloads'>
 
+CONFIG_CXL_BUS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_BUS                                  note<'Enable CXL bus support built-in; required for CXL Type-2 device and RAS support'>
+
+CONFIG_CXL_MEM                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_MEM                                  note<'Auto-selected by CXL_PCI; required for CXL memory expansion and Type-2 device support'>
+
 CONFIG_CXL_MEM_RAW_COMMANDS                     policy<{'amd64': 'n', 'arm64': 'y'}>
 CONFIG_CXL_MEM_RAW_COMMANDS                     note<'Enable CXL raw commands for memory devices'>
+
+CONFIG_CXL_PCI                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_PCI                                  note<'Enable CXL PCI management built-in; auto-selects CXL_MEM; required for CXL Type-2 device support'>
+
+CONFIG_CXL_PORT                                 policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_PORT                                 note<'Required for CXL port enumeration; defaults to CXL_BUS value'>
+
+CONFIG_CXL_RAS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_RAS                                  note<'New def_bool replacing PCIEAER_CXL; auto-enabled with ACPI_APEI_GHES+PCIEAER+CXL_BUS; CXL RAS error handling support'>
 
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
@@ -122,6 +149,12 @@ CONFIG_EFI_SECRET                               note<'Required for confidential 
 
 CONFIG_ETM4X_IMPDEF_FEATURE                     policy<{'arm64': 'n'}>
 CONFIG_ETM4X_IMPDEF_FEATURE                     note<'Required for Grace enablement'>
+
+CONFIG_FWCTL                                    policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_FWCTL                                    note<'Selected by CXL_BUS when CXL_FEATURES is enabled; required for CXL feature mailbox access'>
+
+CONFIG_GENERIC_CPU_CACHE_MAINTENANCE            policy<{'amd64': '-', 'arm64': 'y'}>
+CONFIG_GENERIC_CPU_CACHE_MAINTENANCE            note<'Selected by arm64 via arch/arm64/Kconfig since 4d873c5dc3ed; not selected by x86'>
 
 CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
 CONFIG_GPIO_AAEON                               note<'Disable all Ubuntu ODM drivers'>
@@ -171,6 +204,9 @@ CONFIG_NOUVEAU_PLATFORM_DRIVER                  note<'Disable nouveau for NVIDIA
 CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
 CONFIG_NR_CPUS                                  note<'LP: #1864198'>
 
+CONFIG_PCIEAER_CXL                              policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_PCIEAER_CXL                              note<'Removed by commit d18f1b7beadf (PCI/AER: Replace PCIEAER_CXL symbol with CXL_RAS)'>
+
 CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
 
@@ -188,6 +224,9 @@ CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablem
 
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM drivers'>
+
+CONFIG_SFC_CXL                                  policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_SFC_CXL                                  note<'Solarflare SFC9100-family CXL Type-2 device support; not needed for NVIDIA platforms'>
 
 CONFIG_SND_HDA_ACPI                             policy<{'amd64': 'n', 'arm64': 'm'}>
 CONFIG_SND_HDA_ACPI                             note<'Add support for ACPI-enumerated HDA'>
