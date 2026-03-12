@@ -100,6 +100,10 @@ bool resctrl_arch_mon_capable(void)
 	return exposed_mon_capable;
 }
 
+/*
+ * Provide empty implementations for compilation. The feature are not
+ * needed on MPAM platforms.
+ */
 bool resctrl_arch_is_evt_configurable(enum resctrl_event_id evt)
 {
 	return false;
@@ -114,6 +118,10 @@ void resctrl_arch_mon_event_config_write(void *info)
 }
 
 void resctrl_arch_reset_rmid_all(struct rdt_resource *r, struct rdt_l3_mon_domain *d)
+{
+}
+
+void resctrl_arch_pre_mount(void)
 {
 }
 
@@ -535,9 +543,9 @@ static int read_mon_cdp_safe(struct mpam_resctrl_mon *mon, struct mpam_component
 }
 
 /* MBWU when not in ABMC mode, and CSU counters. */
-int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
+int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_domain_hdr *hdr,
 			   u32 closid, u32 rmid, enum resctrl_event_id eventid,
-			   u64 *val, void *arch_mon_ctx)
+			   void *arch_priv, u64 *val, void *arch_mon_ctx)
 {
 	struct mpam_resctrl_dom *l3_dom;
 	struct mpam_component *mon_comp;
@@ -553,7 +561,7 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
 	if (eventid >= QOS_NUM_EVENTS || !mon->class)
 		return -EINVAL;
 
-	l3_dom = container_of(d, struct mpam_resctrl_dom, resctrl_mon_dom);
+	l3_dom = container_of(hdr, struct mpam_resctrl_dom, resctrl_mon_dom.hdr);
 	mon_comp = l3_dom->mon_comp[eventid];
 
 	switch (eventid) {
@@ -573,7 +581,7 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_mon_domain *d,
 }
 
 /* MBWU counters when in ABMC mode */
-int resctrl_arch_cntr_read(struct rdt_resource *r, struct rdt_mon_domain *d,
+int resctrl_arch_cntr_read(struct rdt_resource *r, struct rdt_l3_mon_domain *d,
 			   u32 closid, u32 rmid, int mon_idx,
 			   enum resctrl_event_id eventid, u64 *val)
 {
@@ -629,7 +637,7 @@ static void reset_mon_cdp_safe(struct mpam_resctrl_mon *mon, struct mpam_compone
 }
 
 /* Called via IPI. Call with read_cpus_lock() held. */
-void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_mon_domain *d,
+void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_l3_mon_domain *d,
 			     u32 closid, u32 rmid, enum resctrl_event_id eventid)
 {
 	struct mpam_resctrl_dom *l3_dom;
@@ -650,7 +658,7 @@ void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_mon_domain *d,
 }
 
 /* Reset an assigned counter */
-void resctrl_arch_reset_cntr(struct rdt_resource *r, struct rdt_mon_domain *d,
+void resctrl_arch_reset_cntr(struct rdt_resource *r, struct rdt_l3_mon_domain *d,
 			     u32 closid, u32 rmid, int cntr_id,
 			     enum resctrl_event_id eventid)
 {
@@ -1278,7 +1286,7 @@ static void __config_cntr(struct mpam_resctrl_mon *mon, u32 cntr_id,
 		mon->mbwu_idx_to_mon[mbwu_idx] = -1;
 }
 
-void resctrl_arch_config_cntr(struct rdt_resource *r, struct rdt_mon_domain *d,
+void resctrl_arch_config_cntr(struct rdt_resource *r, struct rdt_l3_mon_domain *d,
 			      enum resctrl_event_id evtid, u32 rmid, u32 closid,
 			      u32 cntr_id, bool assign)
 {
@@ -1453,6 +1461,9 @@ static void mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 {
 	struct mpam_resctrl_res *res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
 	struct rdt_resource *l3 = &res->resctrl_res;
+	struct rdt_resource *r;
+
+	r = &res->resctrl_res;
 
 	lockdep_assert_cpus_held();
 
@@ -1478,7 +1489,8 @@ static void mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 		l3->name = "L3";
 		l3->mon_scope = RESCTRL_L3_CACHE;
 
-		resctrl_enable_mon_event(type);
+		if (resctrl_enable_mon_event(type, false, 0, NULL))
+			r->mon_capable = true;
 
 		/*
 		 * Unfortunately, num_rmid doesn't mean anything for
@@ -1772,7 +1784,7 @@ mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 {
 	int err, idx;
 	struct mpam_resctrl_dom *dom;
-	struct rdt_mon_domain *mon_d;
+	struct rdt_l3_mon_domain *mon_d;
 	struct rdt_ctrl_domain *ctrl_d;
 	struct mpam_class *class = res->class;
 	struct mpam_component *comp_iter, *ctrl_comp;
@@ -1844,7 +1856,7 @@ mpam_resctrl_alloc_domain(unsigned int cpu, struct mpam_resctrl_res *res)
 		mpam_resctrl_domain_hdr_init(cpu, any_mon_comp, &mon_d->hdr);
 		mon_d->hdr.type = RESCTRL_MON_DOMAIN;
 		mpam_resctrl_domain_insert(&r->mon_domains, &mon_d->hdr);
-		err = resctrl_online_mon_domain(r, mon_d);
+		err = resctrl_online_mon_domain(r, &mon_d->hdr);
 		if (err) {
 			dom = ERR_PTR(err);
 			goto offline_mon_hdr;
@@ -1872,7 +1884,7 @@ out:
 static struct mpam_resctrl_dom *mpam_resctrl_get_mon_domain_from_cpu(int cpu)
 {
 	u32 cache_id;
-	struct rdt_mon_domain *mon_d;
+	struct rdt_l3_mon_domain *mon_d;
 	struct mpam_resctrl_dom *dom;
 	struct mpam_resctrl_res *l3 = &mpam_resctrl_controls[RDT_RESOURCE_L3];
 
@@ -1965,7 +1977,7 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 	int i;
 	struct mpam_resctrl_res *res;
 	struct mpam_resctrl_dom *dom;
-	struct rdt_mon_domain *mon_d;
+	struct rdt_l3_mon_domain *mon_d;
 	struct rdt_ctrl_domain *ctrl_d;
 	bool ctrl_dom_empty, mon_dom_empty;
 
@@ -1996,7 +2008,7 @@ int mpam_resctrl_offline_cpu(unsigned int cpu)
 			mon_d = &dom->resctrl_mon_dom;
 			mon_dom_empty = mpam_resctrl_offline_domain_hdr(cpu, &mon_d->hdr);
 			if (mon_dom_empty)
-				resctrl_offline_mon_domain(&res->resctrl_res, mon_d);
+				resctrl_offline_mon_domain(&res->resctrl_res, &mon_d->hdr);
 		}
 
 		if (ctrl_dom_empty && mon_dom_empty)
