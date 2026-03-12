@@ -454,6 +454,7 @@ KBUILD_USERLDFLAGS := $(USERLDFLAGS)
 # host programs.
 export rust_common_flags := --edition=2021 \
 			    -Zbinary_dep_depinfo=y \
+			    -Aunused_features \
 			    -Dunsafe_op_in_unsafe_fn -Drust_2018_idioms \
 			    -Dunreachable_pub -Dnon_ascii_idents \
 			    -Wmissing_docs \
