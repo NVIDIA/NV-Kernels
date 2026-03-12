@@ -1227,6 +1227,7 @@ struct intel_crtc_state {
 	u32 dc3co_exitline;
 	u16 su_y_granularity;
 	struct drm_dp_vsc_sdp psr_vsc;
+	u8 entry_setup_frames;
 
 	/*
 	 * Frequence the dpll for the port should run at. Differs from the
