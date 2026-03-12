@@ -449,7 +449,7 @@ struct mpam_resctrl_dom {
 	struct mpam_component   *mon_comp[QOS_NUM_EVENTS];
 
 	struct rdt_ctrl_domain	resctrl_ctrl_dom;
-	struct rdt_mon_domain	resctrl_mon_dom;
+	struct rdt_l3_mon_domain	resctrl_mon_dom;
 };
 
 struct mpam_resctrl_res {
