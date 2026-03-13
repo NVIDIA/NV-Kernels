@@ -225,10 +225,8 @@ static const struct pci_device_id rtl8169_pci_tbl[] = {
 	{ 0x0001, 0x8168, PCI_ANY_ID, 0x2410 },
 	{ PCI_VDEVICE(REALTEK,	0x8125) },
 	{ PCI_VDEVICE(REALTEK,	0x8126) },
-	{ PCI_VDEVICE(REALTEK,	0x8127) },
 	{ PCI_VDEVICE(REALTEK,	0x3000) },
 	{ PCI_VDEVICE(REALTEK,	0x5000) },
-	{ PCI_VDEVICE(REALTEK,	0x0e10) },
 	{}
 };
 
