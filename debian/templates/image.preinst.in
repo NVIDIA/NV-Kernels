@@ -10,8 +10,8 @@ fi
 
 if [ "$1" = install ]; then
     # Create a flag file for postinst
-    mkdir -p /lib/modules/$version
-    touch /lib/modules/$version/.fresh-install
+    mkdir -p /usr/lib/modules/$version
+    touch /usr/lib/modules/$version/.fresh-install
 fi
 
 if [ -d /etc/kernel/preinst.d ]; then

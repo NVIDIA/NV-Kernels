@@ -42,13 +42,13 @@ fi
 
 depmod $version
 
-if [ -f /lib/modules/$version/.fresh-install ]; then
+if [ -f /usr/lib/modules/$version/.fresh-install ]; then
     change=install
 else
     change=upgrade
 fi
 linux-update-symlinks $change $version $image_path
-rm -f /lib/modules/$version/.fresh-install
+rm -f /usr/lib/modules/$version/.fresh-install
 
 if [ -d /etc/kernel/postinst.d ]; then
     mkdir -p /usr/lib/linux/triggers
