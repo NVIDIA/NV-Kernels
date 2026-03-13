@@ -263,10 +263,6 @@ struct mpam_config {
 	u32	mbw_pbm;
 	u16	mbw_max;
 
-	bool	reset_cpbm;
-	bool	reset_mbw_pbm;
-	bool	reset_mbw_max;
-
 	struct mpam_garbage	garbage;
 };
 
