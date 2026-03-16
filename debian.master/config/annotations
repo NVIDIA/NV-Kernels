@@ -6618,6 +6618,7 @@ CONFIG_I2C_XILINX                               policy<{'amd64': 'm', 'arm64': '
 CONFIG_I2C_XLP9XX                               policy<{'arm64': 'm'}>
 CONFIG_I2C_ZHAOXIN                              policy<{'amd64': 'm', 'arm64': 'm', 'riscv64': 'm'}>
 CONFIG_I3C                                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
+CONFIG_I3C_OR_I2C                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_I40E                                     policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_I40EVF                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_I40E_DCB                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
