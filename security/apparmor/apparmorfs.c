@@ -177,14 +177,6 @@ static struct aa_proxy *get_proxy_common_ref(struct aa_common_ref *ref)
 	return NULL;
 }
 
-static struct aa_loaddata *get_loaddata_common_ref(struct aa_common_ref *ref)
-{
-	if (ref)
-		return aa_get_i_loaddata(container_of(ref, struct aa_loaddata,
-						      count));
-	return NULL;
-}
-
 static void aa_put_common_ref(struct aa_common_ref *ref)
 {
 	if (!ref)
@@ -1793,6 +1785,14 @@ static const struct file_operations seq_rawdata_ ##NAME ##_fops = {	      \
 	.llseek		= seq_lseek,					      \
 	.release	= seq_rawdata_release,				      \
 }									      \
+
+static struct aa_loaddata *get_loaddata_common_ref(struct aa_common_ref *ref)
+{
+	if (ref)
+		return aa_get_i_loaddata(container_of(ref, struct aa_loaddata,
+						      count));
+	return NULL;
+}
 
 static int seq_rawdata_open(struct inode *inode, struct file *file,
 			    int (*show)(struct seq_file *, void *))
