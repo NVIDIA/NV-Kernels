@@ -49,7 +49,14 @@ static void arm_smmu_update_ctx_desc_devices(struct arm_smmu_domain *smmu_domain
 
 	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
 	list_for_each_entry(master, &smmu_domain->devices, domain_head) {
-		arm_smmu_write_ctx_desc(master, ssid, cd);
+		/*
+		 * Devices in the same iommu group may not all support PASIDs
+		 * (e.g. PCIe bridges or NICs sharing a group with a GPU).
+		 * Skip PASID CD writes for non-PASID-capable devices, but
+		 * always allow SSID 0 (IOMMU_NO_PASID) updates through.
+		 */
+		if (ssid == IOMMU_NO_PASID || master->dev->iommu->max_pasids > 0)
+			arm_smmu_write_ctx_desc(master, ssid, cd);
 	}
 	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
 }
