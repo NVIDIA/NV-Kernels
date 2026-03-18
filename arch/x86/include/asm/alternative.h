@@ -152,7 +152,7 @@ static inline u8 *its_static_thunk(int reg)
 }
 #endif
 
-#if defined(CONFIG_RETHUNK) && defined(CONFIG_OBJTOOL)
+#if defined(CONFIG_MITIGATION_RETHUNK) && defined(CONFIG_OBJTOOL)
 extern bool cpu_wants_rethunk(void);
 extern bool cpu_wants_rethunk_at(void *addr);
 #else

@@ -2462,7 +2462,7 @@ config FINEIBT
 
 config HAVE_CALL_THUNKS
 	def_bool y
-	depends on CC_HAS_ENTRY_PADDING && RETHUNK && OBJTOOL
+	depends on CC_HAS_ENTRY_PADDING && MITIGATION_RETHUNK && OBJTOOL
 
 config CALL_THUNKS
 	def_bool n
@@ -2509,7 +2509,7 @@ config MITIGATION_RETPOLINE
 	  branches. Requires a compiler with -mindirect-branch=thunk-extern
 	  support for full protection. The kernel may run slower.
 
-config RETHUNK
+config MITIGATION_RETHUNK
 	bool "Enable return-thunks"
 	depends on MITIGATION_RETPOLINE && CC_HAS_RETURN_THUNK
 	select OBJTOOL if HAVE_OBJTOOL
@@ -2522,7 +2522,7 @@ config RETHUNK
 
 config CPU_UNRET_ENTRY
 	bool "Enable UNRET on kernel entry"
-	depends on CPU_SUP_AMD && RETHUNK && X86_64
+	depends on CPU_SUP_AMD && MITIGATION_RETHUNK && X86_64
 	default y
 	help
 	  Compile the kernel with support for the retbleed=unret mitigation.
@@ -2577,7 +2577,7 @@ config CPU_IBRS_ENTRY
 
 config CPU_SRSO
 	bool "Mitigate speculative RAS overflow on AMD"
-	depends on CPU_SUP_AMD && X86_64 && RETHUNK
+	depends on CPU_SUP_AMD && X86_64 && MITIGATION_RETHUNK
 	default y
 	help
 	  Enable the SRSO mitigation needed on AMD Zen1-4 machines.
@@ -2635,7 +2635,7 @@ config MITIGATION_SPECTRE_BHI
 config MITIGATION_ITS
 	bool "Enable Indirect Target Selection mitigation"
 	depends on CPU_SUP_INTEL && X86_64
-	depends on MITIGATION_RETPOLINE && RETHUNK
+	depends on MITIGATION_RETPOLINE && MITIGATION_RETHUNK
 	default y
 	help
 	  Enable Indirect Target Selection (ITS) mitigation. ITS is a bug in
