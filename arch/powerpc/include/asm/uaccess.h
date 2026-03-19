@@ -15,9 +15,6 @@
 #define TASK_SIZE_MAX		TASK_SIZE_USER64
 #endif
 
-/* Threshold above which VMX copy path is used */
-#define VMX_COPY_THRESHOLD 3328
-
 #include <asm-generic/access_ok.h>
 
 /*
@@ -329,62 +326,40 @@ do {								\
 extern unsigned long __copy_tofrom_user(void __user *to,
 		const void __user *from, unsigned long size);
 
-unsigned long __copy_tofrom_user_base(void __user *to,
-				      const void __user *from, unsigned long size);
-
-unsigned long __copy_tofrom_user_power7_vmx(void __user *to,
-					    const void __user *from, unsigned long size);
-
-static __always_inline bool will_use_vmx(unsigned long n)
-{
-	return IS_ENABLED(CONFIG_ALTIVEC) && cpu_has_feature(CPU_FTR_VMX_COPY) &&
-	       n > VMX_COPY_THRESHOLD;
-}
-
-static __always_inline unsigned long
-raw_copy_tofrom_user(void __user *to, const void __user *from,
-		     unsigned long n, unsigned long dir)
-{
-	unsigned long ret;
-
-	if (will_use_vmx(n) && enter_vmx_usercopy()) {
-		allow_user_access(to, dir);
-		ret = __copy_tofrom_user_power7_vmx(to, from, n);
-		prevent_user_access(dir);
-		exit_vmx_usercopy();
-
-		if (unlikely(ret)) {
-			allow_user_access(to, dir);
-			ret = __copy_tofrom_user_base(to, from, n);
-			prevent_user_access(dir);
-		}
-		return ret;
-	}
-
-	allow_user_access(to, dir);
-	ret = __copy_tofrom_user(to, from, n);
-	prevent_user_access(dir);
-	return ret;
-}
-
-#ifdef CONFIG_PPC64
+#ifdef __powerpc64__
 static inline unsigned long
 raw_copy_in_user(void __user *to, const void __user *from, unsigned long n)
 {
-	barrier_nospec();
-	return raw_copy_tofrom_user(to, from, n, KUAP_READ_WRITE);
-}
-#endif /* CONFIG_PPC64 */
+	unsigned long ret;
 
-static inline unsigned long raw_copy_from_user(void *to, const void __user *from, unsigned long n)
+	barrier_nospec();
+	allow_user_access(to, KUAP_READ_WRITE);
+	ret = __copy_tofrom_user(to, from, n);
+	prevent_user_access(KUAP_READ_WRITE);
+	return ret;
+}
+#endif /* __powerpc64__ */
+
+static inline unsigned long raw_copy_from_user(void *to,
+		const void __user *from, unsigned long n)
 {
-	return raw_copy_tofrom_user((__force void __user *)to, from, n, KUAP_READ);
+	unsigned long ret;
+
+	allow_user_access(NULL, KUAP_READ);
+	ret = __copy_tofrom_user((__force void __user *)to, from, n);
+	prevent_user_access(KUAP_READ);
+	return ret;
 }
 
 static inline unsigned long
 raw_copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	return raw_copy_tofrom_user(to, (__force const void __user *)from, n, KUAP_WRITE);
+	unsigned long ret;
+
+	allow_user_access(to, KUAP_WRITE);
+	ret = __copy_tofrom_user(to, (__force const void __user *)from, n);
+	prevent_user_access(KUAP_WRITE);
+	return ret;
 }
 
 unsigned long __arch_clear_user(void __user *addr, unsigned long size);

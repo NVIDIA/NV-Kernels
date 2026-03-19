@@ -562,4 +562,3 @@ exc;	std	r10,32(3)
 	li	r5,4096
 	b	.Ldst_aligned
 EXPORT_SYMBOL(__copy_tofrom_user)
-EXPORT_SYMBOL(__copy_tofrom_user_base)
