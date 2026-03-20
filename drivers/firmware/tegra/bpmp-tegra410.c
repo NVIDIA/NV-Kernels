@@ -282,8 +282,8 @@ static int bpmp_sysfs_export(struct tegra_bpmp *bpmp)
 	if (!ACPI_HANDLE(bpmp->dev))
 		return -EFAULT;
 
-	parent = device_create(&bpmp_class, NULL, MKDEV(0, 0), bpmp,
-			       "mbwt_control");
+	parent = device_create(&bpmp_class, bpmp->dev, MKDEV(0, 0), bpmp,
+			       "mbwt_control_%s", dev_name(bpmp->dev));
 	if (IS_ERR(parent)) {
 		dev_warn(bpmp->dev,
 			 "failed creating device for bpmp sysfs export\n");
