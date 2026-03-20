@@ -18248,14 +18248,18 @@ static int do_check(struct bpf_verifier_env *env)
 				}
 process_bpf_exit_full:
 				if (env->cur_state->active_lock.ptr &&
-				    !in_rbtree_lock_required_cb(env)) {
-					verbose(env, "bpf_spin_unlock is missing\n");
+				    (exception_exit || !in_rbtree_lock_required_cb(env))) {
+					verbose(env, exception_exit ?
+						"bpf_throw cannot be used inside bpf_spin_lock-ed region\n" :
+						"bpf_spin_unlock is missing\n");
 					return -EINVAL;
 				}
 
 				if (env->cur_state->active_rcu_lock &&
-				    !in_rbtree_lock_required_cb(env)) {
-					verbose(env, "bpf_rcu_read_unlock is missing\n");
+				    (exception_exit || !in_rbtree_lock_required_cb(env))) {
+					verbose(env, exception_exit ?
+						"bpf_throw cannot be used inside bpf_rcu_read_lock-ed region\n" :
+						"bpf_rcu_read_unlock is missing\n");
 					return -EINVAL;
 				}
 
