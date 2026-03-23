@@ -4152,6 +4152,7 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 						ATA_HORKAGE_FIRMWARE_WARN },
 
 	/* Seagate disks with LPM issues */
+	{ "ST1000DM010-2EP102",	NULL,		ATA_HORKAGE_NOLPM },
 	{ "ST2000DM008-2FR102",	NULL,		ATA_HORKAGE_NOLPM },
 
 	/* drives which fail FPDMA_AA activation (some may freeze afterwards)
