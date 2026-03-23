@@ -249,6 +249,8 @@ CONFIG_GENERIC_CPU_CACHE_MAINTENANCE            note<'Selected by arm64 via arch
 CONFIG_CACHEMAINT_FOR_HOTPLUG                   policy<{'amd64': '-', 'arm64': 'n'}>
 CONFIG_CACHEMAINT_FOR_HOTPLUG                   note<'Optional HiSilicon HHA cache maintenance driver; depends on GENERIC_CPU_CACHE_MAINTENANCE; not needed for NVIDIA platforms'>
 
+CONFIG_PCI_CXL                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_PCI_CXL                                  note<'Hidden bool; auto-enabled by CXL_BUS; PCI core CXL DVSEC and HDM state save/restore support'>
 
 # ---- Annotations without notes ----
 
