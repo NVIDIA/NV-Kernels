@@ -684,7 +684,7 @@ static inline void vcpu_set_hcrx(struct kvm_vcpu *vcpu)
 static inline bool kvm_is_realm(struct kvm *kvm)
 {
 	if (static_branch_unlikely(&kvm_rmi_is_available))
-		return kvm->arch.is_realm;
+		return kvm && kvm->arch.is_realm;
 	return false;
 }
 
