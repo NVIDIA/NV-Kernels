@@ -515,10 +515,12 @@ int vfio_pci_core_enable(struct vfio_pci_core_device *vdev)
 	if (ret)
 		goto out_power;
 
+#if 0
 	/* If reset fails because of the device lock, fail this path entirely */
 	ret = pci_try_reset_function(pdev);
 	if (ret == -EAGAIN)
 		goto out_disable_device;
+#endif
 
 	vdev->reset_works = !ret;
 	pci_save_state(pdev);
@@ -1235,11 +1237,12 @@ static int vfio_pci_ioctl_set_irqs(struct vfio_pci_core_device *vdev,
 static int vfio_pci_ioctl_reset(struct vfio_pci_core_device *vdev,
 				void __user *arg)
 {
-	int ret;
+	int ret = 0;
 
 	if (!vdev->reset_works)
 		return -EINVAL;
 
+#if 0
 	vfio_pci_zap_and_down_write_memory_lock(vdev);
 
 	/*
@@ -1258,6 +1261,7 @@ static int vfio_pci_ioctl_reset(struct vfio_pci_core_device *vdev,
 	if (__vfio_pci_memory_enabled(vdev))
 		vfio_pci_dma_buf_move(vdev, false);
 	up_write(&vdev->memory_lock);
+#endif
 
 	return ret;
 }
