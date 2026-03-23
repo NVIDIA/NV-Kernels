@@ -20,6 +20,7 @@
 #include <linux/nmi.h>
 #include <linux/ktime.h>
 #include <linux/delay.h>
+#include <linux/preempt.h>
 #include <linux/acpi.h>
 #include <linux/platform_device.h>
 
@@ -43,13 +44,16 @@
 #define LFA_PRIME_CALL_AGAIN		BIT(0)
 #define LFA_ACTIVATE_CALL_AGAIN		BIT(0)
 
-/* Prime loop limits, TODO: tune after testing */
-#define LFA_PRIME_BUDGET_US		30000000	/* 30s cap */
-#define LFA_PRIME_POLL_DELAY_US		10		/* 10us between polls */
-
-/* Activation loop limits, TODO: tune after testing */
-#define LFA_ACTIVATE_BUDGET_US		20000000	/* 20s cap */
-#define LFA_ACTIVATE_POLL_DELAY_US	10		/* 10us between polls */
+/*
+ * SMC retry timeouts and pacing.
+ *
+ * Budget: max wall time for PRIME call_again and for ACTIVATE (call_again + LFA_BUSY).
+ * PRIME call_again: usleep_range(min, max). ACTIVATE LFA_BUSY: udelay(min) in all
+ * contexts (including stop_machine with IRQs off). ACTIVATE call_again: cpu_relax().
+ */
+#define LFA_SMC_BUDGET_US		20000000	/* 20s */
+#define LFA_SMC_RETRY_SLEEP_MIN_US	100
+#define LFA_SMC_RETRY_SLEEP_MAX_US	200
 
 /* LFA return values */
 #define LFA_SUCCESS			0
@@ -111,6 +115,7 @@ struct image_props {
 	struct kobject *image_dir;
 	struct kobj_attribute image_attrs[LFA_ATTR_NR_IMAGES];
 };
+
 static LIST_HEAD(lfa_fw_images);
 
 /* A UUID split over two 64-bit registers */
@@ -233,7 +238,7 @@ static int call_lfa_activate(void *data)
 	struct image_props *attrs = data;
 	struct arm_smccc_1_2_regs args = { 0 };
 	struct arm_smccc_1_2_regs res = { 0 };
-	ktime_t end = ktime_add_us(ktime_get(), LFA_ACTIVATE_BUDGET_US);
+	ktime_t end = ktime_add_us(ktime_get(), LFA_SMC_BUDGET_US);
 
 	args.a0 = LFA_1_0_FN_ACTIVATE;
 	args.a1 = attrs->fw_seq_id; /* fw_seq_id under consideration */
@@ -252,6 +257,22 @@ static int call_lfa_activate(void *data)
 		arm_smccc_1_2_invoke(&args, &res);
 
 		if ((long)res.a0 < 0) {
+			/*
+			 * DEN0147 §2.6: LFA_BUSY means live activation was
+			 * postponed and must be attempted again later; prime
+			 * status is unchanged. Inter-attempt delay is
+			 * IMPLEMENTATION DEFINED — udelay works here even under
+			 * stop_machine (usleep_range would not).
+			 */
+			if ((long)res.a0 == -LFA_BUSY) {
+				if (ktime_before(ktime_get(), end)) {
+					udelay(LFA_SMC_RETRY_SLEEP_MIN_US);
+					continue;
+				}
+				pr_err("ACTIVATE for image %s timed out while LFA_BUSY\n",
+				       attrs->image_name);
+				return -ETIMEDOUT;
+			}
 			pr_err("ACTIVATE for image %s failed: %s\n",
 				attrs->image_name, lfa_error_strings[-res.a0]);
 			return res.a0;
@@ -259,9 +280,9 @@ static int call_lfa_activate(void *data)
 		if (!(res.a1 & LFA_ACTIVATE_CALL_AGAIN))
 			break; /* ACTIVATE successful */
 
-		/* SMC returned with call_again flag set */
+		/* SMC returned with call_again flag set — re-enter ACTIVATE soon */
 		if (ktime_before(ktime_get(), end)) {
-			udelay(LFA_ACTIVATE_POLL_DELAY_US);
+			cpu_relax();
 			continue;
 		}
 
@@ -297,7 +318,7 @@ static int prime_fw_image(struct image_props *attrs)
 {
 	struct arm_smccc_1_2_regs args = { 0 };
 	struct arm_smccc_1_2_regs res = { 0 };
-	ktime_t end = ktime_add_us(ktime_get(), LFA_PRIME_BUDGET_US);
+	ktime_t end = ktime_add_us(ktime_get(), LFA_SMC_BUDGET_US);
 	int ret;
 
 	mutex_lock(&lfa_lock);
@@ -330,6 +351,19 @@ static int prime_fw_image(struct image_props *attrs)
 		arm_smccc_1_2_invoke(&args, &res);
 
 		if ((long)res.a0 < 0) {
+			if ((long)res.a0 == -LFA_BUSY) {
+				/*
+				 * DEN0147 §2.5: LFA_BUSY means LFA_PRIME is executing
+				 * concurrently on another CPU. This driver does not
+				 * issue PRIME for multiple components in parallel and
+				 * does not expect concurrent PRIME from elsewhere.
+				 */
+				pr_warn("LFA_PRIME returned LFA_BUSY for image %s (another CPU may be in LFA_PRIME; unexpected for this driver)\n",
+					attrs->image_name);
+				mutex_unlock(&lfa_lock);
+
+				return res.a0;
+			}
 			pr_err("LFA_PRIME for image %s failed: %s\n",
 				attrs->image_name, lfa_error_strings[-res.a0]);
 			mutex_unlock(&lfa_lock);
@@ -341,7 +375,8 @@ static int prime_fw_image(struct image_props *attrs)
 
 		/* SMC returned with call_again flag set */
 		if (ktime_before(ktime_get(), end)) {
-			udelay(LFA_PRIME_POLL_DELAY_US);
+			usleep_range(LFA_SMC_RETRY_SLEEP_MIN_US,
+				     LFA_SMC_RETRY_SLEEP_MAX_US);
 			continue;
 		}
 
@@ -355,7 +390,7 @@ static int prime_fw_image(struct image_props *attrs)
 	}
 
 	mutex_unlock(&lfa_lock);
-	return ret;
+	return 0;
 }
 
 static ssize_t name_show(struct kobject *kobj, struct kobj_attribute *attr,
