@@ -10500,6 +10500,7 @@ CONFIG_PHY_QCOM_IPQ806X_SATA                    policy<{'arm64': 'm', 'armhf': '
 CONFIG_PHY_QCOM_IPQ806X_USB                     policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_PHY_QCOM_M31_EUSB                        policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_PHY_QCOM_M31_USB                         policy<{'arm64': 'm', 'armhf': 'm'}>
+CONFIG_PHY_QCOM_MIPI_CSI2                       policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_PHY_QCOM_PCIE2                           policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_PHY_QCOM_QMP                             policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_PHY_QCOM_QMP_COMBO                       policy<{'arm64': 'm', 'armhf': 'm'}>
