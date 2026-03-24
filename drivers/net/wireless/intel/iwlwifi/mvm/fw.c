@@ -492,7 +492,8 @@ static void iwl_mvm_uats_init(struct iwl_mvm *mvm)
 	};
 
 	if (!(mvm->trans->trans_cfg->device_family >=
-	      IWL_DEVICE_FAMILY_AX210)) {
+	      IWL_DEVICE_FAMILY_AX210) ||
+	    !mvm->trans->cfg->uhb_supported) {
 		IWL_DEBUG_RADIO(mvm, "UATS feature is not supported\n");
 		return;
 	}
