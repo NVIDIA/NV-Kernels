@@ -25,7 +25,7 @@
 
 
 static inline aa_state_t RULE_MEDIATES_SK(struct aa_ruleset *rules,
-					  struct sock *sk)
+					  const struct sock *sk)
 {
 	return RULE_MEDIATES_NET(rules);
 }
@@ -162,7 +162,8 @@ static int map_sock_addr(struct socket *sock, enum addr_type addrtype,
 
 /* TODO: combine with connect map addr */
 /* TODO: raw_port */
-static int bind_map_addr(struct sock *sk, struct sockaddr *addr, int addrlen,
+static int bind_map_addr(const struct sock *sk, struct sockaddr *addr,
+			 int addrlen,
 			 struct match_addr *maddr,
 			 struct apparmor_audit_data *ad)
 {
@@ -321,7 +322,7 @@ static aa_state_t match_addr_label(struct aa_policydb *policy, aa_state_t state,
 
 
 static aa_state_t match_to_sk(struct aa_policydb *policy, aa_state_t state,
-			      u32 request, struct sock *sk,
+			      u32 request, const struct sock *sk,
 			      struct match_addr *maddr,
 			      struct aa_perms **p, const char **info)
 {
@@ -341,7 +342,7 @@ enum cmd_type {
 
 static inline aa_state_t match_to_cmd(struct aa_policydb *policy,
 				      aa_state_t state, u32 request,
-				      struct sock *sk, enum cmd_type cmd,
+				      const struct sock *sk, enum cmd_type cmd,
 				      struct match_addr *maddr,
 				      struct aa_perms **p, const char **info)
 {
@@ -381,8 +382,9 @@ static int match_label(struct aa_profile *profile, struct aa_profile *peer,
 
 
 static inline int profile_sk_perm(struct aa_profile *profile, u32 request,
-				    struct sock *sk, struct match_addr *maddr,
-				    struct apparmor_audit_data *ad)
+				  const struct sock *sk,
+				  struct match_addr *maddr,
+				  struct apparmor_audit_data *ad)
 {
 	struct aa_ruleset *rules = profile->label.rules[0];
 	struct aa_perms *p = NULL;
@@ -425,7 +427,8 @@ static int profile_create_perm(struct aa_profile *profile, int family,
 
 
 /* sendmsg/rcvmsg/connect */
-static int profile_remote_perm(struct aa_profile *profile, struct sock *sk,
+static int profile_remote_perm(struct aa_profile *profile,
+			       const struct sock *sk,
 			       u32 request, struct match_addr *raddr,
 			       struct match_addr *laddr,
 			       struct apparmor_audit_data *ad)
@@ -455,7 +458,8 @@ static int profile_remote_perm(struct aa_profile *profile, struct sock *sk,
 	return do_perms(profile, state, request, p, ad);
 }
 
-static int profile_bind_perm(struct aa_profile *profile, struct sock *sk,
+static int profile_bind_perm(struct aa_profile *profile,
+			     const struct sock *sk,
 			     struct match_addr *maddr,
 			     struct apparmor_audit_data *ad)
 {
@@ -490,7 +494,8 @@ static int profile_bind_perm(struct aa_profile *profile, struct sock *sk,
 	return do_perms(profile, state, AA_MAY_BIND, p, ad);
 }
 
-static int profile_listen_perm(struct aa_profile *profile, struct sock *sk,
+static int profile_listen_perm(struct aa_profile *profile,
+			       const struct sock *sk,
 			       struct match_addr *maddr, int backlog,
 			       struct apparmor_audit_data *ad)
 {
@@ -523,8 +528,9 @@ static int profile_listen_perm(struct aa_profile *profile, struct sock *sk,
 }
 
 static inline int profile_accept_perm(struct aa_profile *profile,
-				      struct sock *sk, struct match_addr *maddr,
-				      struct sock *newsk,
+				      const struct sock *sk,
+				      struct match_addr *maddr,
+				      const struct sock *newsk,
 				      struct apparmor_audit_data *ad)
 {
 	struct aa_ruleset *rules = profile->label.rules[0];
@@ -550,7 +556,7 @@ static inline int profile_accept_perm(struct aa_profile *profile,
 
 /* getopt/setopt */
 static int profile_opt_perm(struct aa_profile *profile, u32 request,
-			    struct sock *sk, struct match_addr *maddr,
+			    const struct sock *sk, struct match_addr *maddr,
 			    int level, int optname,
 			    struct apparmor_audit_data *ad)
 {
@@ -625,7 +631,7 @@ static int profile_opt_perm(struct aa_profile *profile, u32 request,
 #define sk_has_perm2(SOCKSK, OP, REQUEST, PROFILE, AAD, XXXXY, YYYYX, CALLBACKFN) \
 ({									\
 	struct aa_label *label;						\
-	struct aa_sk_ctx *ctx= aa_sock(SOCKSK);				\
+	struct aa_sk_ctx *ctx = aa_sock(SOCKSK);			\
 	int __ERROR = 0;						\
 	if (rcu_access_pointer(ctx->label) != kernel_t) {		\
 									\
@@ -772,7 +778,7 @@ static int inet_label_sock_perm(const struct cred *cred, struct aa_label *label,
 /* revaliation, get/set attr/getsockname/peername */
 int aa_inet_sock_perm(const char *op, u32 request, struct socket *sock)
 {
-	struct aa_sk_ctx *ctx= aa_sock(sock->sk);
+	struct aa_sk_ctx *ctx = aa_sock(sock->sk);
 	struct aa_label *label;
 	int error;
 
@@ -791,7 +797,7 @@ int aa_inet_file_perm(const struct cred *subj_cred, struct aa_label *label,
 {
 	u32 sk_req = request & ~NET_PEER_MASK;
 	struct stored_match_addr laddr;
-	struct sock *sk = sock->sk;
+	const struct sock *sk = sock->sk;
 	int error = 0;
 
 	AA_BUG(!label);

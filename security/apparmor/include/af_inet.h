@@ -17,11 +17,11 @@
 
 int aa_inet_peer_perm(const struct cred *subj_cred,
 		      struct aa_label *label, const char *op, u32 request,
-		      struct sock *sk, struct sock *peer_sk,
+		      const struct sock *sk, const struct sock *peer_sk,
 		      struct aa_label *peer_label);
 int aa_inet_label_sk_perm(const struct cred *subj_cred,
 			  struct aa_label *label, const char *op, u32 request,
-			  struct sock *sk);
+			  const struct sock *sk);
 int aa_inet_sock_perm(const char *op, u32 request, struct socket *sock);
 int aa_inet_create_perm(struct aa_label *label, int family, int type,
 			int protocol);

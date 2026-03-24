@@ -324,7 +324,7 @@ int aa_af_perm(const struct cred *subj_cred, struct aa_label *label,
 static int aa_label_sk_perm(const struct cred *subj_cred,
 			    struct aa_label *label,
 			    const char *op, u32 request,
-			    struct sock *sk)
+			    const struct sock *sk)
 {
 	struct aa_sk_ctx *ctx = aa_sock(sk);
 	int error = 0;
@@ -345,7 +345,7 @@ static int aa_label_sk_perm(const struct cred *subj_cred,
 	return error;
 }
 
-int aa_sk_perm(const char *op, u32 request, struct sock *sk)
+int aa_sk_perm(const char *op, u32 request, const struct sock *sk)
 {
 	struct aa_label *label;
 	int error;
@@ -441,7 +441,7 @@ static int aa_secmark_perm(struct aa_profile *profile, u32 request, u32 secid,
 	return aa_check_perms(profile, &perms, request, ad, audit_net_cb);
 }
 
-int apparmor_secmark_check(struct aa_label *label, char *op, u32 request,
+int apparmor_secmark_check(struct aa_label *label, const char *op, u32 request,
 			   u32 secid, const struct sock *sk)
 {
 	struct aa_profile *profile;

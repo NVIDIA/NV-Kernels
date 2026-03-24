@@ -119,18 +119,18 @@ int aa_af_perm(const struct cred *subj_cred, struct aa_label *label,
 	       int type, int protocol);
 static inline int aa_profile_af_sk_perm(struct aa_profile *profile,
 					struct apparmor_audit_data *ad,
-					u32 request, struct sock *sk)
+					u32 request, const struct sock *sk)
 {
 	return aa_profile_af_compat_perm(profile, ad, request, sk->sk_family,
 					 sk->sk_type);
 }
-int aa_sk_perm(const char *op, u32 request, struct sock *sk);
+int aa_sk_perm(const char *op, u32 request, const struct sock *sk);
 
 int aa_sock_file_perm(const struct cred *subj_cred, struct aa_label *label,
 		      const char *op, u32 request,
 		      struct file *file);
 
-int apparmor_secmark_check(struct aa_label *label, char *op, u32 request,
+int apparmor_secmark_check(struct aa_label *label, const char *op, u32 request,
 			   u32 secid, const struct sock *sk);
 
 #endif /* __AA_NET_H */
