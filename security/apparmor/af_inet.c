@@ -808,7 +808,7 @@ int aa_inet_file_perm(const struct cred *subj_cred, struct aa_label *label,
 					&ad));
 
 	if (!error) {
-		struct stored_match_addr laddr, raddr;
+		struct stored_match_addr raddr;
 
 		/* TODO: have ad here: instead of in CB so we do have to redo */
 		error = map_sock_addr(sock, ADDR_REMOTE, &raddr, NULL);
