@@ -604,6 +604,7 @@ static int profile_opt_perm(struct aa_profile *profile, u32 request,
 		struct aa_profile *PROFILE;			\
 		DEFINE_AUDIT_SK(AAD, OP, CRED, SOCKSK);		\
 		(AAD).subj_cred = (CRED);			\
+		(AAD).request = (REQUEST);			\
 		__EERROR = (XXXX);				\
 		if (__EERROR == 0) {				\
 			__EERROR = (YYYY);			\
