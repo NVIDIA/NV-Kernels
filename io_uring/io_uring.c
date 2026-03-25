@@ -1718,6 +1718,23 @@ static bool __io_cqring_overflow_flush(struct io_ring_ctx *ctx, bool force)
 		posted = true;
 		list_del(&ocqe->list);
 		kfree(ocqe);
+
+		/*
+		 * For silly syzbot cases that deliberately overflow by huge
+		 * amounts, check if we need to resched and drop and
+		 * reacquire the locks if so. Nothing real would ever hit this.
+		 * Ideally we'd have a non-posting unlock for this, but hard
+		 * to care for a non-real case.
+		 */
+		if (need_resched()) {
+			io_commit_cqring(ctx);
+			spin_unlock(&ctx->completion_lock);
+			io_cqring_ev_posted(ctx);
+			mutex_unlock(&ctx->uring_lock);
+			cond_resched();
+			mutex_lock(&ctx->uring_lock);
+			spin_lock(&ctx->completion_lock);
+		}
 	}
 
 	all_flushed = list_empty(&ctx->cq_overflow_list);
