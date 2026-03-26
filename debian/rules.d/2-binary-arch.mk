@@ -27,6 +27,9 @@ else
 BPFTOOL_PATH = $(builddirpa)/tools/bpf/bpftool/bpftool
 endif
 
+# Pick LLVM version from the build-depends
+LLVM_VERSION     = $(shell sed -n -r '/^Build/,/^$$/s/.*llvm-([0-9]+)-dev.*/\1/p' debian/control)
+
 debian/scripts/fix-filenames: debian/scripts/fix-filenames.c
 	$(HOSTCC) $^ -o $@
 
@@ -623,7 +626,7 @@ ifeq ($(do_tools_cpupower),true)
 endif
 ifeq ($(do_tools_perf),true)
 	cd $(builddirpa)/tools/perf && \
-		$(kmake) prefix=/usr HAVE_CPLUS_DEMANGLE_SUPPORT=1 CROSS_COMPILE=$(CROSS_COMPILE) NO_LIBPERL=1 WERROR=0
+		LLVM_CONFIG=llvm-config-$(LLVM_VERSION) $(kmake) prefix=/usr HAVE_CPLUS_DEMANGLE_SUPPORT=1 CROSS_COMPILE=$(CROSS_COMPILE) NO_LIBPERL=1 WERROR=0
 endif
 ifeq ($(do_tools_bpftool),true)
 	$(kmake) CROSS_COMPILE=$(CROSS_COMPILE) -C $(builddirpa)/tools/bpf/bpftool
