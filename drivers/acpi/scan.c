@@ -2023,7 +2023,7 @@ static u32 acpi_scan_check_dep(acpi_handle handle)
 		honor_dep = acpi_info_matches_ids(info, acpi_honor_dep_ids);
 		kfree(info);
 
-		if (skip)
+		if (skip && !honor_dep)
 			continue;
 
 		dep = kzalloc(sizeof(*dep), GFP_KERNEL);
