@@ -7413,6 +7413,7 @@ static int gcc_x1e80100_probe(struct platform_device *pdev)
 	regmap_update_bits(regmap, 0x32004, BIT(0), BIT(0)); /* gcc_video_ahb_clk */
 	regmap_update_bits(regmap, 0x32030, BIT(0), BIT(0)); /* gcc_video_xo_clk */
 	regmap_update_bits(regmap, 0x71004, BIT(0), BIT(0)); /* gcc_gpu_cfg_ahb_clk */
+	regmap_update_bits(regmap, 0x7d01c, BIT(0), BIT(0)); /* gcc_hlos1_vote_aggre_noc_mmu_usb_qtb_clk */
 
 	/* Clear GDSC_SLEEP_ENA_VOTE to stop votes being auto-removed in sleep. */
 	regmap_write(regmap, 0x52224, 0x0);
