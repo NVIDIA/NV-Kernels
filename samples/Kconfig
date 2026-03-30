@@ -128,6 +128,10 @@ config SAMPLE_RPMSG_CLIENT
 	  to communicate with an AMP-configured remote processor over
 	  the rpmsg bus.
 
+config SAMPLE_ARM_CCA_TEST_SUITE
+	tristate "Arm CCA Realm World test suite"
+	select RMEDA_GUEST
+
 config SAMPLE_SMMUV3TESTENGINE
 	tristate "Arm FVP SMMUv3 Test Engine"
 	default m
