@@ -188,6 +188,14 @@ struct realm_config {
 
 #define SMC_RSI_VDEV_DMA_ENABLE			SMC_RSI_FID(0x19C)
 
+#define RSI_VDEV_DMA_FLAGS_ATS			(1 << 0)
+
+/*
+ * arg1 == Realm device identifier
+ * ret0 == Status / error
+ */
+#define SMC_RSI_VDEV_DMA_DISABLE		SMC_RSI_FID(0x1A4)
+
 struct rsi_vdevice_info {
 	union {
 		struct {

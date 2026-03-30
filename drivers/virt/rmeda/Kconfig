@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config RMEDA_GUEST
+	tristate "RMEDA Guest Library"
+	depends on PCI && ARM64

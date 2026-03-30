@@ -242,4 +242,15 @@ static inline unsigned long __rsi_vdev_dma_enable(unsigned long vdev_id,
 	return res.a0;
 }
 
+static inline unsigned long rsi_vdev_dma_disable(unsigned long dev_id)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(SMC_RSI_VDEV_DMA_DISABLE,
+		      dev_id, 0, 0, 0, 0, 0, 0, &res);
+
+	return res.a0;
+
+}
+
 #endif /* __ASM_RSI_CMDS_H */

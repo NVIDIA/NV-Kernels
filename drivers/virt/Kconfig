@@ -49,4 +49,6 @@ source "drivers/virt/acrn/Kconfig"
 
 endif
 
+source "drivers/virt/rmeda/Kconfig"
+
 source "drivers/virt/coco/Kconfig"
