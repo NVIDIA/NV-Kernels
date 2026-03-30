@@ -841,10 +841,8 @@ static int control_limit_kctl(struct device *dev,
 	tlv[2] = (min * 100) >> 8;
 	tlv[3] = (max * 100) >> 8;
 
-	step = (step * 100) >> 8;
-
-	mc->min = ((int)tlv[2] / step);
-	mc->max = ((int)tlv[3] / step);
+	mc->min = min / step;
+	mc->max = max / step;
 	mc->shift = step;
 	mc->sign_bit = 15;
 	mc->sdca_q78 = 1;

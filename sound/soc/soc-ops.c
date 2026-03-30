@@ -120,25 +120,17 @@ static int sdca_soc_q78_reg_to_ctl(struct soc_mixer_control *mc, unsigned int re
 		return -EINVAL;
 
 	val = sign_extend32(val, mc->sign_bit);
-	val = (((val * 100) >> 8) / (int)mc->shift);
-	val -= mc->min;
 
-	return val & mask;
+	return ((val / mc->shift) - mc->min) & mask;
 }
 
 static unsigned int sdca_soc_q78_ctl_to_reg(struct soc_mixer_control *mc, int val,
 					 unsigned int mask, unsigned int shift, int max)
 {
-	unsigned int ret_val;
-	int reg_val;
-
 	if (WARN_ON(!mc->shift))
 		return -EINVAL;
 
-	reg_val = val + mc->min;
-	ret_val = (int)((reg_val * mc->shift) << 8) / 100;
-
-	return ret_val & mask;
+	return ((val + mc->min) * mc->shift) & mask;
 }
 
 static int soc_mixer_reg_to_ctl(struct soc_mixer_control *mc, unsigned int reg_val,
