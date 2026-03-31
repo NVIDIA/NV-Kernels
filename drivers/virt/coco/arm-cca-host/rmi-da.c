@@ -895,7 +895,7 @@ int cca_vdev_read_cached_object(struct pci_dev *pdev, int type,
 		len = host_tdi->interface_report->offset;
 		buf = host_tdi->interface_report->buf;
 	} else if (type == RHI_DA_OBJECT_MEASUREMENT) {
-		if (!host_tdi->interface_report)
+		if (!host_tdi->measurements)
 			return -EINVAL;
 		len = host_tdi->measurements->offset;
 		buf = host_tdi->measurements->buf;
