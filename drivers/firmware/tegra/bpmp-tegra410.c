@@ -195,6 +195,13 @@ static struct attribute *bpmp_membw_attrs[] = {
 ATTRIBUTE_GROUPS(bpmp_membw);
 
 
+static int bpmp_unexport_match(struct device *child, const void *data)
+{
+	struct bpmp_export *export = child_to_bpmp_export(child);
+
+	return export->instance == *(unsigned int *)data;
+}
+
 static ssize_t export_store(struct device *parent,
 			    struct device_attribute *attr,
 			    const char *buf, size_t len)
@@ -202,11 +209,18 @@ static ssize_t export_store(struct device *parent,
 	int ret;
 	struct tegra_bpmp *bpmp = dev_get_drvdata(parent);
 	struct bpmp_export *export;
+	struct device *existing;
 	u32 instance;
 
 	ret = kstrtouint(buf, 0, &instance);
 	if (ret < 0)
 		return ret;
+
+	existing = device_find_child(parent, &instance, bpmp_unexport_match);
+	if (existing) {
+		put_device(existing);
+		return -EBUSY;
+	}
 
 	export = kzalloc(sizeof(*export), GFP_KERNEL);
 	if (!export)
@@ -224,21 +238,12 @@ static ssize_t export_store(struct device *parent,
 	ret = device_register(&export->child);
 	if (ret) {
 		put_device(&export->child);
-		export = NULL;
 		return ret;
 	}
 
-	return ret ? : len;
+	return len;
 }
 static DEVICE_ATTR_WO(export);
-
-
-static int bpmp_unexport_match(struct device *child, const void *data)
-{
-	struct bpmp_export *export = child_to_bpmp_export(child);
-
-	return export->instance == *(unsigned int *)data;
-}
 
 static ssize_t unexport_store(struct device *parent,
 			    struct device_attribute *attr,
