@@ -1,6 +1,6 @@
 build_arch	= x86
 defconfig	= defconfig
-flavours	= nvidia
+flavours	= nvidia-bos
 build_image	= bzImage
 kernel_file	= arch/$(build_arch)/boot/bzImage
 install_file	= vmlinuz
