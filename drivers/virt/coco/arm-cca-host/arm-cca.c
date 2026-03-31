@@ -155,10 +155,6 @@ static int cca_tsm_connect(struct pci_dev *pdev)
 	pci_ide_stream_setup(pdev, ide);
 	pci_ide_stream_setup(rp, ide);
 
-	rc = tsm_ide_stream_register(ide);
-	if (rc)
-		goto err_tsm;
-
 	rc = init_dev_communication_buffers(pdev, &pf0_dsc->comm_data);
 	if (rc)
 		goto err_comm_buff;
@@ -181,8 +177,6 @@ err_ide_setup:
 err_pdev_create:
 	free_dev_communication_buffers(&pf0_dsc->comm_data);
 err_comm_buff:
-	tsm_ide_stream_unregister(ide);
-err_tsm:
 	pci_ide_stream_teardown(rp, ide);
 	pci_ide_stream_teardown(pdev, ide);
 	pci_ide_stream_unregister(ide);
