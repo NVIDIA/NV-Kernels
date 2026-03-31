@@ -1,8 +1,8 @@
 # Menu: HEADER
 # FORMAT: 4
 # ARCH: amd64 arm64
-# FLAVOUR: amd64-nvidia arm64-nvidia arm64-nvidia-64k
-# FLAVOUR_DEP: {'amd64-nvidia': 'amd64-generic', 'arm64-nvidia': 'arm64-generic', 'arm64-nvidia-64k': 'arm64-generic-64k'}
+# FLAVOUR: amd64-nvidia-bos arm64-nvidia-bos arm64-nvidia-bos-64k
+# FLAVOUR_DEP: {'amd64-nvidia-bos': 'amd64-generic', 'arm64-nvidia-bos': 'arm64-generic', 'arm64-nvidia-bos-64k': 'arm64-generic-64k'}
 
 include "../../debian.master/config/annotations"
 
@@ -45,7 +45,7 @@ CONFIG_ARM_LFA                                  note<'LP: #2138342'>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      note<'LP: #2095028'>
 
-CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '32', 'arm64-nvidia': '128', 'arm64-nvidia-64k': '1024'}>
+CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '32', 'arm64-nvidia-bos': '128', 'arm64-nvidia-bos-64k': '1024'}>
 CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2095028'>
 
 CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
