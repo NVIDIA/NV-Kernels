@@ -2133,8 +2133,6 @@ static void snd_soc_unbind_card(struct snd_soc_card *card)
 {
 	if (snd_soc_card_is_instantiated(card)) {
 		card->instantiated = false;
-		snd_soc_flush_all_delayed_work(card);
-
 		soc_cleanup_card_resources(card);
 	}
 }
