@@ -1,6 +1,6 @@
 build_arch	= arm64
 defconfig	= defconfig
-flavours	= nvidia nvidia-64k
+flavours	= nvidia-bos nvidia-bos-64k
 build_image	= vmlinuz.efi
 kernel_file	= arch/$(build_arch)/boot/vmlinuz.efi
 install_file	= vmlinuz
