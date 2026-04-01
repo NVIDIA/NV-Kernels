@@ -502,3 +502,37 @@ void vfio_cxl_clean_virt_regs(struct vfio_pci_cxl_state *cxl)
 	kfree(cxl->comp_reg_virt);
 	cxl->comp_reg_virt = NULL;
 }
+
+/*
+ * vfio_cxl_register_comp_regs_region - Register the COMP_REGS device region.
+ *
+ * Exposes the emulated HDM decoder register state as a VFIO device region
+ * with type VFIO_REGION_SUBTYPE_CXL_COMP_REGS.	 QEMU attaches a
+ * notify_change callback to this region to intercept HDM COMMIT writes
+ * and map the DPA MemoryRegion at the appropriate GPA.
+ *
+ * The region is read+write only (no mmap) to ensure all accesses pass
+ * through comp_regs_dispatch_write() for proper bit-field enforcement.
+ */
+int vfio_cxl_register_comp_regs_region(struct vfio_pci_core_device *vdev)
+{
+	struct vfio_pci_cxl_state *cxl = vdev->cxl;
+	u32 flags = VFIO_REGION_INFO_FLAG_READ | VFIO_REGION_INFO_FLAG_WRITE;
+	int ret;
+
+	if (!cxl || !cxl->comp_reg_virt)
+		return -ENODEV;
+
+	ret = vfio_pci_core_register_dev_region(vdev,
+						PCI_VENDOR_ID_CXL |
+						VFIO_REGION_TYPE_PCI_VENDOR_TYPE,
+						VFIO_REGION_SUBTYPE_CXL_COMP_REGS,
+						&vfio_cxl_comp_regs_ops,
+						cxl->hdm_reg_offset +
+						cxl->hdm_reg_size, flags, cxl);
+	if (!ret)
+		cxl->comp_reg_region_idx = vdev->num_regions - 1;
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(vfio_cxl_register_comp_regs_region);
