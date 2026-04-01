@@ -80,6 +80,8 @@ vfio_cxl_create_device_state(struct pci_dev *pdev, u16 dvsec)
 	}
 
 	cxl->cache_capable = FIELD_GET(CXL_DVSEC_CAP_CACHE_CAPABLE, cap_word);
+	cxl->dpa_region_idx = -1;
+	cxl->comp_reg_region_idx = -1;
 
 	return cxl;
 }
@@ -537,14 +539,19 @@ static int vfio_cxl_region_mmap(struct vfio_pci_core_device *vdev,
  */
 void vfio_cxl_zap_region_locked(struct vfio_pci_core_device *vdev)
 {
+	struct vfio_device *core_vdev = &vdev->vdev;
 	struct vfio_pci_cxl_state *cxl = vdev->cxl;
 
 	lockdep_assert_held_write(&vdev->memory_lock);
 
-	if (!cxl)
+	if (!cxl || cxl->dpa_region_idx < 0)
 		return;
 
 	WRITE_ONCE(cxl->region_active, false);
+	unmap_mapping_range(core_vdev->inode->i_mapping,
+			    VFIO_PCI_INDEX_TO_OFFSET(VFIO_PCI_NUM_REGIONS +
+						     cxl->dpa_region_idx),
+			    cxl->region_size, true);
 }
 
 /*
@@ -652,6 +659,7 @@ out:
 static void vfio_cxl_region_release(struct vfio_pci_core_device *vdev,
 				    struct vfio_pci_region *region)
 {
+	struct vfio_device *core_vdev = &vdev->vdev;
 	struct vfio_pci_cxl_state *cxl = region->data;
 
 	/*
@@ -660,6 +668,16 @@ static void vfio_cxl_region_release(struct vfio_pci_core_device *vdev,
 	 * than inserting a PFN into an unmapped region.
 	 */
 	WRITE_ONCE(cxl->region_active, false);
+
+	/*
+	 * Remove all user mappings of the DPA region while the device is
+	 * still alive.
+	 */
+	if (cxl->dpa_region_idx >= 0)
+		unmap_mapping_range(core_vdev->inode->i_mapping,
+			    VFIO_PCI_INDEX_TO_OFFSET(VFIO_PCI_NUM_REGIONS +
+						     cxl->dpa_region_idx),
+				    cxl->region_size, true);
 
 	if (cxl->region_vaddr) {
 		memunmap(cxl->region_vaddr);
@@ -672,5 +690,103 @@ static const struct vfio_pci_regops vfio_cxl_regops = {
 	.mmap		= vfio_cxl_region_mmap,
 	.release	= vfio_cxl_region_release,
 };
+
+int vfio_cxl_register_cxl_region(struct vfio_pci_core_device *vdev)
+{
+	struct vfio_pci_cxl_state *cxl = vdev->cxl;
+	u32 flags;
+	int ret;
+
+	if (!cxl)
+		return -ENODEV;
+
+	if (!cxl->region || cxl->region_vaddr)
+		return -ENODEV;
+
+	/*
+	 * CXL device memory is RAM, not MMIO.  Use memremap() rather than
+	 * ioremap_cache() so the correct memory-mapping API is used.
+	 * The WB attribute matches the cache-coherent nature of CXL.mem.
+	 */
+	cxl->region_vaddr = memremap(cxl->region_hpa, cxl->region_size,
+				     MEMREMAP_WB);
+	if (!cxl->region_vaddr)
+		return -ENOMEM;
+
+	/*
+	 * BOS/backport policy: do not advertise DPA mmap until the CXL DPA
+	 * backing is proven safe for userspace CPU mappings.  Keep fd
+	 * read/write available via the memremap() kernel mapping.
+	 */
+	flags = VFIO_REGION_INFO_FLAG_READ |
+		VFIO_REGION_INFO_FLAG_WRITE;
+
+	ret = vfio_pci_core_register_dev_region(vdev,
+						PCI_VENDOR_ID_CXL |
+						VFIO_REGION_TYPE_PCI_VENDOR_TYPE,
+						VFIO_REGION_SUBTYPE_CXL,
+						&vfio_cxl_regops,
+						cxl->region_size, flags,
+						cxl);
+	if (ret) {
+		memunmap(cxl->region_vaddr);
+		cxl->region_vaddr = NULL;
+		return ret;
+	}
+
+	/*
+	 * Cache the vdev->region[] index before activating the region.
+	 * vfio_pci_core_register_dev_region() placed the new entry at
+	 * vdev->region[num_regions - 1] and incremented num_regions.
+	 * vfio_cxl_zap_region_locked() uses this to avoid scanning
+	 * vdev->region[] on every FLR.
+	 */
+	cxl->dpa_region_idx = vdev->num_regions - 1;
+
+	vfio_cxl_reinit_comp_regs(cxl);
+
+	/*
+	 * Only activate the DPA region when the HDM decoder is currently
+	 * committed.  vfio_pci_core_enable() runs pci_try_reset_function()
+	 * before regions are registered; that FLR clears the decoder
+	 * COMMITTED bit and firmware may not have re-committed it yet.
+	 * Mirror vfio_cxl_finish_reset(): if COMMITTED is not set here, the
+	 * region stays inactive and guest DPA access returns
+	 * VM_FAULT_SIGBUS / -EIO until a subsequent reset re-runs
+	 * finish_reset with the decoder committed.
+	 */
+	if (cxl->precommitted && cxl->comp_reg_virt) {
+		u32 ctrl = le32_to_cpu(*hdm_reg_ptr(cxl,
+					    CXL_HDM_DECODER0_CTRL_OFFSET(0)));
+
+		if (ctrl & CXL_HDM_DECODER0_CTRL_COMMITTED)
+			WRITE_ONCE(cxl->region_active, true);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(vfio_cxl_register_cxl_region);
+
+/**
+ * vfio_cxl_unregister_cxl_region - Undo vfio_cxl_register_cxl_region()
+ * @vdev: VFIO PCI device
+ *
+ * Marks the DPA region inactive and resets dpa_region_idx.
+ * Does NOT touch CXL subsystem state (cxl->region, cxl->cxled, cxl->cxlrd).
+ * The caller must call vfio_cxl_destroy_cxl_region() separately to release
+ * those objects.
+ */
+void vfio_cxl_unregister_cxl_region(struct vfio_pci_core_device *vdev)
+{
+	struct vfio_pci_cxl_state *cxl = vdev->cxl;
+
+	if (!cxl || cxl->dpa_region_idx < 0)
+		return;
+
+	WRITE_ONCE(cxl->region_active, false);
+
+	cxl->dpa_region_idx = -1;
+}
+EXPORT_SYMBOL_GPL(vfio_cxl_unregister_cxl_region);
 
 MODULE_IMPORT_NS("CXL");
