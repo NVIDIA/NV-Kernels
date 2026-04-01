@@ -395,6 +395,48 @@ int vfio_cxl_setup_virt_regs(struct vfio_pci_core_device *vdev,
 }
 
 /*
+ * vfio_cxl_read_committed_decoder_size - Extract committed DPA capacity from
+ *					  comp_reg_virt[].
+ *
+ * Called from probe context after vfio_cxl_reinit_comp_regs() has taken the
+ * post-MEM_ACTIVE readl() snapshot and patched SIZE_HIGH/SIZE_LOW from DVSEC.
+ * comp_reg_virt[] is already correct at this point; no hardware access needed.
+ *
+ * Returns the committed DPA capacity in bytes, or 0 if the decoder is not
+ * committed.
+ */
+resource_size_t
+vfio_cxl_read_committed_decoder_size(struct vfio_pci_core_device *vdev,
+				     struct vfio_pci_cxl_state *cxl)
+{
+	struct pci_dev *pdev = vdev->pdev;
+	resource_size_t capacity;
+	u32 ctrl, sz_hi, sz_lo;
+
+	if (WARN_ON(!cxl || !cxl->comp_reg_virt))
+		return 0;
+
+	ctrl  = le32_to_cpu(*hdm_reg_ptr(cxl, CXL_HDM_DECODER0_CTRL_OFFSET(0)));
+	sz_hi = le32_to_cpu(*hdm_reg_ptr(cxl, CXL_HDM_DECODER0_SIZE_HIGH_OFFSET(0)));
+	sz_lo = le32_to_cpu(*hdm_reg_ptr(cxl, CXL_HDM_DECODER0_SIZE_LOW_OFFSET(0)));
+
+	if (!(ctrl & CXL_HDM_DECODER0_CTRL_COMMITTED)) {
+		pci_dbg(pdev,
+			"vfio_cxl: decoder0 not committed: ctrl=0x%08x\n",
+			ctrl);
+		return 0;
+	}
+
+	capacity = ((resource_size_t)sz_hi << 32) | (sz_lo & GENMASK(31, 28));
+
+	pci_dbg(pdev,
+		"vfio_cxl: decoder0 committed: sz_hi=0x%08x sz_lo=0x%08x capacity=0x%llx\n",
+		sz_hi, sz_lo, (unsigned long long)capacity);
+
+	return capacity;
+}
+
+/*
  * Called with memory_lock write side held (from vfio_cxl_reactivate_region).
  * Uses the pre-established hdm_iobase, no ioremap() under the lock,
  * which would deadlock on PREEMPT_RT where ioremap() can sleep.
