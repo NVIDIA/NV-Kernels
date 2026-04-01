@@ -21,6 +21,197 @@
 #include "../vfio_pci_priv.h"
 #include "vfio_cxl_priv.h"
 
+u8 vfio_cxl_get_component_reg_bar(struct vfio_pci_core_device *vdev)
+{
+	return vdev->cxl->comp_reg_bar;
+}
+
+int vfio_cxl_get_region_info(struct vfio_pci_core_device *vdev,
+			     struct vfio_region_info *info,
+			     struct vfio_info_cap *caps)
+{
+	unsigned long minsz = offsetofend(struct vfio_region_info, offset);
+	struct vfio_region_info_cap_sparse_mmap *sparse;
+	struct vfio_pci_cxl_state *cxl = vdev->cxl;
+	resource_size_t bar_len, comp_end;
+	u32 nr_areas, cap_size;
+	int ret;
+
+	if (!cxl)
+		return -ENOTTY;
+
+	if (!info)
+		return -ENOTTY;
+
+	if (info->argsz < minsz)
+		return -EINVAL;
+
+	if (info->index != cxl->comp_reg_bar)
+		return -ENOTTY;
+
+	/*
+	 * The device state is not fully initialised;
+	 * fall through to the default BAR handler.
+	 */
+	if (!cxl->comp_reg_size)
+		return -ENOTTY;
+
+	bar_len  = pci_resource_len(vdev->pdev, info->index);
+	comp_end = cxl->comp_reg_offset + cxl->comp_reg_size;
+
+	/*
+	 * A component block past the end of the BAR would walk subsequent
+	 * readl()s off the ioremap window.  Reject that up front.
+	 */
+	if (comp_end > bar_len)
+		return -EINVAL;
+
+	/*
+	 * If the component block covers the entire BAR there is nothing to
+	 * mmap; return the BAR with read/write access only and let userspace
+	 * use the COMP_REGS device region for register access.
+	 */
+	if (cxl->comp_reg_size == bar_len) {
+		info->offset = VFIO_PCI_INDEX_TO_OFFSET(info->index);
+		info->size   = bar_len;
+		info->flags  = VFIO_REGION_INFO_FLAG_READ |
+			       VFIO_REGION_INFO_FLAG_WRITE;
+		return 0;
+	}
+
+	/*
+	 * Preserve the existing vfio-pci bar_mmap_supported gate.  When the
+	 * BAR is non-mappable for any reason (non-page-aligned resource, the
+	 * non_mappable_bars policy, etc.), advertising a sparse-mmap cap and
+	 * VFIO_REGION_INFO_FLAG_MMAP would let userspace try to mmap and get
+	 * a stale -EINVAL from the mmap path.  Return the bare BAR descriptor
+	 * instead and let userspace fall back to fd read/write.
+	 */
+	if (!vdev->bar_mmap_supported[info->index]) {
+		info->offset = VFIO_PCI_INDEX_TO_OFFSET(info->index);
+		info->size   = bar_len;
+		info->flags  = VFIO_REGION_INFO_FLAG_READ |
+			       VFIO_REGION_INFO_FLAG_WRITE;
+		return 0;
+	}
+
+	/*
+	 * Advertise the GPU/accelerator register windows as mmappable by
+	 * carving the CXL component register block out of the BAR.  The
+	 * number of sparse areas depends on where the block sits:
+	 *
+	 *  [A] comp block at BAR end  [gpu_regs | comp_regs]:
+	 *    comp_reg_offset > 0  &&  comp_end == bar_len
+	 *    = 1 area: [0, comp_reg_offset)
+	 *
+	 *  [B] comp block at BAR start [comp_regs | gpu_regs]:
+	 *    comp_reg_offset == 0 &&  comp_end < bar_len
+	 *    = 1 area: [comp_end, bar_len)
+	 *
+	 *  [C] comp block in middle    [gpu_regs | comp_regs | gpu_regs]:
+	 *    comp_reg_offset > 0  &&  comp_end < bar_len
+	 *    = 2 areas: [0, comp_reg_offset) and [comp_end, bar_len)
+	 */
+	if (cxl->comp_reg_offset > 0 && comp_end < bar_len)
+		nr_areas = 2;
+	else
+		nr_areas = 1;
+
+	cap_size = struct_size(sparse, areas, nr_areas);
+	sparse = kzalloc(cap_size, GFP_KERNEL);
+	if (!sparse)
+		return -ENOMEM;
+
+	sparse->header.id = VFIO_REGION_INFO_CAP_SPARSE_MMAP;
+	sparse->header.version = 1;
+	sparse->nr_areas = nr_areas;
+
+	if (nr_areas == 2) {
+		/* [C]: window before and after comp block */
+		sparse->areas[0].offset = 0;
+		sparse->areas[0].size   = cxl->comp_reg_offset;
+		sparse->areas[1].offset = comp_end;
+		sparse->areas[1].size   = bar_len - comp_end;
+	} else if (cxl->comp_reg_offset == 0) {
+		/* [B]: comp block at BAR start, window follows */
+		sparse->areas[0].offset = comp_end;
+		sparse->areas[0].size   = bar_len - comp_end;
+	} else {
+		/* [A]: comp block at BAR end, window precedes */
+		sparse->areas[0].offset = 0;
+		sparse->areas[0].size   = cxl->comp_reg_offset;
+	}
+
+	ret = vfio_info_add_capability(caps, &sparse->header, cap_size);
+	kfree(sparse);
+	if (ret)
+		return ret;
+
+	info->offset = VFIO_PCI_INDEX_TO_OFFSET(info->index);
+	info->size   = bar_len;
+	info->flags  = VFIO_REGION_INFO_FLAG_READ |
+		       VFIO_REGION_INFO_FLAG_WRITE |
+		       VFIO_REGION_INFO_FLAG_MMAP;
+
+	return 0;
+}
+
+bool vfio_cxl_mmap_overlaps_comp_regs(struct vfio_pci_core_device *vdev,
+				       u64 req_start, u64 req_len)
+{
+	struct vfio_pci_cxl_state *cxl = vdev->cxl;
+
+	if (!cxl->comp_reg_size)
+		return false;
+
+	return req_start < cxl->comp_reg_offset + cxl->comp_reg_size &&
+	       req_start + req_len > cxl->comp_reg_offset;
+}
+
+int vfio_cxl_get_info(struct vfio_pci_core_device *vdev,
+		      struct vfio_info_cap *caps)
+{
+	struct vfio_pci_cxl_state *cxl = vdev->cxl;
+	struct vfio_device_info_cap_cxl cxl_cap = {0};
+
+	if (!cxl)
+		return 0;
+
+	/*
+	 * Device is not fully initialised?
+	 */
+	if (WARN_ON(cxl->dpa_region_idx < 0 || cxl->comp_reg_region_idx < 0))
+		return -ENODEV;
+
+	/* Fill in from CXL device structure */
+	cxl_cap.header.id = VFIO_DEVICE_INFO_CAP_CXL;
+	cxl_cap.header.version = 1;
+	/*
+	 * COMP_REGS region starts at comp_reg_offset + CXL_CM_OFFSET within
+	 * the BAR.  This is the byte offset of the CXL.mem register area (where
+	 * the CXL Capability Array Header lives) within the component register
+	 * block. Userspace derives hdm_decoder_offset and hdm_count from the
+	 * COMP_REGS region itself (CXL Capability Array traversal + HDMC read).
+	 */
+	cxl_cap.hdm_regs_offset = cxl->comp_reg_offset + CXL_CM_OFFSET;
+	cxl_cap.hdm_regs_bar_index = cxl->comp_reg_bar;
+
+	if (cxl->precommitted)
+		cxl_cap.flags |= VFIO_CXL_CAP_FIRMWARE_COMMITTED;
+	if (cxl->cache_capable)
+		cxl_cap.flags |= VFIO_CXL_CAP_CACHE_CAPABLE;
+
+	/*
+	 * Populate absolute VFIO region indices so userspace can query them
+	 * directly with VFIO_DEVICE_GET_REGION_INFO.
+	 */
+	cxl_cap.dpa_region_index = VFIO_PCI_NUM_REGIONS + cxl->dpa_region_idx;
+	cxl_cap.comp_regs_region_index =
+		VFIO_PCI_NUM_REGIONS + cxl->comp_reg_region_idx;
+
+	return vfio_info_add_capability(caps, &cxl_cap.header, sizeof(cxl_cap));
+}
+
 /*
  * Scope-based cleanup wrappers for the CXL resource APIs
  */
