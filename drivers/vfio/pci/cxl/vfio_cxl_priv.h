@@ -1,0 +1,29 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * Common infrastructure for CXL Type-2 device variant drivers
+ *
+ * Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved
+ */
+
+#ifndef __LINUX_VFIO_CXL_PRIV_H
+#define __LINUX_VFIO_CXL_PRIV_H
+
+#include <cxl/cxl.h>
+#include <linux/types.h>
+#include <cxl/pci.h>
+
+/* CXL device state embedded in vfio_pci_core_device */
+struct vfio_pci_cxl_state {
+	struct cxl_dev_state         cxlds;
+	struct cxl_memdev           *cxlmd;
+	struct cxl_root_decoder     *cxlrd;
+	struct cxl_endpoint_decoder *cxled;
+	resource_size_t              hdm_reg_offset;
+	size_t                       hdm_reg_size;
+	resource_size_t              comp_reg_offset;
+	size_t                       comp_reg_size;
+	u8                           hdm_count;
+	u8                           comp_reg_bar;
+};
+
+#endif /* __LINUX_VFIO_CXL_PRIV_H */
