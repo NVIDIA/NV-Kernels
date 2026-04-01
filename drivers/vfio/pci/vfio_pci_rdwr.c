@@ -201,19 +201,29 @@ EXPORT_SYMBOL_GPL(vfio_pci_core_do_io_rw);
 int vfio_pci_core_setup_barmap(struct vfio_pci_core_device *vdev, int bar)
 {
 	struct pci_dev *pdev = vdev->pdev;
-	int ret;
+	int ret, bars;
 	void __iomem *io;
 
 	if (vdev->barmap[bar])
 		return 0;
 
-	ret = pci_request_selected_regions(pdev, 1 << bar, "vfio");
+	/*
+	 * The CXL component register BAR cannot be claimed exclusively: the
+	 * CXL subsystem holds persistent sub-range iomem claims during HDM
+	 * decoder setup. pci_request_selected_regions() for the full BAR
+	 * fails with EBUSY. Pass bars=0 to make the request a no-op and map
+	 * directly via pci_iomap().
+	 */
+	bars = (vdev->cxl && bar == vfio_cxl_get_component_reg_bar(vdev)) ?
+		0 : (1 << bar);
+
+	ret = pci_request_selected_regions(pdev, bars, "vfio");
 	if (ret)
 		return ret;
 
 	io = pci_iomap(pdev, bar, 0);
 	if (!io) {
-		pci_release_selected_regions(pdev, 1 << bar);
+		pci_release_selected_regions(pdev, bars);
 		return -ENOMEM;
 	}
 
@@ -247,6 +257,17 @@ ssize_t vfio_pci_bar_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 		return -EINVAL;
 
 	count = min(count, (size_t)(end - pos));
+
+	/*
+	 * For CXL devices, the component register subrange is emulated through
+	 * the dedicated COMP_REGS region (comp_regs_dispatch_write).  Reject fd
+	 * read/write that targets that subrange so userspace cannot bypass the
+	 * emulation by issuing pread()/pwrite() on the BAR fd.  This matches
+	 * the mmap path, which rejects overlapping mmap requests.
+	 */
+	if (vdev->cxl && bar == vfio_cxl_get_component_reg_bar(vdev) &&
+	    vfio_cxl_mmap_overlaps_comp_regs(vdev, pos, count))
+		return -EINVAL;
 
 	if (bar == PCI_ROM_RESOURCE) {
 		/*
@@ -447,6 +468,16 @@ int vfio_pci_ioeventfd(struct vfio_pci_core_device *vdev, loff_t offset,
 	if (bar == vdev->msix_bar &&
 	    !(pos + count <= vdev->msix_offset ||
 	      pos >= vdev->msix_offset + vdev->msix_size))
+		return -EINVAL;
+
+	/*
+	 * Disallow ioeventfds that would land inside the CXL component
+	 * register subrange.  Without this check, the eventfd handler would
+	 * iowrite directly into the BAR mapping, bypassing the COMP_REGS
+	 * emulation enforced on the mmap and pread/pwrite paths.
+	 */
+	if (vdev->cxl && bar == vfio_cxl_get_component_reg_bar(vdev) &&
+	    vfio_cxl_mmap_overlaps_comp_regs(vdev, pos, count))
 		return -EINVAL;
 
 	if (count == 8)
