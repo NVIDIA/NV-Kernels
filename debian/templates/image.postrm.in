@@ -16,11 +16,11 @@ if [ -d /etc/kernel/postrm.d ]; then
     # then become lost.  Therefore we clear any pending trigger and apply
     # postrm directly.
     if [ -f /usr/lib/linux/triggers/$version ]; then
-	echo "$0 ... removing pending trigger"
-	rm -f /usr/lib/linux/triggers/$version
+        echo "$0 ... removing pending trigger"
+        rm -f /usr/lib/linux/triggers/$version
     fi
     DEB_MAINT_PARAMS="$*" run-parts --report --exit-on-error --arg=$version \
-	      --arg=$image_path /etc/kernel/postrm.d
+        --arg=$image_path /etc/kernel/postrm.d
 fi
 
 if [ "$1" = purge ]; then
@@ -31,8 +31,8 @@ if [ "$1" = purge ]; then
                       modules.alias modules.ccwmap modules.inputmap \
                       modules.symbols modules.ofmap \
                       modules.seriomap modules.\*.bin \
-		      modules.softdep modules.weakdep modules.devname; do
-	eval rm -f /usr/lib/modules/$version/$extra_file
+                      modules.softdep modules.weakdep modules.devname; do
+        eval rm -f /usr/lib/modules/$version/$extra_file
     done
     rmdir /usr/lib/modules/$version || true
 fi
