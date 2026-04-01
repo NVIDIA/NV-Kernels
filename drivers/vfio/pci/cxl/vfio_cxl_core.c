@@ -73,13 +73,13 @@ vfio_cxl_create_device_state(struct pci_dev *pdev, u16 dvsec)
 	 * CACHE_CAPABLE is forwarded to the VMM so it knows whether a WBI
 	 * sequence is needed before FLR.
 	 */
-	if (!FIELD_GET(CXL_DVSEC_MEM_CAPABLE, cap_word) ||
+	if (!FIELD_GET(CXL_DVSEC_CAP_MEM_CAPABLE, cap_word) ||
 	    (pdev->class >> 8) == PCI_CLASS_MEMORY_CXL) {
 		devm_kfree(&pdev->dev, cxl);
 		return ERR_PTR(-ENODEV);
 	}
 
-	cxl->cache_capable = FIELD_GET(CXL_DVSEC_CACHE_CAPABLE, cap_word);
+	cxl->cache_capable = FIELD_GET(CXL_DVSEC_CAP_CACHE_CAPABLE, cap_word);
 
 	return cxl;
 }
