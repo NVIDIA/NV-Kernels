@@ -223,6 +223,17 @@ ssize_t vfio_pci_bar_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 
 	count = min(count, (size_t)(end - pos));
 
+	/*
+	 * For CXL devices, the component register subrange is emulated through
+	 * the dedicated COMP_REGS region (comp_regs_dispatch_write).  Reject fd
+	 * read/write that targets that subrange so userspace cannot bypass the
+	 * emulation by issuing pread()/pwrite() on the BAR fd.  This matches
+	 * the mmap path, which rejects overlapping mmap requests.
+	 */
+	if (vdev->cxl && bar == vfio_cxl_get_component_reg_bar(vdev) &&
+	    vfio_cxl_mmap_overlaps_comp_regs(vdev, pos, count))
+		return -EINVAL;
+
 	if (bar == PCI_ROM_RESOURCE) {
 		/*
 		 * The ROM can fill less space than the BAR, so we start the
@@ -421,6 +432,16 @@ int vfio_pci_ioeventfd(struct vfio_pci_core_device *vdev, loff_t offset,
 	if (bar == vdev->msix_bar &&
 	    !(pos + count <= vdev->msix_offset ||
 	      pos >= vdev->msix_offset + vdev->msix_size))
+		return -EINVAL;
+
+	/*
+	 * Disallow ioeventfds that would land inside the CXL component
+	 * register subrange.  Without this check, the eventfd handler would
+	 * iowrite directly into the BAR mapping, bypassing the COMP_REGS
+	 * emulation enforced on the mmap and pread/pwrite paths.
+	 */
+	if (vdev->cxl && bar == vfio_cxl_get_component_reg_bar(vdev) &&
+	    vfio_cxl_mmap_overlaps_comp_regs(vdev, pos, count))
 		return -EINVAL;
 
 	if (count == 8)

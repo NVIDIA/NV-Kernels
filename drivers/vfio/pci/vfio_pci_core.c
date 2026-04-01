@@ -540,6 +540,21 @@ static int vfio_pci_core_runtime_resume(struct device *dev)
 #endif /* CONFIG_PM */
 
 /*
+ * The CXL component register BAR cannot be claimed exclusively: the
+ * CXL subsystem holds persistent sub-range iomem claims during HDM
+ * decoder setup. pci_request_selected_regions() for the full BAR
+ * fails with EBUSY. Pass bars=0 to make the request a no-op and map
+ * directly via pci_iomap().
+ */
+static int vfio_pci_bar_region_mask(struct vfio_pci_core_device *vdev, int bar)
+{
+	if (vdev->cxl && bar == vfio_cxl_get_component_reg_bar(vdev))
+		return 0;
+
+	return 1 << bar;
+}
+
+/*
  * Eager-request BAR resources, and iomap them.  Soft failures are
  * allowed, and consumers must check the barmap before use in order to
  * give compatible user-visible behaviour with the previous on-demand
@@ -561,7 +576,9 @@ static void vfio_pci_core_map_bars(struct vfio_pci_core_device *vdev)
 		if (!pci_resource_len(pdev, i))
 			continue;
 
-		if (pci_request_selected_regions(pdev, 1 << bar, "vfio")) {
+		if (pci_request_selected_regions(pdev,
+						 vfio_pci_bar_region_mask(vdev, bar),
+						 "vfio")) {
 			pci_dbg(pdev, "Failed to reserve region %d\n", bar);
 			vdev->barmap[bar] = IOMEM_ERR_PTR(-EBUSY);
 			continue;
@@ -570,7 +587,8 @@ static void vfio_pci_core_map_bars(struct vfio_pci_core_device *vdev)
 		vdev->barmap[bar] = pci_iomap(pdev, bar, 0);
 		if (!vdev->barmap[bar]) {
 			pci_dbg(pdev, "Failed to iomap region %d\n", bar);
-			pci_release_selected_regions(pdev, 1 << bar);
+			pci_release_selected_regions(pdev,
+						     vfio_pci_bar_region_mask(vdev, bar));
 			vdev->barmap[bar] = IOMEM_ERR_PTR(-ENOMEM);
 		}
 	}
@@ -746,7 +764,8 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 		if (IS_ERR_OR_NULL(vdev->barmap[bar]))
 			continue;
 		pci_iounmap(pdev, vdev->barmap[bar]);
-		pci_release_selected_regions(pdev, 1 << bar);
+		pci_release_selected_regions(pdev,
+					     vfio_pci_bar_region_mask(vdev, bar));
 		vdev->barmap[bar] = NULL;
 	}
 
@@ -1091,6 +1110,13 @@ static int vfio_pci_ioctl_get_info(struct vfio_pci_core_device *vdev,
 	if (vdev->reset_works)
 		info.flags |= VFIO_DEVICE_FLAGS_RESET;
 
+	if (vdev->cxl) {
+		ret = vfio_cxl_get_info(vdev, &caps);
+		if (ret)
+			return ret;
+		info.flags |= VFIO_DEVICE_FLAGS_CXL;
+	}
+
 	info.num_regions = VFIO_PCI_NUM_REGIONS + vdev->num_regions;
 	info.num_irqs = VFIO_PCI_NUM_IRQS;
 
@@ -1135,6 +1161,12 @@ int vfio_pci_ioctl_get_region_info(struct vfio_device *core_vdev,
 		container_of(core_vdev, struct vfio_pci_core_device, vdev);
 	struct pci_dev *pdev = vdev->pdev;
 	int i, ret;
+
+	if (vdev->cxl) {
+		ret = vfio_cxl_get_region_info(vdev, info, caps);
+		if (ret != -ENOTTY)
+			return ret;
+	}
 
 	switch (info->index) {
 	case VFIO_PCI_CONFIG_REGION_INDEX:
@@ -1862,6 +1894,18 @@ int vfio_pci_core_mmap(struct vfio_device *core_vdev, struct vm_area_struct *vma
 	req_start = pgoff << PAGE_SHIFT;
 
 	if (req_start + req_len > phys_len)
+		return -EINVAL;
+
+	/*
+	 * CXL devices: mmap is permitted for the GPU/accelerator register
+	 * windows listed in the sparse-mmap capability.  Block any request
+	 * that overlaps the CXL component register block
+	 * [comp_reg_offset, comp_reg_offset + comp_reg_size); those registers
+	 * must be accessed exclusively through the COMP_REGS device region so
+	 * that the emulation layer (notify_change) intercepts every write.
+	 */
+	if (vdev->cxl && index == vfio_cxl_get_component_reg_bar(vdev) &&
+	    vfio_cxl_mmap_overlaps_comp_regs(vdev, req_start, req_len))
 		return -EINVAL;
 
 	/*
