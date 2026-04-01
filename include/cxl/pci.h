@@ -26,5 +26,7 @@ int cxl_find_regblock(struct pci_dev *pdev, enum cxl_regloc_type type,
 void cxl_probe_component_regs(struct device *dev, void __iomem *base,
                               struct cxl_component_reg_map *map);
 int cxl_await_range_active(struct cxl_dev_state *cxlds);
+int cxl_regblock_get_bar_info(const struct cxl_register_map *map, u8 *bar_index,
+			      resource_size_t *bar_offset);
 int cxl_setup_regs(struct cxl_register_map *map);
 #endif
