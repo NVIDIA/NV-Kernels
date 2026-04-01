@@ -2168,6 +2168,8 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 	if (ret)
 		goto out_vf;
 
+	vfio_pci_cxl_detect_and_init(vdev);
+
 	vfio_pci_probe_power_state(vdev);
 
 	/*
@@ -2210,6 +2212,8 @@ void vfio_pci_core_unregister_device(struct vfio_pci_core_device *vdev)
 
 	vfio_pci_vf_uninit(vdev);
 	vfio_pci_vga_uninit(vdev);
+
+	vfio_pci_cxl_cleanup(vdev);
 
 	if (!disable_idle_d3)
 		pm_runtime_get_noresume(&vdev->pdev->dev);
