@@ -1,0 +1,9 @@
+config VFIO_CXL_CORE
+	bool "VFIO CXL core"
+	depends on VFIO_PCI_CORE && CXL_BUS && CXL_MEM
+	help
+	    Extends vfio-pci-core with CXL.mem passthrough for vendor-specific
+	    CXL devices (CXL_DEVTYPE_DEVMEM) that implement HDM-D or HDM-DB
+	    decoders without the standard CXL memory expander class code
+	    (PCI_CLASS_MEMORY_CXL).  Covers CXL Type-2 accelerators and
+	    non-class-code Type-3 variants (e.g. compressed memory devices).
