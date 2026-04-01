@@ -23,6 +23,7 @@ struct vfio_pci_cxl_state {
 	resource_size_t              comp_reg_offset;
 	size_t                       comp_reg_size;
 	__le32                      *comp_reg_virt;
+	size_t                       dpa_size;
 	void __iomem                *hdm_iobase;
 	u16                          dvsec_len;
 	u8                           hdm_count;
@@ -85,5 +86,8 @@ int vfio_cxl_setup_virt_regs(struct vfio_pci_core_device *vdev,
 			     resource_size_t max_size);
 void vfio_cxl_clean_virt_regs(struct vfio_pci_cxl_state *cxl);
 void vfio_cxl_reinit_comp_regs(struct vfio_pci_cxl_state *cxl);
+resource_size_t
+vfio_cxl_read_committed_decoder_size(struct vfio_pci_core_device *vdev,
+				     struct vfio_pci_cxl_state *cxl);
 
 #endif /* __LINUX_VFIO_CXL_PRIV_H */
