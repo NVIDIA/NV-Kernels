@@ -118,9 +118,16 @@ struct cxl_pmu_reg_map {
  * @resource: physical resource base of the register block
  * @max_size: maximum mapping size to perform register search
  * @reg_type: see enum cxl_regloc_type
+ * @bar_index: PCI BAR index (0-5) when regblock is BAR-backed; 0xFF otherwise
+ * @bar_offset: offset within the BAR; only valid when bar_index <= 5
  * @component_map: cxl_reg_map for component registers
  * @device_map: cxl_reg_maps for device registers
  * @pmu_map: cxl_reg_maps for CXL Performance Monitoring Units
+ *
+ * When the register block is described by the Register Locator DVSEC with
+ * a BAR Indicator (BIR 0-5), bar_index and bar_offset are set so callers can
+ * use pci_iomap(pdev, bar_index, size) and base + bar_offset instead of
+ * ioremap(resource).
  */
 struct cxl_register_map {
 	struct device *host;
@@ -128,6 +135,8 @@ struct cxl_register_map {
 	resource_size_t resource;
 	resource_size_t max_size;
 	u8 reg_type;
+	u8 bar_index;
+	resource_size_t bar_offset;
 	union {
 		struct cxl_component_reg_map component_map;
 		struct cxl_device_reg_map device_map;
