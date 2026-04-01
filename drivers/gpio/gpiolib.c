@@ -4523,8 +4523,8 @@ static struct gpio_desc *gpiod_find(struct device *dev, const char *con_id,
 				return desc;
 			}
 
-			dev_warn(dev, "cannot find GPIO line %s, deferring\n",
-				 p->key);
+			dev_dbg(dev, "cannot find GPIO line %s, deferring\n",
+				p->key);
 			return ERR_PTR(-EPROBE_DEFER);
 		}
 
@@ -4538,8 +4538,8 @@ static struct gpio_desc *gpiod_find(struct device *dev, const char *con_id,
 			 * consumer be probed again or let the Deferred
 			 * Probe infrastructure handle the error.
 			 */
-			dev_warn(dev, "cannot find GPIO chip %s, deferring\n",
-				 p->key);
+			dev_dbg(dev, "cannot find GPIO chip %s, deferring\n",
+				p->key);
 			return ERR_PTR(-EPROBE_DEFER);
 		}
 
