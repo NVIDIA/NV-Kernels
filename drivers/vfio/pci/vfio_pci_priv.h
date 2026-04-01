@@ -133,4 +133,18 @@ static inline void vfio_pci_dma_buf_move(struct vfio_pci_core_device *vdev,
 }
 #endif
 
+#if IS_ENABLED(CONFIG_VFIO_CXL_CORE)
+
+void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev);
+void vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev);
+
+#else
+
+static inline void
+vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev) { }
+static inline void
+vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev) { }
+
+#endif /* CONFIG_VFIO_CXL_CORE */
+
 #endif
