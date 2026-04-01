@@ -592,7 +592,7 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 	struct pci_dev *pdev = vdev->pdev;
 	struct vfio_pci_dummy_resource *dummy_res, *tmp;
 	struct vfio_pci_ioeventfd *ioeventfd, *ioeventfd_tmp;
-	int i, bar;
+	int i, bar, bars;
 
 	/* For needs_reset */
 	lockdep_assert_held(&vdev->vdev.dev_set->lock);
@@ -651,8 +651,10 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 		bar = i + PCI_STD_RESOURCES;
 		if (!vdev->barmap[bar])
 			continue;
+		bars = (vdev->cxl && i == vfio_cxl_get_component_reg_bar(vdev)) ?
+			0 : (1 << bar);
 		pci_iounmap(pdev, vdev->barmap[bar]);
-		pci_release_selected_regions(pdev, 1 << bar);
+		pci_release_selected_regions(pdev, bars);
 		vdev->barmap[bar] = NULL;
 	}
 
@@ -988,6 +990,13 @@ static int vfio_pci_ioctl_get_info(struct vfio_pci_core_device *vdev,
 	if (vdev->reset_works)
 		info.flags |= VFIO_DEVICE_FLAGS_RESET;
 
+	if (vdev->cxl) {
+		ret = vfio_cxl_get_info(vdev, &caps);
+		if (ret)
+			return ret;
+		info.flags |= VFIO_DEVICE_FLAGS_CXL;
+	}
+
 	info.num_regions = VFIO_PCI_NUM_REGIONS + vdev->num_regions;
 	info.num_irqs = VFIO_PCI_NUM_IRQS;
 
@@ -1032,6 +1041,12 @@ int vfio_pci_ioctl_get_region_info(struct vfio_device *core_vdev,
 		container_of(core_vdev, struct vfio_pci_core_device, vdev);
 	struct pci_dev *pdev = vdev->pdev;
 	int i, ret;
+
+	if (vdev->cxl) {
+		ret = vfio_cxl_get_region_info(vdev, info, caps);
+		if (ret != -ENOTTY)
+			return ret;
+	}
 
 	switch (info->index) {
 	case VFIO_PCI_CONFIG_REGION_INDEX:
@@ -1758,6 +1773,18 @@ int vfio_pci_core_mmap(struct vfio_device *core_vdev, struct vm_area_struct *vma
 	req_start = pgoff << PAGE_SHIFT;
 
 	if (req_start + req_len > phys_len)
+		return -EINVAL;
+
+	/*
+	 * CXL devices: mmap is permitted for the GPU/accelerator register
+	 * windows listed in the sparse-mmap capability.  Block any request
+	 * that overlaps the CXL component register block
+	 * [comp_reg_offset, comp_reg_offset + comp_reg_size); those registers
+	 * must be accessed exclusively through the COMP_REGS device region so
+	 * that the emulation layer (notify_change) intercepts every write.
+	 */
+	if (vdev->cxl && index == vfio_cxl_get_component_reg_bar(vdev) &&
+	    vfio_cxl_mmap_overlaps_comp_regs(vdev, req_start, req_len))
 		return -EINVAL;
 
 	/*
