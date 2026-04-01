@@ -134,6 +134,9 @@ struct vfio_pci_core_device {
 	bool			pm_intx_masked;
 	bool			pm_runtime_engaged;
 	bool			sriov_active;
+#if IS_ENABLED(CONFIG_VFIO_CXL_CORE)
+	bool			disable_cxl:1;
+#endif
 	struct pci_saved_state	*pci_saved_state;
 	struct pci_saved_state	*pm_save;
 	int			ioeventfds_nr;
