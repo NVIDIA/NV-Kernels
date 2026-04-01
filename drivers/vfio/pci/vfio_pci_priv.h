@@ -45,6 +45,10 @@ int vfio_raw_config_read(struct vfio_pci_core_device *vdev, int pos,
 			 int count, struct perm_bits *perm,
 			 int offset, __le32 *val);
 
+int vfio_direct_config_read(struct vfio_pci_core_device *vdev, int pos,
+			    int count, struct perm_bits *perm,
+			    int offset, __le32 *val);
+
 ssize_t vfio_pci_bar_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 			size_t count, loff_t *ppos, bool iswrite);
 
@@ -147,6 +151,7 @@ void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev);
 void vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev);
 void vfio_cxl_zap_region_locked(struct vfio_pci_core_device *vdev);
 void vfio_cxl_reactivate_region(struct vfio_pci_core_device *vdev);
+void vfio_cxl_setup_dvsec_perms(struct vfio_pci_core_device *vdev);
 
 #else
 
@@ -158,6 +163,8 @@ static inline void
 vfio_cxl_zap_region_locked(struct vfio_pci_core_device *vdev) { }
 static inline void
 vfio_cxl_reactivate_region(struct vfio_pci_core_device *vdev) { }
+static inline void
+vfio_cxl_setup_dvsec_perms(struct vfio_pci_core_device *vdev) { }
 
 #endif /* CONFIG_VFIO_CXL_CORE */
 
