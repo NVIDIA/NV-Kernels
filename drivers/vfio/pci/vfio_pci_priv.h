@@ -129,6 +129,9 @@ void vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev);
 void vfio_cxl_zap_region_locked(struct vfio_pci_core_device *vdev);
 void vfio_cxl_reactivate_region(struct vfio_pci_core_device *vdev);
 void vfio_cxl_setup_dvsec_perms(struct vfio_pci_core_device *vdev);
+int vfio_cxl_register_cxl_region(struct vfio_pci_core_device *vdev);
+void vfio_cxl_unregister_cxl_region(struct vfio_pci_core_device *vdev);
+int  vfio_cxl_register_comp_regs_region(struct vfio_pci_core_device *vdev);
 
 #else
 
@@ -142,6 +145,14 @@ static inline void
 vfio_cxl_reactivate_region(struct vfio_pci_core_device *vdev) { }
 static inline void
 vfio_cxl_setup_dvsec_perms(struct vfio_pci_core_device *vdev) { }
+static inline int
+vfio_cxl_register_cxl_region(struct vfio_pci_core_device *vdev)
+{ return 0; }
+static inline void
+vfio_cxl_unregister_cxl_region(struct vfio_pci_core_device *vdev) { }
+static inline int
+vfio_cxl_register_comp_regs_region(struct vfio_pci_core_device *vdev)
+{ return 0; }
 
 #endif /* CONFIG_VFIO_CXL_CORE */
 
