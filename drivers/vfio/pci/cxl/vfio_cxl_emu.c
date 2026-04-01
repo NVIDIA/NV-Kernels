@@ -33,7 +33,7 @@
  *     +0x1c: (reserved)
  */
 
-static inline __le32 *hdm_reg_ptr(struct vfio_pci_cxl_state *cxl, u32 hdm_off)
+__le32 *hdm_reg_ptr(struct vfio_pci_cxl_state *cxl, u32 hdm_off)
 {
 	/*
 	 * hdm_off is a byte offset within the HDM decoder block.
