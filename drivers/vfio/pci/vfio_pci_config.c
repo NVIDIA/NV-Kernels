@@ -270,9 +270,9 @@ static int vfio_direct_config_read(struct vfio_pci_core_device *vdev, int pos,
 }
 
 /* Raw access skips any kind of virtualization */
-static int vfio_raw_config_write(struct vfio_pci_core_device *vdev, int pos,
-				 int count, struct perm_bits *perm,
-				 int offset, __le32 val)
+int vfio_raw_config_write(struct vfio_pci_core_device *vdev, int pos,
+			  int count, struct perm_bits *perm,
+			  int offset, __le32 val)
 {
 	int ret;
 
@@ -283,9 +283,9 @@ static int vfio_raw_config_write(struct vfio_pci_core_device *vdev, int pos,
 	return count;
 }
 
-static int vfio_raw_config_read(struct vfio_pci_core_device *vdev, int pos,
-				int count, struct perm_bits *perm,
-				int offset, __le32 *val)
+int vfio_raw_config_read(struct vfio_pci_core_device *vdev, int pos,
+			 int count, struct perm_bits *perm,
+			 int offset, __le32 *val)
 {
 	int ret;
 
