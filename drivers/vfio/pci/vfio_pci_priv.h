@@ -155,6 +155,14 @@ void vfio_cxl_setup_dvsec_perms(struct vfio_pci_core_device *vdev);
 int vfio_cxl_register_cxl_region(struct vfio_pci_core_device *vdev);
 void vfio_cxl_unregister_cxl_region(struct vfio_pci_core_device *vdev);
 int  vfio_cxl_register_comp_regs_region(struct vfio_pci_core_device *vdev);
+int vfio_cxl_get_info(struct vfio_pci_core_device *vdev,
+		      struct vfio_info_cap *caps);
+int vfio_cxl_get_region_info(struct vfio_pci_core_device *vdev,
+			     struct vfio_region_info *info,
+			     struct vfio_info_cap *caps);
+u8 vfio_cxl_get_component_reg_bar(struct vfio_pci_core_device *vdev);
+bool vfio_cxl_mmap_overlaps_comp_regs(struct vfio_pci_core_device *vdev,
+				      u64 req_start, u64 req_len);
 
 #else
 
@@ -176,6 +184,22 @@ vfio_cxl_unregister_cxl_region(struct vfio_pci_core_device *vdev) { }
 static inline int
 vfio_cxl_register_comp_regs_region(struct vfio_pci_core_device *vdev)
 { return 0; }
+static inline int
+vfio_cxl_get_info(struct vfio_pci_core_device *vdev,
+		  struct vfio_info_cap *caps)
+{ return -ENOTTY; }
+static inline int
+vfio_cxl_get_region_info(struct vfio_pci_core_device *vdev,
+			 struct vfio_region_info *info,
+			 struct vfio_info_cap *caps)
+{ return -ENOTTY; }
+static inline u8
+vfio_cxl_get_component_reg_bar(struct vfio_pci_core_device *vdev)
+{ return U8_MAX; }
+static inline bool
+vfio_cxl_mmap_overlaps_comp_regs(struct vfio_pci_core_device *vdev,
+				 u64 req_start, u64 req_len)
+{ return false; }
 
 #endif /* CONFIG_VFIO_CXL_CORE */
 
