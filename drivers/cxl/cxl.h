@@ -722,6 +722,8 @@ int cxl_port_setup_regs(struct cxl_port *port,
 			resource_size_t component_reg_phys);
 
 struct cxl_dev_state;
+int cxl_get_hdm_info(struct cxl_dev_state *cxlds, u8 *count,
+		     resource_size_t *offset, resource_size_t *size);
 int cxl_dvsec_rr_decode(struct cxl_dev_state *cxlds,
 			struct cxl_endpoint_dvsec_info *info);
 
