@@ -37,6 +37,14 @@ int vfio_pci_set_irqs_ioctl(struct vfio_pci_core_device *vdev, uint32_t flags,
 ssize_t vfio_pci_config_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 			   size_t count, loff_t *ppos, bool iswrite);
 
+int vfio_raw_config_write(struct vfio_pci_core_device *vdev, int pos,
+			  int count, struct perm_bits *perm,
+			  int offset, __le32 val);
+
+int vfio_raw_config_read(struct vfio_pci_core_device *vdev, int pos,
+			 int count, struct perm_bits *perm,
+			 int offset, __le32 *val);
+
 ssize_t vfio_pci_bar_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 			size_t count, loff_t *ppos, bool iswrite);
 
