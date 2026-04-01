@@ -279,7 +279,8 @@ static void vfio_pci_device_setup(struct vfio_pci_device *device)
 		struct vfio_pci_bar *bar = device->bars + i;
 
 		vfio_pci_region_get(device, i, &bar->info);
-		if (bar->info.flags & VFIO_REGION_INFO_FLAG_MMAP)
+		if ((bar->info.flags & VFIO_REGION_INFO_FLAG_MMAP) &&
+		    !(bar->info.flags & VFIO_REGION_INFO_FLAG_CAPS))
 			vfio_pci_bar_map(device, i);
 	}
 
