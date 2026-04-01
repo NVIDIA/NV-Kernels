@@ -65,6 +65,8 @@ source "drivers/vfio/pci/virtio/Kconfig"
 
 source "drivers/vfio/pci/nvgrace-gpu/Kconfig"
 
+source "drivers/vfio/pci/cxl/Kconfig"
+
 source "drivers/vfio/pci/qat/Kconfig"
 
 endmenu
