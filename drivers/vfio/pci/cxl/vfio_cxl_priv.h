@@ -38,6 +38,8 @@ struct vfio_pci_cxl_state {
 	__le32                      *comp_reg_virt;
 	size_t                       dpa_size;
 	void __iomem                *hdm_iobase;
+	int                          dpa_region_idx;
+	int                          comp_reg_region_idx;
 	u16                          dvsec_len;
 	u8                           hdm_count;
 	u8                           comp_reg_bar;
