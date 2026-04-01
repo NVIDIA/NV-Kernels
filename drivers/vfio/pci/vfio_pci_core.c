@@ -2188,6 +2188,8 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 	if (ret)
 		goto out_vf;
 
+	vfio_pci_cxl_detect_and_init(vdev);
+
 	vfio_pci_probe_power_state(vdev);
 
 	/*
