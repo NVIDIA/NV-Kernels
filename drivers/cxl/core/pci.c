@@ -454,6 +454,35 @@ int cxl_hdm_decode_init(struct cxl_dev_state *cxlds, struct cxl_hdm *cxlhdm,
 }
 EXPORT_SYMBOL_NS_GPL(cxl_hdm_decode_init, "CXL");
 
+/**
+ * cxl_get_hdm_info - Get HDM decoder register block location and count
+ * @cxlds: CXL device state (must have component regs enumerated via
+ *	   cxl_probe_component_regs())
+ * @count:  number of HDM decoders in the block (from HDM Capability bits [3:0])
+ * @offset: byte offset of HDM decoder block within the component register BAR
+ * @size:   size in bytes of the HDM decoder block
+ *
+ * Return: 0 on success. -ENODEV if the HDM decoder block is not present.
+ */
+int cxl_get_hdm_info(struct cxl_dev_state *cxlds, u8 *count,
+		     resource_size_t *offset, resource_size_t *size)
+{
+	struct cxl_reg_map *hdm = &cxlds->reg_map.component_map.hdm_decoder;
+
+	if (WARN_ON(!count || !offset || !size))
+		return -EINVAL;
+
+	if (!hdm->valid)
+		return -ENODEV;
+
+	*count	= hdm->count;
+	*offset = hdm->offset;
+	*size	= hdm->size;
+
+	return 0;
+}
+EXPORT_SYMBOL_NS_GPL(cxl_get_hdm_info, "CXL");
+
 #define CXL_DOE_TABLE_ACCESS_REQ_CODE		0x000000ff
 #define   CXL_DOE_TABLE_ACCESS_REQ_CODE_READ	0
 #define CXL_DOE_TABLE_ACCESS_TABLE_TYPE		0x0000ff00
