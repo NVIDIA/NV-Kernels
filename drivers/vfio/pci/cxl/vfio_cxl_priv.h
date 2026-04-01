@@ -22,8 +22,20 @@ struct vfio_pci_cxl_state {
 	size_t                       hdm_reg_size;
 	resource_size_t              comp_reg_offset;
 	size_t                       comp_reg_size;
+	u16                          dvsec_len;
 	u8                           hdm_count;
 	u8                           comp_reg_bar;
+	bool                         cache_capable;
 };
+
+/*
+ * CXL DVSEC for CXL Devices - register offsets within the DVSEC
+ * (CXL 4.0 8.1.3).
+ * Offsets are relative to the DVSEC capability base (cxl->dvsec).
+ */
+#define CXL_DVSEC_CAPABILITY_OFFSET 0xa
+#define CXL_DVSEC_MEM_CAPABLE	    BIT(2)
+/* CXL DVSEC Capability register bit 0: device supports CXL.cache (HDM-DB) */
+#define CXL_DVSEC_CACHE_CAPABLE	    BIT(0)
 
 #endif /* __LINUX_VFIO_CXL_PRIV_H */
