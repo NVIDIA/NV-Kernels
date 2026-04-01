@@ -11,6 +11,7 @@
 #include <linux/range.h>
 #include <linux/errno.h>
 #include <cxl/mailbox.h>
+#include <uapi/cxl/cxl_regs.h>
 
 /**
  * enum cxl_devtype - delineate type-2 from a generic type-3 device
