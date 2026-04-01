@@ -208,6 +208,7 @@ CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablem
 # ---- Annotations without notes ----
 
 CONFIG_ACPI_MPAM                                policy<{'amd64': '-', 'arm64': 'y'}>
+CONFIG_AMCC_QT2025_PHY                          policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_ARCH_HAS_CPU_RESCTRL                     policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_ARM64_MPAM                               policy<{'amd64': '-', 'arm64': 'y'}>
 CONFIG_ARM64_MPAM_DRIVER                        policy<{'arm64': 'y'}>
@@ -244,6 +245,7 @@ CONFIG_KVM_GENERIC_PRIVATE_MEM                  policy<{'amd64': 'y', 'arm64': '
 CONFIG_KVM_PRIVATE_MEM                          policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_NOVA_CORE                                policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_NVGRACE_EGM                              policy<{'arm64': 'm'}>
 CONFIG_NVIDIA_FFA_EC                            policy<{'arm64': 'y'}>
 CONFIG_NVIDIA_TEGRA410_C2C_PMU                  policy<{'arm64': 'm'}>
