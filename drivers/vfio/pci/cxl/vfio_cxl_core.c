@@ -22,6 +22,13 @@
 #include "vfio_cxl_priv.h"
 
 /*
+ * Scope-based cleanup wrappers for the CXL resource APIs
+ */
+DEFINE_FREE(cxl_put_root_decoder, struct cxl_root_decoder *, if (!IS_ERR_OR_NULL(_T)) cxl_put_root_decoder(_T))
+DEFINE_FREE(cxl_dpa_free, struct cxl_endpoint_decoder *, if (!IS_ERR_OR_NULL(_T)) cxl_dpa_free(_T))
+DEFINE_FREE(cxl_unregister_region, struct cxl_region *, if (!IS_ERR_OR_NULL(_T)) cxl_unregister_region(_T))
+
+/*
  * vfio_cxl_create_device_state - Allocate and validate CXL device state
  *
  * Returns a pointer to the allocated vfio_pci_cxl_state on success, or
@@ -170,6 +177,121 @@ failed_release:
 	return ret;
 }
 
+int vfio_cxl_create_cxl_region(struct vfio_pci_cxl_state *cxl,
+			       resource_size_t size)
+{
+	resource_size_t max_size;
+
+	struct cxl_root_decoder *cxlrd __free(cxl_put_root_decoder) =
+		cxl_get_hpa_freespace(cxl->cxlmd, 1,
+				      CXL_DECODER_F_RAM | CXL_DECODER_F_TYPE2,
+				      &max_size);
+	if (IS_ERR(cxlrd))
+		return PTR_ERR(cxlrd);
+
+	/* Insufficient HPA space; cxlrd freed automatically by __free() */
+	if (max_size < size)
+		return -ENOSPC;
+
+	struct cxl_endpoint_decoder *cxled __free(cxl_dpa_free) =
+		cxl_request_dpa(cxl->cxlmd, CXL_PARTMODE_RAM, size);
+	if (IS_ERR(cxled))
+		return PTR_ERR(cxled);
+
+	struct cxl_region *region __free(cxl_unregister_region) =
+		cxl_create_region(cxlrd, &cxled, 1);
+	if (IS_ERR(region))
+		return PTR_ERR(region);
+
+	/* All operations succeeded; transfer ownership to cxl state */
+	cxl->cxlrd  = no_free_ptr(cxlrd);
+	cxl->cxled  = no_free_ptr(cxled);
+	cxl->region = no_free_ptr(region);
+
+	return 0;
+}
+
+void vfio_cxl_destroy_cxl_region(struct vfio_pci_cxl_state *cxl)
+{
+	if (!cxl->region)
+		return;
+
+	/*
+	 * Precommitted regions are obtained via cxl_get_committed_decoder() as
+	 * a borrowed reference owned by the cxl core; do not unregister or
+	 * free the decoder objects from here.  Only vfio_cxl_create_cxl_region()
+	 * owns the region and decoders.
+	 */
+	if (!cxl->precommitted) {
+		cxl_unregister_region(cxl->region);
+		cxl_dpa_free(cxl->cxled);
+		cxl_put_root_decoder(cxl->cxlrd);
+	}
+
+	cxl->region = NULL;
+	cxl->cxled = NULL;
+	cxl->cxlrd = NULL;
+}
+
+static int vfio_cxl_create_region_helper(struct vfio_pci_core_device *vdev,
+					 struct vfio_pci_cxl_state *cxl,
+					 resource_size_t capacity)
+{
+	struct pci_dev *pdev = vdev->pdev;
+	struct range range;
+	int ret;
+
+	if (cxl->precommitted) {
+		struct cxl_endpoint_decoder *cxled;
+		/*
+		 * cxl_get_committed_decoder() does not write *region on every
+		 * failure path (e.g. when cxlmd->endpoint is NULL or no decoder
+		 * is committed).  Initialise to NULL so the !cxl->region check
+		 * below catches it regardless of stack-init mode.
+		 */
+		struct cxl_region *region = NULL;
+
+		cxled = cxl_get_committed_decoder(cxl->cxlmd, &region);
+		if (IS_ERR(cxled))
+			return PTR_ERR(cxled);
+		cxl->cxled = cxled;
+		cxl->region = region;
+	} else {
+		ret = vfio_cxl_create_cxl_region(cxl, capacity);
+		if (ret)
+			return ret;
+	}
+
+	if (!cxl->region) {
+		pci_err(pdev, "Failed to create CXL region\n");
+		ret = -ENODEV;
+		goto failed;
+	}
+
+	ret = cxl_get_region_range(cxl->region, &range);
+	if (ret)
+		goto failed;
+
+	cxl->region_hpa = range.start;
+	cxl->region_size = range_len(&range);
+
+	pci_dbg(pdev, "CXL region: HPA 0x%llx size %lu MB\n",
+		cxl->region_hpa, cxl->region_size >> 20);
+
+	return 0;
+
+failed:
+	if (cxl->region) {
+		cxl_unregister_region(cxl->region);
+		cxl->region = NULL;
+	}
+
+	cxl->cxled = NULL;
+	cxl->cxlrd = NULL;
+
+	return ret;
+}
+
 static int vfio_cxl_create_memdev(struct vfio_pci_cxl_state *cxl,
 				  resource_size_t capacity)
 {
@@ -284,6 +406,7 @@ void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev)
 		goto regs_failed;
 	}
 
+	cxl->precommitted = true;
 	cxl->dpa_size = capacity;
 
 	pci_dbg(pdev, "Device capacity: %llu MB\n", capacity >> 20);
@@ -293,6 +416,10 @@ void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev)
 		pci_warn(pdev, "Failed to create memdev\n");
 		goto regs_failed;
 	}
+
+	ret = vfio_cxl_create_region_helper(vdev, cxl, capacity);
+	if (ret)
+		goto regs_failed;
 
 	/*
 	 * Register probing succeeded.  Assign vdev->cxl now so that
@@ -319,6 +446,7 @@ void vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev)
 		return;
 
 	vfio_cxl_clean_virt_regs(cxl);
+	vfio_cxl_destroy_cxl_region(cxl);
 }
 
 MODULE_IMPORT_NS("CXL");
