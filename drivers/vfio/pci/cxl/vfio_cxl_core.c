@@ -170,6 +170,22 @@ failed_release:
 	return ret;
 }
 
+static int vfio_cxl_create_memdev(struct vfio_pci_cxl_state *cxl,
+				  resource_size_t capacity)
+{
+	int ret;
+
+	ret = cxl_set_capacity(&cxl->cxlds, capacity);
+	if (ret)
+		return ret;
+
+	cxl->cxlmd = devm_cxl_add_memdev(&cxl->cxlds, NULL);
+	if (IS_ERR(cxl->cxlmd))
+		return PTR_ERR(cxl->cxlmd);
+
+	return 0;
+}
+
 /*
  * Free CXL state early on probe failure.  devm_kfree() on a live devres
  * allocation removes it from the list immediately, so the normal devres
@@ -194,6 +210,7 @@ void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev)
 {
 	struct pci_dev *pdev = vdev->pdev;
 	struct vfio_pci_cxl_state *cxl;
+	resource_size_t capacity = 0;
 	u16 dvsec;
 	int ret;
 
@@ -239,7 +256,43 @@ void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev)
 		goto free_cxl;
 	}
 
+	cxl->cxlds.media_ready = !cxl_await_range_active(&cxl->cxlds);
+	if (!cxl->cxlds.media_ready) {
+		pci_warn(pdev, "CXL media not ready\n");
+		pci_disable_device(pdev);
+		goto regs_failed;
+	}
+
+	/*
+	 * Take the single authoritative HDM decoder snapshot now that
+	 * MEM_ACTIVE is confirmed and BAR memory is still enabled.  Using
+	 * readl() per-dword ensures correct MMIO serialisation and captures
+	 * the final firmware-written values for all fields including SIZE_HIGH,
+	 * which firmware commits to the BAR at MEM_ACTIVE time.
+	 */
+	vfio_cxl_reinit_comp_regs(cxl);
+
 	pci_disable_device(pdev);
+
+	capacity = vfio_cxl_read_committed_decoder_size(vdev, cxl);
+	if (capacity == 0) {
+		/*
+		 * TODO: Add handling for devices which do not have
+		 * firmware pre-committed decoders
+		 */
+		pci_info(pdev, "Uncommitted region size must be configured via sysfs before bind\n");
+		goto regs_failed;
+	}
+
+	cxl->dpa_size = capacity;
+
+	pci_dbg(pdev, "Device capacity: %llu MB\n", capacity >> 20);
+
+	ret = vfio_cxl_create_memdev(cxl, capacity);
+	if (ret) {
+		pci_warn(pdev, "Failed to create memdev\n");
+		goto regs_failed;
+	}
 
 	/*
 	 * Register probing succeeded.  Assign vdev->cxl now so that
@@ -250,6 +303,9 @@ void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev)
 	vdev->cxl = cxl;
 
 	return;
+
+regs_failed:
+	vfio_cxl_clean_virt_regs(cxl);
 
 free_cxl:
 	vfio_cxl_dev_state_free(pdev, cxl);
