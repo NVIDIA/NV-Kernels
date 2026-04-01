@@ -86,14 +86,43 @@ struct vfio_pci_cxl_state {
 #define CXL_HDM_DECODER_GLOBAL_CTRL_POISON_EN_BIT BIT(0)
 
 /*
- * CXL DVSEC for CXL Devices - register offsets within the DVSEC
- * (CXL 4.0 8.1.3).
- * Offsets are relative to the DVSEC capability base (cxl->dvsec).
+ * DVSEC register offsets and per-bit hardware definitions are in
+ * <uapi/cxl/cxl_regs.h> as CXL_DVSEC_*.  The masks below encode
+ * emulation policy: which bits to ignore, which to preserve separately
+ * from their raw hardware state.
  */
-#define CXL_DVSEC_CAPABILITY_OFFSET 0xa
-#define CXL_DVSEC_MEM_CAPABLE	    BIT(2)
-/* CXL DVSEC Capability register bit 0: device supports CXL.cache (HDM-DB) */
-#define CXL_DVSEC_CACHE_CAPABLE	    BIT(0)
+/* DVSEC Control (0x0C): bits 13 (RsvdP) and 15 (RsvdP) are always discarded */
+#define CXL_CTRL_RESERVED_MASK           (BIT(13) | BIT(15))
+/* bit 12 (P2P_Mem_Enable) treated as reserved if Cap3.P2P_Mem_Capable=0 */
+#define CXL_CTRL_P2P_REV_MASK            CXL_DVSEC_CTRL_P2P_MEM_ENABLE
+
+/* DVSEC Status (0x0E): bits 13:0 and 15 are RsvdZ */
+#define CXL_STATUS_RESERVED_MASK         (GENMASK(13, 0) | BIT(15))
+
+/*
+ * DVSEC Control2 (0x10) emulation masks.
+ *
+ * CXL_CTRL2_HW_BITS_MASK: bits 1 (Initiate_Cache_WBI) and 2
+ * (Initiate_CXL_Reset) always read 0 from hardware _ they are write-only
+ * action triggers per CXL 4.0 _8.1.3.8 Table 8-8.  Forward these to the
+ * device to trigger the hardware action; clear them from vconfig shadow so
+ * that subsequent guest reads return 0 as hardware requires.
+ *
+ * NOTE: bit 0 (Disable_Caching) and bit 3 (CXL_Reset_Mem_Clr_Enable) are
+ * ordinary RW fields _ they must be preserved in vconfig, not forwarded.
+ */
+#define CXL_CTRL2_RESERVED_MASK          GENMASK(15, 6)
+#define CXL_CTRL2_HW_BITS_MASK           (BIT(1) | BIT(2))
+/* bit 4 is RsvdP if Cap3.Volatile_HDM_Configurability=0 */
+#define CXL_CTRL2_VOLATILE_HDM_REV_MASK  CXL_DVSEC_CTRL2_DESIRED_VOLATILE_HDM
+/* bit 5 is RsvdP if Cap2.Mod_Completion_Capable=0 */
+#define CXL_CTRL2_MODIFIED_COMP_REV_MASK CXL_DVSEC_CTRL2_MOD_COMPLETION_ENABLE
+
+/* DVSEC Lock (0x14): bits 15:1 are RsvdP */
+#define CXL_LOCK_RESERVED_MASK           GENMASK(15, 1)
+
+/* DVSEC Range Base Low: bits 27:0 are reserved per Tables 8-15/8-19 */
+#define CXL_BASE_LO_RESERVED_MASK        CXL_DVSEC_RANGE_BASE_LOW_RSVD_MASK
 
 int vfio_cxl_setup_virt_regs(struct vfio_pci_core_device *vdev,
 			     struct vfio_pci_cxl_state *cxl,
