@@ -85,6 +85,7 @@ void cxl_probe_component_regs(struct device *dev, void __iomem *base,
 			decoder_cnt = cxl_hdm_decoder_count(hdr);
 			length = 0x20 * decoder_cnt + 0x10;
 			rmap = &map->hdm_decoder;
+			rmap->count = decoder_cnt;
 			break;
 		}
 		case CXL_CM_CAP_CAP_ID_RAS:
