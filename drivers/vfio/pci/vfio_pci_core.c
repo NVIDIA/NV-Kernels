@@ -1222,6 +1222,9 @@ static int vfio_pci_ioctl_reset(struct vfio_pci_core_device *vdev,
 
 	vfio_pci_zap_and_down_write_memory_lock(vdev);
 
+	/* Zap CXL DPA region PTEs before hardware reset clears HDM state */
+	vfio_cxl_zap_region_locked(vdev);
+
 	/*
 	 * This function can be invoked while the power state is non-D0. If
 	 * pci_try_reset_function() has been called while the power state is
@@ -1234,6 +1237,14 @@ static int vfio_pci_ioctl_reset(struct vfio_pci_core_device *vdev,
 	vfio_pci_set_power_state(vdev, PCI_D0);
 
 	ret = pci_try_reset_function(vdev->pdev);
+
+	/*
+	 * Re-enable DPA region if reset succeeded; fault handler will
+	 * re-insert PFNs on next access without requiring a new mmap.
+	 */
+	if (!ret)
+		vfio_cxl_reactivate_region(vdev);
+
 	up_write(&vdev->memory_lock);
 
 	return ret;
