@@ -79,6 +79,7 @@ static int init_pdev_params(struct pci_dev *pdev, struct rmi_pdev_params *params
 	params->rid_top = params->rid_base + 1;
 	params->ecam_addr = cfg->res.start;
 	params->root_id = pci_dev_id(pcie_find_root_port(pdev));
+	params->segment_id = pci_domain_nr(pdev->bus);
 
 	params->ncoh_num_addr_range =
 		pci_dev_addr_range(pdev, params->ncoh_addr_range);
