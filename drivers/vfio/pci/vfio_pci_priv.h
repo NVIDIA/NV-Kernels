@@ -110,4 +110,18 @@ static inline bool vfio_pci_is_vga(struct pci_dev *pdev)
 	return (pdev->class >> 8) == PCI_CLASS_DISPLAY_VGA;
 }
 
+#if IS_ENABLED(CONFIG_VFIO_CXL_CORE)
+
+void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev);
+void vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev);
+
+#else
+
+static inline void
+vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev) { }
+static inline void
+vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev) { }
+
+#endif /* CONFIG_VFIO_CXL_CORE */
+
 #endif
