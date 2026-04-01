@@ -3485,7 +3485,7 @@ CONFIG_COREDUMP                                 policy<{'amd64': 'y', 'arm64': '
 CONFIG_CORESIGHT                                policy<{'arm64': 'n', 'armhf': 'n'}>
 CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CORTINA_PHY                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
-CONFIG_COUNTER                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'n', 's390x': 'n'}>
+CONFIG_COUNTER                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
 CONFIG_CPA_DEBUG                                policy<{'amd64': 'n'}>
 CONFIG_CPCAP_ADC                                policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_CPM_TSA                                  policy<{'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n'}>
@@ -7166,7 +7166,7 @@ CONFIG_INTERCONNECT_QCOM_SM8750                 policy<{'arm64': 'm', 'armhf': '
 CONFIG_INTERCONNECT_QCOM_SMD_RPM                policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_QCOM_X1E80100               policy<{'arm64': 'm', 'armhf': 'm'}>
 CONFIG_INTERCONNECT_SAMSUNG                     policy<{'armhf': 'n'}>
-CONFIG_INTERRUPT_CNT                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_INTERRUPT_CNT                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_INTERRUPT_SANITIZE_REGISTERS             policy<{'ppc64el': 'y'}>
 CONFIG_INTERVAL_TREE                            policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_INTERVAL_TREE_SPAN_ITER                  policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
