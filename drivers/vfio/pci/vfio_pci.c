@@ -120,6 +120,29 @@ static int vfio_pci_open_device(struct vfio_device *core_vdev)
 		}
 	}
 
+	if (vdev->cxl) {
+		/*
+		 * pci_config_map and vconfig are valid now (allocated by
+		 * vfio_config_init() inside vfio_pci_core_enable() above).
+		 */
+		vfio_cxl_setup_dvsec_perms(vdev);
+
+		ret = vfio_cxl_register_cxl_region(vdev);
+		if (ret) {
+			pci_warn(pdev, "Failed to setup CXL region\n");
+			vfio_pci_core_disable(vdev);
+			return ret;
+		}
+
+		ret = vfio_cxl_register_comp_regs_region(vdev);
+		if (ret) {
+			pci_warn(pdev, "Failed to register COMP_REGS region\n");
+			vfio_cxl_unregister_cxl_region(vdev);
+			vfio_pci_core_disable(vdev);
+			return ret;
+		}
+	}
+
 	vfio_pci_core_finish_enable(vdev);
 
 	return 0;
