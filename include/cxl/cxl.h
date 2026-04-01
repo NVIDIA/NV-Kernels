@@ -376,6 +376,7 @@ int cxl_find_regblock(struct pci_dev *pdev, enum cxl_regloc_type type,
 		      struct cxl_register_map *map);
 void cxl_probe_component_regs(struct device *dev, void __iomem *base,
 			      struct cxl_component_reg_map *map);
+int cxl_await_range_active(struct cxl_dev_state *cxlds);
 #else
 
 static inline
@@ -390,7 +391,8 @@ static inline void
 cxl_probe_component_regs(struct device *dev, void __iomem *base,
 			 struct cxl_component_reg_map *map)
 { }
-
+static inline int cxl_await_range_active(struct cxl_dev_state *cxlds)
+{ return -EOPNOTSUPP; }
 #endif /* CONFIG_CXL_BUS */
 
 #endif /* __CXL_CXL_H__ */
