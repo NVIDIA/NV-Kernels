@@ -214,6 +214,16 @@ struct vfio_device_info {
 #define VFIO_DEVICE_FLAGS_FSL_MC (1 << 6)	/* vfio-fsl-mc device */
 #define VFIO_DEVICE_FLAGS_CAPS	(1 << 7)	/* Info supports caps */
 #define VFIO_DEVICE_FLAGS_CDX	(1 << 8)	/* vfio-cdx device */
+/*
+ * Vendor-specific CXL device with CXL.mem capability (HDM-D or HDM-DB
+ * decoder, PCI class code != PCI_CLASS_MEMORY_CXL).  Covers CXL Type-2
+ * accelerators and non-class-code Type-3 variants.  When set,
+ * VFIO_DEVICE_FLAGS_PCI is also set (same device is a PCI device). The
+ * capability chain (VFIO_DEVICE_FLAGS_CAPS) contains VFIO_DEVICE_INFO_CAP_CXL
+ * describing HDM decoders, region indices, decoder layout, and CXL-specific
+ * options.
+ */
+#define VFIO_DEVICE_FLAGS_CXL   (1 << 9)        /* Device supports CXL */
 	__u32	num_regions;	/* Max region index + 1 */
 	__u32	num_irqs;	/* Max IRQ index + 1 */
 	__u32   cap_offset;	/* Offset within info struct of first cap */
@@ -254,6 +264,70 @@ struct vfio_device_info_cap_pci_atomic_comp {
 #define VFIO_PCI_ATOMIC_COMP64	(1 << 1)
 #define VFIO_PCI_ATOMIC_COMP128	(1 << 2)
 	__u32 reserved;
+};
+
+/*
+ * VFIO_DEVICE_INFO_CAP_CXL - CXL Type-2 device capability
+ *
+ * Present in the device info capability chain when VFIO_DEVICE_FLAGS_CXL
+ * is set. Describes Host Managed Device Memory (HDM) layout and CXL
+ * memory options so that userspace (e.g. QEMU) can expose the CXL region
+ * and component registers correctly to the guest.
+ *
+ * The HDM decoder count and HDM decoder block offset within the COMP_REGS
+ * region are derivable from the COMP_REGS region itself.
+ *
+ * To find the HDM decoder block offset (hdm_decoder_offset), traverse the CXL
+ * Capability Array starting at COMP_REGS region offset 0:
+ *   - Dword 0 bits[31:24] (CXL_CM_CAP_HDR_ARRAY_SIZE_MASK): number of
+ *     capability entries.
+ *   - Each subsequent dword at offset (cap * 4): bits[15:0] = cap ID
+ *     (CXL_CM_CAP_HDR_ID_MASK), bits[31:20] = byte offset from COMP_REGS
+ *     start to that capability's register block (CXL_CM_CAP_PTR_MASK).
+ *   - Locate the entry with cap ID == CXL_CM_CAP_CAP_ID_HDM (0x5); the
+ *     extracted bits[31:20] value is directly the byte offset
+ *     hdm_decoder_offset (no further scaling required).
+ *
+ * To find the HDM decoder count, pread the HDM Decoder Capability register
+ * at hdm_decoder_offset + CXL_HDM_DECODER_CAP_OFFSET within the
+ * COMP_REGS region; bits[3:0] (CXL_HDM_DECODER_COUNT_MASK) encode the count
+ * using the formula: count = (field == 0) ? 1 : field * 2.
+ */
+#define VFIO_DEVICE_INFO_CAP_CXL		6
+struct vfio_device_info_cap_cxl {
+	struct vfio_info_cap_header header;
+	__u8  hdm_regs_bar_index; /* PCI BAR containing HDM registers */
+	__u8  reserved[3];
+	__u32 flags;
+/* Decoder was committed by host firmware/BIOS */
+#define VFIO_CXL_CAP_FIRMWARE_COMMITTED		(1 << 0)
+/*
+ * Device implements an HDM-DB decoder (CXL.cache + CXL.mem).  Reflects
+ * the Cache_Capable bit (bit 0) in the CXL DVSEC Capability register.
+ *
+ * When clear: HDM-D decoder (CXL.mem only, no CXL.cache).  FLR does not
+ * require a Write-Back Invalidation (WBI) sequence; the device holds no
+ * coherent copies of host memory.
+ *
+ * When set: HDM-DB decoder (CXL 3.0+).  The kernel driver does not
+ * perform Write-Back Invalidation (WBI) automatically.  The VMM must
+ * issue a WBI sequence before asserting FLR to flush dirty device cache
+ * lines and prevent coherency violations, and should advertise
+ * Back-Invalidation support in the virtual CXL topology.
+ */
+#define	VFIO_CXL_CAP_CACHE_CAPABLE		(1 << 1)
+	/*
+	 * Byte offset within the BAR to the CXL.mem register area start
+	 * (= comp_reg_offset + CXL_CM_OFFSET).	 This is where the CXL
+	 * Capability Array Header lives.
+	 */
+	__u64 hdm_regs_offset;
+	/*
+	 * Region indices for the two CXL VFIO device regions.
+	 * Avoids forcing userspace to scan all regions by type/subtype.
+	 */
+	__u32  dpa_region_index;       /* VFIO_REGION_SUBTYPE_CXL */
+	__u32  comp_regs_region_index; /* VFIO_REGION_SUBTYPE_CXL_COMP_REGS */
 };
 
 /**
@@ -368,6 +442,18 @@ struct vfio_region_info_cap_type {
  * Deprecated, region no longer provided
  */
 #define VFIO_REGION_SUBTYPE_IBM_NVLINK2_ATSD	(1)
+
+/* 1e98 vendor PCI sub-types (CXL Consortium) */
+/*
+ * CXL memory region. Use with region type
+ * (PCI_VENDOR_ID_CXL | VFIO_REGION_TYPE_PCI_VENDOR_TYPE).
+ * DPA memory region (fault+zap mmap)
+ */
+#define VFIO_REGION_SUBTYPE_CXL                 (1)
+/*
+ * HDM decoder register emulation region (read/write only, no mmap).
+ */
+#define VFIO_REGION_SUBTYPE_CXL_COMP_REGS       (2)
 
 /* sub-types for VFIO_REGION_TYPE_GFX */
 #define VFIO_REGION_SUBTYPE_GFX_EDID            (1)
