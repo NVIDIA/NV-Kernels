@@ -2215,6 +2215,15 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 	return 0;
 
 out_power:
+	/*
+	 * vfio_pci_cxl_detect_and_init() may have assigned vdev->cxl and
+	 * allocated comp_reg_virt[] / hdm_iobase / region state above.  The
+	 * normal teardown via vfio_pci_core_unregister_device() will not run
+	 * if registration failed, so release the CXL state here.  No-op when
+	 * vdev->cxl is NULL (non-CXL device or detect skipped).
+	 */
+	vfio_pci_cxl_cleanup(vdev);
+
 	if (!disable_idle_d3)
 		pm_runtime_get_noresume(dev);
 
