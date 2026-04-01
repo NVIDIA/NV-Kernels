@@ -147,16 +147,24 @@ static int cxl_dvsec_mem_range_active(struct cxl_dev_state *cxlds, int id)
 	return 0;
 }
 
-/*
- * Wait up to @media_ready_timeout for the device to report memory
- * active.
+/**
+ * cxl_await_range_active - Wait for all HDM DVSEC memory ranges to be active
+ * @cxlds: CXL device state (DVSEC and HDM count must be valid)
+ *
+ * For each HDM decoder range reported in the CXL DVSEC capability, waits for
+ * the range to report MEM INFO VALID (up to 1s per range), then MEM ACTIVE
+ * (up to media_ready_timeout seconds per range, default 60s). Used by
+ * cxl_await_media_ready() and by callers that only need range readiness
+ * without checking the memory device status register.
+ *
+ * Return: 0 if all ranges become valid and active, -ETIMEDOUT if a timeout
+ * occurs, or a negative errno from config read on failure.
  */
-int cxl_await_media_ready(struct cxl_dev_state *cxlds)
+int cxl_await_range_active(struct cxl_dev_state *cxlds)
 {
 	struct pci_dev *pdev = to_pci_dev(cxlds->dev);
 	int d = cxlds->cxl_dvsec;
 	int rc, i, hdm_count;
-	u64 md_status;
 	u16 cap;
 
 	rc = pci_read_config_word(pdev,
@@ -176,6 +184,23 @@ int cxl_await_media_ready(struct cxl_dev_state *cxlds)
 		if (rc)
 			return rc;
 	}
+
+	return 0;
+}
+EXPORT_SYMBOL_NS_GPL(cxl_await_range_active, "CXL");
+
+/*
+ * Wait up to @media_ready_timeout for the device to report memory
+ * active.
+ */
+int cxl_await_media_ready(struct cxl_dev_state *cxlds)
+{
+	u64 md_status;
+	int rc;
+
+	rc = cxl_await_range_active(cxlds);
+	if (rc)
+		return rc;
 
 	md_status = readq(cxlds->regs.memdev + CXLMDEV_STATUS_OFFSET);
 	if (!CXLMDEV_READY(md_status))
