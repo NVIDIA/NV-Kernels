@@ -16,10 +16,13 @@ enum cxl_regloc_type {
 
 struct pci_dev;
 struct cxl_register_map;
+struct cxl_component_reg_map;
 
 int cxl_pci_setup_regs(struct pci_dev *pdev, enum cxl_regloc_type type,
 		       struct cxl_register_map *map);
 int cxl_find_regblock(struct pci_dev *pdev, enum cxl_regloc_type type,
 		      struct cxl_register_map *map);
+void cxl_probe_component_regs(struct device *dev, void __iomem *base,
+                              struct cxl_component_reg_map *map);
 int cxl_setup_regs(struct cxl_register_map *map);
 #endif
