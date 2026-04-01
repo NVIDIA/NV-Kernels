@@ -336,17 +336,31 @@ struct cxl_memdev *devm_cxl_probe_mem(struct cxl_dev_state *cxlds,
 
 int cxl_set_capacity(struct cxl_dev_state *cxlds, u64 capacity);
 
+
+enum cxl_regloc_type;
+
 #ifdef CONFIG_CXL_BUS
 
 int cxl_get_hdm_info(struct cxl_dev_state *cxlds, u8 *count,
 		     resource_size_t *offset, resource_size_t *size);
-
+int cxl_find_regblock(struct pci_dev *pdev, enum cxl_regloc_type type,
+		      struct cxl_register_map *map);
+void cxl_probe_component_regs(struct device *dev, void __iomem *base,
+			      struct cxl_component_reg_map *map);
 #else
 
 static inline
 int cxl_get_hdm_info(struct cxl_dev_state *cxlds, u8 *count,
 		     resource_size_t *offset, resource_size_t *size)
 { return -EOPNOTSUPP; }
+static inline int
+cxl_find_regblock(struct pci_dev *pdev, enum cxl_regloc_type type,
+		  struct cxl_register_map *map)
+{ return -EOPNOTSUPP; }
+static inline void
+cxl_probe_component_regs(struct device *dev, void __iomem *base,
+			 struct cxl_component_reg_map *map)
+{ }
 
 #endif /* CONFIG_CXL_BUS */
 
