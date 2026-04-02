@@ -25,7 +25,7 @@ Build-Profiles: <!stage1>
 Architecture: ARCH
 Section: kernel
 Priority: optional
-Depends: ${misc:Depends}, ${shlibs:Depends}, wireless-regdb
+Depends: ${misc:Depends}, ${shlibs:Depends}, linux-main-modules-zfs-PKGVER-ABINUM-FLAVOUR [amd64 arm64 ppc64el s390x], wireless-regdb
 Built-Using: ${linux:BuiltUsing}
 Description: Linux kernel modules for version PKGVER
  Contains the corresponding System.map file, the modules built by the
