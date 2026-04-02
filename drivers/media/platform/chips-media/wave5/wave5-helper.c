@@ -61,7 +61,6 @@ int wave5_vpu_release_device(struct file *filp,
 	unsigned long flags;
 	int ret = 0;
 
-	v4l2_m2m_ctx_release(inst->v4l2_fh.m2m_ctx);
 	/*
 	 * Serialize removal from the instance list with both phases of interrupt
 	 * handling so neither phase can retain a pointer to a freed instance.
@@ -73,6 +72,9 @@ int wave5_vpu_release_device(struct file *filp,
 	list_del_init(&inst->list);
 	spin_unlock_irqrestore(&dev->irq_spinlock, flags);
 	mutex_unlock(&dev->irq_lock);
+
+	v4l2_m2m_ctx_release(inst->v4l2_fh.m2m_ctx);
+
 	if (inst->state != VPU_INST_STATE_NONE) {
 		u32 fail_res;
 
