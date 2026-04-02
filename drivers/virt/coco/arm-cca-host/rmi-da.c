@@ -20,32 +20,33 @@
 #define RMI_PDEV_PARAMS_DISABLE_SEL_IDE		(1UL << 62)
 #define RMI_PDEV_PARAMS_DISABLE_LINK_IDE	(1UL << 63)
 
-static int pci_dev_addr_range(struct pci_dev *pdev,
-			      struct rmi_pdev_addr_range *pdev_addr)
-{
-	int naddr = 0;
-	struct pci_dev *br;
-	struct resource *mem, *pref;
 
-	br = pci_upstream_bridge(pdev);
-	if (!br)
+/*
+ * Construct the PDEV ranges using IORESOURCE_MEM properties. Otherwise
+ * RMM cannot properly create the fake report for platform devices.
+ */
+static int pci_dev_addr_range(struct rmi_pdev_addr_range *pdev_addr,
+			      unsigned int naddr,
+			      struct resource *res,
+			      unsigned int nres)
+{
+	int i, j;
+
+	if (!res)
 		return 0;
 
-	mem = pci_resource_n(br, PCI_BRIDGE_MEM_WINDOW);
-	if (resource_assigned(mem)) {
-		pdev_addr[naddr].base = mem->start;
-		pdev_addr[naddr].top  = mem->end + 1;
-		naddr++;
+	for (i = 0, j = 0; i < naddr && j < nres; j++) {
+		/* Skip over the custom coherent resource */
+		if (j == PCI_COHERENT_RESOURCE)
+			continue;
+		if (res[j].flags & IORESOURCE_MEM) {
+			pdev_addr[i].base = res[j].start;
+			/* NOTE: the address range end is exclusive */
+			pdev_addr[i].top = res[j].end + 1;
+			i++;
+		}
 	}
-
-	pref = pci_resource_n(br, PCI_BRIDGE_PREF_MEM_WINDOW);
-	if (resource_assigned(pref)) {
-		pdev_addr[naddr].base = pref->start;
-		pdev_addr[naddr].top  = pref->end + 1;
-		naddr++;
-	}
-
-	return naddr;
+	return i;
 }
 
 static void free_aux_pages(int cnt, void *aux[])
@@ -91,7 +92,10 @@ static int init_pdev_params(struct pci_dev *pdev, struct rmi_pdev_params *params
 	params->segment_id = pci_domain_nr(pdev->bus);
 
 	params->ncoh_num_addr_range =
-		pci_dev_addr_range(pdev, params->ncoh_addr_range);
+		pci_dev_addr_range(params->ncoh_addr_range,
+				   ARRAY_SIZE(params->ncoh_addr_range),
+				   pdev->resource,
+				   DEVICE_COUNT_RESOURCE);
 
 	rmi_pdev_aux_count(params->flags, &params->num_aux);
 	pf0_dsc->num_aux = params->num_aux;
