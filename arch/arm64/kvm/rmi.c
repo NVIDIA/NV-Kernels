@@ -1409,6 +1409,17 @@ static int __realm_dev_mem_map(struct kvm *kvm,
 			/* Create missing RTTs and retry */
 			int level = RMI_RETURN_INDEX(rmi_ret);
 
+			/*
+			 * If no memory is available, undelegate the page and
+			 * break out and validate the range this far.
+			 */
+			if (kvm_mmu_memory_cache_nr_free_objects(cache) <
+			   (RMM_RTT_MAX_LEVEL - level)) {
+				WARN_ON(rmi_granule_undelegate(phys));
+				ret = -ENOMEM;
+				break;
+			}
+
 			ret = realm_create_rtt_levels(realm, ipa, level,
 						      RMM_RTT_MAX_LEVEL,
 						      cache);
@@ -1429,12 +1440,12 @@ static int __realm_dev_mem_map(struct kvm *kvm,
 	 * Return the highest mapped IPA within the range
 	 * (processed by vdev_mem_map)
 	 */
-	*top_ipa = end_ipa;
+	*top_ipa = ipa;
 
-	while (start_ipa < end_ipa) {
+	while (start_ipa < ipa) {
 		/* now validate the device memory mapping */
 		if (rmi_vdev_validate_mapping(rd_phys, rec_phys, pdev_phys,
-				vdev_phys, start_ipa, end_ipa, &next_ipa)) {
+				vdev_phys, start_ipa, ipa, &next_ipa)) {
 			/*
 			 * We can't find the RTT error here, because
 			 * things are already setup by dev_mem_map before
@@ -1445,12 +1456,12 @@ static int __realm_dev_mem_map(struct kvm *kvm,
 		start_ipa = next_ipa;
 	}
 
-	return 0;
+	return ret;
 
  err_vdev_mem_map:
 	WARN_ON(rmi_granule_undelegate(phys));
  err_delegate:
-	*top_ipa = ipa - PAGE_SIZE;
+	*top_ipa = ipa;
 	return ret;
 }
 
