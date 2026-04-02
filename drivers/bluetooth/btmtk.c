@@ -22,22 +22,6 @@
 #define MTK_SEC_MAP_COMMON_SIZE	12
 #define MTK_SEC_MAP_NEED_SEND_SIZE	52
 
-/* Known MT6639 (MT7927) Bluetooth USB devices.
- * Used to scope the zero-CHIPID workaround to real MT6639 hardware,
- * since some boards return 0x0000 from the MMIO chip ID register.
- */
-static const struct {
-	u16 vendor;
-	u16 product;
-} btmtk_mt6639_devs[] = {
-	{ 0x0489, 0xe13a },	/* ASUS ROG Crosshair X870E Hero */
-	{ 0x0489, 0xe0fa },	/* Lenovo Legion Pro 7 16ARX9 */
-	{ 0x0489, 0xe10f },	/* Gigabyte Z790 AORUS MASTER X */
-	{ 0x0489, 0xe110 },	/* MSI X870E Ace Max */
-	{ 0x0489, 0xe116 },	/* TP-Link Archer TBE550E */
-	{ 0x13d3, 0x3588 },	/* ASUS ROG STRIX X870E-E */
-};
-
 struct btmtk_patch_header {
 	u8 datetime[16];
 	u8 platform[4];
@@ -468,6 +452,22 @@ int btmtk_process_coredump(struct hci_dev *hdev, struct sk_buff *skb)
 EXPORT_SYMBOL_GPL(btmtk_process_coredump);
 
 #if IS_ENABLED(CONFIG_BT_HCIBTUSB_MTK)
+/* Known MT6639 (MT7927) Bluetooth USB devices.
+ * Used to scope the zero-CHIPID workaround to real MT6639 hardware,
+ * since some boards return 0x0000 from the MMIO chip ID register.
+ */
+static const struct {
+	u16 vendor;
+	u16 product;
+} btmtk_mt6639_devs[] = {
+	{ 0x0489, 0xe13a },	/* ASUS ROG Crosshair X870E Hero */
+	{ 0x0489, 0xe0fa },	/* Lenovo Legion Pro 7 16ARX9 */
+	{ 0x0489, 0xe10f },	/* Gigabyte Z790 AORUS MASTER X */
+	{ 0x0489, 0xe110 },	/* MSI X870E Ace Max */
+	{ 0x0489, 0xe116 },	/* TP-Link Archer TBE550E */
+	{ 0x13d3, 0x3588 },	/* ASUS ROG STRIX X870E-E */
+};
+
 static void btmtk_usb_wmt_recv(struct urb *urb)
 {
 	struct hci_dev *hdev = urb->context;
