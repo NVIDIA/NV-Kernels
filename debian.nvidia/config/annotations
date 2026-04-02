@@ -217,8 +217,4 @@ CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
 # ---- Annotations without notes ----
 
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
-CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"', 'arm64': '"aarch64-linux-gnu-gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
-CONFIG_PAHOLE_VERSION                           policy<{'amd64': '131', 'arm64': '131'}>
-CONFIG_RUSTC_VERSION                            policy<{'amd64': '109301', 'arm64': '109301'}>
-CONFIG_RUSTC_VERSION_TEXT                       policy<{'amd64': '"rustc 1.93.1 (01f6ddf75 2026-02-11) (built from a source tarball)"', 'arm64': '"rustc 1.93.1 (01f6ddf75 2026-02-11) (built from a source tarball)"'}>
