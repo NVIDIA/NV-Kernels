@@ -202,6 +202,7 @@ enum mpam_device_features {
 	mpam_feat_mbw_part,
 	mpam_feat_mbw_min,
 	mpam_feat_mbw_max,
+	mpam_feat_mbw_max_hardlim_rw,
 	mpam_feat_mbw_prop,
 	mpam_feat_intpri_part,
 	mpam_feat_intpri_part_0_low,
@@ -233,6 +234,11 @@ struct mpam_props {
 	u16			dspri_wd;
 	u16			num_csu_mon;
 	u16			num_mbwu_mon;
+	/*
+	 * MPAMF_MBW_IDR.MAX_LIM [1:0] when mpam_feat_mbw_max; else 0.
+	 * 0 = soft+hard, 1 = soft only, 2 = hard only, 3 = reserved.
+	 */
+	u8			mbw_max_lim;
 
 /*
  * Kunit tests use memset() to set up feature combinations that should be
@@ -615,6 +621,7 @@ int mpam_fb_get_protocol_version(struct mpam_msc *msc);
 
 /* MPAMF_MBW_IDR - MPAM features memory bandwidth partitioning ID register */
 #define MPAMF_MBW_IDR_BWA_WD		GENMASK(5, 0)
+#define MPAMF_MBW_IDR_MAX_LIM		GENMASK(9, 8)
 #define MPAMF_MBW_IDR_HAS_MIN		BIT(10)
 #define MPAMF_MBW_IDR_HAS_MAX		BIT(11)
 #define MPAMF_MBW_IDR_HAS_PBM		BIT(12)

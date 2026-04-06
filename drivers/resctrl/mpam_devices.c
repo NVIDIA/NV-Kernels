@@ -934,6 +934,19 @@ out_unlock:
 	return ret;
 }
 
+/* Align mpam_feat_mbw_max_hardlim_rw with MPAMF_MBW_IDR.MAX_LIM and mbw_max. */
+static void mpam_props_sync_mbw_max_hardlim_rw(struct mpam_props *props)
+{
+	if (!mpam_has_feature(mpam_feat_mbw_max, props)) {
+		mpam_clear_feature(mpam_feat_mbw_max_hardlim_rw, props);
+		return;
+	}
+	if (props->mbw_max_lim == 0)
+		mpam_set_feature(mpam_feat_mbw_max_hardlim_rw, props);
+	else
+		mpam_clear_feature(mpam_feat_mbw_max_hardlim_rw, props);
+}
+
 static int mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 {
 	int err;
@@ -992,6 +1005,8 @@ static int mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 		if (err)
 			return err;
 
+		props->mbw_max_lim = 0;
+
 		/* portion bitmap resolution */
 		props->mbw_pbm_bits = FIELD_GET(MPAMF_MBW_IDR_BWPBM_WD, mbw_features);
 		if (props->mbw_pbm_bits &&
@@ -1006,14 +1021,18 @@ static int mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 		 */
 		props->bwa_wd = min(props->bwa_wd, 16);
 
-		if (props->bwa_wd && FIELD_GET(MPAMF_MBW_IDR_HAS_MAX, mbw_features))
+		if (props->bwa_wd && FIELD_GET(MPAMF_MBW_IDR_HAS_MAX, mbw_features)) {
 			mpam_set_feature(mpam_feat_mbw_max, props);
+			props->mbw_max_lim = FIELD_GET(MPAMF_MBW_IDR_MAX_LIM, mbw_features);
+		}
 
 		if (props->bwa_wd && FIELD_GET(MPAMF_MBW_IDR_HAS_MIN, mbw_features))
 			mpam_set_feature(mpam_feat_mbw_min, props);
 
 		if (props->bwa_wd && FIELD_GET(MPAMF_MBW_IDR_HAS_PROP, mbw_features))
 			mpam_set_feature(mpam_feat_mbw_prop, props);
+
+		mpam_props_sync_mbw_max_hardlim_rw(props);
 	}
 
 	/* Priority partitioning */
@@ -2544,10 +2563,29 @@ static void __props_mismatch(struct mpam_props *parent,
 	if (alias && !mpam_has_bwa_wd_feature(parent) &&
 	    mpam_has_bwa_wd_feature(child)) {
 		parent->bwa_wd = child->bwa_wd;
+		parent->mbw_max_lim = child->mbw_max_lim;
+		if (mpam_has_feature(mpam_feat_mbw_max_hardlim_rw, child))
+			mpam_set_feature(mpam_feat_mbw_max_hardlim_rw, parent);
+		else
+			mpam_clear_feature(mpam_feat_mbw_max_hardlim_rw, parent);
 	} else if (MISMATCHED_HELPER(parent, child, mpam_has_bwa_wd_feature,
 				     bwa_wd, alias)) {
 		pr_debug("took the min bwa_wd\n");
 		parent->bwa_wd = min(parent->bwa_wd, child->bwa_wd);
+	}
+
+	if (CAN_MERGE_FEAT(parent, child, mpam_feat_mbw_max, alias)) {
+		parent->mbw_max_lim = child->mbw_max_lim;
+		if (mpam_has_feature(mpam_feat_mbw_max_hardlim_rw, child))
+			mpam_set_feature(mpam_feat_mbw_max_hardlim_rw, parent);
+		else
+			mpam_clear_feature(mpam_feat_mbw_max_hardlim_rw, parent);
+	} else if (MISMATCHED_FEAT(parent, child, mpam_feat_mbw_max,
+				   mbw_max_lim, alias)) {
+		pr_debug("%s mbw_max_lim mismatch, clearing mbw_max\n", __func__);
+		mpam_clear_feature(mpam_feat_mbw_max, parent);
+		parent->mbw_max_lim = 0;
+		mpam_props_sync_mbw_max_hardlim_rw(parent);
 	}
 
 	if (alias && !mpam_has_cmax_wd_feature(parent) && mpam_has_cmax_wd_feature(child)) {
