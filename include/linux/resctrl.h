@@ -248,11 +248,15 @@ enum membw_throttle_mode {
  * @min_bw:		Minimum memory bandwidth percentage user can request
  * @max_bw:		Maximum memory bandwidth value, used as the reset value
  * @bw_gran:		Granularity at which the memory bandwidth is allocated
+ * @mb_max_lim:		MPAM MAX_LIM encoding (MPAMF_MBW_IDR); invalid elsewhere
+ * @arch_has_mb_max_lim:True if mb_max_lim is supported
  */
 struct resctrl_membw {
 	u32				min_bw;
 	u32				max_bw;
 	u32				bw_gran;
+	u8				mb_max_lim;
+	bool				arch_has_mb_max_lim;
 };
 
 /**
