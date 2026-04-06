@@ -1487,7 +1487,8 @@ static bool rdtgroup_mode_test_exclusive(struct rdtgroup *rdtgrp)
 
 	list_for_each_entry(s, &resctrl_schema_all, list) {
 		r = s->res;
-		if (r->rid == RDT_RESOURCE_MBA || r->rid == RDT_RESOURCE_SMBA)
+		if (r->rid == RDT_RESOURCE_MBA || r->rid == RDT_RESOURCE_SMBA ||
+		    r->rid == RDT_RESOURCE_MB_HLIM)
 			continue;
 		has_cache = true;
 		list_for_each_entry(d, &r->ctrl_domains, hdr.list) {
@@ -1781,6 +1782,9 @@ static int resctrl_schema_format_show(struct kernfs_open_file *of,
 	/* The way these schema behave isn't discoverable from resctrl */
 	case RESCTRL_SCHEMA__AMD_MBA:
 		seq_puts(seq, "platform\n");
+		break;
+	case RESCTRL_SCHEMA_MB_HLIM:
+		seq_puts(seq, "0/1\n");
 		break;
 	}
 
@@ -2523,6 +2527,7 @@ static u32 fflags_from_schema(struct resctrl_schema *s)
 		fflags |= RFTYPE_SCHEMA_MBPS;
 		break;
 	case RESCTRL_SCHEMA__AMD_MBA:
+	case RESCTRL_SCHEMA_MB_HLIM:
 		/* No standard files are exposed */
 		break;
 	}
@@ -2876,6 +2881,7 @@ static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type
 	case RESCTRL_SCHEMA_PERCENT:
 	case RESCTRL_SCHEMA_MBPS:
 	case RESCTRL_SCHEMA__AMD_MBA:
+	case RESCTRL_SCHEMA_MB_HLIM:
 		s->fmt_str = "%d=%u";
 		break;
 	}
@@ -3830,6 +3836,19 @@ static void rdtgroup_init_mba(struct rdt_resource *r, u32 closid)
 	}
 }
 
+/* Initialize MB_HLIM resource with default hardlim off (0). */
+static void rdtgroup_init_mb_hlim(struct resctrl_schema *s)
+{
+	struct resctrl_staged_config *cfg;
+	struct rdt_ctrl_domain *d;
+
+	list_for_each_entry(d, &s->res->ctrl_domains, hdr.list) {
+		cfg = &d->staged_config[s->conf_type];
+		cfg->new_ctrl = 0;
+		cfg->have_new_ctrl = true;
+	}
+}
+
 /* Initialize the RDT group's allocations. */
 static int rdtgroup_init_alloc(struct rdtgroup *rdtgrp)
 {
@@ -3846,6 +3865,8 @@ static int rdtgroup_init_alloc(struct rdtgroup *rdtgrp)
 			rdtgroup_init_mba(r, rdtgrp->closid);
 			if (is_mba_sc(r))
 				continue;
+		} else if (r->rid == RDT_RESOURCE_MB_HLIM) {
+			rdtgroup_init_mb_hlim(s);
 		} else {
 			ret = rdtgroup_init_cat(s, rdtgrp->closid);
 			if (ret < 0)
