@@ -155,6 +155,19 @@ with respect to allocation:
 		non-linear. This field is purely informational
 		only.
 
+"max_lim":
+		Read-only. On ARM MPAM systems where MBA exposes MBW_MAX, this
+		file contains a single decimal integer: the
+		``MPAMF_MBW_IDR.MAX_LIM`` field [1:0] (values ``0``–``3``) as probed for the MBA resource.
+		The file appears only when the platform supports MBA MBW_MAX and
+		the MAX_LIM value is available; otherwise it is not listed.
+
+		The Arm MPAM architecture defines the meaning of each MAX_LIM
+		encoding. In this kernel, when ``max_lim`` reads ``0``, the
+		driver treats the ``HARDLIM`` bit of ``MPAMCFG_MBW_MAX`` as
+		read/write and an optional ``MB_HLIM`` line may appear in
+		``schemata``. When ``max_lim`` is nonzero, ``MB_HLIM`` is omitted.
+
 "thread_throttle_mode":
 		Indicator on Intel systems of how tasks running on threads
 		of a physical core are throttled in cases where they
@@ -870,6 +883,27 @@ Memory bandwidth domain is L3 cache.
 ::
 
 	MB:<cache_id0>=bw_MiBps0;<cache_id1>=bw_MiBps1;...
+
+MBW maximum hard limit (ARM MPAM)
+---------------------------------
+On some ARM systems, resctrl memory bandwidth allocation uses MPAM
+maximum bandwidth (MBW_MAX). When ``max_lim`` reads ``0`` (see ``max_lim``
+under the ``MB`` allocation ``info`` directory), an additional schemata
+line selects the ``HARDLIM`` bit for ``MPAMCFG_MBW_MAX`` independently of
+the numeric limit on the ``MB`` line.
+
+The line uses the same cache/domain indices as ``MB``. Each value must
+be ``0`` or ``1``: ``0`` clears HARDLIM (soft-limit behaviour for the
+max), ``1`` sets HARDLIM (hard limit). When ``max_lim`` is nonzero or
+``MB_HLIM`` is not supported for the platform, the line is omitted from
+``schemata``.
+
+Format:
+::
+
+	MB_HLIM:<cache_id0>=0|1;<cache_id1>=0|1;...
+
+The corresponding ``schema_format`` entry under ``info`` is ``mb_hlim``.
 
 Slow Memory Bandwidth Allocation (SMBA)
 ---------------------------------------
