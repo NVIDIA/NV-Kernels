@@ -57,6 +57,7 @@ enum resctrl_res_level {
 	RDT_RESOURCE_PERF_PKG,
 	RDT_RESOURCE_L3_MAX,
 	RDT_RESOURCE_L2_MAX,
+	RDT_RESOURCE_MB_HLIM,
 
 	/* Must be the last */
 	RDT_NUM_RESOURCES,
@@ -286,12 +287,15 @@ enum resctrl_scope {
  * @RESCTRL_SCHEMA_PERCENT:	The schema is a percentage.
  * @RESCTRL_SCHEMA_MBPS:	The schema ia a MBps value.
  * @RESCTRL_SCHEMA__AMD_MBA:	The schema value is MBA for AMD platforms.
+ * @RESCTRL_SCHEMA_MB_HLIM:	Per-domain MBW max hard limit (0/1), ARM MPAM only
+ *				when MPAMF_MBW_IDR.MAX_LIM is 0b00 (HARDLIM RW).
  */
 enum resctrl_schema_fmt {
 	RESCTRL_SCHEMA_BITMAP,
 	RESCTRL_SCHEMA_PERCENT,
 	RESCTRL_SCHEMA_MBPS,
 	RESCTRL_SCHEMA__AMD_MBA,
+	RESCTRL_SCHEMA_MB_HLIM,
 };
 
 /**
@@ -426,6 +430,8 @@ static inline u32 resctrl_get_resource_default_ctrl(struct rdt_resource *r)
 	case RESCTRL_SCHEMA_MBPS:
 	case RESCTRL_SCHEMA__AMD_MBA:
 		return r->membw.max_bw;
+	case RESCTRL_SCHEMA_MB_HLIM:
+		return 0;
 	}
 
 	return WARN_ON_ONCE(1);
