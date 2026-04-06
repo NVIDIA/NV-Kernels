@@ -2501,6 +2501,8 @@ static unsigned long fflags_from_resource(struct rdt_resource *r)
 		return RFTYPE_RES_MB;
 	case RDT_RESOURCE_PERF_PKG:
 		return RFTYPE_RES_PERF_PKG;
+	case RDT_RESOURCE_MB_HLIM:
+		return 0;
 	}
 
 	return 0;
