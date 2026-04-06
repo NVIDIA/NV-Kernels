@@ -1276,6 +1276,17 @@ static int rdt_delay_linear_show(struct kernfs_open_file *of,
 	return 0;
 }
 
+static int rdt_mb_max_lim_show(struct kernfs_open_file *of,
+			       struct seq_file *seq, void *v)
+{
+	struct resctrl_schema *s = rdt_kn_parent_priv(of->kn);
+	struct rdt_resource *r = s->res;
+
+	seq_printf(seq, "%d\n", r->membw.mb_max_lim);
+
+	return 0;
+}
+
 static int max_threshold_occ_show(struct kernfs_open_file *of,
 				  struct seq_file *seq, void *v)
 {
@@ -2090,6 +2101,12 @@ static struct rftype res_common_files[] = {
 		.seq_show	= rdt_delay_linear_show,
 		.fflags		= RFTYPE_CTRL_INFO | RFTYPE_RES_MB,
 	},
+	{
+		.name		= "max_lim",
+		.mode		= 0444,
+		.kf_ops		= &rdtgroup_kf_single_ops,
+		.seq_show	= rdt_mb_max_lim_show,
+	},
 	/*
 	 * Platform specific which (if any) capabilities are provided by
 	 * thread_throttle_mode. Defer "fflags" initialization to platform
@@ -2305,6 +2322,17 @@ static void thread_throttle_mode_init(void)
 
 	resctrl_file_fflags_init("thread_throttle_mode",
 				 RFTYPE_CTRL_INFO | RFTYPE_RES_MB);
+}
+
+/* The resctrl file "max_lim" is added using MB resource if visible. */
+static void mb_max_lim_init(void)
+{
+	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_MBA);
+
+	if (!r->membw.arch_has_mb_max_lim)
+		return;
+
+	resctrl_file_fflags_init("max_lim", RFTYPE_CTRL_INFO | RFTYPE_RES_MB);
 }
 
 void resctrl_file_fflags_init(const char *config, unsigned long fflags)
@@ -4769,6 +4797,8 @@ int resctrl_init(void)
 	rdtgroup_setup_default();
 
 	thread_throttle_mode_init();
+
+	mb_max_lim_init();
 
 	ret = resctrl_mon_init();
 	if (ret)
