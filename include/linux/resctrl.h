@@ -451,6 +451,8 @@ static inline u32 resctrl_get_schema_default_ctrl(struct resctrl_schema *s)
 	case RESCTRL_SCHEMA_MBPS:
 	case RESCTRL_SCHEMA__AMD_MBA:
 		return s->membw.max_bw;
+	case RESCTRL_SCHEMA_MB_HLIM:
+		return 0;
 	}
 
 	return WARN_ON_ONCE(1);
