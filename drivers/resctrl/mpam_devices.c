@@ -1751,9 +1751,19 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 		mpam_write_partsel_reg(msc, MBW_MIN, val);
 	}
 
-	if (mpam_has_feature(mpam_feat_mbw_max, rprops) &&
-	    mpam_has_feature(mpam_feat_mbw_max, cfg))
-		mpam_write_partsel_reg(msc, MBW_MAX, cfg->mbw_max);
+	if (mpam_has_feature(mpam_feat_mbw_max, rprops)) {
+		if (mpam_has_feature(mpam_feat_mbw_max, cfg) ||
+		    mpam_has_feature(mpam_feat_mbw_max_hardlim_rw, cfg)) {
+			u32 mbw_val = cfg->mbw_max;
+
+			if (mpam_has_feature(mpam_feat_mbw_max_hardlim_rw, cfg) &&
+			    cfg->mbw_max_hardlim)
+				mbw_val |= MPAMCFG_MBW_MAX_HARDLIM;
+			mpam_write_partsel_reg(msc, MBW_MAX, mbw_val);
+		} else {
+			mpam_write_partsel_reg(msc, MBW_MAX, MPAMCFG_MBW_MAX_MAX);
+		}
+	}
 
 	if (mpam_has_feature(mpam_feat_mbw_prop, rprops) &&
 	    mpam_has_feature(mpam_feat_mbw_prop, cfg))
@@ -3442,6 +3452,8 @@ static bool mpam_update_config(struct mpam_config *cfg,
 	maybe_update_config(cfg, mpam_feat_mbw_part, newcfg, mbw_pbm, has_changes);
 	maybe_update_config(cfg, mpam_feat_mbw_max, newcfg, mbw_max, has_changes);
 	maybe_update_config(cfg, mpam_feat_mbw_min, newcfg, mbw_min, has_changes);
+	maybe_update_config(cfg, mpam_feat_mbw_max_hardlim_rw, newcfg,
+			    mbw_max_hardlim, has_changes);
 
 	return has_changes;
 }
