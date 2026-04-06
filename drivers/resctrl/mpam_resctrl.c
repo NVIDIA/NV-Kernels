@@ -1512,6 +1512,11 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res)
 		r->membw.max_bw = MAX_MBA_BW;
 		r->membw.bw_gran = get_mba_granularity(cprops);
 
+		if (mpam_has_feature(mpam_feat_mbw_max, cprops)) {
+			r->membw.mb_max_lim = cprops->mbw_max_lim;
+			r->membw.arch_has_mb_max_lim = true;
+		}
+
 		r->name = "MB";
 		r->alloc_capable = true;
 		break;
