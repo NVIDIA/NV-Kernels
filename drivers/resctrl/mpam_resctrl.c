@@ -1183,6 +1183,13 @@ static void mpam_resctrl_pick_mba(void)
 		pr_debug("selected class %u to back MBA\n", candidate_class->level);
 		res = &mpam_resctrl_controls[RDT_RESOURCE_MBA];
 		res->class = candidate_class;
+		if (mpam_has_feature(mpam_feat_mbw_max_hardlim_rw,
+				     &candidate_class->props)) {
+			struct mpam_resctrl_res *mbh =
+				&mpam_resctrl_controls[RDT_RESOURCE_MB_HLIM];
+
+			mbh->class = candidate_class;
+		}
 	}
 }
 
@@ -1496,6 +1503,14 @@ static int mpam_resctrl_control_init(struct mpam_resctrl_res *res,
 		r->name = "MB";
 
 		break;
+	case RDT_RESOURCE_MB_HLIM:
+		if (!mpam_has_feature(mpam_feat_mbw_max_hardlim_rw, cprops))
+			break;
+		r->alloc_capable = true;
+		r->schema_fmt = RESCTRL_SCHEMA_MB_HLIM;
+		r->ctrl_scope = RESCTRL_L3_CACHE;
+		r->name = "MB_HLIM";
+		break;
 	default:
 		break;
 	}
@@ -1637,6 +1652,33 @@ static int mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 	return 0;
 }
 
+/* MB_HLIM schemata read: 0/1 per domain for current closid. */
+static u32 mpam_read_mbw_max_hardlim(struct rdt_resource *r, struct rdt_ctrl_domain *dom,
+				     u32 closid, enum resctrl_conf_type type)
+{
+	struct mpam_resctrl_dom *m_dom;
+	struct mpam_config *cfg;
+	u32 partid;
+
+	if (!mpam_is_enabled() || r->rid != RDT_RESOURCE_MB_HLIM)
+		return 0;
+
+	partid = resctrl_get_config_index(closid, type);
+	if (partid >= resctrl_arch_get_num_closid(r))
+		return 0;
+
+	m_dom = container_of(dom, struct mpam_resctrl_dom, resctrl_ctrl_dom);
+	if (!m_dom->ctrl_comp || !m_dom->ctrl_comp->cfg)
+		return 0;
+
+	cfg = &m_dom->ctrl_comp->cfg[partid];
+	if (!mpam_has_feature(mpam_feat_mbw_max, cfg) &&
+	    !mpam_has_feature(mpam_feat_mbw_max_hardlim_rw, cfg))
+		return 0;
+
+	return cfg->mbw_max_hardlim ? 1 : 0;
+}
+
 u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 			    u32 closid, enum resctrl_conf_type type)
 {
@@ -1676,6 +1718,8 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 	case RDT_RESOURCE_L3_MAX:
 		configured_by = mpam_feat_cmax_cmax;
 		break;
+	case RDT_RESOURCE_MB_HLIM:
+		return mpam_read_mbw_max_hardlim(r, d, closid, type);
 	case RDT_RESOURCE_MBA:
 		if (mba_class_use_mbw_part(cprops)) {
 			configured_by = mpam_feat_mbw_part;
@@ -1767,6 +1811,15 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_ctrl_domain *d,
 			break;
 		} else if (mpam_has_feature(mpam_feat_mbw_max, cprops)) {
 			cfg.mbw_max = percent_to_mbw_max(cfg_val, cprops);
+			mpam_set_feature(mpam_feat_mbw_max, &cfg);
+			break;
+		}
+		return -EINVAL;
+	case RDT_RESOURCE_MB_HLIM:
+		if (mpam_has_feature(mpam_feat_mbw_max_hardlim_rw, cprops) &&
+		    mpam_has_feature(mpam_feat_mbw_max, cprops)) {
+			cfg.mbw_max_hardlim = cfg_val != 0;
+			mpam_set_feature(mpam_feat_mbw_max_hardlim_rw, &cfg);
 			mpam_set_feature(mpam_feat_mbw_max, &cfg);
 			break;
 		}
