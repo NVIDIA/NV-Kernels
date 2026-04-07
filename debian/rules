@@ -179,7 +179,7 @@ ifeq ($(src_pkg_name),linux)
 endif
 
 # Calculate Ubuntu Compatible Signing levels
-UBUNTU_COMPATIBLE_SIGNING=$(shell grep -qx ' *Subject: C = GB, ST = Isle of Man, O = Canonical Ltd., OU = Secure Boot, CN = Canonical Ltd. Secure Boot Signing (2021 v3)' debian/canonical-revoked-certs.pem && echo ubuntu/4 pro/3)
+UBUNTU_COMPATIBLE_SIGNING=$(shell /bin/sh debian/scripts/ubuntu-compatible-signing)
 
 # Misc stuff
 .PHONY: $(DEBIAN)/control.stub
