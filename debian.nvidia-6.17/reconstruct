@@ -45,4 +45,7 @@ chmod +x 'drivers/net/ethernet/realtek/r8127/rtltool.c'
 chmod +x 'drivers/net/ethernet/realtek/r8127/rtltool.h'
 # Remove any files deleted from the orig.
 rm -f 'Documentation/admin-guide/perf/nvidia-pmu.rst'
+rm -f 'drivers/staging/most/i2c/Kconfig'
+rm -f 'drivers/staging/most/i2c/Makefile'
+rm -f 'drivers/staging/most/i2c/i2c.c'
 exit 0
