@@ -1104,6 +1104,9 @@ static void init_amd_zen3(struct cpuinfo_x86 *c)
 		if (!cpu_has(c, X86_FEATURE_BTC_NO))
 			set_cpu_cap(c, X86_FEATURE_BTC_NO);
 	}
+
+	pr_notice_once("AMD Zen1 FPDSS bug detected, enabling mitigation.\n");
+	msr_set_bit(MSR_AMD64_FP_CFG, MSR_AMD64_FP_CFG_ZEN1_DENORM_FIX_BIT);
 }
 
 static void init_amd_zen4(struct cpuinfo_x86 *c)
