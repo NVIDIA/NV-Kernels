@@ -10101,7 +10101,6 @@ CONFIG_PINCTRL_SM8150                           policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8250                           policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8250_LPASS_LPI                 policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8350                           policy<{'arm64': 'm'}>
-CONFIG_PINCTRL_SM8350_LPASS_LPI                 policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8450                           policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8450_LPASS_LPI                 policy<{'arm64': 'm'}>
 CONFIG_PINCTRL_SM8550                           policy<{'arm64': 'm'}>
