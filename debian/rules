@@ -183,10 +183,11 @@ UBUNTU_COMPATIBLE_SIGNING=$(shell /bin/sh debian/scripts/ubuntu-compatible-signi
 
 # Misc stuff
 .PHONY: $(DEBIAN)/control.stub
-$(DEBIAN)/control.stub: 				\
+$(DEBIAN)/control.stub: debian/canonical-revoked-certs.pem debian/canonical-revoked-certs.pem FORCE \
 		$(DROOT)/scripts/control-create		\
 		$(control_files)			\
 		debian/canonical-revoked-certs.pem	\
+		debian/canonical-certs.pem		\
 		$(DROOT)/control.d/flavour-module.stub	\
 		$(DEBIAN)/changelog			\
 		$(wildcard $(DEBIAN)/control.d/*)
@@ -213,7 +214,7 @@ $(DEBIAN)/control.stub: 				\
 	done
 
 .PHONY: debian/control
-debian/control: $(DEBIAN)/control.stub
+debian/control: $(DEBIAN)/control.stub FORCE
 	cp $(DEBIAN)/control.stub debian/control
 
 debian/canonical-certs.pem: $(wildcard $(DROOT)/certs/*-all.pem) $(wildcard $(DROOT)/certs/*-$(arch).pem) $(wildcard $(DEBIAN)/certs/*-all.pem) $(wildcard $(DEBIAN)/certs/*-$(arch).pem)
@@ -239,3 +240,6 @@ debian/canonical-revoked-certs.pem: $(wildcard $(DROOT)/revoked-certs/*-all.pem)
 			fi;							\
 		done;								\
 	done >"$@"
+
+# Add FORCE to the prerequisites of a target to force it to be always rebuilt.
+.PHONY: FORCE debian/canonical-certs.pem debian/canonical-revoked-certs.pem
