@@ -503,14 +503,13 @@ static int nft_tunnel_obj_init(const struct nft_ctx *ctx,
 			return err;
 	}
 
-	md = metadata_dst_alloc(priv->opts.len, METADATA_IP_TUNNEL,
-				GFP_KERNEL_ACCOUNT);
+	md = metadata_dst_alloc(priv->opts.len, METADATA_IP_TUNNEL, GFP_KERNEL);
 	if (!md)
 		return -ENOMEM;
 
 	memcpy(&md->u.tun_info, &info, sizeof(info));
 #ifdef CONFIG_DST_CACHE
-	err = dst_cache_init(&md->u.tun_info.dst_cache, GFP_KERNEL_ACCOUNT);
+	err = dst_cache_init(&md->u.tun_info.dst_cache, GFP_KERNEL);
 	if (err < 0) {
 		metadata_dst_free(md);
 		return err;

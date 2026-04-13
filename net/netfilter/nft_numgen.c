@@ -66,7 +66,7 @@ static int nft_ng_inc_init(const struct nft_ctx *ctx,
 	if (priv->offset + priv->modulus - 1 < priv->offset)
 		return -EOVERFLOW;
 
-	priv->counter = kmalloc(sizeof(*priv->counter), GFP_KERNEL_ACCOUNT);
+	priv->counter = kmalloc(sizeof(*priv->counter), GFP_KERNEL);
 	if (!priv->counter)
 		return -ENOMEM;
 

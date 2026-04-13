@@ -909,7 +909,7 @@ static void pipapo_lt_bits_adjust(struct nft_pipapo_field *f)
 		return;
 	}
 
-	new_lt = kvzalloc(lt_size, GFP_KERNEL_ACCOUNT);
+	new_lt = kvzalloc(lt_size, GFP_KERNEL);
 	if (!new_lt)
 		return;
 
@@ -1184,7 +1184,7 @@ static int pipapo_realloc_scratch(struct nft_pipapo_match *clone,
 #endif
 		scratch = kvzalloc_node(struct_size(scratch, map, bsize_max * 2) +
 					NFT_PIPAPO_ALIGN_HEADROOM,
-					GFP_KERNEL_ACCOUNT, cpu_to_node(i));
+					GFP_KERNEL, cpu_to_node(i));
 		if (!scratch) {
 			/* On failure, there's no need to undo previous
 			 * allocations: this means that some scratch maps have
@@ -1358,7 +1358,7 @@ static struct nft_pipapo_match *pipapo_clone(struct nft_pipapo_match *old)
 	struct nft_pipapo_match *new;
 	int i;
 
-	new = kmalloc(struct_size(new, f, old->field_count), GFP_KERNEL_ACCOUNT);
+	new = kmalloc(struct_size(new, f, old->field_count), GFP_KERNEL);
 	if (!new)
 		return ERR_PTR(-ENOMEM);
 
@@ -1390,7 +1390,7 @@ static struct nft_pipapo_match *pipapo_clone(struct nft_pipapo_match *old)
 		if (lt_size < 0)
 			goto out_lt;
 
-		new_lt = kvzalloc(lt_size, GFP_KERNEL_ACCOUNT);
+		new_lt = kvzalloc(lt_size, GFP_KERNEL);
 		if (!new_lt)
 			goto out_lt;
 
