@@ -778,8 +778,7 @@ static int rdtgroup_move_task(pid_t pid, struct rdtgroup *rdtgrp,
 	return ret;
 }
 
-static int rdtgroup_move_iommu(int iommu_group_id, struct rdtgroup *rdtgrp,
-			       struct kernfs_open_file *of)
+static int rdtgroup_move_iommu(int iommu_group_id, struct rdtgroup *rdtgrp)
 {
 	const struct cred *cred = current_cred();
 	struct iommu_group *iommu_group;
@@ -860,7 +859,7 @@ static ssize_t rdtgroup_tasks_write(struct kernfs_open_file *of,
 
 		is_iommu = string_is_iommu_group(pid_str, &iommu_group_id);
 		if (is_iommu) {
-			ret = rdtgroup_move_iommu(iommu_group_id, rdtgrp, of);
+			ret = rdtgroup_move_iommu(iommu_group_id, rdtgrp);
 			if (ret) {
 				rdt_last_cmd_printf("Error while processing iommu_group %d\n",
 						     iommu_group_id);
