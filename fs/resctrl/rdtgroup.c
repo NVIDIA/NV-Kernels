@@ -859,24 +859,33 @@ static ssize_t rdtgroup_tasks_write(struct kernfs_open_file *of,
 		pid_str = strim(strsep(&buf, ","));
 
 		is_iommu = string_is_iommu_group(pid_str, &iommu_group_id);
-		if (is_iommu)
+		if (is_iommu) {
 			ret = rdtgroup_move_iommu(iommu_group_id, rdtgrp, of);
-		else if (kstrtoint(pid_str, 0, &pid)) {
-			rdt_last_cmd_printf("Task list parsing error pid %s\n", pid_str);
-			ret = -EINVAL;
-			break;
-		}
+			if (ret) {
+				rdt_last_cmd_printf("Error while processing iommu_group %d\n",
+						     iommu_group_id);
+				break;
+			}
+		} else {
+			if (kstrtoint(pid_str, 0, &pid)) {
+				rdt_last_cmd_printf("Task list parsing error pid %s\n",
+						     pid_str);
+				ret = -EINVAL;
+				break;
+			}
 
-		if (pid < 0) {
-			rdt_last_cmd_printf("Invalid pid %d\n", pid);
-			ret = -EINVAL;
-			break;
-		}
+			if (pid < 0) {
+				rdt_last_cmd_printf("Invalid pid %d\n", pid);
+				ret = -EINVAL;
+				break;
+			}
 
-		ret = rdtgroup_move_task(pid, rdtgrp, of);
-		if (ret) {
-			rdt_last_cmd_printf("Error while processing task %d\n", pid);
-			break;
+			ret = rdtgroup_move_task(pid, rdtgrp, of);
+			if (ret) {
+				rdt_last_cmd_printf("Error while processing task %d\n",
+						     pid);
+				break;
+			}
 		}
 	}
 
