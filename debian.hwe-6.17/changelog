@@ -6045,6 +6045,8 @@ linux (6.17.0-6.6) questing; urgency=medium
   * Miscellaneous Ubuntu changes
     - [Config] updateconfigs after rebase to 6.17
 
+ -- Timo Aaltonen <timo.aaltonen@canonical.com>  Tue, 07 Oct 2025 14:15:18 +0300
+
 linux (6.17.0-5.5) questing; urgency=medium
 
   * questing/linux: 6.17.0-5.5 -proposed tracker (LP: #2125319)
