@@ -3784,6 +3784,19 @@ static int arm_smmu_def_domain_type(struct device *dev)
 		if (IS_HISI_PTT_DEVICE(pdev))
 			return IOMMU_DOMAIN_IDENTITY;
 
+		/*
+		 * ASPEED BMC devices behind an AST1150 PCIe-to-PCI bridge
+		 * receive DMA from BMC firmware using host physical addresses
+		 * that bypass the kernel DMA API.  Use identity mapping so
+		 * the SMMU passes these transactions through untranslated.
+		 */
+		if (pdev->bus->self &&
+		    (pdev->bus->self->dev_flags &
+		     PCI_DEV_FLAGS_PCI_BRIDGE_NO_ALIAS) &&
+		    pdev->bus->self->vendor == PCI_VENDOR_ID_ASPEED &&
+		    pdev->bus->self->device == 0x1150)
+			return IOMMU_DOMAIN_IDENTITY;
+
 		if (pdev->vendor == PCI_VENDOR_ID_NVIDIA &&
 		    (pdev->device == 0x2E12 || pdev->device == 0x2E2A ||
 		     pdev->device == 0x2E2B))
