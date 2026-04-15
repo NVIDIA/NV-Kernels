@@ -1620,6 +1620,9 @@ void sched_init_dl_servers(void)
 		u64 runtime =  50 * NSEC_PER_MSEC;
 		u64 period = 1000 * NSEC_PER_MSEC;
 
+		if (tick_nohz_full_cpu(cpu))
+			continue;
+
 		rq = cpu_rq(cpu);
 
 		guard(rq_lock_irq)(rq);
