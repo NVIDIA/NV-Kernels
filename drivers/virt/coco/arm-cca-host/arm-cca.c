@@ -146,6 +146,14 @@ static int cca_tsm_connect(struct pci_dev *pdev)
 		goto err_stream_alloc;
 	}
 
+	/*
+	 * Associate all EP memory accesses with this stream, and mark the
+	 * stream as the default stream.
+	 */
+	ide->partner[PCI_IDE_EP].mem_assoc.start = 0;
+	ide->partner[PCI_IDE_EP].mem_assoc.end = 0xFFFFFFFFFFF00000ULL;
+	ide->partner[PCI_IDE_EP].default_stream = true;
+
 	pf0_dsc->sel_stream = ide;
 	ide->stream_id = stream_id;
 	rc = pci_ide_stream_register(ide);
