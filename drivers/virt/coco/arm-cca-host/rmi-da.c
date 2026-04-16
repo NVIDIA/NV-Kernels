@@ -67,6 +67,7 @@ static int init_pdev_params(struct pci_dev *pdev, struct rmi_pdev_params *params
 	struct pci_config_window *cfg = pdev->bus->sysdata;
 	struct cca_host_pf0_dsc *pf0_dsc = to_cca_pf0_dsc(pdev);
 	struct pci_ide *ide = pf0_dsc->sel_stream;
+	unsigned int nres = PCI_STD_RESOURCE_END;
 
 	/* assign the ep device with RMM */
 	rid = pci_dev_id(pdev);
@@ -91,11 +92,27 @@ static int init_pdev_params(struct pci_dev *pdev, struct rmi_pdev_params *params
 	params->root_id = pci_dev_id(pcie_find_root_port(pdev));
 	params->segment_id = pci_domain_nr(pdev->bus);
 
+	/*
+	 * Workaround: If the coherent memory is set, and the device doesn't
+	 * use SPDM, include only 4 BARs (or 2 64bit BARs):
+	 *
+	 * - RMM generates the report including all reported ranges since
+	 *   SPDM is not used.
+	 * - The coherent range in VFIO generally replaces one of the BARs
+	 *   (but there is no way to know about it here..).
+	 * - The guest assumes in this case that there are two non-coherent
+	 *   regions (BARs) and one coherent region
+	 *   (advertised as a BAR too).
+	 */
+	if ((pdev->resource[PCI_COHERENT_RESOURCE].flags & IORESOURCE_MEM) &&
+	    !pdev->enable_spdm)
+		nres = PCI_STD_RESOURCES + 4;
+
 	params->ncoh_num_addr_range =
 		pci_dev_addr_range(params->ncoh_addr_range,
 				   ARRAY_SIZE(params->ncoh_addr_range),
 				   pdev->resource,
-				   DEVICE_COUNT_RESOURCE);
+				   nres);
 
 	if (pdev->resource[PCI_COHERENT_RESOURCE].flags & IORESOURCE_MEM) {
 		params->coh_addr_range[0].base =
