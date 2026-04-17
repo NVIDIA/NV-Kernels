@@ -311,11 +311,4 @@ config MARVELL_PEM_PMU
 	  Enable support for PCIe Interface performance monitoring
 	  on Marvell platform.
 
-config NVIDIA_TEGRA410_CMEM_LATENCY_PMU
-	tristate "NVIDIA Tegra410 CPU Memory Latency PMU"
-	depends on ARM64
-	help
-	  Enable perf support for CPU memory latency counters monitoring on
-	  NVIDIA Tegra410 SoC.
-
 endmenu
