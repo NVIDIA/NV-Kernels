@@ -63,7 +63,7 @@ void _start_c(long *sp)
 
 	/* find _auxv */
 	for (auxv = (void *)envp; *auxv++;)
-		;
+		__asm__("");
 	_auxv = auxv;
 
 	for (func = __preinit_array_start; func < __preinit_array_end; func++)
