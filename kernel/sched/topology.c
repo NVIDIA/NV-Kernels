@@ -680,16 +680,38 @@ static void update_top_cache_domain(int cpu)
 	int id = cpu;
 	int size = 1;
 
+	sd = lowest_flag_domain(cpu, SD_ASYM_CPUCAPACITY_FULL);
+	/*
+	 * The shared object is attached to sd_asym_cpucapacity only when the
+	 * asym domain is non-overlapping (i.e., not built from SD_NUMA).
+	 * On overlapping (NUMA) asym domains we fall back to letting the
+	 * SD_SHARE_LLC path own the shared object, so sd->shared may be NULL
+	 * here.
+	 */
+	if (sd && sd->shared)
+		sds = sd->shared;
+
+	rcu_assign_pointer(per_cpu(sd_asym_cpucapacity, cpu), sd);
+
 	sd = highest_flag_domain(cpu, SD_SHARE_LLC);
 	if (sd) {
 		id = cpumask_first(sched_domain_span(sd));
 		size = cpumask_weight(sched_domain_span(sd));
-		sds = sd->shared;
+
+		/*
+		 * If sd_asym_cpucapacity didn't claim the shared object,
+		 * sd_llc must have one linked.
+		 */
+		if (!sds) {
+			WARN_ON_ONCE(!sd->shared);
+			sds = sd->shared;
+		}
 	}
 
 	rcu_assign_pointer(per_cpu(sd_llc, cpu), sd);
 	per_cpu(sd_llc_size, cpu) = size;
 	per_cpu(sd_llc_id, cpu) = id;
+
 	rcu_assign_pointer(per_cpu(sd_llc_shared, cpu), sds);
 
 	sd = lowest_flag_domain(cpu, SD_CLUSTER);
@@ -708,9 +730,6 @@ static void update_top_cache_domain(int cpu)
 
 	sd = highest_flag_domain(cpu, SD_ASYM_PACKING);
 	rcu_assign_pointer(per_cpu(sd_asym_packing, cpu), sd);
-
-	sd = lowest_flag_domain(cpu, SD_ASYM_CPUCAPACITY_FULL);
-	rcu_assign_pointer(per_cpu(sd_asym_cpucapacity, cpu), sd);
 }
 
 /*
@@ -1640,7 +1659,7 @@ sd_init(struct sched_domain_topology_level *tl,
 {
 	struct sd_data *sdd = &tl->data;
 	struct sched_domain *sd = *per_cpu_ptr(sdd->sd, cpu);
-	int sd_id, sd_weight, sd_flags = 0;
+	int sd_weight, sd_flags = 0;
 	struct cpumask *sd_span;
 
 	sd_weight = cpumask_weight(tl->mask(tl, cpu));
@@ -1688,7 +1707,6 @@ sd_init(struct sched_domain_topology_level *tl,
 
 	sd_span = sched_domain_span(sd);
 	cpumask_and(sd_span, cpu_map, tl->mask(tl, cpu));
-	sd_id = cpumask_first(sd_span);
 
 	sd->flags |= asym_cpu_capacity_classify(sd_span, cpu_map);
 
@@ -1725,16 +1743,6 @@ sd_init(struct sched_domain_topology_level *tl,
 #endif /* CONFIG_NUMA */
 	} else {
 		sd->cache_nice_tries = 1;
-	}
-
-	/*
-	 * For all levels sharing cache; connect a sched_domain_shared
-	 * instance.
-	 */
-	if (sd->flags & SD_SHARE_LLC) {
-		sd->shared = *per_cpu_ptr(sdd->sds, sd_id);
-		atomic_inc(&sd->shared->ref);
-		atomic_set(&sd->shared->nr_busy_cpus, sd_weight);
 	}
 
 	sd->private = sdd;
@@ -2548,6 +2556,16 @@ static bool topology_span_sane(const struct cpumask *cpu_map)
 	return true;
 }
 
+static void init_sched_domain_shared(struct sched_domain *sd)
+{
+	struct sd_data *sdd = sd->private;
+	int sd_id = cpumask_first(sched_domain_span(sd));
+
+	sd->shared = *per_cpu_ptr(sdd->sds, sd_id);
+	atomic_set(&sd->shared->nr_busy_cpus, sd->span_weight);
+	atomic_inc(&sd->shared->ref);
+}
+
 /*
  * Build sched domains for a given set of CPUs and attach the sched domains
  * to the individual CPUs
@@ -2602,6 +2620,57 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 				if (build_sched_groups(sd, i))
 					goto error;
 			}
+		}
+	}
+
+	for_each_cpu(i, cpu_map) {
+		struct sched_domain *sd_asym = NULL;
+		bool asym_claimed = false;
+
+		sd = *per_cpu_ptr(d.sd, i);
+		if (!sd)
+			continue;
+
+		/*
+		 * In case of ASYM_CPUCAPACITY, attach sd->shared to
+		 * sd_asym_cpucapacity for wakeup stat tracking.
+		 *
+		 * Caveats:
+		 *
+		 * 1) has_asym is system-wide, but a given CPU may still
+		 *    lack an SD_ASYM_CPUCAPACITY_FULL ancestor (e.g., an
+		 *    exclusive cpuset carving out a symmetric capacity island).
+		 *    Such CPUs must fall through to the LLC seeding path below.
+		 *
+		 * 2) Skip the asym attach if the asym ancestor is an
+		 *    overlapping domain (SD_NUMA). On those topologies let the
+		 *    LLC path own the shared object instead.
+		 *
+		 * XXX: This assumes SD_ASYM_CPUCAPACITY_FULL domain
+		 * always has more than one group else it is prone to
+		 * degeneration.
+		 */
+		sd_asym = sd;
+		while (sd_asym && !(sd_asym->flags & SD_ASYM_CPUCAPACITY_FULL))
+			sd_asym = sd_asym->parent;
+
+		if (sd_asym && !(sd_asym->flags & SD_NUMA)) {
+			init_sched_domain_shared(sd_asym);
+			asym_claimed = true;
+		}
+
+		/* First, find the topmost SD_SHARE_LLC domain */
+		sd = *per_cpu_ptr(d.sd, i);
+		while (sd->parent && (sd->parent->flags & SD_SHARE_LLC))
+			sd = sd->parent;
+
+		if (sd->flags & SD_SHARE_LLC) {
+			/*
+			 * Initialize the sd->shared for SD_SHARE_LLC unless
+			 * the asym path above already claimed it.
+			 */
+			if (!asym_claimed)
+				init_sched_domain_shared(sd);
 		}
 	}
 
