@@ -129,6 +129,15 @@ CONFIG_CXL_PORT                                 note<'Required for CXL port enum
 CONFIG_CXL_RAS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CXL_RAS                                  note<'New def_bool replacing PCIEAER_CXL; auto-enabled with ACPI_APEI_GHES+PCIEAER+CXL_BUS; CXL RAS error handling support'>
 
+CONFIG_DEV_DAX                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX                                  note<'Override debian.master m-'>
+
+CONFIG_DEV_DAX_CXL                              policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_CXL                              note<'Override debian.master m-'>
+
+CONFIG_DEV_DAX_KMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m-'>
+
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
 
@@ -207,6 +216,9 @@ CONFIG_NR_CPUS                                  note<'LP: #1864198'>
 CONFIG_PCIEAER_CXL                              policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_PCIEAER_CXL                              note<'Removed by commit d18f1b7beadf (PCI/AER: Replace PCIEAER_CXL symbol with CXL_RAS)'>
 
+CONFIG_PCI_CXL                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_PCI_CXL                                  note<'Hidden bool; auto-enabled by CXL_BUS; PCI core CXL DVSEC and HDM state save/restore support'>
+
 CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
 
@@ -243,17 +255,6 @@ CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM dri
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
 
-CONFIG_DEV_DAX                                  policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_DEV_DAX                                  note<'Override debian.master m->y; required built-in for DEV_DAX_CXL=y'>
-
-CONFIG_DEV_DAX_CXL                              policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_DEV_DAX_CXL                              note<'Override debian.master m->y; CXL RAM region DAX access; depends on CXL_BUS+CXL_REGION+DEV_DAX'>
-
-CONFIG_DEV_DAX_KMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m->y; map CXL DAX devices as System-RAM'>
-
-CONFIG_PCI_CXL                                  policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_PCI_CXL                                  note<'Hidden bool; auto-enabled by CXL_BUS; PCI core CXL DVSEC and HDM state save/restore support'>
 
 # ---- Annotations without notes ----
 
