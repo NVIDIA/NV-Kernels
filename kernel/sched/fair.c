@@ -7644,6 +7644,7 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 	int fits, best_fits = ASYM_IDLE_COMPLETE_MISFIT;
 	int cpu, best_cpu = -1;
 	struct cpumask *cpus;
+	int nr = INT_MAX;
 
 	cpus = this_cpu_cpumask_var_ptr(select_rq_mask);
 	cpumask_and(cpus, sched_domain_span(sd), p->cpus_ptr);
@@ -7652,9 +7653,27 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 	util_min = uclamp_eff_value(p, UCLAMP_MIN);
 	util_max = uclamp_eff_value(p, UCLAMP_MAX);
 
+	if (sched_feat(SIS_UTIL) && sd->shared) {
+		/*
+		 * Same nr_idle_scan hint as select_idle_cpu(), nr only limits
+		 * the scan when not preferring an idle core.
+		 */
+		nr = READ_ONCE(sd->shared->nr_idle_scan) + 1;
+		/* overloaded domain is unlikely to have idle cpu/core */
+		if (nr == 1)
+			return -1;
+	}
+
 	for_each_cpu_wrap(cpu, cpus, target) {
 		bool preferred_core = !prefers_idle_core || is_core_idle(cpu);
 		unsigned long cpu_cap = capacity_of(cpu);
+
+		/*
+		 * Good-enough early exit (mirrors select_idle_cpu() logic).
+		 */
+		if (!prefers_idle_core &&
+		    --nr <= 0 && best_fits == ASYM_IDLE_CORE_UCLAMP_MISFIT)
+			return best_cpu;
 
 		if (!available_idle_cpu(cpu) && !sched_idle_cpu(cpu))
 			continue;
