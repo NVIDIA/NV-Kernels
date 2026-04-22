@@ -836,7 +836,7 @@ static long notify_user_response(struct aa_listener *listener,
 	if (size > sizeof(uresp)) {
 		/* TODO: put max size on message */
 		big_resp = (union apparmor_notif_resp *) aa_get_buffer(false);
-		if (big_resp)
+		if (!big_resp)
 			return -ENOMEM;
 		if (copy_from_user(big_resp, buf, size)) {
 			kfree(big_resp);
