@@ -861,7 +861,7 @@ static void audit_cache_work_function(struct work_struct *t)
 static void knotif_update_from_uresp_perm(struct aa_knotif *knotif,
 				     struct apparmor_notif_resp_perm *uresp)
 {
-	u16 flags;
+	u16 flags = 0;
 
 	if (uresp) {
 		AA_DEBUG(DEBUG_UPCALL,
