@@ -291,7 +291,6 @@ struct aa_listener *aa_new_listener(struct aa_ns *ns, gfp_t gfp)
 	INIT_LIST_HEAD(&listener->ns_proxies);
 	INIT_LIST_HEAD(&listener->notifications);
 	INIT_LIST_HEAD(&listener->pending);
-	kref_init(&listener->count);
 
 	if (ns)
 		ns = aa_get_ns(ns);
