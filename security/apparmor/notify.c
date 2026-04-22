@@ -752,20 +752,20 @@ static bool response_is_valid_name(struct apparmor_notif_resp_name *reply,
 		AA_DEBUG(DEBUG_UPCALL,
 			 "id %lld: reply bad size %u < %ld",
 			 knotif->id, size, sizeof(*reply));
-		return -EMSGSIZE;
+		return false;
 	}
 	if (reply->name < sizeof(*reply)) {
 		/* inside of data declared fields */
 		AA_DEBUG(DEBUG_UPCALL,
 			 "id %lld: reply bad name offset in fields %u < %ld",
 			 knotif->id, reply->name, sizeof(*reply));
-		return -EINVAL;
+		return false;
 	}
 	if (reply->name > size) {
 		AA_DEBUG(DEBUG_UPCALL,
 			 "id %lld: reply name pasted end of data size %u > %ld",
 			 knotif->id, reply->name, sizeof(*reply));
-		return -EINVAL;
+		return false;
 	}
 	/* currently supported flags */
 	if ((reply->perm.base.flags != (URESPONSE_LOOKUP | URESPONSE_PROFILE))) {
@@ -773,7 +773,7 @@ static bool response_is_valid_name(struct apparmor_notif_resp_name *reply,
 			 "id %lld: reply bad flags 0x%x expected 0x%x",
 			 knotif->id, reply->perm.base.flags,
 			 URESPONSE_LOOKUP | URESPONSE_PROFILE);
-		return -EINVAL;
+		return false;
 	}
 
 	if ((reply->perm.base.flags == URESPONSE_TAILGLOB) &&
