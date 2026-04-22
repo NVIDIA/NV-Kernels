@@ -375,6 +375,7 @@ struct aa_profile *aa_alloc_profile(const char *hname, struct aa_proxy *proxy,
 		goto fail;
 
 	INIT_LIST_HEAD(&profile->rules);
+	spin_lock_init(&profile->rules_lock);
 
 	/* allocate the first ruleset, but leave it empty */
 	rules = aa_alloc_ruleset(gfp);
