@@ -807,17 +807,18 @@ static long notify_user_response(struct aa_listener *listener,
 		if (!big_resp)
 			return -ENOMEM;
 		if (copy_from_user(big_resp, buf, size)) {
-			kfree(big_resp);
+			aa_put_buffer((char *) big_resp);
 			return -EFAULT;
 		}
+		error = aa_listener_unotif_response(listener, big_resp, size);
+		aa_put_buffer((char *) big_resp);
 	} else {
 		size = min_t(size_t, size, sizeof(uresp));
 		if (copy_from_user(&uresp, buf, size))
 			return -EFAULT;
-	}
 
-	error = aa_listener_unotif_response(listener, &uresp, size);
-	aa_put_buffer((char *) big_resp);
+		error = aa_listener_unotif_response(listener, &uresp, size);
+	}
 
 	return error;
 }
