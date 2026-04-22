@@ -744,7 +744,7 @@ static long notify_set_filter(struct aa_listener *listener,
 
 	if (copy_from_user(&size, buf, sizeof(size)))
 		return -EFAULT;
-	if (size < sizeof(unotif))
+	if (size < sizeof(*unotif))
 		return -EINVAL;
 	/* size is capped at U16_MAX by data type */
 	unotif = kzalloc(size, GFP_KERNEL);
