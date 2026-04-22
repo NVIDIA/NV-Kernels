@@ -779,7 +779,7 @@ static long notify_set_filter(struct aa_listener *listener,
 			ret = -EINVAL;
 			goto out;
 		}
-		dfa = aa_dfa_unpack(pos, size - ((void *) unotif - pos),
+		dfa = aa_dfa_unpack(pos, size - unotif->filter,
 				    DFA_FLAG_VERIFY_STATES |
 				    TO_ACCEPT1_FLAG(YYTD_DATA32));
 		if (IS_ERR(dfa)) {
