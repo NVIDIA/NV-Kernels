@@ -955,10 +955,12 @@ static long knotif_update_from_uresp_name(struct aa_knotif *knotif,
 
 		clone = aa_dup_audit_data(&node->data, GFP_KERNEL);
 		glob = kstrdup(name, GFP_KERNEL);
-		if (!name)
+		if (!glob) {
+			aa_put_audit_node(clone);
 			return -ENOMEM;
+		}
 		if (!clone) {
-			kfree(name);
+			kfree(glob);
 			return -ENOMEM;
 		}
 		kfree(clone->data.name);
