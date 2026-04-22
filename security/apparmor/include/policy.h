@@ -217,6 +217,7 @@ struct aa_attachment {
  * @disconnected: what to prepend if attach_disconnected is specified
  * @attach: attachment rules for the profile
  * @rules: rules to be enforced
+ * @rules_lock: lock for rules
  * @net_compat: v2 compat network controls for the profile
  *
  * @dents: dentries for the profiles file entries in apparmorfs
@@ -250,6 +251,7 @@ struct aa_profile {
 
 	struct aa_attachment attach;
 	struct list_head rules;
+	spinlock_t rules_lock;
 	struct aa_net_compat *net_compat;
 
 	struct aa_audit_cache learning_cache;

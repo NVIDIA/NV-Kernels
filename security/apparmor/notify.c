@@ -777,6 +777,8 @@ static long knotif_update_from_uresp_name(struct aa_knotif *knotif,
 		}
 		aa_put_ns(ns);
 
+		spin_lock(&profile->rules_lock);
+
 		rules = aa_clone_ruleset(list_first_entry(&profile->rules,
 							  typeof(*rules), list));
 		if (!rules) {
@@ -788,9 +790,10 @@ static long knotif_update_from_uresp_name(struct aa_knotif *knotif,
 			 profile->base.hname);
 		aa_put_profile(profile);
 
-		/* add list to profile rules TODO: improve locking*/
 		profile = labels_profile(node->data.subj_label);
-		list_add_tail_entry(rules, &profile->rules, list);
+
+		list_add_tail_rcu(&(rules)->list, &profile->rules);
+		spin_unlock(&profile->rules_lock);
 	} else if (reply->perm.base.flags == URESPONSE_TAILGLOB) {
 		// TODO: dedup with cache update in perm
 		struct aa_audit_node *node = container_of(knotif,
