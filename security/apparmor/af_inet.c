@@ -595,7 +595,7 @@ static int profile_opt_perm(struct aa_profile *profile, u32 request,
 
 	state = RULE_MEDIATES_SK(rules, sk);
 	if (state) {
-		__be16 l = htons(l);
+		__be16 l = htons(level);
 		__be16 n = htons(optname);
 
 		state = match_to_cmd(rules->policy, state, request, sk,
