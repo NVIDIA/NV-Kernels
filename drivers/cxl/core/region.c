@@ -2481,6 +2481,39 @@ static void unregister_region(struct cxl_region *cxlr)
 	put_device(&cxlr->dev);
 }
 
+static void cxl_endpoint_region_autoremove(void *_cxlr);
+
+static void cxl_region_release_action(struct cxl_region *cxlr)
+{
+	if (cxlr->type != CXL_DECODER_DEVMEM) {
+		unregister_region(cxlr);
+		return;
+	}
+
+	if (cxlr->params.nr_targets) {
+		struct cxl_endpoint_decoder *cxled = cxlr->params.targets[0];
+		struct cxl_port *endpoint = cxled_to_port(cxled);
+
+		guard(device)(&endpoint->dev);
+		if (cxlr->detach) {
+			void (*detach)(void *data) = cxlr->detach;
+			void *detach_data = cxlr->detach_data;
+
+			cxlr->detach = NULL;
+			cxlr->detach_data = NULL;
+			devm_release_action(&endpoint->dev, detach, detach_data);
+			devm_release_action(&endpoint->dev,
+					    cxl_endpoint_region_autoremove,
+					    cxlr);
+		} else {
+			unregister_region(cxlr);
+		}
+		return;
+	}
+
+	unregister_region(cxlr);
+}
+
 static struct lock_class_key cxl_region_key;
 
 static struct cxl_region *cxl_region_alloc(struct cxl_root_decoder *cxlrd, int id)
@@ -2678,7 +2711,8 @@ static ssize_t create_ram_region_show(struct device *dev,
 }
 
 static struct cxl_region *__create_region(struct cxl_root_decoder *cxlrd,
-					  enum cxl_partition_mode mode, int id)
+					  enum cxl_partition_mode mode, int id,
+					  enum cxl_decoder_type type)
 {
 	int rc;
 
@@ -2703,7 +2737,7 @@ static struct cxl_region *__create_region(struct cxl_root_decoder *cxlrd,
 		return ERR_PTR(-EBUSY);
 	}
 
-	return devm_cxl_add_region(cxlrd, id, mode, CXL_DECODER_HOSTONLYMEM);
+	return devm_cxl_add_region(cxlrd, id, mode, type);
 }
 
 static ssize_t create_region_store(struct device *dev, const char *buf,
@@ -2721,7 +2755,7 @@ static ssize_t create_region_store(struct device *dev, const char *buf,
 	if ((rc = ACQUIRE_ERR(mutex_intr, &regions_lock)))
 		return rc;
 
-	cxlr = __create_region(cxlrd, mode, id);
+	cxlr = __create_region(cxlrd, mode, id, CXL_DECODER_HOSTONLYMEM);
 	if (IS_ERR(cxlr))
 		return PTR_ERR(cxlr);
 
@@ -2780,7 +2814,7 @@ static ssize_t delete_region_store(struct device *dev,
 	if (!cxlr || !sysfs_streq(buf, dev_name(&cxlr->dev)))
 		return -ENODEV;
 
-	unregister_region(cxlr);
+	cxl_region_release_action(cxlr);
 
 	return len;
 }
@@ -3940,7 +3974,8 @@ static struct cxl_region *construct_region(struct cxl_root_decoder *cxlrd,
 
 	do {
 		cxlr = __create_region(cxlrd, cxlds->part[part].mode,
-				       atomic_read(&cxlrd->region_id));
+				       atomic_read(&cxlrd->region_id),
+				       cxled->cxld.target_type);
 	} while (IS_ERR(cxlr) && PTR_ERR(cxlr) == -EBUSY);
 
 	if (IS_ERR(cxlr)) {
@@ -3953,7 +3988,7 @@ static struct cxl_region *construct_region(struct cxl_root_decoder *cxlrd,
 
 	rc = __construct_region(cxlr, ctx);
 	if (rc) {
-		unregister_region(cxlr);
+		cxl_region_release_action(cxlr);
 		return ERR_PTR(rc);
 	}
 
@@ -4234,6 +4269,135 @@ static int cxl_region_can_probe(struct cxl_region *cxlr)
 
 	return 0;
 }
+
+static int first_mapped_decoder(struct device *dev, const void *data)
+{
+	struct cxl_endpoint_decoder *cxled;
+
+	if (!is_endpoint_decoder(dev))
+		return 0;
+
+	cxled = to_cxl_endpoint_decoder(dev);
+	if (cxled->cxld.region)
+		return 1;
+
+	return 0;
+}
+
+/*
+ * As this is running in endpoint port remove context it does not race cxl_root
+ * destruction since port topologies are always removed depth first.
+ */
+static void cxl_endpoint_region_autoremove(void *_cxlr)
+{
+	unregister_region(_cxlr);
+}
+
+/**
+ * cxl_memdev_attach_region - bind region to accelerator memdev
+ *
+ * @cxlmd: a pointer to cxl_memdev to use
+ * @attach: a pointer to region attach struct with callbacks for
+ *          safely working with a region range by the caller
+ *
+ * Returns 0 or error.
+ */
+int cxl_memdev_attach_region(struct cxl_memdev *cxlmd,
+			     struct cxl_attach_region *attach)
+{
+	struct cxl_port *endpoint = cxlmd->endpoint;
+	struct cxl_endpoint_decoder *cxled;
+	struct cxl_region *cxlr;
+	int rc;
+
+	if (IS_ERR(endpoint))
+		return PTR_ERR(endpoint);
+	if (!endpoint)
+		return -ENXIO;
+
+	{
+		/* hold endpoint lock to setup autoremove of the region */
+		guard(device)(&endpoint->dev);
+		if (!endpoint->dev.driver)
+			return -ENXIO;
+
+		{
+			guard(rwsem_read)(&cxl_rwsem.region);
+			guard(rwsem_read)(&cxl_rwsem.dpa);
+
+			/*
+			 * TODO auto-instantiate a region, for now assume this will
+			 * find an auto-region.
+			 */
+			struct device *dev __free(put_device) =
+				device_find_child(&endpoint->dev, NULL,
+						  first_mapped_decoder);
+
+			if (!dev) {
+				dev_dbg(cxlmd->cxlds->dev,
+					"no region found for memdev %s\n",
+					dev_name(&cxlmd->dev));
+				return -ENXIO;
+			}
+
+			cxled = to_cxl_endpoint_decoder(dev);
+			cxlr = cxled->cxld.region;
+
+			if (cxlr->params.state < CXL_CONFIG_COMMIT) {
+				dev_dbg(cxlmd->cxlds->dev,
+					"region %s not committed for memdev %s\n",
+					dev_name(&cxlr->dev), dev_name(&cxlmd->dev));
+				return -ENXIO;
+			}
+
+			if (cxlr->params.nr_targets > 1) {
+				dev_dbg(cxlmd->cxlds->dev,
+					"Only attach to local non-interleaved region\n");
+				return -ENXIO;
+			}
+
+			attach->region = (struct range) {
+				.start = cxlr->params.res->start,
+				.end = cxlr->params.res->end,
+			};
+
+			/*
+			 * With endpoint locked leave the caller to safely work
+			 * with the region range.
+			 */
+			rc = attach->attach(attach->data);
+			if (rc)
+				return rc;
+
+			/* Only teardown regions that pass validation, ignore the rest */
+			rc = devm_add_action(&endpoint->dev,
+					     cxl_endpoint_region_autoremove, cxlr);
+			if (rc) {
+				attach->detach(attach->data);
+				goto err_unregister;
+			}
+
+			/* Link type2 driver callback for stopping use of the region range. */
+			rc = devm_add_action_or_reset(&endpoint->dev,
+						      attach->detach, attach->data);
+			if (rc) {
+				devm_remove_action(&endpoint->dev,
+						   cxl_endpoint_region_autoremove,
+						   cxlr);
+				goto err_unregister;
+			}
+
+			cxlr->detach = attach->detach;
+			cxlr->detach_data = attach->data;
+
+			return 0;
+		}
+err_unregister:
+		unregister_region(cxlr);
+		return rc;
+	}
+}
+EXPORT_SYMBOL_NS_GPL(cxl_memdev_attach_region, "CXL");
 
 static int cxl_region_probe(struct device *dev)
 {
