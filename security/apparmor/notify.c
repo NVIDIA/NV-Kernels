@@ -729,6 +729,8 @@ void aa_free_ruleset(struct aa_ruleset *rules)
 struct aa_ruleset *aa_new_ruleset(gfp_t gfp)
 {
 	struct aa_ruleset *rules = kzalloc(sizeof(*rules), gfp);
+	if (!rules)
+		return NULL;
 
 	INIT_LIST_HEAD(&rules->list);
 
