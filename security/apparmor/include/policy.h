@@ -208,7 +208,7 @@ struct aa_ruleset {
 
 void aa_free_ruleset(struct aa_ruleset *rules);
 struct aa_ruleset *aa_new_ruleset(gfp_t gfp);
-struct aa_ruleset *aa_clone_ruleset(struct aa_ruleset *rules);
+struct aa_ruleset *aa_clone_ruleset(struct aa_ruleset *rules, gfp_t gfp);
 
 /* struct aa_attachment - data and rules for a profiles attachment
  * @list:

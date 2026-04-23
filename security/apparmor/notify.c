@@ -928,11 +928,11 @@ struct aa_ruleset *aa_new_ruleset(gfp_t gfp)
 	return rules;
 }
 
-struct aa_ruleset *aa_clone_ruleset(struct aa_ruleset *rules)
+struct aa_ruleset *aa_clone_ruleset(struct aa_ruleset *rules, gfp_t gfp)
 {
 	struct aa_ruleset *clone;
 
-	clone = aa_new_ruleset(GFP_KERNEL);
+	clone = aa_new_ruleset(gfp);
 	if (!clone)
 		return NULL;
 	clone->size = rules->size;
@@ -947,7 +947,7 @@ struct aa_ruleset *aa_clone_ruleset(struct aa_ruleset *rules)
 
 static long knotif_update_from_uresp_name(struct aa_knotif *knotif,
 				struct apparmor_notif_resp_name *reply,
-				u16 size)
+				u16 size, gfp_t gfp)
 {
 	struct aa_ruleset *rules;
 	struct aa_profile *profile;
@@ -969,7 +969,7 @@ static long knotif_update_from_uresp_name(struct aa_knotif *knotif,
 		}
 		aa_put_ns(ns);
 
-		rules = aa_clone_ruleset(profile->label.rules[0]);
+		rules = aa_clone_ruleset(profile->label.rules[0], gfp);
 		if (!rules) {
 			aa_put_profile(profile);
 			return -ENOMEM;
@@ -990,8 +990,8 @@ static long knotif_update_from_uresp_name(struct aa_knotif *knotif,
 		struct aa_audit_node *hit;
 		struct aa_profile *profile = labels_profile(node->data.subj_label);
 
-		clone = aa_dup_audit_data(&node->data, GFP_KERNEL);
-		glob = kstrdup(name, GFP_KERNEL);
+		clone = aa_dup_audit_data(&node->data, gfp);
+		glob = kstrdup(name, gfp);
 		if (!glob) {
 			aa_put_audit_node(clone);
 			return -ENOMEM;
@@ -1079,7 +1079,8 @@ long aa_listener_unotif_response(struct aa_listener *listener,
 	if (uresp->perm.base.ntype == APPARMOR_NOTIF_RESP_PERM) {
 		knotif_update_from_uresp_perm(knotif, &uresp->perm);
 	} else if (uresp->perm.base.ntype == APPARMOR_NOTIF_RESP_NAME) {
-		size = knotif_update_from_uresp_name(knotif, &uresp->name, size);
+		/* holding a spin_lock, therefore, GFP_ATOMIC */
+		size = knotif_update_from_uresp_name(knotif, &uresp->name, size, GFP_ATOMIC);
 	} else {
 		AA_DEBUG(DEBUG_UPCALL, "id %lld: unknown response type", knotif->id);
 		size = -EINVAL;
