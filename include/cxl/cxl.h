@@ -7,6 +7,7 @@
 
 #include <linux/node.h>
 #include <linux/ioport.h>
+#include <linux/pci.h>
 #include <cxl/mailbox.h>
 
 /**
@@ -154,6 +155,20 @@ struct cxl_memdev_attach {
 };
 
 /**
+ * struct cxl_attach_region - accelerator region handling
+ * @attach: invoked at cxl_memdev_attach_region() with endpoint device locked.
+ * @detach: invoked at endpoint release.
+ * @data: pointer referencing accelerator data for attach and detach calls.
+ * @region: initialised with autodiscovered region values linked to memdev.
+ */
+struct cxl_attach_region {
+	int (*attach)(void *);
+	void (*detach)(void *);
+	void *data;
+	struct range region;
+};
+
+/**
  * struct cxl_dev_state - The driver device state
  *
  * cxl_dev_state represents the CXL driver/device state.  It provides an
@@ -231,4 +246,6 @@ struct cxl_dev_state *_devm_cxl_dev_state_create(struct device *dev,
 int cxl_set_capacity(struct cxl_dev_state *cxlds, u64 capacity);
 struct cxl_memdev *devm_cxl_add_memdev(struct cxl_dev_state *cxlds,
 				       const struct cxl_memdev_attach *attach);
+struct cxl_region;
+int cxl_memdev_attach_region(struct cxl_memdev *cxlmd, struct cxl_attach_region *attach);
 #endif /* __CXL_CXL_H__ */
