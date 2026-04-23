@@ -233,4 +233,5 @@ static inline bool cxl_region_contains_resource(struct resource *res)
 }
 #endif
 
+int cxl_set_capacity(struct cxl_dev_state *cxlds, u64 capacity);
 #endif /* __CXL_CXL_H__ */
