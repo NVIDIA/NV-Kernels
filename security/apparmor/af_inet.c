@@ -206,6 +206,7 @@ static int bind_map_addr(const struct sock *sk, struct sockaddr *addr,
 		/* see __inet_bind(), we only want to allow
 		 * AF_UNSPEC if the address is INADDR_ANY
 		 */
+		addr4 = (struct sockaddr_in *)addr;
 		if (addr4->sin_addr.s_addr != htonl(INADDR_ANY))
 			return -EAFNOSUPPORT;
 		family = AF_INET;
