@@ -443,6 +443,8 @@ struct cxl_region_params {
  * @hpa_range: Address range occupied by the region
  * @mode: Operational mode of the mapped capacity
  * @type: Endpoint decoder target type
+ * @detach: accelerator detach callback for device-memory regions
+ * @detach_data: accelerator detach callback data
  * @cxl_nvb: nvdimm bridge for coordinating @cxlr_pmem setup / shutdown
  * @cxlr_pmem: (for pmem regions) cached copy of the nvdimm bridge
  * @flags: Region state flags
@@ -458,6 +460,8 @@ struct cxl_region {
 	struct range hpa_range;
 	enum cxl_partition_mode mode;
 	enum cxl_decoder_type type;
+	void (*detach)(void *data);
+	void *detach_data;
 	struct cxl_nvdimm_bridge *cxl_nvb;
 	struct cxl_pmem_region *cxlr_pmem;
 	unsigned long flags;
