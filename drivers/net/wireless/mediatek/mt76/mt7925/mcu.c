@@ -2018,6 +2018,9 @@ int mt7925_mcu_set_chctx(struct mt76_phy *phy, struct mt76_vif *mvif,
 	case NL80211_CHAN_WIDTH_160:
 		rlm_req.rlm.bw = CMD_CBW_160MHZ;
 		break;
+	case NL80211_CHAN_WIDTH_320:
+		rlm_req.rlm.bw = CMD_CBW_320MHZ;
+		break;
 	case NL80211_CHAN_WIDTH_5:
 		rlm_req.rlm.bw = CMD_CBW_5MHZ;
 		break;
