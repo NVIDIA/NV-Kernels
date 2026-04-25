@@ -2394,6 +2394,7 @@ int mt7925_mcu_add_bss_info(struct mt792x_phy *phy,
 
 	err = mt76_mcu_skb_send_msg(&dev->mt76, skb,
 				    MCU_UNI_CMD(BSS_INFO_UPDATE), true);
+	err = mt76_connac_mcu_bss_deact_err(&dev->mt76, err, enable);
 	if (err < 0)
 		return err;
 
