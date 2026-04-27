@@ -3745,8 +3745,7 @@ static int arm_smmu_def_domain_type(struct device *dev)
 			return IOMMU_DOMAIN_IDENTITY;
 
 		if (pdev->vendor == PCI_VENDOR_ID_NVIDIA &&
-		    (pdev->device == 0x2E12 || pdev->device == 0x2E2A ||
-		     pdev->device == 0x2E2B))
+		    pdev->device >= 0x2E00 && pdev->device <= 0x2E3F)
 			return IOMMU_DOMAIN_DMA;
 	}
 
