@@ -1327,7 +1327,7 @@ static int purge_fn(struct device *dev, void *data)
 
 	spin_lock_irq(cdev->ccwlock);
 	if (is_blacklisted(id->ssid, id->devno) &&
-	    (cdev->private->state == DEV_STATE_OFFLINE) &&
+	    (!cdev->online) &&
 	    (atomic_cmpxchg(&cdev->private->onoff, 0, 1) == 0)) {
 		CIO_MSG_EVENT(3, "ccw: purging 0.%x.%04x\n", id->ssid,
 			      id->devno);
