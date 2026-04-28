@@ -335,12 +335,12 @@ static void __ksmbd_remove_durable_fd(struct ksmbd_file *fp)
 
 static void __ksmbd_remove_fd(struct ksmbd_file_table *ft, struct ksmbd_file *fp)
 {
-	if (!has_file_id(fp->volatile_id))
-		return;
-
 	down_write(&fp->f_ci->m_lock);
 	list_del_init(&fp->node);
 	up_write(&fp->f_ci->m_lock);
+
+	if (!has_file_id(fp->volatile_id))
+		return;
 
 	write_lock(&ft->lock);
 	idr_remove(ft->idr, fp->volatile_id);
@@ -680,15 +680,58 @@ err_out:
 	return ERR_PTR(ret);
 }
 
-void ksmbd_update_fstate(struct ksmbd_file_table *ft, struct ksmbd_file *fp,
-			 unsigned int state)
+/**
+ * ksmbd_update_fstate() - update an fp state under the file-table lock
+ * @ft: file table that publishes @fp's volatile id
+ * @fp: file pointer to update
+ * @state: new state
+ *
+ * Return: 0 on success.  The FP_NEW -> FP_INITED transition is special:
+ * -ENOENT if teardown already unpublished @fp by advancing the state or
+ * clearing the volatile id.  Other state updates preserve the historical
+ * fire-and-forget behavior.
+ */
+int ksmbd_update_fstate(struct ksmbd_file_table *ft, struct ksmbd_file *fp,
+			unsigned int state)
 {
+	int ret;
+
 	if (!fp)
-		return;
+		return -ENOENT;
 
 	write_lock(&ft->lock);
-	fp->f_state = state;
+	if (state == FP_INITED &&
+	    (fp->f_state != FP_NEW || !has_file_id(fp->volatile_id))) {
+		ret = -ENOENT;
+	} else {
+		fp->f_state = state;
+		ret = 0;
+	}
 	write_unlock(&ft->lock);
+
+	return ret;
+}
+
+/*
+ * ksmbd_mark_fp_closed() - mark fp closed under ft->lock and return how many
+ * refs the teardown path owns.
+ *
+ * FP_INITED has a normal idr-owned reference, so teardown owns both that
+ * reference and the transient lookup reference.  FP_NEW is still owned by the
+ * in-flight opener, which will drop the original reference after
+ * ksmbd_update_fstate(..., FP_INITED) observes the cleared volatile id.
+ * FP_CLOSED on entry means an earlier ksmbd_close_fd() already consumed the
+ * idr-owned ref.
+ */
+static int ksmbd_mark_fp_closed(struct ksmbd_file *fp)
+{
+	if (fp->f_state == FP_INITED) {
+		set_close_state_blocked_works(fp);
+		fp->f_state = FP_CLOSED;
+		return 2;
+	}
+
+	return 1;
 }
 
 static int
@@ -702,6 +745,8 @@ __close_file_table_ids(struct ksmbd_file_table *ft,
 	int num = 0;
 
 	while (1) {
+		int n_to_drop;
+
 		write_lock(&ft->lock);
 		fp = idr_get_next(ft->idr, &id);
 		if (!fp) {
@@ -709,25 +754,33 @@ __close_file_table_ids(struct ksmbd_file_table *ft,
 			break;
 		}
 
-		if (skip(tcon, fp) ||
-		    !atomic_dec_and_test(&fp->refcount)) {
+		if (!atomic_inc_not_zero(&fp->refcount)) {
 			id++;
 			write_unlock(&ft->lock);
 			continue;
 		}
 
-		set_close_state_blocked_works(fp);
-		idr_remove(ft->idr, fp->volatile_id);
+		/* Both callbacks in this tree are non-sleeping pointer checks. */
+		if (skip(tcon, fp)) {
+			atomic_dec(&fp->refcount);
+			write_unlock(&ft->lock);
+			id++;
+			continue;
+		}
+
+		idr_remove(ft->idr, id);
 		fp->volatile_id = KSMBD_NO_FID;
+		n_to_drop = ksmbd_mark_fp_closed(fp);
 		write_unlock(&ft->lock);
 
 		down_write(&fp->f_ci->m_lock);
 		list_del_init(&fp->node);
 		up_write(&fp->f_ci->m_lock);
 
-		__ksmbd_close_fd(ft, fp);
-
-		num++;
+		if (atomic_sub_and_test(n_to_drop, &fp->refcount)) {
+			__ksmbd_close_fd(NULL, fp);
+			num++;
+		}
 		id++;
 	}
 
