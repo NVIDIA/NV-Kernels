@@ -815,6 +815,87 @@ static void vfio_cxl_enable_memory_space(struct vfio_pci_core_device *vdev)
 }
 
 /*
+ * vfio_cxl_reinit_hdm_shadow - reinitialise comp_reg_virt, preserving the
+ * guest-visible BASE registers and CTRL LOCK across reset.
+ *
+ * reinit_comp_regs() re-reads hardware into comp_reg_virt[] after FLR.
+ * pci_dev_restore() re-commits the host-physical BASE values it saved
+ * before the reset, so reinit_comp_regs() sees those host bases and not
+ * the guest-physical bases the device manager programmed in shadow.  The
+ * decoder CTRL LOCK bit is also cleared by FLR on hardware and is not
+ * re-applied by pci_dev_restore().  Snapshot BASE_LOW/BASE_HIGH and the
+ * LOCK bit from shadow before reinit, then write them back so the
+ * emulated decoder stays consistent with what the guest configured.
+ *
+ * Called with memory_lock write side held (from vfio_cxl_finish_reset).
+ */
+static void vfio_cxl_reinit_hdm_shadow(struct vfio_pci_cxl_state *cxl)
+{
+	__le32 *saved_lo = NULL, *saved_hi = NULL, *saved_ctrl = NULL;
+	u8 n, count = cxl->hdm_count;
+
+	if (cxl->comp_reg_virt && count) {
+		saved_lo   = kcalloc(count, sizeof(*saved_lo),   GFP_KERNEL);
+		saved_hi   = kcalloc(count, sizeof(*saved_hi),   GFP_KERNEL);
+		saved_ctrl = kcalloc(count, sizeof(*saved_ctrl), GFP_KERNEL);
+		if (!saved_lo || !saved_hi || !saved_ctrl) {
+			/*
+			 * Allocation failure: skip the snapshot and let reinit
+			 * resync from hardware.  The guest-visible BASE/LOCK
+			 * state will diverge but the device is otherwise
+			 * functional.  This path is unlikely under normal load.
+			 */
+			pci_warn(cxl->vdev->pdev,
+				 "vfio_cxl: HDM shadow snapshot allocation failed; resetting without GPA preservation\n");
+			kfree(saved_lo);
+			kfree(saved_hi);
+			kfree(saved_ctrl);
+			saved_lo = saved_hi = saved_ctrl = NULL;
+		} else {
+			for (n = 0; n < count; n++) {
+				saved_lo[n]   = *hdm_reg_ptr(cxl,
+					CXL_HDM_DECODER0_BASE_LOW_OFFSET(n));
+				saved_hi[n]   = *hdm_reg_ptr(cxl,
+					CXL_HDM_DECODER0_BASE_HIGH_OFFSET(n));
+				saved_ctrl[n] = *hdm_reg_ptr(cxl,
+					CXL_HDM_DECODER0_CTRL_OFFSET(n));
+			}
+		}
+	}
+
+	vfio_cxl_reinit_comp_regs(cxl);
+
+	if (cxl->comp_reg_virt && saved_lo) {
+		for (n = 0; n < count; n++) {
+			u32 ctrl;
+
+			*hdm_reg_ptr(cxl,
+				CXL_HDM_DECODER0_BASE_LOW_OFFSET(n))  = saved_lo[n];
+			*hdm_reg_ptr(cxl,
+				CXL_HDM_DECODER0_BASE_HIGH_OFFSET(n)) = saved_hi[n];
+
+			/*
+			 * Restore the LOCK bit from shadow.  Other CTRL bits
+			 * (COMMITTED, error indicators) should reflect the
+			 * post-FLR hardware state that reinit_comp_regs() just
+			 * snapshotted, so leave those alone.
+			 */
+			ctrl = le32_to_cpu(*hdm_reg_ptr(cxl,
+				CXL_HDM_DECODER0_CTRL_OFFSET(n)));
+			ctrl |= le32_to_cpu(saved_ctrl[n]) &
+				CXL_HDM_DECODER0_CTRL_LOCK;
+			*hdm_reg_ptr(cxl,
+				CXL_HDM_DECODER0_CTRL_OFFSET(n)) =
+					cpu_to_le32(ctrl);
+		}
+	}
+
+	kfree(saved_lo);
+	kfree(saved_hi);
+	kfree(saved_ctrl);
+}
+
+/*
  * vfio_cxl_finish_reset - Re-enable DPA region after reset.
  *
  * Must be called with vdev->memory_lock held for writing.  Re-reads the
@@ -833,11 +914,10 @@ void vfio_cxl_finish_reset(struct vfio_pci_core_device *vdev)
 	vfio_cxl_enable_memory_space(vdev);
 
 	/*
-	 * Re-initialise the emulated HDM comp_reg_virt[] from hardware.
-	 * A reset clears decoder registers; mirror that in the emulated
-	 * state so the guest device manager sees the post-reset hardware.
+	 * Re-initialise the emulated HDM comp_reg_virt[] from hardware,
+	 * preserving the GPA decoder bases set by the device manager.
 	 */
-	vfio_cxl_reinit_comp_regs(cxl);
+	vfio_cxl_reinit_hdm_shadow(cxl);
 
 	/*
 	 * Only re-enable the DPA mmap if the hardware has actually
