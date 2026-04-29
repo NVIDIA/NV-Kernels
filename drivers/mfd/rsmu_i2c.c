@@ -109,13 +109,9 @@ static int rsmu_write_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u16 bytes
 
 static int rsmu_write_page_register(struct rsmu_ddata *rsmu, u32 reg)
 {
-	u32 page = reg & RSMU_CM_PAGE_MASK;
+	u32 page = (reg | RSMU_CM_SCSR_BASE) & RSMU_CM_PAGE_MASK;
 	u8 buf[4];
 	int err;
-
-	/* Do not modify offset register for none-scsr registers */
-	if (reg < RSMU_CM_SCSR_BASE)
-		return 0;
 
 	/* Simply return if we are on the same page */
 	if (rsmu->page == page)
