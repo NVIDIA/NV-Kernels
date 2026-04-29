@@ -272,6 +272,7 @@ static ssize_t vfio_cxl_comp_regs_rw(struct vfio_pci_core_device *vdev,
 {
 	struct vfio_pci_cxl_state *cxl = vdev->cxl;
 	loff_t pos = *ppos & VFIO_PCI_OFFSET_MASK;
+	ssize_t ret = 0;
 	size_t done = 0;
 
 	if (!count)
@@ -283,14 +284,26 @@ static ssize_t vfio_cxl_comp_regs_rw(struct vfio_pci_core_device *vdev,
 	count = min(count,
 		    (size_t)(cxl->hdm_reg_offset + cxl->hdm_reg_size - pos));
 
+	/*
+	 * Serialise against vfio_cxl_reinit_hdm_shadow(), which holds
+	 * memory_lock write-side while it saves, zeroes, and restores
+	 * comp_reg_virt[] during reset.  Without this read lock a concurrent
+	 * COMP_REGS write can land between the save snapshot and the restore,
+	 * causing the restore to silently overwrite it.  A concurrent read
+	 * can observe the array mid-rebuild.
+	 */
+	down_read(&vdev->memory_lock);
+
 	while (done < count) {
 		u32 sz	 = count - done;
 		u32 off	 = pos + done;
 		__le32 v;
 
 		/* Enforce exactly 4-byte, 4-byte-aligned accesses */
-		if (sz != CXL_REG_SIZE_DWORD || (off & 0x3))
-			return done ? (ssize_t)done : -EINVAL;
+		if (sz != CXL_REG_SIZE_DWORD || (off & 0x3)) {
+			ret = done ? (ssize_t)done : -EINVAL;
+			goto out_unlock;
+		}
 
 		if (iswrite) {
 			if (off < cxl->hdm_reg_offset) {
@@ -298,22 +311,29 @@ static ssize_t vfio_cxl_comp_regs_rw(struct vfio_pci_core_device *vdev,
 				done += sizeof(v);
 				continue;
 			}
-			if (copy_from_user(&v, buf + done, sizeof(v)))
-				return done ? (ssize_t)done : -EFAULT;
+			if (copy_from_user(&v, buf + done, sizeof(v))) {
+				ret = done ? (ssize_t)done : -EFAULT;
+				goto out_unlock;
+			}
 			comp_regs_dispatch_write(vdev,
 						 off - cxl->hdm_reg_offset,
 						 &v, sizeof(v));
 		} else {
-			/* Read from extended buffer _ covers cap array and HDM */
+			/* Read from extended buffer - covers cap array and HDM */
 			v = cxl->comp_reg_virt[off / sizeof(__le32)];
-			if (copy_to_user(buf + done, &v, sizeof(v)))
-				return done ? (ssize_t)done : -EFAULT;
+			if (copy_to_user(buf + done, &v, sizeof(v))) {
+				ret = done ? (ssize_t)done : -EFAULT;
+				goto out_unlock;
+			}
 		}
 		done += sizeof(v);
 	}
 
+	ret = done;
 	*ppos += done;
-	return done;
+out_unlock:
+	up_read(&vdev->memory_lock);
+	return ret;
 }
 
 static void vfio_cxl_comp_regs_release(struct vfio_pci_core_device *vdev,
@@ -437,7 +457,7 @@ vfio_cxl_read_committed_decoder_size(struct vfio_pci_core_device *vdev,
 }
 
 /*
- * Called with memory_lock write side held (from vfio_cxl_finish_reset).
+ * Called with memory_lock write side held (from vfio_cxl_reinit_hdm_shadow).
  * Uses the pre-established hdm_iobase, no ioremap() under the lock,
  * which would deadlock on PREEMPT_RT where ioremap() can sleep.
  */
