@@ -1237,7 +1237,7 @@ static void cxl_pci_functions_reset_done(struct cxl_reset_context *ctx)
 /*
  * CXL device reset execution
  */
-static int cxl_dev_reset(struct pci_dev *pdev, int dvsec)
+int cxl_dev_reset(struct pci_dev *pdev, int dvsec, bool mem_clr_en)
 {
 	static const u32 reset_timeout_ms[] = { 10, 100, 1000, 10000, 100000 };
 	u16 cap, ctrl2, status2;
@@ -1307,7 +1307,17 @@ static int cxl_dev_reset(struct pci_dev *pdev, int dvsec)
 		if (rc)
 			return rc;
 
-		ctrl2 |= PCI_DVSEC_CXL_RST_MEM_CLR_EN;
+		/*
+		 * Explicitly set or clear RST_MEM_CLR_EN rather than only
+		 * setting it.  A previous reset may have left the bit set in
+		 * hardware; if mem_clr_en is false we must clear it so that a
+		 * stale bit does not cause an unwanted memory-clearing reset.
+		 */
+		if (mem_clr_en)
+			ctrl2 |= PCI_DVSEC_CXL_RST_MEM_CLR_EN;
+		else
+			ctrl2 &= ~PCI_DVSEC_CXL_RST_MEM_CLR_EN;
+
 		rc = pci_write_config_word(pdev, dvsec + PCI_DVSEC_CXL_CTRL2,
 					   ctrl2);
 		if (rc)
@@ -1356,6 +1366,47 @@ static int cxl_dev_reset(struct pci_dev *pdev, int dvsec)
 
 	return 0;
 }
+EXPORT_SYMBOL_NS_GPL(cxl_dev_reset, "CXL");
+
+/**
+ * cxl_dev_reset_locked() - cxl_dev_reset() under cxl_reset_mutex with sibling
+ *                          CXL.cachemem function save/restore.
+ * @pdev: Target CXL function
+ * @dvsec: CXL DVSEC capability offset (pci_find_dvsec_capability())
+ * @mem_clr_en: Pass-through to cxl_dev_reset() (Mem_Clr_Enable in CTRL2)
+ *
+ * Out-of-tree callers (currently vfio-pci) need the same serialization and
+ * sibling-function coordination that the sysfs reset path applies before
+ * invoking cxl_dev_reset(): take the global cxl_reset_mutex, lock the target,
+ * save_and_disable() target plus every CXL.cachemem sibling function on the
+ * bus, run the reset, then restore in reverse order.  Without this, a guest-
+ * triggered CXL reset could race a host sysfs reset or strand a sibling
+ * function in a half-reset state.
+ *
+ * Return: 0 on success, negative errno from cxl_dev_reset() on failure.
+ */
+int cxl_dev_reset_locked(struct pci_dev *pdev, int dvsec, bool mem_clr_en)
+{
+	struct cxl_reset_context ctx = { .target = pdev };
+	int rc;
+
+	mutex_lock(&cxl_reset_mutex);
+	pci_dev_lock(pdev);
+
+	pci_dev_save_and_disable(pdev);
+	cxl_pci_functions_reset_prepare(&ctx);
+
+	rc = cxl_dev_reset(pdev, dvsec, mem_clr_en);
+
+	cxl_pci_functions_reset_done(&ctx);
+	pci_dev_restore(pdev);
+
+	pci_dev_unlock(pdev);
+	mutex_unlock(&cxl_reset_mutex);
+
+	return rc;
+}
+EXPORT_SYMBOL_NS_GPL(cxl_dev_reset_locked, "CXL");
 
 static int match_memdev_by_parent(struct device *dev, const void *parent)
 {
@@ -1395,7 +1446,7 @@ static int cxl_do_reset(struct pci_dev *pdev)
 	pci_dev_save_and_disable(pdev);
 	cxl_pci_functions_reset_prepare(&ctx);
 
-	rc = cxl_dev_reset(pdev, dvsec);
+	rc = cxl_dev_reset(pdev, dvsec, true);
 
 	cxl_pci_functions_reset_done(&ctx);
 
@@ -1424,7 +1475,7 @@ out_unlock:
  * devices under bus core serialization.
  */
 
-static bool pci_cxl_reset_capable(struct pci_dev *pdev)
+bool pci_cxl_reset_capable(struct pci_dev *pdev)
 {
 	int dvsec;
 	u16 cap;
@@ -1443,6 +1494,7 @@ static bool pci_cxl_reset_capable(struct pci_dev *pdev)
 
 	return !!(cap & PCI_DVSEC_CXL_RST_CAPABLE);
 }
+EXPORT_SYMBOL_NS_GPL(pci_cxl_reset_capable, "CXL");
 
 static ssize_t cxl_reset_store(struct device *dev,
 			       struct device_attribute *attr,
