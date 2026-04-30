@@ -2148,6 +2148,7 @@ static int snd_soc_bind_card(struct snd_soc_card *card)
 	snd_soc_fill_dummy_dai(card);
 
 	snd_soc_dapm_init(dapm, card, NULL);
+	list_del_init(&card->list);
 
 	/* check whether any platform is ignore machine FE and using topology */
 	soc_check_tplg_fes(card);
@@ -2291,6 +2292,10 @@ static int snd_soc_bind_card(struct snd_soc_card *card)
 probe_end:
 	if (ret < 0)
 		soc_cleanup_card_resources(card);
+	if (ret == -EPROBE_DEFER) {
+		list_add(&card->list, &unbind_card_list);
+		ret = 0;
+	}
 	snd_soc_card_mutex_unlock(card);
 
 	return ret;
@@ -2306,12 +2311,15 @@ static int devm_snd_soc_bind_card(struct device *dev, struct snd_soc_card *card)
 	struct snd_soc_card **ptr;
 	int ret;
 
+	/* The procedure may be called many times during the lifetime of the card. */
+	devres_destroy(dev, devm_card_bind_release, NULL, NULL);
+
 	ptr = devres_alloc(devm_card_bind_release, sizeof(*ptr), GFP_KERNEL);
 	if (!ptr)
 		return -ENOMEM;
 
 	ret = snd_soc_bind_card(card);
-	if (ret == 0 || ret == -EPROBE_DEFER) {
+	if (ret == 0) {
 		*ptr = card;
 		devres_add(dev, ptr);
 	} else {
@@ -2321,21 +2329,11 @@ static int devm_snd_soc_bind_card(struct device *dev, struct snd_soc_card *card)
 	return ret;
 }
 
-static int snd_soc_rebind_card(struct snd_soc_card *card)
+static int call_soc_bind_card(struct snd_soc_card *card)
 {
-	int ret;
-
-	if (card->devres_dev) {
-		devres_destroy(card->devres_dev, devm_card_bind_release, NULL, NULL);
-		ret = devm_snd_soc_bind_card(card->devres_dev, card);
-	} else {
-		ret = snd_soc_bind_card(card);
-	}
-
-	if (ret != -EPROBE_DEFER)
-		list_del_init(&card->list);
-
-	return ret;
+	if (card->devres_dev)
+		return devm_snd_soc_bind_card(card->devres_dev, card);
+	return snd_soc_bind_card(card);
 }
 
 /* probes a new socdev */
@@ -2533,8 +2531,6 @@ EXPORT_SYMBOL_GPL(snd_soc_add_dai_controls);
  */
 int snd_soc_register_card(struct snd_soc_card *card)
 {
-	int ret;
-
 	if (!card->name || !card->dev)
 		return -EINVAL;
 
@@ -2557,17 +2553,7 @@ int snd_soc_register_card(struct snd_soc_card *card)
 
 	guard(mutex)(&client_mutex);
 
-	if (card->devres_dev) {
-		ret = devm_snd_soc_bind_card(card->devres_dev, card);
-		if (ret == -EPROBE_DEFER) {
-			list_add(&card->list, &unbind_card_list);
-			ret = 0;
-		}
-	} else {
-		ret = snd_soc_bind_card(card);
-	}
-
-	return ret;
+	return call_soc_bind_card(card);
 }
 EXPORT_SYMBOL_GPL(snd_soc_register_card);
 
@@ -2882,7 +2868,7 @@ int snd_soc_add_component(struct snd_soc_component *component,
 	list_add(&component->list, &component_list);
 
 	list_for_each_entry_safe(card, c, &unbind_card_list, list)
-		snd_soc_rebind_card(card);
+		call_soc_bind_card(card);
 
 err_cleanup:
 	if (ret < 0)
