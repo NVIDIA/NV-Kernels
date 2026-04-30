@@ -2595,6 +2595,7 @@ nv170_chipset = {
 	.nvdec    = { 0x0000001f, ga100_nvdec_new },
 	.nvjpg    = { 0x00000001, ga100_nvjpg_new },
 	.ofa      = { 0x00000001, ga100_ofa_new },
+	.sec2     = { 0x00000001, tu102_sec2_new },
 };
 
 static const struct nvkm_device_chip
