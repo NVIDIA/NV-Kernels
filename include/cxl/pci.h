@@ -28,5 +28,8 @@ void cxl_probe_component_regs(struct device *dev, void __iomem *base,
 int cxl_await_range_active(struct cxl_dev_state *cxlds);
 int cxl_regblock_get_bar_info(const struct cxl_register_map *map, u8 *bar_index,
 			      resource_size_t *bar_offset);
+int cxl_dev_reset(struct pci_dev *pdev, int dvsec, bool mem_clr_en);
+int cxl_dev_reset_locked(struct pci_dev *pdev, int dvsec, bool mem_clr_en);
+bool pci_cxl_reset_capable(struct pci_dev *pdev);
 int cxl_setup_regs(struct cxl_register_map *map);
 #endif
