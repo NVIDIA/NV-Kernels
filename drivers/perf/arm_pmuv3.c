@@ -1002,13 +1002,7 @@ static bool armv8pmu_can_use_pmccntr(struct pmu_hw_events *cpuc,
 	if (has_branch_stack(event))
 		return false;
 
-	/*
-	 * The PMCCNTR_EL0 increments from the processor clock rather than
-	 * the PE clock (ARM DDI0487 L.b D13.1.3) which means it'll continue
-	 * counting on a WFI PE if one of its SMT sibling is not idle on a
-	 * multi-threaded implementation. So don't use it on SMT cores.
-	 */
-	if (cpu_pmu->has_smt)
+	if (cpu_pmu->avoid_pmccntr)
 		return false;
 
 	return true;
