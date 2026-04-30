@@ -24,6 +24,8 @@
 #include <linux/irq.h>
 #include <linux/irqdesc.h>
 
+#include <asm/cpu.h>
+#include <asm/cputype.h>
 #include <asm/irq_regs.h>
 
 static int armpmu_count_irq_users(const int irq);
@@ -932,6 +934,76 @@ void armpmu_free(struct arm_pmu *pmu)
 	kfree(pmu);
 }
 
+#ifdef CONFIG_ARM64
+/*
+ * List of CPUs that should avoid using PMCCNTR_EL0.
+ */
+static struct midr_range armpmu_avoid_pmccntr_cpus[] = {
+	/*
+	 * The PMCCNTR_EL0 in Olympus CPU may still increment while in WFI/WFE state.
+	 * This is an implementation specific behavior and not an erratum.
+	 *
+	 * From ARM DDI0487 D14.4:
+	 *   It is IMPLEMENTATION SPECIFIC whether CPU_CYCLES and PMCCNTR count
+	 *   when the PE is in WFI or WFE state, even if the clocks are not stopped.
+	 *
+	 * From ARM DDI0487 D24.5.2:
+	 *   All counters are subject to any changes in clock frequency, including
+	 *   clock stopping caused by the WFI and WFE instructions.
+	 *   This means that it is CONSTRAINED UNPREDICTABLE whether or not
+	 *   PMCCNTR_EL0 continues to increment when clocks are stopped by WFI and
+	 *   WFE instructions.
+	 */
+	MIDR_ALL_VERSIONS(MIDR_NVIDIA_OLYMPUS),
+	{}
+};
+
+static bool armpmu_is_in_avoid_pmccntr_cpus(int cpu)
+{
+	struct midr_range const *r = armpmu_avoid_pmccntr_cpus;
+	u32 midr = (u32)per_cpu(cpu_data, cpu).reg_midr;
+
+	while (r->model) {
+		if (midr_is_cpu_model_range(midr, r->model, r->rv_min, r->rv_max))
+			return true;
+		r++;
+	}
+
+	return false;
+}
+#else
+static bool armpmu_is_in_avoid_pmccntr_cpus(int cpu)
+{
+	return false;
+}
+#endif
+
+static bool armpmu_avoid_pmccntr(struct arm_pmu *pmu)
+{
+	int cpu = cpumask_first(&pmu->supported_cpus);
+
+	/*
+	 * By this stage we know our supported CPUs on either DT/ACPI platforms,
+	 * detect the SMT implementation.
+	 * On SMT CPUs, the PMCCNTR_EL0 increments from the processor clock rather
+	 * than the PE clock (ARM DDI0487 L.b D13.1.3) which means it'll continue
+	 * counting on a WFI PE if one of its SMT sibling is not idle on a
+	 * multi-threaded implementation. So don't use it on SMT cores.
+	 */
+	if (topology_core_has_smt(cpu))
+		return true;
+
+	/*
+	 * On some CPUs, PMCCNTR_EL0 does not match the behavior of CPU_CYCLES
+	 * programmable counter, so avoid routing cycles through PMCCNTR_EL0 to
+	 * prevent inconsistency in the results.
+	 */
+	if (armpmu_is_in_avoid_pmccntr_cpus(cpu))
+		return true;
+
+	return false;
+}
+
 int armpmu_register(struct arm_pmu *pmu)
 {
 	int ret;
@@ -940,11 +1012,7 @@ int armpmu_register(struct arm_pmu *pmu)
 	if (ret)
 		return ret;
 
-	/*
-	 * By this stage we know our supported CPUs on either DT/ACPI platforms,
-	 * detect the SMT implementation.
-	 */
-	pmu->has_smt = topology_core_has_smt(cpumask_first(&pmu->supported_cpus));
+	pmu->avoid_pmccntr = armpmu_avoid_pmccntr(pmu);
 
 	if (!pmu->set_event_filter)
 		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_EXCLUDE;
