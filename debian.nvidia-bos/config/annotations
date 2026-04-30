@@ -282,6 +282,8 @@ CONFIG_VFIO_CONTAINER                           note<'LP: #2095028'>
 CONFIG_VFIO_IOMMU_TYPE1                         policy<{'amd64': 'm', 'arm64': '-'}>
 CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
 
+CONFIG_RESCTRL_FS				policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_RESCTRL_FS				note<'LP: #2122432'>
 
 # ---- Annotations without notes ----
 
