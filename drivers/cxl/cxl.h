@@ -163,6 +163,11 @@ int cxl_find_regblock_instance(struct pci_dev *pdev, enum cxl_regloc_type type,
 			       struct cxl_register_map *map, unsigned int index);
 int cxl_regblock_get_bar_info(const struct cxl_register_map *map,
 			      u8 *bar_index, resource_size_t *bar_offset);
+int cxl_dev_reset(struct pci_dev *pdev, int dvsec, bool mem_clr_en);
+int cxl_dev_reset_locked(struct pci_dev *pdev, int dvsec, bool mem_clr_en);
+bool pci_cxl_reset_capable(struct pci_dev *pdev);
+void cxl_reset_sysfs_init(void);
+void cxl_reset_sysfs_exit(void);
 struct cxl_dport;
 int cxl_dport_map_rcd_linkcap(struct pci_dev *pdev, struct cxl_dport *dport);
 
