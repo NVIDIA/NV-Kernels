@@ -1472,7 +1472,7 @@ void arm_smmu_clear_cd(struct arm_smmu_master *master, ioasid_t ssid)
 	if (!arm_smmu_cdtab_allocated(&master->cd_table))
 		return;
 	cdptr = arm_smmu_get_cd_ptr(master, ssid);
-	if (!cdptr)
+	if (WARN_ON(!cdptr))
 		return;
 	arm_smmu_write_cd_entry(master, ssid, cdptr, &target);
 }
@@ -1486,22 +1486,6 @@ static int arm_smmu_alloc_cd_tables(struct arm_smmu_master *master)
 	struct arm_smmu_ctx_desc_cfg *cd_table = &master->cd_table;
 
 	cd_table->s1cdmax = master->ssid_bits;
-
-	/*
-	 * When a device doesn't support PASID (non default SSID), ssid_bits is
-	 * set to 0. This also sets S1CDMAX to 0, which disables the substreams
-	 * and ignores the S1DSS field.
-	 *
-	 * On the other hand, if a device demands ATS to be always on even when
-	 * its default substream is IOMMU bypassed, it has to use EATS that is
-	 * only effective with an STE (CFG=S1translate, S1DSS=Bypass). For such
-	 * use cases, S1CDMAX has to be !0, in order to make use of S1DSS/EATS.
-	 *
-	 * Set S1CDMAX no lower than 1. This would add a dummy substream in the
-	 * CD table but it should never be used by an actual CD.
-	 */
-	if (master->ats_always_on)
-		cd_table->s1cdmax = max_t(u8, cd_table->s1cdmax, 1);
 	max_contexts = 1 << cd_table->s1cdmax;
 
 	if (!(smmu->features & ARM_SMMU_FEAT_2_LVL_CDTAB) ||
@@ -3255,8 +3239,7 @@ static int arm_smmu_blocking_set_dev_pasid(struct iommu_domain *new_domain,
 	 * When the last user of the CD table goes away downgrade the STE back
 	 * to a non-cd_table one.
 	 */
-	if (!master->ats_always_on &&
-	    !arm_smmu_ssids_in_use(&master->cd_table)) {
+	if (!arm_smmu_ssids_in_use(&master->cd_table)) {
 		struct iommu_domain *sid_domain =
 			iommu_get_domain_for_dev(master->dev);
 
@@ -3270,7 +3253,7 @@ static int arm_smmu_blocking_set_dev_pasid(struct iommu_domain *new_domain,
 static void arm_smmu_attach_dev_ste(struct iommu_domain *domain,
 				    struct device *dev,
 				    struct arm_smmu_ste *ste,
-				    unsigned int s1dss, bool ats_always_on)
+				    unsigned int s1dss)
 {
 	struct arm_smmu_master *master = dev_iommu_priv_get(dev);
 	struct arm_smmu_attach_state state = {
@@ -3289,7 +3272,7 @@ static void arm_smmu_attach_dev_ste(struct iommu_domain *domain,
 	 * If the CD table is not in use we can use the provided STE, otherwise
 	 * we use a cdtable STE with the provided S1DSS.
 	 */
-	if (ats_always_on || arm_smmu_ssids_in_use(&master->cd_table)) {
+	if (arm_smmu_ssids_in_use(&master->cd_table)) {
 		/*
 		 * If a CD table has to be present then we need to run with ATS
 		 * on because we have to assume a PASID is using ATS. For
@@ -3323,8 +3306,7 @@ static int arm_smmu_attach_dev_identity(struct iommu_domain *domain,
 
 	arm_smmu_master_clear_vmaster(master);
 	arm_smmu_make_bypass_ste(master->smmu, &ste);
-	arm_smmu_attach_dev_ste(domain, dev, &ste, STRTAB_STE_1_S1DSS_BYPASS,
-				master->ats_always_on);
+	arm_smmu_attach_dev_ste(domain, dev, &ste, STRTAB_STE_1_S1DSS_BYPASS);
 	return 0;
 }
 
@@ -3345,8 +3327,7 @@ static int arm_smmu_attach_dev_blocked(struct iommu_domain *domain,
 
 	arm_smmu_master_clear_vmaster(master);
 	arm_smmu_make_abort_ste(&ste);
-	arm_smmu_attach_dev_ste(domain, dev, &ste,
-				STRTAB_STE_1_S1DSS_TERMINATE, false);
+	arm_smmu_attach_dev_ste(domain, dev, &ste, STRTAB_STE_1_S1DSS_TERMINATE);
 	return 0;
 }
 
@@ -3584,40 +3565,6 @@ static void arm_smmu_remove_master(struct arm_smmu_master *master)
 	kfree(master->streams);
 }
 
-static int arm_smmu_master_prepare_ats(struct arm_smmu_master *master)
-{
-	bool s1p = master->smmu->features & ARM_SMMU_FEAT_TRANS_S1;
-	unsigned int stu = __ffs(master->smmu->pgsize_bitmap);
-	struct pci_dev *pdev = to_pci_dev(master->dev);
-	int ret;
-
-	if (!arm_smmu_ats_supported(master))
-		return 0;
-
-	if (!pci_ats_always_on(pdev))
-		goto out_prepare;
-
-	/*
-	 * S1DSS is required for ATS to be always on for identity domain cases.
-	 * However, the S1DSS field is ignored if !IDR0_S1P or !IDR1_SSIDSIZE.
-	 */
-	if (!s1p || !master->smmu->ssid_bits) {
-		dev_info_once(master->dev,
-			      "SMMU doesn't support ATS to be always on\n");
-		goto out_prepare;
-	}
-
-	master->ats_always_on = true;
-
-	ret = arm_smmu_alloc_cd_tables(master);
-	if (ret)
-		return ret;
-
-out_prepare:
-	pci_prepare_ats(pdev, stu);
-	return 0;
-}
-
 static struct iommu_device *arm_smmu_probe_device(struct device *dev)
 {
 	int ret;
@@ -3666,14 +3613,14 @@ static struct iommu_device *arm_smmu_probe_device(struct device *dev)
 	    smmu->features & ARM_SMMU_FEAT_STALL_FORCE)
 		master->stall_enabled = true;
 
-	ret = arm_smmu_master_prepare_ats(master);
-	if (ret)
-		goto err_disable_pasid;
+	if (dev_is_pci(dev)) {
+		unsigned int stu = __ffs(smmu->pgsize_bitmap);
+
+		pci_prepare_ats(to_pci_dev(dev), stu);
+	}
 
 	return &smmu->iommu;
 
-err_disable_pasid:
-	arm_smmu_disable_pasid(master);
 err_free_master:
 	kfree(master);
 	return ERR_PTR(ret);
