@@ -2007,7 +2007,6 @@ void pci_dev_lock(struct pci_dev *dev);
 int pci_dev_trylock(struct pci_dev *dev);
 void pci_dev_unlock(struct pci_dev *dev);
 DEFINE_GUARD(pci_dev, struct pci_dev *, pci_dev_lock(_T), pci_dev_unlock(_T))
-
 void pci_dev_save_and_disable(struct pci_dev *dev);
 void pci_dev_restore(struct pci_dev *dev);
 
