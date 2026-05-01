@@ -7960,6 +7960,7 @@ CONFIG_MFD_TI_AM335X_TSCADC                     policy<{'amd64': '-', 'arm64': '
 CONFIG_MFD_TI_LMU                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
 CONFIG_MFD_TI_LP873X                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
 CONFIG_MFD_TI_LP87565                           policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
+CONFIG_MFD_TN48M_CPLD                           policy<{'arm64': 'n', 'armhf': 'n'}>
 CONFIG_MFD_TPS65086                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
 CONFIG_MFD_TPS65090                             policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': '-'}>
 CONFIG_MFD_TPS65218                             policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
