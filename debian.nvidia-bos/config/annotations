@@ -45,8 +45,8 @@ CONFIG_ARM_LFA                                  note<'LP: #2138342'>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      note<'LP: #2095028'>
 
-CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '32', 'arm64-nvidia-bos': '128', 'arm64-nvidia-bos-64k': '1024'}>
-CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2095028'>
+CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '0'}>
+CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2150898'>
 
 CONFIG_CORESIGHT                                policy<{'arm64': 'm'}>
 CONFIG_CORESIGHT                                note<'Required for Grace enablement'>
