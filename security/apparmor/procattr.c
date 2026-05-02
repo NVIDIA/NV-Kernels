@@ -56,6 +56,8 @@ int aa_getprocattr(struct aa_label *label, char **string, bool newline)
 
 	len = aa_label_snxprint(*string, len + 2, current_ns, label, flags);
 	if (len < 0) {
+		kfree(*string);
+		*string = NULL;
 		aa_put_ns(current_ns);
 		return len;
 	}
