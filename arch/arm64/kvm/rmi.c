@@ -1491,6 +1491,13 @@ int realm_dev_mem_map(struct kvm *kvm, unsigned long rec_phys,
 	phys_addr_t rd_phys = virt_to_phys(realm->rd);
 	struct kvm_mmu_memory_cache cache = { .gfp_zero = __GFP_ZERO };
 
+	/* TODO: This should be done in VMM to handle
+	 * NS IOMMU mappings correctly. For now, remove the
+	 * potential NS mappings to avoid duplicate mappings
+	 * to the same ranges.
+	 */
+	kvm_realm_unmap_range(kvm, start_ipa, end_ipa - start_ipa, false, false);
+
 	do {
 		ret = kvm_mmu_topup_memory_cache(&cache,
 						 kvm_mmu_cache_min_pages(mmu));
