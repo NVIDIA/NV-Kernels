@@ -120,9 +120,6 @@ struct cdx_controller {
  * @req_id: Requestor ID associated with CDX device
  * @is_bus: Is this bus device
  * @enabled: is this bus enabled
- * @driver_override: driver name to force a match; do not set directly,
- *                   because core frees it; use driver_set_override() to
- *                   set or clear it.
  */
 struct cdx_device {
 	struct device dev;
@@ -144,7 +141,6 @@ struct cdx_device {
 	u32 req_id;
 	bool is_bus;
 	bool enabled;
-	const char *driver_override;
 };
 
 #define to_cdx_device(_dev) \
