@@ -15927,6 +15927,8 @@ CONFIG_VFIO_AP                                  policy<{'s390x': 'm'}>
 CONFIG_VFIO_CCW                                 policy<{'s390x': 'm'}>
 CONFIG_VFIO_CDX                                 policy<{'arm64': 'm'}>
 CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_VFIO_CXL_CORE                            policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_VFIO_CXL_CORE                            note<'Enable VFIO CXL core for CXL Type-2 device passthrough support'>
 CONFIG_VFIO_DEBUGFS                             policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_VFIO_DEVICE_CDEV                         policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'riscv64': 'y'}>
 CONFIG_VFIO_FSL_MC                              policy<{'arm64': 'm'}>
