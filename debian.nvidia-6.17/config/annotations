@@ -255,6 +255,8 @@ CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM dri
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
 
+CONFIG_VFIO_CXL_CORE                            policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_VFIO_CXL_CORE                            note<'Enable VFIO CXL core for CXL Type-2 device passthrough support'>
 
 # ---- Annotations without notes ----
 
