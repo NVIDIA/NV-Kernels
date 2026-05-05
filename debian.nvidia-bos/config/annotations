@@ -129,6 +129,9 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           note<'LP: #2028576: Perf governo
 CONFIG_CXL_BUS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CXL_BUS                                  note<'Enable CXL bus support built-in; required for CXL Type-2 device and RAS support'>
 
+CONFIG_CXL_HDM                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_HDM                                  note<'Hidden bool; auto-selected by CXL_BUS; low-level HDM decoder helper'>
+
 CONFIG_CXL_MEM                                  policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CXL_MEM                                  note<'Auto-selected by CXL_PCI; required for CXL memory expansion and Type-2 device support'>
 
@@ -243,9 +246,6 @@ CONFIG_NVIDIA_TEGRA410_CMEM_LATENCY_PMU         note<'LP: #2139315'>
 CONFIG_PCIEAER_CXL                              policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_PCIEAER_CXL                              note<'Removed by commit d18f1b7beadf (PCI/AER: Replace PCIEAER_CXL symbol with CXL_RAS)'>
 
-CONFIG_PCI_CXL                                  policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_PCI_CXL                                  note<'Hidden bool; auto-enabled by CXL_BUS; PCI core CXL DVSEC and HDM state save/restore support'>
-
 CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
 
@@ -287,6 +287,9 @@ CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablem
 
 CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'n'}>
 CONFIG_VFIO_CONTAINER                           note<'LP: #2095028'>
+
+CONFIG_VFIO_CXL_CORE                            policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_VFIO_CXL_CORE                            note<'Enable VFIO CXL core for CXL Type-2 device passthrough support'>
 
 CONFIG_VFIO_IOMMU_TYPE1                         policy<{'amd64': 'm', 'arm64': '-'}>
 CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
