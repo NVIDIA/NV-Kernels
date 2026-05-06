@@ -201,6 +201,9 @@ CONFIG_TCG_ARM_CRB_FFA                          note<'LP: #2111511'>
 CONFIG_TCG_TIS_SPI                              policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_TCG_TIS_SPI                              note<'Ensures the TPM is available before the IMA driver initializes'>
 
+CONFIG_TEST_WORKQUEUE                           policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_TEST_WORKQUEUE                           note<'LP: #2150467'>
+
 CONFIG_UBUNTU_ODM_DRIVERS                       policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM drivers'>
 
