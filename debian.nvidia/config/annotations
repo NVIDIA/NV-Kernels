@@ -204,6 +204,9 @@ CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM dri
 CONFIG_TCG_ARM_CRB_FFA                          policy<{'arm64': 'y'}>
 CONFIG_TCG_ARM_CRB_FFA                          note<'LP: #2111511'>
 
+CONFIG_TEST_WORKQUEUE                           policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_TEST_WORKQUEUE                           note<'LP: #2150467'>
+
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
 
