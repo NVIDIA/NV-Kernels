@@ -20,8 +20,8 @@
 #define NH_RES_DEFAULT_IDLE_TIMER	(120 * HZ)
 #define NH_RES_DEFAULT_UNBALANCED_TIMER	0	/* No forced rebalancing. */
 
-static bool remove_nexthop(struct net *net, struct nexthop *nh,
-			   struct nl_info *nlinfo);
+static bool __must_check remove_nexthop(struct net *net, struct nexthop *nh,
+					struct nl_info *nlinfo);
 
 #define NH_DEV_HASHBITS  8
 #define NH_DEV_HASHSIZE (1U << NH_DEV_HASHBITS)
@@ -2004,8 +2004,9 @@ static void nh_hthr_group_rebalance(struct nh_group *nhg)
 	}
 }
 
-static bool remove_nh_grp_entry(struct net *net, struct nh_grp_entry *nhge,
-				struct nl_info *nlinfo)
+static bool __must_check
+remove_nh_grp_entry(struct net *net, struct nh_grp_entry *nhge,
+		    struct nl_info *nlinfo)
 {
 	struct nh_grp_entry *nhges, *new_nhges;
 	struct nexthop *nhp = nhge->nh_parent;
@@ -2082,8 +2083,9 @@ static bool remove_nh_grp_entry(struct net *net, struct nh_grp_entry *nhge,
 	return false;
 }
 
-static bool remove_nexthop_from_groups(struct net *net, struct nexthop *nh,
-				       struct nl_info *nlinfo)
+static bool __must_check
+remove_nexthop_from_groups(struct net *net, struct nexthop *nh,
+			   struct nl_info *nlinfo)
 {
 	struct nh_grp_entry *nhge, *tmp;
 	bool need_flush = false;
@@ -2125,7 +2127,8 @@ static void remove_nexthop_group(struct nexthop *nh, struct nl_info *nlinfo)
 }
 
 /* not called for nexthop replace */
-static bool __remove_nexthop_fib(struct net *net, struct nexthop *nh)
+static bool __must_check __remove_nexthop_fib(struct net *net,
+					      struct nexthop *nh)
 {
 	bool need_flush = !list_empty(&nh->fi_list);
 	struct fib6_info *f6i;
@@ -2156,8 +2159,8 @@ static bool __remove_nexthop_fib(struct net *net, struct nexthop *nh)
 	return need_flush;
 }
 
-static bool __remove_nexthop(struct net *net, struct nexthop *nh,
-			     struct nl_info *nlinfo)
+static bool __must_check __remove_nexthop(struct net *net, struct nexthop *nh,
+					  struct nl_info *nlinfo)
 {
 	bool need_flush = __remove_nexthop_fib(net, nh);
 
@@ -2176,8 +2179,8 @@ static bool __remove_nexthop(struct net *net, struct nexthop *nh,
 	return need_flush;
 }
 
-static bool remove_nexthop(struct net *net, struct nexthop *nh,
-			   struct nl_info *nlinfo)
+static bool __must_check remove_nexthop(struct net *net, struct nexthop *nh,
+					struct nl_info *nlinfo)
 {
 	bool need_flush;
 
