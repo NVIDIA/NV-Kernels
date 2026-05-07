@@ -341,6 +341,7 @@ struct mrq_response {
 #define MRQ_GEARS		82U
 #define MRQ_BWMGR_INT		83U
 #define MRQ_OC_STATUS		84U
+#define MRQ_SOCHUB_MBWT         96U
 
 /** @cond DEPRECATED */
 #define MRQ_RESERVED_2		2U
@@ -374,7 +375,7 @@ struct mrq_response {
  * @brief Maximum MRQ code to be sent by CPU software to
  * BPMP. Subject to change in future
  */
-#define MAX_CPU_MRQ_ID		84U
+#define MAX_CPU_MRQ_ID         96U
 
 /**
  * @addtogroup MRQ_Payloads
@@ -3910,6 +3911,67 @@ struct mrq_gears_response {
 
 /** @} Gears */
 /** @endcond bpmp_th500 */
+
+/** @cond (bpmp_tb500)
+ * @ingroup MRQ_Codes
+ * @def MRQ_SOCHUB_MBWT
+ * @brief Configure per-virtual-channel bandwidth caps for a SoC Hub instance using
+ *        Memory Bandwidth Throttler (MBWT).
+ *
+ * * Initiators: Any
+ * * Targets: BPMP
+ * * Request Payload: @ref mrq_sochub_mbwt_request
+ * * Response Payload: @ref mrq_sochub_mbwt_response
+ *
+ * @addtogroup SOCHUB_MBWT
+ * @{
+ */
+
+/**
+ * @brief Sub-command identifiers for #MRQ_SOCHUB_MBWT.
+ */
+enum mrq_sochub_mbwt_cmd {
+	CMD_SOCHUB_MBWT_QUERY_ABI = 0,
+	CMD_SOCHUB_MBWT_GET_BW = 1,
+	CMD_SOCHUB_MBWT_SET_BW = 2,
+};
+
+struct cmd_sochub_mbwt_query_abi_req {
+	uint32_t cmd_code;
+} BPMP_ABI_PACKED;
+
+struct cmd_sochub_mbwt_get_bw_req {
+	uint32_t instance;
+	uint32_t vc_type;
+} BPMP_ABI_PACKED;
+
+struct cmd_sochub_mbwt_set_bw_req {
+	uint32_t instance;
+	uint32_t vc_type;
+	uint32_t bw;
+} BPMP_ABI_PACKED;
+
+struct cmd_sochub_mbwt_get_bw_resp {
+	uint32_t bw;
+} BPMP_ABI_PACKED;
+
+struct mrq_sochub_mbwt_request {
+	uint32_t cmd;
+	union {
+		struct cmd_sochub_mbwt_query_abi_req query_abi;
+		struct cmd_sochub_mbwt_get_bw_req get_bw;
+		struct cmd_sochub_mbwt_set_bw_req set_bw;
+	} BPMP_UNION_ANON;
+} BPMP_ABI_PACKED;
+
+struct mrq_sochub_mbwt_response {
+	union {
+		struct cmd_sochub_mbwt_get_bw_resp get_bw;
+	} BPMP_UNION_ANON;
+} BPMP_ABI_PACKED;
+
+/** @} SOCHUB_MBWT */
+/** @endcond */
 
 /**
  * @addtogroup Error_Codes
