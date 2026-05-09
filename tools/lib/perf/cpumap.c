@@ -449,7 +449,7 @@ struct perf_cpu_map *perf_cpu_map__merge(struct perf_cpu_map *orig,
 					 struct perf_cpu_map *other)
 {
 	struct perf_cpu *tmp_cpus;
-	int tmp_len;
+	volatile int tmp_len;
 	int i, j, k;
 	struct perf_cpu_map *merged;
 
