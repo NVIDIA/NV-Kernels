@@ -72,6 +72,7 @@ struct cs35l41_hda {
 	int firmware_type;
 	int speaker_id;
 	struct mutex fw_mutex;
+	struct mutex ctl_lock;
 	struct work_struct fw_load_work;
 	struct snd_kcontrol *fw_type_ctl;
 	struct snd_kcontrol *fw_load_ctl;

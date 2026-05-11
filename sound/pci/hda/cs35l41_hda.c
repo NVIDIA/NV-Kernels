@@ -1175,16 +1175,21 @@ static int cs35l41_fw_type_ctl_info(struct snd_kcontrol *kcontrol, struct snd_ct
 
 static void cs35l41_remove_controls(struct cs35l41_hda *cs35l41)
 {
+	guard(mutex)(&cs35l41->ctl_lock);
+
 	if (!cs35l41->codec)
 		return;
 
-	snd_ctl_remove(cs35l41->codec->card, cs35l41->mute_override_ctl);
+	if (cs35l41->mute_override_ctl)
+		snd_ctl_remove(cs35l41->codec->card, cs35l41->mute_override_ctl);
 	cs35l41->mute_override_ctl = NULL;
 
-	snd_ctl_remove(cs35l41->codec->card, cs35l41->fw_load_ctl);
+	if (cs35l41->fw_load_ctl)
+		snd_ctl_remove(cs35l41->codec->card, cs35l41->fw_load_ctl);
 	cs35l41->fw_load_ctl = NULL;
 
-	snd_ctl_remove(cs35l41->codec->card, cs35l41->fw_type_ctl);
+	if (cs35l41->fw_type_ctl)
+		snd_ctl_remove(cs35l41->codec->card, cs35l41->fw_type_ctl);
 	cs35l41->fw_type_ctl = NULL;
 }
 
@@ -1406,7 +1411,10 @@ static void cs35l41_hda_unbind(struct device *dev, struct device *master, void *
 
 		cs35l41_remove_controls(cs35l41);
 		cancel_work_sync(&cs35l41->fw_load_work);
+
+		mutex_lock(&cs35l41->ctl_lock);
 		cs35l41->codec = NULL;
+		mutex_unlock(&cs35l41->ctl_lock);
 	}
 }
 
@@ -1859,6 +1867,7 @@ int cs35l41_hda_probe(struct device *dev, const char *device_name, int id, int i
 
 	INIT_WORK(&cs35l41->fw_load_work, cs35l41_fw_load_work);
 	mutex_init(&cs35l41->fw_mutex);
+	mutex_init(&cs35l41->ctl_lock);
 
 	pm_runtime_set_autosuspend_delay(cs35l41->dev, 3000);
 	pm_runtime_use_autosuspend(cs35l41->dev);
