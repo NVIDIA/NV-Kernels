@@ -173,10 +173,6 @@ extern int cppc_get_auto_act_window(int cpu, u64 *auto_act_window);
 extern int cppc_set_auto_act_window(int cpu, u64 auto_act_window);
 extern int cppc_get_auto_sel(int cpu, bool *enable);
 extern int cppc_set_auto_sel(int cpu, bool enable);
-extern int cppc_get_min_perf(int cpu, u64 *min_perf);
-extern int cppc_set_min_perf(int cpu, u32 min_perf);
-extern int cppc_get_max_perf(int cpu, u64 *max_perf);
-extern int cppc_set_max_perf(int cpu, u32 max_perf);
 extern int amd_get_highest_perf(unsigned int cpu, u32 *highest_perf);
 extern int amd_get_boost_ratio_numerator(unsigned int cpu, u64 *numerator);
 extern int amd_detect_prefcore(bool *detected);
@@ -266,22 +262,6 @@ static inline int cppc_get_auto_sel(int cpu, bool *enable)
 	return -EOPNOTSUPP;
 }
 static inline int cppc_set_auto_sel(int cpu, bool enable)
-{
-	return -EOPNOTSUPP;
-}
-static inline int cppc_get_min_perf(int cpu, u64 *min_perf)
-{
-	return -EOPNOTSUPP;
-}
-static inline int cppc_set_min_perf(int cpu, u32 min_perf)
-{
-	return -EOPNOTSUPP;
-}
-static inline int cppc_get_max_perf(int cpu, u64 *max_perf)
-{
-	return -EOPNOTSUPP;
-}
-static inline int cppc_set_max_perf(int cpu, u32 max_perf)
 {
 	return -EOPNOTSUPP;
 }
