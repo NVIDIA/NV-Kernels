@@ -42,11 +42,6 @@
 #define CPPC_EPP_PERFORMANCE_PREF		0x00
 #define CPPC_EPP_ENERGY_EFFICIENCY_PREF		0xFF
 
-#define CPPC_PERF_LIMITED_DESIRED_EXCURSION	BIT(0)
-#define CPPC_PERF_LIMITED_MINIMUM_EXCURSION	BIT(1)
-#define CPPC_PERF_LIMITED_MASK		(CPPC_PERF_LIMITED_DESIRED_EXCURSION | \
-					 CPPC_PERF_LIMITED_MINIMUM_EXCURSION)
-
 /* Each register has the folowing format. */
 struct cpc_reg {
 	u8 descriptor;
@@ -182,8 +177,6 @@ extern int cppc_get_min_perf(int cpu, u64 *min_perf);
 extern int cppc_set_min_perf(int cpu, u32 min_perf);
 extern int cppc_get_max_perf(int cpu, u64 *max_perf);
 extern int cppc_set_max_perf(int cpu, u32 max_perf);
-extern int cppc_get_perf_limited(int cpu, u64 *perf_limited);
-extern int cppc_set_perf_limited(int cpu, u64 perf_limited);
 extern int amd_get_highest_perf(unsigned int cpu, u32 *highest_perf);
 extern int amd_get_boost_ratio_numerator(unsigned int cpu, u64 *numerator);
 extern int amd_detect_prefcore(bool *detected);
@@ -289,14 +282,6 @@ static inline int cppc_get_max_perf(int cpu, u64 *max_perf)
 	return -EOPNOTSUPP;
 }
 static inline int cppc_set_max_perf(int cpu, u32 max_perf)
-{
-	return -EOPNOTSUPP;
-}
-static inline int cppc_get_perf_limited(int cpu, u64 *perf_limited)
-{
-	return -EOPNOTSUPP;
-}
-static inline int cppc_set_perf_limited(int cpu, u64 perf_limited)
 {
 	return -EOPNOTSUPP;
 }
