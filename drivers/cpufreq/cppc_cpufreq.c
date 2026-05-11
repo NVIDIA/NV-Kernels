@@ -539,35 +539,6 @@ static void populate_efficiency_class(void)
 }
 #endif
 
-/* Set min/max performance HW register and cache the value */
-static int cppc_cpufreq_set_mperf_reg(struct cpufreq_policy *policy,
-				      u64 val, bool is_min)
-{
-	struct cppc_cpudata *cpu_data = policy->driver_data;
-	struct cppc_perf_caps *caps = &cpu_data->perf_caps;
-	unsigned int cpu = policy->cpu;
-	u32 perf;
-	int ret;
-
-	perf = clamp(val, caps->lowest_perf, caps->highest_perf);
-
-	ret = is_min ? cppc_set_min_perf(cpu, perf) :
-		       cppc_set_max_perf(cpu, perf);
-	if (ret) {
-		if (ret != -EOPNOTSUPP)
-			pr_warn("CPU%d: set %s_perf=%u failed (%d)\n",
-				cpu, is_min ? "min" : "max", perf, ret);
-		return ret;
-	}
-
-	if (is_min)
-		cpu_data->perf_ctrls.min_perf = perf;
-	else
-		cpu_data->perf_ctrls.max_perf = perf;
-
-	return 0;
-}
-
 static struct cppc_cpudata *cppc_cpufreq_get_cpu_data(unsigned int cpu)
 {
 	struct cppc_cpudata *cpu_data;
@@ -917,152 +888,16 @@ CPPC_CPUFREQ_ATTR_RW_U64(auto_act_window, cppc_get_auto_act_window,
 CPPC_CPUFREQ_ATTR_RW_U64(energy_performance_preference_val,
 			 cppc_get_epp_perf, cppc_set_epp)
 
-/**
- * show_min_perf - Show minimum performance as frequency (kHz)
- * @policy: cpufreq policy
- * @buf: buffer to write the frequency value to
- *
- * Reads the MIN_PERF register and converts the performance value to
- * frequency (kHz).
- */
-static ssize_t show_min_perf(struct cpufreq_policy *policy, char *buf)
-{
-	struct cppc_cpudata *cpu_data = policy->driver_data;
-	struct cppc_perf_caps *caps = &cpu_data->perf_caps;
-	u64 perf;
-	int ret;
-
-	ret = cppc_get_min_perf(policy->cpu, &perf);
-	if (ret == -EOPNOTSUPP)
-		return sysfs_emit(buf, "<unsupported>\n");
-	if (ret)
-		return ret;
-
-	/* Use lowest_perf if register is uninitialized or out of range */
-	if (perf == 0 || perf < caps->lowest_perf)
-		perf = caps->lowest_perf;
-
-	/* Convert performance to frequency (kHz) for user */
-	return sysfs_emit(buf, "%u\n", cppc_perf_to_khz(caps, perf));
-}
-
-/**
- * store_min_perf - Set minimum performance from frequency (kHz)
- * @policy: cpufreq policy
- * @buf: buffer containing the frequency value
- * @count: size of @buf
- *
- * Converts the user-provided frequency (kHz) to a performance value
- * and writes it to the MIN_PERF register.
- */
-static ssize_t store_min_perf(struct cpufreq_policy *policy, const char *buf,
-			      size_t count)
-{
-	struct cppc_cpudata *cpu_data = policy->driver_data;
-	unsigned int freq_khz;
-	u64 perf;
-	int ret;
-
-	ret = kstrtouint(buf, 0, &freq_khz);
-	if (ret)
-		return ret;
-
-	/* Convert frequency (kHz) to performance value */
-	perf = cppc_khz_to_perf(&cpu_data->perf_caps, freq_khz);
-
-	/*
-	 * min_perf must be less than or equal to max_perf.
-	 * Skip check if max_perf is 0 (uninitialized).
-	 */
-	if (cpu_data->perf_ctrls.max_perf &&
-	    perf > cpu_data->perf_ctrls.max_perf)
-		return -EINVAL;
-
-	ret = cppc_cpufreq_set_mperf_reg(policy, perf, true);
-	if (ret)
-		return ret;
-
-	return count;
-}
-
-/**
- * show_max_perf - Show maximum performance as frequency (kHz)
- * @policy: cpufreq policy
- * @buf: buffer to write the frequency value to
- *
- * Reads the MAX_PERF register and converts the performance value to
- * frequency (kHz).
- */
-static ssize_t show_max_perf(struct cpufreq_policy *policy, char *buf)
-{
-	struct cppc_cpudata *cpu_data = policy->driver_data;
-	struct cppc_perf_caps *caps = &cpu_data->perf_caps;
-	u64 perf;
-	int ret;
-
-	ret = cppc_get_max_perf(policy->cpu, &perf);
-	if (ret == -EOPNOTSUPP)
-		return sysfs_emit(buf, "<unsupported>\n");
-	if (ret)
-		return ret;
-
-	/* Use highest_perf if register is uninitialized or out of range */
-	if (perf == 0 || perf > caps->highest_perf)
-		perf = caps->highest_perf;
-
-	/* Convert performance to frequency (kHz) for user */
-	return sysfs_emit(buf, "%u\n", cppc_perf_to_khz(caps, perf));
-}
-
-/**
- * store_max_perf - Set maximum performance from frequency (kHz)
- * @policy: cpufreq policy
- * @buf: buffer containing the frequency value
- * @count: size of @buf
- *
- * Converts the user-provided frequency (kHz) to a performance value
- * and writes it to the MAX_PERF register.
- */
-static ssize_t store_max_perf(struct cpufreq_policy *policy, const char *buf,
-			      size_t count)
-{
-	struct cppc_cpudata *cpu_data = policy->driver_data;
-	unsigned int freq_khz;
-	u64 perf;
-	int ret;
-
-	ret = kstrtouint(buf, 0, &freq_khz);
-	if (ret)
-		return ret;
-
-	/* Convert frequency (kHz) to performance value */
-	perf = cppc_khz_to_perf(&cpu_data->perf_caps, freq_khz);
-
-	/* max_perf must be greater than or equal to min_perf */
-	if (perf < cpu_data->perf_ctrls.min_perf)
-		return -EINVAL;
-
-	ret = cppc_cpufreq_set_mperf_reg(policy, perf, false);
-	if (ret)
-		return ret;
-
-	return count;
-}
-
 cpufreq_freq_attr_ro(freqdomain_cpus);
 cpufreq_freq_attr_rw(auto_select);
 cpufreq_freq_attr_rw(auto_act_window);
 cpufreq_freq_attr_rw(energy_performance_preference_val);
-cpufreq_freq_attr_rw(min_perf);
-cpufreq_freq_attr_rw(max_perf);
 
 static struct freq_attr *cppc_cpufreq_attr[] = {
 	&freqdomain_cpus,
 	&auto_select,
 	&auto_act_window,
 	&energy_performance_preference_val,
-	&min_perf,
-	&max_perf,
 	NULL,
 };
 
