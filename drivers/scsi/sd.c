@@ -2239,8 +2239,7 @@ sd_spinup_disk(struct scsi_disk *sdkp)
 {
 	unsigned char cmd[10];
 	unsigned long spintime_expire = 0;
-	int retries, spintime;
-	unsigned int the_result;
+	int the_result, retries, spintime;
 	struct scsi_sense_hdr sshdr;
 	const struct scsi_exec_args exec_args = {
 		.sshdr = &sshdr,
