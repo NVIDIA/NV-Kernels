@@ -637,18 +637,23 @@ static struct platform_driver pf_driver = {
 
 static int acpi_probe(struct platform_device *pdev)
 {
-	struct acpi_device *device = ACPI_COMPANION(&pdev->dev);
 	struct platform_device_info pdev_info = {
-		.fwnode = acpi_fwnode_handle(device),
 		.name = PLATFORM_NAME,
 		.id = PLATFORM_DEVID_NONE,
 	};
+	struct acpi_device *device;
 	int ret;
 	const char *product;
 	int year = 2017;
 
 	if (pf_device)
 		return 0;
+
+	device = ACPI_COMPANION(&pdev->dev);
+	if (!device)
+		return -ENODEV;
+
+	pdev_info.fwnode = acpi_fwnode_handle(device);
 
 	ret = platform_driver_register(&pf_driver);
 	if (ret)
