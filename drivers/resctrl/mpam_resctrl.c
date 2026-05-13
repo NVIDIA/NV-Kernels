@@ -46,7 +46,7 @@ static struct mpam_resctrl_res mpam_resctrl_controls[RDT_NUM_RESOURCES];
  * to those supported by MPAM.
  * Class pointer may be NULL.
  */
-#define MPAM_MAX_EVENT QOS_L3_MBM_TOTAL_EVENT_ID
+#define MPAM_MAX_EVENT QOS_L3_MBM_LOCAL_EVENT_ID
 static struct mpam_resctrl_mon mpam_resctrl_counters[MPAM_MAX_EVENT + 1];
 
 #define for_each_mpam_resctrl_mon(mon, eventid)					\
@@ -173,21 +173,6 @@ static void resctrl_reset_task_closids(void)
 					     RESCTRL_RESERVED_RMID);
 	}
 	read_unlock(&tasklist_lock);
-}
-
-static struct mpam_resctrl_mon *mpam_resctrl_mon_from_res(struct mpam_resctrl_res *res)
-{
-	struct mpam_resctrl_mon *mon;
-	enum resctrl_event_id eventid;
-
-	if (!res->class)
-		return NULL;
-
-	for_each_mpam_resctrl_mon(mon, eventid) {
-		if (mon->class == res->class)
-			return mon;
-	}
-	return NULL;
 }
 
 static struct mpam_resctrl_res *mpam_resctrl_res_from_mon(struct mpam_resctrl_mon *mon)
@@ -1423,15 +1408,22 @@ void resctrl_arch_config_cntr(struct rdt_resource *r, struct rdt_l3_mon_domain *
 bool resctrl_arch_mbm_cntr_assign_enabled(struct rdt_resource *r)
 {
 	struct mpam_resctrl_res *res;
-	struct mpam_resctrl_mon *mon;
+	enum resctrl_event_id evt;
 
 	res = container_of(r, struct mpam_resctrl_res, resctrl_res);
 
-	mon = mpam_resctrl_mon_from_res(res);
-	if (!mon)
-		return false;
+	/* OCCUP shares the L3 class but has no MBWU assigned_counters. */
+	for (evt = QOS_L3_MBM_TOTAL_EVENT_ID; evt <= QOS_L3_MBM_LOCAL_EVENT_ID;
+	     evt++) {
+		struct mpam_resctrl_mon *mon = &mpam_resctrl_counters[evt];
 
-	return mon->assigned_counters ? true : false;
+		if (!mon->assigned_counters)
+			continue;
+		if (mpam_resctrl_res_from_mon(mon) == res)
+			return true;
+	}
+
+	return false;
 }
 
 int resctrl_arch_mbm_cntr_assign_set(struct rdt_resource *r, bool enable)
