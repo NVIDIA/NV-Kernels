@@ -243,6 +243,9 @@ CONFIG_NVIDIA_TEGRA410_CMEM_LATENCY_PMU         note<'LP: #2139315'>
 CONFIG_PCIEAER_CXL                              policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_PCIEAER_CXL                              note<'Removed by commit d18f1b7beadf (PCI/AER: Replace PCIEAER_CXL symbol with CXL_RAS)'>
 
+CONFIG_PCI_CXL                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_PCI_CXL                                  note<'Hidden bool; auto-enabled by CXL_BUS; PCI core CXL DVSEC and HDM state save/restore support'>
+
 CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
 
