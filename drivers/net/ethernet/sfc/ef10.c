@@ -24,6 +24,7 @@
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 #include <net/udp_tunnel.h>
+#include "efx_cxl.h"
 
 /* Hardware control for EF10 architecture including 'Huntington'. */
 
@@ -106,7 +107,7 @@ static int efx_ef10_get_vf_index(struct efx_nic *efx)
 
 static int efx_ef10_init_datapath_caps(struct efx_nic *efx)
 {
-	MCDI_DECLARE_BUF(outbuf, MC_CMD_GET_CAPABILITIES_V4_OUT_LEN);
+	MCDI_DECLARE_BUF(outbuf, MC_CMD_GET_CAPABILITIES_V7_OUT_LEN);
 	struct efx_ef10_nic_data *nic_data = efx->nic_data;
 	size_t outlen;
 	int rc;
@@ -176,6 +177,12 @@ static int efx_ef10_init_datapath_caps(struct efx_nic *efx)
 			  "firmware did not report num_mac_stats, assuming %u\n",
 			  efx->num_mac_stats);
 	}
+
+	if (outlen < MC_CMD_GET_CAPABILITIES_V7_OUT_LEN)
+		nic_data->datapath_caps3 = 0;
+	else
+		nic_data->datapath_caps3 = MCDI_DWORD(outbuf,
+						      GET_CAPABILITIES_V7_OUT_FLAGS3);
 
 	return 0;
 }
@@ -771,6 +778,35 @@ static int efx_ef10_alloc_piobufs(struct efx_nic *efx, unsigned int n)
 	return rc;
 }
 
+#ifdef CONFIG_SFC_CXL
+/* Invoked from cxl core when a cxl region is removed. This is expected at
+ * driver exit linked to cxl core devm releases which does not require the
+ * below sync.
+ *
+ * However, it is required when user space actions triggger such a cxl region
+ * removal forcing any cxl piobuf usage to stop. Setting per tx queue piobuf
+ * to NULL is safe if such a tx queue is not currently in use inside
+ * efx_hard_start_xmit() implying tx_queue locked.
+ *
+ * After this the cxl region physical range can be safely unmap.
+ */
+void efx_ef10_disable_piobufs(struct efx_nic *efx)
+{
+	struct efx_tx_queue *tx_queue;
+	struct efx_channel *channel;
+
+	local_bh_disable();
+	efx_for_each_channel(channel, efx)
+		efx_for_each_channel_tx_queue(tx_queue, channel) {
+			HARD_TX_LOCK(efx->net_dev, tx_queue->core_txq,
+				     smp_processor_id());
+			tx_queue->piobuf = NULL;
+			HARD_TX_UNLOCK(efx->net_dev, tx_queue->core_txq);
+		}
+	local_bh_enable();
+}
+#endif
+
 static int efx_ef10_link_piobufs(struct efx_nic *efx)
 {
 	struct efx_ef10_nic_data *nic_data = efx->nic_data;
@@ -913,6 +949,12 @@ static void efx_ef10_free_piobufs(struct efx_nic *efx)
 static void efx_ef10_forget_old_piobufs(struct efx_nic *efx)
 {
 }
+
+#ifdef CONFIG_SFC_CXL
+void efx_ef10_disable_piobufs(struct efx_nic *efx)
+{
+}
+#endif
 
 #endif /* EFX_USE_PIO */
 
@@ -1140,6 +1182,9 @@ static int efx_ef10_dimension_resources(struct efx_nic *efx)
 	unsigned int channel_vis, pio_write_vi_base, max_vis;
 	struct efx_ef10_nic_data *nic_data = efx->nic_data;
 	unsigned int uc_mem_map_size, wc_mem_map_size;
+#ifdef CONFIG_SFC_CXL
+	struct efx_probe_data *probe_data;
+#endif
 	void __iomem *membase;
 	int rc;
 
@@ -1263,8 +1308,25 @@ static int efx_ef10_dimension_resources(struct efx_nic *efx)
 	iounmap(efx->membase);
 	efx->membase = membase;
 
-	/* Set up the WC mapping if needed */
-	if (wc_mem_map_size) {
+	if (!wc_mem_map_size)
+		goto skip_pio;
+
+	/* Set up the WC mapping */
+
+#ifdef CONFIG_SFC_CXL
+	probe_data = container_of(efx, struct efx_probe_data, efx);
+	if ((nic_data->datapath_caps3 &
+	    (1 << MC_CMD_GET_CAPABILITIES_V7_OUT_CXL_CONFIG_ENABLE_LBN)) &&
+	    probe_data->cxl_pio_initialised) {
+		/* Using PIO through CXL mapping */
+		nic_data->pio_write_base = probe_data->cxl->ctpio_cxl;
+		nic_data->pio_write_vi_base = pio_write_vi_base;
+
+		probe_data->cxl_pio_in_use = true;
+	} else
+#endif
+	{
+		/* Using legacy PIO BAR mapping */
 		nic_data->wc_membase = ioremap_wc(efx->membase_phys +
 						  uc_mem_map_size,
 						  wc_mem_map_size);
@@ -1279,11 +1341,13 @@ static int efx_ef10_dimension_resources(struct efx_nic *efx)
 			nic_data->wc_membase +
 			(pio_write_vi_base * efx->vi_stride + ER_DZ_TX_PIOBUF -
 			 uc_mem_map_size);
-
-		rc = efx_ef10_link_piobufs(efx);
-		if (rc)
-			efx_ef10_free_piobufs(efx);
 	}
+
+	rc = efx_ef10_link_piobufs(efx);
+	if (rc)
+		efx_ef10_free_piobufs(efx);
+
+skip_pio:
 
 	netif_dbg(efx, probe, efx->net_dev,
 		  "memory BAR at %pa (virtual %p+%x UC, %p+%x WC)\n",
