@@ -548,16 +548,7 @@ uvc_video_clock_decode(struct uvc_streaming *stream, struct uvc_buffer *buf,
 	if (!has_scr)
 		return;
 
-	/*
-	 * To limit the amount of data, drop SCRs with an SOF identical to the
-	 * previous one. This filtering is also needed to support UVC 1.5, where
-	 * all the data packets of the same frame contains the same SOF. In that
-	 * case only the first one will match the host_sof.
-	 */
 	dev_sof = get_unaligned_le16(&data[header_size - 2]);
-	if (dev_sof == stream->clock.last_sof)
-		return;
-
 	dev_stc = get_unaligned_le32(&data[header_size - 6]);
 
 	/*
@@ -585,8 +576,6 @@ uvc_video_clock_decode(struct uvc_streaming *stream, struct uvc_buffer *buf,
 	if (buf && buf->bytesused == 0 && len == header_size &&
 	    dev_stc == 0 && dev_sof == 0)
 		return;
-
-	stream->clock.last_sof = dev_sof;
 
 	host_sof = usb_get_current_frame_number(stream->dev->udev);
 
@@ -632,6 +621,15 @@ uvc_video_clock_decode(struct uvc_streaming *stream, struct uvc_buffer *buf,
 
 	dev_sof = (dev_sof + stream->clock.sof_offset) & 2047;
 
+	/*
+	 * To limit the amount of data, drop SCRs with an SOF identical to the
+	 * previous one. This filtering is also needed to support UVC 1.5, where
+	 * all the data packets of the same frame contains the same SOF. In that
+	 * case only the first one will match the host_sof.
+	 */
+	if (dev_sof == stream->clock.last_sof)
+		return;
+
 	spin_lock_irqsave(&stream->clock.lock, flags);
 
 	sample = &stream->clock.samples[stream->clock.head];
@@ -647,6 +645,8 @@ uvc_video_clock_decode(struct uvc_streaming *stream, struct uvc_buffer *buf,
 		stream->clock.count++;
 
 	spin_unlock_irqrestore(&stream->clock.lock, flags);
+
+	stream->clock.last_sof = dev_sof;
 }
 
 static void uvc_video_clock_reset(struct uvc_streaming *stream)
