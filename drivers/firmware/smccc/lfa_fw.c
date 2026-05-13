@@ -17,9 +17,6 @@
 #include <linux/array_size.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
-#include <linux/nmi.h>
-#include <linux/ktime.h>
-#include <linux/delay.h>
 
 #undef pr_fmt
 #define pr_fmt(fmt) "Arm LFA: " fmt
@@ -39,14 +36,6 @@
 /* CALL_AGAIN flags (returned by SMC) */
 #define LFA_PRIME_CALL_AGAIN		BIT(0)
 #define LFA_ACTIVATE_CALL_AGAIN		BIT(0)
-
-/* Prime loop limits, TODO: tune after testing */
-#define LFA_PRIME_BUDGET_US		30000000	/* 30s cap */
-#define LFA_PRIME_POLL_DELAY_US		10		/* 10us between polls */
-
-/* Activation loop limits, TODO: tune after testing */
-#define LFA_ACTIVATE_BUDGET_US		20000000	/* 20s cap */
-#define LFA_ACTIVATE_POLL_DELAY_US	10		/* 10us between polls */
 
 /* LFA return values */
 #define LFA_SUCCESS			0
@@ -228,12 +217,10 @@ static int lfa_cancel(void *data)
 static int call_lfa_activate(void *data)
 {
 	struct image_props *attrs = data;
-	struct arm_smccc_1_2_regs args = { 0 };
-	struct arm_smccc_1_2_regs res = { 0 };
-	ktime_t end = ktime_add_us(ktime_get(), LFA_ACTIVATE_BUDGET_US);
+	struct arm_smccc_1_2_regs reg = { 0 };
 
-	args.a0 = LFA_1_0_FN_ACTIVATE;
-	args.a1 = attrs->fw_seq_id; /* fw_seq_id under consideration */
+	reg.a0 = LFA_1_0_FN_ACTIVATE;
+	reg.a1 = attrs->fw_seq_id; /* fw_seq_id under consideration */
 	/*
 	 * As we do not support updates requiring a CPU reset (yet),
 	 * we pass 0 in reg.a3 and reg.a4, holding the entry point and context
@@ -241,32 +228,21 @@ static int call_lfa_activate(void *data)
 	 * cpu_rendezvous_forced is set by the administrator, via sysfs,
 	 * cpu_rendezvous is dictated by each firmware component.
 	 */
-	args.a2 = !(attrs->cpu_rendezvous_forced || attrs->cpu_rendezvous);
+	reg.a2 = !(attrs->cpu_rendezvous_forced || attrs->cpu_rendezvous);
 
 	for (;;) {
-		/* Touch watchdog, ACTIVATE shouldn't take longer than watchdog_thresh */
-		touch_nmi_watchdog();
-		arm_smccc_1_2_invoke(&args, &res);
+		arm_smccc_1_2_invoke(&reg, &reg);
 
-		if ((long)res.a0 < 0) {
+		if ((long)reg.a0 < 0) {
 			pr_err("ACTIVATE for image %s failed: %s\n",
-				attrs->image_name, lfa_error_strings[-res.a0]);
-			return res.a0;
+				attrs->image_name, lfa_error_strings[-reg.a0]);
+			return reg.a0;
 		}
-		if (!(res.a1 & LFA_ACTIVATE_CALL_AGAIN))
+		if (!(reg.a1 & LFA_ACTIVATE_CALL_AGAIN))
 			break; /* ACTIVATE successful */
-
-		/* SMC returned with call_again flag set */
-		if (ktime_before(ktime_get(), end)) {
-			udelay(LFA_ACTIVATE_POLL_DELAY_US);
-			continue;
-		}
-
-		pr_err("ACTIVATE for image %s timed out", attrs->image_name);
-		return -ETIMEDOUT;
 	}
 
-	return res.a0;
+	return reg.a0;
 }
 
 static int activate_fw_image(struct image_props *attrs)
@@ -311,9 +287,7 @@ static int activate_fw_image(struct image_props *attrs)
 
 static int prime_fw_image(struct image_props *attrs)
 {
-	struct arm_smccc_1_2_regs args = { 0 };
-	struct arm_smccc_1_2_regs res = { 0 };
-	ktime_t end = ktime_add_us(ktime_get(), LFA_PRIME_BUDGET_US);
+	struct arm_smccc_1_2_regs reg = { 0 };
 	int ret;
 
 	mutex_lock(&lfa_lock);
@@ -333,41 +307,27 @@ static int prime_fw_image(struct image_props *attrs)
 	}
 
 	/*
-	 * LFA_PRIME/ACTIVATE will return 1 in res.a1 if the firmware
+	 * LFA_PRIME/ACTIVATE will return 1 in reg.a1 if the firmware
 	 * priming/activation is still in progress. In that case
 	 * LFA_PRIME/ACTIVATE will need to be called again.
-	 * res.a1 will become 0 once the prime/activate process completes.
+	 * reg.a1 will become 0 once the prime/activate process completes.
 	 */
-	args.a0 = LFA_1_0_FN_PRIME;
-	args.a1 = attrs->fw_seq_id; /* fw_seq_id under consideration */
+	reg.a0 = LFA_1_0_FN_PRIME;
+	reg.a1 = attrs->fw_seq_id; /* fw_seq_id under consideration */
 	for (;;) {
-		/* Touch watchdog, PRIME shouldn't take longer than watchdog_thresh */
-		touch_nmi_watchdog();
-		arm_smccc_1_2_invoke(&args, &res);
+		arm_smccc_1_2_invoke(&reg, &reg);
 
-		if ((long)res.a0 < 0) {
+		if ((long)reg.a0 < 0) {
 			pr_err("LFA_PRIME for image %s failed: %s\n",
-				attrs->image_name, lfa_error_strings[-res.a0]);
+				attrs->image_name, lfa_error_strings[-reg.a0]);
 			mutex_unlock(&lfa_lock);
 
-			return res.a0;
+			return reg.a0;
 		}
-		if (!(res.a1 & LFA_PRIME_CALL_AGAIN))
+		if (!(reg.a1 & LFA_PRIME_CALL_AGAIN)) {
+			ret = 0;
 			break; /* PRIME successful */
-
-		/* SMC returned with call_again flag set */
-		if (ktime_before(ktime_get(), end)) {
-			udelay(LFA_PRIME_POLL_DELAY_US);
-			continue;
 		}
-
-		pr_err("LFA_PRIME for image %s timed out", attrs->image_name);
-		mutex_unlock(&lfa_lock);
-
-		ret = lfa_cancel(attrs);
-		if (ret != 0)
-			return ret;
-		return -ETIMEDOUT;
 	}
 
 	mutex_unlock(&lfa_lock);
