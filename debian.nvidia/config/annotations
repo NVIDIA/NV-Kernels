@@ -123,6 +123,9 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE         note<'LP: #2028576: Perf governo
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL           note<'LP: #2028576: Perf governor required for NVIDIA workloads'>
 
+CONFIG_CXL_ACPI                                 policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_ACPI                                 note<'Override debian.master m-; required for DEV_DAX_HMEM=y'>
+
 CONFIG_CXL_BUS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CXL_BUS                                  note<'Enable CXL bus support built-in; required for CXL Type-2 device and RAS support'>
 
@@ -135,11 +138,29 @@ CONFIG_CXL_MEM_RAW_COMMANDS                     note<'Enable CXL raw commands fo
 CONFIG_CXL_PCI                                  policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CXL_PCI                                  note<'Enable CXL PCI management built-in; auto-selects CXL_MEM; required for CXL Type-2 device support'>
 
+CONFIG_CXL_PMEM                                 policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_PMEM                                 note<'Override debian.master m-; required for CXL_ACPI=y'>
+
 CONFIG_CXL_PORT                                 policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CXL_PORT                                 note<'Required for CXL port enumeration; defaults to CXL_BUS value'>
 
 CONFIG_CXL_RAS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CXL_RAS                                  note<'New def_bool replacing PCIEAER_CXL; auto-enabled with ACPI_APEI_GHES+PCIEAER+CXL_BUS; CXL RAS error handling support'>
+
+CONFIG_DEV_DAX                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX                                  note<'Override debian.master m->y; required built-in for DEV_DAX_CXL=y'>
+
+CONFIG_DEV_DAX_CXL                              policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_CXL                              note<'Override debian.master m->y; CXL RAM region DAX access; depends on CXL_BUS+CXL_REGION+DEV_DAX'>
+
+CONFIG_DEV_DAX_FSDEV                            policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_FSDEV                            note<'Override debian.master m-; follows DEV_DAX'>
+
+CONFIG_DEV_DAX_HMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_HMEM                             note<'Override debian.master m-; required for DEV_DAX_CXL=y'>
+
+CONFIG_DEV_DAX_KMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m->y; map CXL DAX devices as System-RAM'>
 
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
