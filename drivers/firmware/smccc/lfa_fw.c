@@ -653,6 +653,7 @@ static int update_fw_images_tree(void)
 	 * _store() handler, so have to postpone the list removal to a
 	 * workqueue.
 	 */
+	INIT_WORK(&fw_images_update_work, remove_invalid_fw_images);
 	queue_work(fw_images_update_wq, &fw_images_update_work);
 
 	return 0;
@@ -679,7 +680,7 @@ static void lfa_notify_handler(acpi_handle handle, u32 event, void *data)
 	 * of all activable and pending images.
 	 */
 	do {
-		flush_workqueue(fw_images_update_wq);
+		/* Reset activable image flag */
 		found_activable_image = false;
 		list_for_each_entry(attrs, &lfa_fw_images, image_node) {
 			if (attrs->fw_seq_id == -1)
@@ -780,8 +781,6 @@ static int __init lfa_init(void)
 
 		return -ENOMEM;
 	}
-
-	INIT_WORK(&fw_images_update_work, remove_invalid_fw_images);
 
 	pr_info("Live Firmware Activation: detected v%ld.%ld\n",
 		reg.a0 >> 16, reg.a0 & 0xffff);
