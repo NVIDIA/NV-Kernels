@@ -273,6 +273,9 @@ CONFIG_DEV_DAX_CXL                              note<'Override debian.master m->
 CONFIG_DEV_DAX_KMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m->y; map CXL DAX devices as System-RAM'>
 
+CONFIG_PCI_CXL                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_PCI_CXL                                  note<'Hidden bool; auto-enabled by CXL_BUS; PCI core CXL DVSEC and HDM state save/restore support'>
+
 CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'n'}>
 CONFIG_VFIO_CONTAINER                           note<'LP: #2095028'>
 
