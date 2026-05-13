@@ -23,11 +23,3 @@ config ARM_SMCCC_SOC_ID
 	help
 	  Include support for the SoC bus on the ARM SMCCC firmware based
 	  platforms providing some sysfs information about the SoC variant.
-
-config ARM_LFA
-	tristate "Arm Live Firmware activation support"
-	depends on HAVE_ARM_SMCCC_DISCOVERY
-	default y
-	help
-	  Include support for triggering Live Firmware Activation, which
-	  allows to upgrade certain firmware components without a reboot.
