@@ -6311,7 +6311,7 @@ create_stream_for_sink(struct drm_connector *connector,
 	int mode_refresh;
 	int preferred_refresh = 0;
 	enum color_transfer_func tf = TRANSFER_FUNC_UNKNOWN;
-	struct dsc_dec_dpcd_caps dsc_caps;
+	struct dsc_dec_dpcd_caps dsc_caps = {0};
 
 	struct dc_link *link = NULL;
 	struct dc_sink *sink = NULL;
