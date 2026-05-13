@@ -10,6 +10,7 @@
 #include <cxl/cxl.h>
 #include <cxl/pci.h>
 #include "net_driver.h"
+#include "efx.h"
 #include "efx_cxl.h"
 
 #define EFX_CTPIO_BUFFER_SIZE	SZ_256M
@@ -40,6 +41,7 @@ static int efx_cxl_map_region(void *data) {
 static void efx_cxl_unmap_region(void *data) {
 	struct efx_probe_data *probe_data = data;
 
+	efx_ef10_disable_piobufs(&probe_data->efx);
 	probe_data->cxl_pio_initialised = false;
 	iounmap(probe_data->cxl->ctpio_cxl);
 }
