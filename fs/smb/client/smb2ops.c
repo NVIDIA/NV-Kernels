@@ -4685,7 +4685,7 @@ handle_read_data(struct TCP_Server_Info *server, struct mid_q_entry *mid,
 		}
 
 		/* Copy the data to the output I/O iterator. */
-		rdata->result = cifs_copy_pages_to_iter(pages, pages_len,
+		rdata->result = cifs_copy_pages_to_iter(pages, data_len,
 							cur_off, &rdata->iter);
 		if (rdata->result != 0) {
 			if (is_offloaded)
@@ -4694,7 +4694,7 @@ handle_read_data(struct TCP_Server_Info *server, struct mid_q_entry *mid,
 				dequeue_mid(mid, rdata->result);
 			return 0;
 		}
-		rdata->got_bytes = pages_len;
+		rdata->got_bytes = data_len;
 
 	} else if (buf_len >= data_offset + data_len) {
 		/* read response payload is in buf */
