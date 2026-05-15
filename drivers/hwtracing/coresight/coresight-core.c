@@ -387,6 +387,9 @@ static void coresight_disable_helpers(struct coresight_device *csdev,
  */
 void coresight_disable_source(struct coresight_device *csdev, void *data)
 {
+	if (!coresight_is_percpu_source(csdev))
+		csdev->path = NULL;
+
 	source_ops(csdev)->disable(csdev, data);
 }
 EXPORT_SYMBOL_GPL(coresight_disable_source);

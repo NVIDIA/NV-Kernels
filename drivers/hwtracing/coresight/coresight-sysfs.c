@@ -69,6 +69,20 @@ static int coresight_enable_source_sysfs(struct coresight_device *csdev,
 		ret = source_ops(csdev)->enable(csdev, NULL, mode, path);
 		if (ret)
 			return ret;
+
+		/*
+		 * Update the path pointer until after the source is enabled to
+		 * avoid races where multiple paths attempt to enable the same
+		 * source.
+		 *
+		 * Do not set the path pointer here for per-CPU sources; set it
+		 * locally on the CPU instead. Otherwise, there is a window where
+		 * the path is enabled but the pointer is not yet set, causing
+		 * CPU PM notifiers to miss PM operations due to reading a NULL
+		 * pointer.
+		 */
+		if (!coresight_is_percpu_source(csdev))
+			csdev->path = path;
 	}
 
 	csdev->refcnt++;
