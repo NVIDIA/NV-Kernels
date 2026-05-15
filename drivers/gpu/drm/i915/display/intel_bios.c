@@ -1545,6 +1545,10 @@ parse_edp(struct intel_display *display,
 	if (display->vbt.version >= 251)
 		panel->vbt.edp.dsc_disable =
 			panel_bool(edp->edp_dsc_disable, panel_type);
+
+	if (display->vbt.version >= 261)
+		panel->vbt.edp.pipe_joiner_enable =
+			panel_bool(edp->pipe_joiner_enable, panel_type);
 }
 
 static void
