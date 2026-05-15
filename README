@@ -1,3 +1,16 @@
+Proof of Concept Branch — Not for Production
+============================================
+
+This branch (CCA-RME-DA-TSM-WIP-6.19) is a proof of concept for ARM CCA
+RME Device Assignment and TSM (TDISP) on NVIDIA arm64 platforms. It is
+based on Linux 6.19.7 plus a subset of CCA/TSM patches under active
+development. Do not ship.
+
+Build with:
+
+    make ARCH=arm64 nvidia_defconfig
+
+
 Linux kernel
 ============
 
