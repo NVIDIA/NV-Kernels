@@ -1542,6 +1542,13 @@ static int create_sdw_dailink(struct snd_soc_card *card, int *link_index,
 	if (codec_info->ignore_pch_dmic)
 		*ignore_pch_dmic = true;
 
+	/*
+	 * The dai_type is used to select function topologies. Since the
+	 * topology stream name and DAI link name use partial matching,
+	 * unconditionally appending the dai_type provides necessary selection
+	 * metadata without breaking existing topologies.
+	 */
+	append_dai_type = true;
 	for_each_pcm_streams(stream) {
 		struct snd_soc_dai_link_ch_map *sdw_codec_ch_maps;
 		char *name, *cpu_name;
