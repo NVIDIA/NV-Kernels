@@ -508,9 +508,14 @@ bool intel_dp_has_joiner(struct intel_dp *intel_dp)
 	struct intel_display *display = to_intel_display(intel_dp);
 	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
 	struct intel_encoder *encoder = &intel_dig_port->base;
+	struct intel_connector *connector = intel_dp->attached_connector;
 
 	/* eDP MSO is not compatible with joiner */
 	if (intel_dp->mso_link_count)
+		return false;
+
+	if (intel_dp_is_edp(intel_dp) &&
+	    !connector->panel.vbt.edp.pipe_joiner_enable)
 		return false;
 
 	return DISPLAY_VER(display) >= 12 ||
