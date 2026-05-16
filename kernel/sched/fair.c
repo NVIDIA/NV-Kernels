@@ -7775,7 +7775,7 @@ static inline void set_idle_cores(int cpu, int val)
 {
 	struct sched_domain_shared *sds;
 
-	sds = rcu_dereference_all(per_cpu(sd_llc_shared, cpu));
+	sds = rcu_dereference_all(per_cpu(sd_balance_shared, cpu));
 	if (sds)
 		WRITE_ONCE(sds->has_idle_cores, val);
 }
@@ -7784,7 +7784,7 @@ static inline bool test_idle_cores(int cpu)
 {
 	struct sched_domain_shared *sds;
 
-	sds = rcu_dereference_all(per_cpu(sd_llc_shared, cpu));
+	sds = rcu_dereference_all(per_cpu(sd_balance_shared, cpu));
 	if (sds)
 		return READ_ONCE(sds->has_idle_cores);
 
@@ -7793,7 +7793,7 @@ static inline bool test_idle_cores(int cpu)
 
 /*
  * Scans the local SMT mask to see if the entire core is idle, and records this
- * information in sd_llc_shared->has_idle_cores.
+ * information in sd_balance_shared->has_idle_cores.
  *
  * Since SMT siblings share all cache levels, inspecting this limited remote
  * state should be fairly cheap.
@@ -7823,7 +7823,8 @@ unlock:
 /*
  * Scan the entire LLC domain for idle cores; this dynamically switches off if
  * there are no idle cores left in the system; tracked through
- * sd_llc->shared->has_idle_cores and enabled through update_idle_core() above.
+ * sd_balance_shared->has_idle_cores and enabled through update_idle_core()
+ * above.
  */
 static int select_idle_core(struct task_struct *p, int core, struct cpumask *cpus, int *idle_cpu)
 {
@@ -7908,19 +7909,23 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 {
 	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_rq_mask);
 	int i, cpu, idle_cpu = -1, nr = INT_MAX;
-	struct sched_domain_shared *sd_share;
 
 	cpumask_and(cpus, sched_domain_span(sd), p->cpus_ptr);
 
-	if (sched_feat(SIS_UTIL)) {
-		sd_share = rcu_dereference_all(per_cpu(sd_llc_shared, target));
-		if (sd_share) {
-			/* because !--nr is the condition to stop scan */
-			nr = READ_ONCE(sd_share->nr_idle_scan) + 1;
-			/* overloaded LLC is unlikely to have idle cpu/core */
-			if (nr == 1)
-				return -1;
-		}
+	if (sched_feat(SIS_UTIL) && sd->shared) {
+		/*
+		 * Increment because !--nr is the condition to stop scan.
+		 *
+		 * Since "sd" is "sd_llc" for target CPU dereferenced in the
+		 * caller, it is safe to directly dereference "sd->shared".
+		 * Topology bits always ensure it assigned for "sd_llc" abd it
+		 * cannot disappear as long as we have a RCU protected
+		 * reference to one the associated "sd" here.
+		 */
+		nr = READ_ONCE(sd->shared->nr_idle_scan) + 1;
+		/* overloaded LLC is unlikely to have idle cpu/core */
+		if (nr == 1)
+			return -1;
 	}
 
 	if (static_branch_unlikely(&sched_cluster_active)) {
@@ -11300,7 +11305,7 @@ static void update_idle_cpu_scan(struct lb_env *env,
 	if (env->sd->span_weight != llc_weight)
 		return;
 
-	sd_share = rcu_dereference_all(per_cpu(sd_llc_shared, env->dst_cpu));
+	sd_share = rcu_dereference_all(per_cpu(sd_balance_shared, env->dst_cpu));
 	if (!sd_share)
 		return;
 
@@ -12799,7 +12804,7 @@ static void nohz_balancer_kick(struct rq *rq)
 		goto unlock;
 	}
 
-	sds = rcu_dereference_all(per_cpu(sd_llc_shared, cpu));
+	sds = rcu_dereference_all(per_cpu(sd_balance_shared, cpu));
 	if (sds) {
 		/*
 		 * If there is an imbalance between LLC domains (IOW we could
@@ -12833,7 +12838,11 @@ static void set_cpu_sd_state_busy(int cpu)
 	rcu_read_lock();
 	sd = rcu_dereference_all(per_cpu(sd_llc, cpu));
 
-	if (!sd || !sd->nohz_idle)
+	/*
+	 * sd->nohz_idle only pairs with nr_busy_cpus on sd->shared; if this
+	 * domain has no shared object there is nothing to clear or account.
+	 */
+	if (!sd || !sd->shared || !sd->nohz_idle)
 		goto unlock;
 	sd->nohz_idle = 0;
 
@@ -12862,7 +12871,8 @@ static void set_cpu_sd_state_idle(int cpu)
 	rcu_read_lock();
 	sd = rcu_dereference_all(per_cpu(sd_llc, cpu));
 
-	if (!sd || sd->nohz_idle)
+	/* See set_cpu_sd_state_busy(): nohz_idle is only used with sd->shared. */
+	if (!sd || !sd->shared || sd->nohz_idle)
 		goto unlock;
 	sd->nohz_idle = 1;
 
