@@ -397,6 +397,9 @@ bool rxrpc_input_call_event(struct rxrpc_call *call, struct sk_buff *skb)
 	if (skb && skb->mark == RXRPC_SKB_MARK_ERROR)
 		goto out;
 
+	if (skb)
+		rxrpc_input_call_packet(call, skb);
+
 	/* If we see our async-event poke, check for timeout trippage. */
 	now = jiffies;
 	t = READ_ONCE(call->expect_rx_by);
@@ -455,9 +458,6 @@ bool rxrpc_input_call_event(struct rxrpc_call *call, struct sk_buff *skb)
 		cmpxchg(&call->resend_at, t, now + MAX_JIFFY_OFFSET);
 		resend = true;
 	}
-
-	if (skb)
-		rxrpc_input_call_packet(call, skb);
 
 	rxrpc_transmit_some_data(call);
 
