@@ -140,6 +140,7 @@ int tegra_bpmp_request_mrq(struct tegra_bpmp *bpmp, unsigned int mrq,
 void tegra_bpmp_free_mrq(struct tegra_bpmp *bpmp, unsigned int mrq,
 			 void *data);
 bool tegra_bpmp_mrq_is_supported(struct tegra_bpmp *bpmp, unsigned int mrq);
+int tegra_bpmp_sysfs_register(struct tegra_bpmp *bpmp);
 #else
 static inline struct tegra_bpmp *tegra_bpmp_get(struct device *dev)
 {
@@ -181,6 +182,12 @@ static inline bool tegra_bpmp_mrq_is_supported(struct tegra_bpmp *bpmp,
 {
 	return false;
 }
+
+static inline int tegra_bpmp_sysfs_register(struct tegra_bpmp *bpmp)
+{
+	return -EOPNOTSUPP;
+}
+
 #endif
 
 void tegra_bpmp_handle_rx(struct tegra_bpmp *bpmp);
