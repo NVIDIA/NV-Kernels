@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
  */
+#include <linux/acpi.h>
 #include <linux/debugfs.h>
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
@@ -771,6 +772,8 @@ free:
 
 int tegra_bpmp_init_debugfs(struct tegra_bpmp *bpmp)
 {
+	const char *root_name = "bpmp";
+	char *acpi_root_name = NULL;
 	struct dentry *root;
 	bool inband;
 	int err;
@@ -780,13 +783,23 @@ int tegra_bpmp_init_debugfs(struct tegra_bpmp *bpmp)
 	if (!inband && !tegra_bpmp_mrq_is_supported(bpmp, MRQ_DEBUGFS))
 		return 0;
 
-	root = debugfs_create_dir("bpmp", NULL);
+	if (ACPI_HANDLE(bpmp->dev)) {
+		acpi_root_name = kasprintf(GFP_KERNEL, "bpmp-%s",
+					   dev_name(bpmp->dev));
+		if (!acpi_root_name)
+			return -ENOMEM;
+
+		root_name = acpi_root_name;
+	}
+
+	root = debugfs_create_dir(root_name, NULL);
+	kfree(acpi_root_name);
 	if (IS_ERR(root))
-		return -ENOMEM;
+		return PTR_ERR(root);
 
 	bpmp->debugfs_mirror = debugfs_create_dir("debug", root);
 	if (IS_ERR(bpmp->debugfs_mirror)) {
-		err = -ENOMEM;
+		err = PTR_ERR(bpmp->debugfs_mirror);
 		goto out;
 	}
 
