@@ -1,0 +1,49 @@
+What:           /sys/bus/platform/devices/<bpmp-device>/mbwt_control/pcie_instance_id
+What:           /sys/bus/platform/devices/<bpmp-device>/mbwt_control/vc_type
+What:           /sys/bus/platform/devices/<bpmp-device>/mbwt_control/bandwidth
+Date:           March 2026
+KernelVersion:  6.18
+Contact:        Aniruddha TVS Rao <anrao@nvidia.com>
+Description:
+               On ACPI-based Tegra systems the BPMP driver does not use the
+               device-tree mailbox path; firmware interaction is via AML. This sysfs
+               interface is a userspace tuning knob for memory bandwidth throttler
+               (MBWT) settings.
+
+               On Tegra410, the PCIe bandwidth control path exposes QoS that caps
+               aggregate bandwidth for PCIe and for GPU traffic over UPHY. Each PCIe
+               bandwidth group has a single shared cap for all traffic in that group.
+               A group may contain only PCIe devices, only a GPU on UPHY, or PCIe and
+               GPU together in a bifurcated topology.
+
+               Following attributes appear under a kobject named mbwt_control on the
+               tegra-bpmp platform device (the same struct device as the driver
+               binds to), only when that device has an ACPI companion and BPMP
+               firmware reports support for both MBWT_GET and MBWT_SET via the MBWT
+               QUERY probe.
+
+               pcie_instance_id (RW):
+                       PCIe bandwidth group index: 0 = pcie0, 1 = pcie1, ..., 5 = pcie5.
+
+               vc_type (RW):
+                       Traffic type to cap for that group:
+                       0 = PCIe read
+                       1 = PCIe write
+                       2 = GPU UPHY read plus write (combined)
+
+               bandwidth (RW):
+                       Target bandwidth cap in GB/s for the pcie_instance_id and vc_type
+                       currently stored in the other two attributes. Intended range is
+                       1-110 GB/s; firmware validates the request (via MRQ MBWT_SET).
+
+                       When read, issues a MBWT_GET for that same pcie_instance_id and vc_type
+                       and returns the bandwidth value in GB/s returned by firmware.
+
+               Example:
+                       echo 0 > .../mbwt_control/pcie_instance_id
+                       echo 1 > .../mbwt_control/vc_type
+                       echo 100 > .../mbwt_control/bandwidth
+                       cat .../mbwt_control/bandwidth
+
+Users:         Customer tuning of PCIe and GPU UPHY bandwidth caps on
+               ACPI-based Tegra410 systems.

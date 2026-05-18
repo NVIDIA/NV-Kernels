@@ -954,6 +954,14 @@ static int tegra_bpmp_probe(struct platform_device *pdev)
 	if (err < 0)
 		goto free_mrq;
 
+	err = tegra_bpmp_sysfs_register(bpmp);
+	if (err < 0) {
+		dev_err(&pdev->dev,
+			"Failed registering sysfs attribute to the BPMP platform device: %d\n",
+			err);
+		goto free_mrq;
+	}
+
 	err = tegra_bpmp_init_debugfs(bpmp);
 	if (err < 0)
 		dev_err(&pdev->dev, "debugfs initialization failed: %d\n", err);
@@ -1056,10 +1064,16 @@ static const struct of_device_id tegra_bpmp_match[] = {
 	{ }
 };
 
+static const struct acpi_device_id tegra_bpmp_acpi_match[] = {
+	{.id = "NVDA3001", .driver_data = 0},
+	{ }
+};
+
 static struct platform_driver tegra_bpmp_driver = {
 	.driver = {
 		.name = "tegra-bpmp",
 		.of_match_table = tegra_bpmp_match,
+		.acpi_match_table = tegra_bpmp_acpi_match,
 		.pm = &tegra_bpmp_pm_ops,
 		.suppress_bind_attrs = true,
 	},
