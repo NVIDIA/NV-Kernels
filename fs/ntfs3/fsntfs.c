@@ -2670,7 +2670,7 @@ int ntfs_set_label(struct ntfs_sb_info *sbi, u8 *label, int len)
 	struct ntfs_inode *ni = sbi->volume.ni;
 	const u8 max_ulen = 0x80; /* TODO: use attrdef to get maximum length */
 	/* Allocate PATH_MAX bytes. */
-	struct cpu_str *uni = __getname();
+	struct cpu_str *uni = kmalloc(PATH_MAX, GFP_KERNEL);
 
 	if (!uni)
 		return -ENOMEM;
@@ -2713,6 +2713,6 @@ unlock_out:
 		err = _ni_write_inode(&ni->vfs_inode, 0);
 
 out:
-	__putname(uni);
+	kfree(uni);
 	return err;
 }
