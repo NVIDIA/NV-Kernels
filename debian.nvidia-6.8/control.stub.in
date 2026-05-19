@@ -11,6 +11,8 @@ Build-Depends:
  libcap-dev <!stage1>,
  libelf-dev <!stage1>,
  libnewt-dev <!stage1>,
+ libnl-3-dev,
+ libnl-genl-3-dev,
  libiberty-dev <!stage1>,
  default-jdk-headless <!stage1>,
  java-common <!stage1>,
