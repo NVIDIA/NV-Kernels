@@ -442,7 +442,7 @@ typedef u64 (*cxl_hpa_to_spa_fn)(struct cxl_root_decoder *cxlrd, u64 hpa);
  * @calc_hb: which host bridge covers the n'th position by granularity
  * @hpa_to_spa: translate CXL host-physical-address to Platform system-physical-address
  * @platform_data: platform specific configuration data
- * @range_lock: sync region autodiscovery by address range
+ * @regions_lock: sync region discovery, construction, and deletion
  * @qos_class: QoS performance class cookie
  * @cxlsd: base cxl switch decoder
  */
@@ -452,7 +452,7 @@ struct cxl_root_decoder {
 	cxl_calc_hb_fn calc_hb;
 	cxl_hpa_to_spa_fn hpa_to_spa;
 	void *platform_data;
-	struct mutex range_lock;
+	struct mutex regions_lock;
 	int qos_class;
 	struct cxl_switch_decoder cxlsd;
 };
