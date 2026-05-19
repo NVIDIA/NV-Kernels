@@ -688,6 +688,7 @@ endif
 ifeq ($(do_tools_x86),true)
 	cd $(builddirpa)/tools/power/x86/x86_energy_perf_policy && make CROSS_COMPILE=$(CROSS_COMPILE)
 	cd $(builddirpa)/tools/power/x86/turbostat && make CROSS_COMPILE=$(CROSS_COMPILE)
+	cd $(builddirpa)/tools/power/x86/intel-speed-select && make CROSS_COMPILE=$(CROSS_COMPILE)
 endif
 endif
 ifeq ($(do_cloud_tools),true)
@@ -741,7 +742,7 @@ ifeq ($(do_tools_bpftool),true)
 endif
 ifeq ($(do_tools_x86),true)
 	install -m755 \
-		$(addprefix $(builddirpa)/tools/power/x86/, x86_energy_perf_policy/x86_energy_perf_policy turbostat/turbostat) \
+		$(addprefix $(builddirpa)/tools/power/x86/, x86_energy_perf_policy/x86_energy_perf_policy turbostat/turbostat intel-speed-select/intel-speed-select) \
 		$(toolspkgdir)/usr/lib/$(src_pkg_name)-tools-$(abi_release)
 endif
 endif
