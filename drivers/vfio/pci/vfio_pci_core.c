@@ -1238,7 +1238,7 @@ static int vfio_pci_ioctl_reset(struct vfio_pci_core_device *vdev,
 	vfio_pci_zap_and_down_write_memory_lock(vdev);
 
 	/* Zap CXL DPA region PTEs before hardware reset clears HDM state */
-	vfio_cxl_zap_region_locked(vdev);
+	vfio_cxl_prepare_reset(vdev);
 
 	/*
 	 * This function can be invoked while the power state is non-D0. If
@@ -1254,11 +1254,10 @@ static int vfio_pci_ioctl_reset(struct vfio_pci_core_device *vdev,
 	ret = pci_try_reset_function(vdev->pdev);
 
 	/*
-	 * Re-enable DPA region if reset succeeded; fault handler will
-	 * re-insert PFNs on next access without requiring a new mmap.
+	 * finish_reset checks the COMMITTED bit from hardware
+	 * and only brings the region back if it is actually set.
 	 */
-	if (!ret)
-		vfio_cxl_reactivate_region(vdev);
+	vfio_cxl_finish_reset(vdev);
 
 	up_write(&vdev->memory_lock);
 
@@ -1637,6 +1636,13 @@ void vfio_pci_zap_and_down_write_memory_lock(struct vfio_pci_core_device *vdev)
 {
 	down_write(&vdev->memory_lock);
 	vfio_pci_zap_bars(vdev);
+	/*
+	 * Zap the CXL DPA region PTEs too: zap_bars only covers the BAR offset
+	 * range, while the DPA region lives in the device-region offset range
+	 * and would otherwise survive a runtime-PM entry or D3 transition.
+	 * No-op on non-CXL devices.
+	 */
+	vfio_cxl_zap_dpa(vdev);
 }
 
 u16 vfio_pci_memory_lock_and_enable(struct vfio_pci_core_device *vdev)
@@ -2514,6 +2520,17 @@ static int vfio_pci_dev_set_hot_reset(struct vfio_device_set *dev_set,
 	}
 
 	/*
+	 * All devices in the set are now locked.  Commit the CXL prepare
+	 * step in its own pass: it clears region_active and zaps DPA PTEs,
+	 * which must be paired with a finish_reset call for every device it
+	 * touches.  Doing this only after all trylocks have succeeded keeps
+	 * a mid-loop failure from leaving earlier devices with
+	 * region_active=false and no matching reset.
+	 */
+	list_for_each_entry(vdev, &dev_set->device_list, vdev.dev_set_list)
+		vfio_cxl_prepare_reset(vdev);
+
+	/*
 	 * The pci_reset_bus() will reset all the devices in the bus.
 	 * The power state can be non-D0 for some of the devices in the bus.
 	 * For these devices, the pci_reset_bus() will internally set
@@ -2526,6 +2543,15 @@ static int vfio_pci_dev_set_hot_reset(struct vfio_device_set *dev_set,
 		vfio_pci_set_power_state(vdev, PCI_D0);
 
 	ret = pci_reset_bus(pdev);
+
+	/*
+	 * Mirror vfio_pci_ioctl_reset(): re-read the post-reset HDM state and
+	 * reactivate the DPA region for CXL devices that hardware committed.
+	 * Runs under each device's memory_lock write side acquired earlier and
+	 * pairs with the prepare_reset pass above.
+	 */
+	list_for_each_entry(vdev, &dev_set->device_list, vdev.dev_set_list)
+		vfio_cxl_finish_reset(vdev);
 
 	vdev = list_last_entry(&dev_set->device_list,
 			       struct vfio_pci_core_device, vdev.dev_set_list);
