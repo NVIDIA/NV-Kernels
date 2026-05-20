@@ -800,6 +800,27 @@ void vfio_cxl_prepare_reset(struct vfio_pci_core_device *vdev)
 }
 
 /*
+ * vfio_cxl_enable_memory_space - ensure PCI Memory Space is on before BAR reads.
+ *
+ * A reset caller may disable Memory Space to quiesce device DMA before
+ * issuing the reset. If a guest wrote PCI_COMMAND with Memory Space cleared
+ * before the FLR; pci_dev_save_and_disable() will capture it disabled and
+ * restores it that way. This can result in Memory Space remains disabled on
+ * return. Accessing a BAR with Memory Space disabled produces an Unsupported
+ * Request completion; on platforms that promote UR to a fatal error this fires
+ * DPC.
+ */
+static void vfio_cxl_enable_memory_space(struct vfio_pci_core_device *vdev)
+{
+	u16 cmd;
+
+	pci_read_config_word(vdev->pdev, PCI_COMMAND, &cmd);
+	if (!(cmd & PCI_COMMAND_MEMORY))
+		pci_write_config_word(vdev->pdev, PCI_COMMAND,
+				      cmd | PCI_COMMAND_MEMORY);
+}
+
+/*
  * vfio_cxl_finish_reset - Re-enable DPA region after reset.
  *
  * Must be called with vdev->memory_lock held for writing.  Re-reads the
@@ -814,6 +835,9 @@ void vfio_cxl_finish_reset(struct vfio_pci_core_device *vdev)
 
 	if (!cxl)
 		return;
+
+	vfio_cxl_enable_memory_space(vdev);
+
 	/*
 	 * Re-initialise the emulated HDM comp_reg_virt[] from hardware.
 	 * A reset clears decoder registers; mirror that in the emulated
