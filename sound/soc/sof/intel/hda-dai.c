@@ -94,6 +94,11 @@ hda_dai_get_ops(struct snd_pcm_substream *substream, struct snd_soc_dai *cpu_dai
 	sdev = widget_to_sdev(w);
 	swidget = w->dobj.private;
 
+	if (!swidget) {
+		dev_err(sdev->dev, "%s: swidget is NULL\n", __func__);
+		return NULL;
+	}
+
 	if (sdev->dspless_mode_selected)
 		return hda_select_dai_widget_ops(sdev, swidget);
 
@@ -390,8 +395,11 @@ static int non_hda_dai_hw_params(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
-	/* get stream_id */
 	sdev = widget_to_sdev(w);
+	if (sdev->dspless_mode_selected)
+		goto skip_tlv;
+
+	/* get stream_id */
 	hext_stream = ops->get_hext_stream(sdev, cpu_dai, substream);
 
 	if (!hext_stream) {
@@ -424,6 +432,7 @@ static int non_hda_dai_hw_params(struct snd_pcm_substream *substream,
 	dma_config->dma_stream_channel_map.device_count = 0; /* mapping not used */
 	dma_config->dma_priv_config_size = 0;
 
+skip_tlv:
 	return 0;
 }
 
