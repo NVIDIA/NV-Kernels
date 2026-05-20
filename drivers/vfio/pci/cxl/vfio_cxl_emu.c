@@ -437,7 +437,7 @@ vfio_cxl_read_committed_decoder_size(struct vfio_pci_core_device *vdev,
 }
 
 /*
- * Called with memory_lock write side held (from vfio_cxl_reactivate_region).
+ * Called with memory_lock write side held (from vfio_cxl_finish_reset).
  * Uses the pre-established hdm_iobase, no ioremap() under the lock,
  * which would deadlock on PREEMPT_RT where ioremap() can sleep.
  */
