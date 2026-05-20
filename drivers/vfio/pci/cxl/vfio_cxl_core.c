@@ -660,6 +660,18 @@ static vm_fault_t vfio_cxl_region_vm_fault(struct vm_fault *vmf)
 	 */
 	down_read(&vdev->memory_lock);
 
+	/*
+	 * Mirror vfio_pci_vmf_insert_pfn(): reject faults while runtime PM is
+	 * engaged or PCI Memory Space / power state would make the underlying
+	 * memory inaccessible.  vfio_pci_zap_and_down_write_memory_lock() has
+	 * already unmapped existing PTEs in those paths; this gate stops the
+	 * fault path from faulting them back in.
+	 */
+	if (vdev->pm_runtime_engaged || !__vfio_pci_memory_enabled(vdev)) {
+		ret = VM_FAULT_SIGBUS;
+		goto out;
+	}
+
 	if (!cxl->region_active) {
 		ret = VM_FAULT_SIGBUS;
 		goto out;
@@ -724,15 +736,27 @@ static int vfio_cxl_region_mmap(struct vfio_pci_core_device *vdev,
 	return 0;
 }
 
+bool vfio_cxl_reset_capable(struct vfio_pci_core_device *vdev)
+{
+	return vdev->cxl && pci_cxl_reset_capable(vdev->pdev);
+}
+
 /*
- * vfio_cxl_zap_region_locked - Invalidate all DPA region PTEs.
+ * vfio_cxl_zap_dpa - Invalidate DPA region PTEs without touching region_active.
  *
- * Must be called with vdev->memory_lock held for writing.  Sets
- * region_active=false before zapping so any subsequent I/O to the region
- * sees the inactive state and returns an error rather than accessing
- * stale mappings.
+ * Used by paths that revoke user access transiently (runtime PM entry, D3
+ * power transitions, Memory Space disable) but do not perform a reset.
+ * The DPA region offset range is separate from the BAR range zapped by
+ * vfio_pci_zap_bars(), so existing DPA mmaps and fd I/O would otherwise
+ * continue to touch CXL.mem while the device is suspended.
+ *
+ * The fault handler and fd I/O path additionally check pm_runtime_engaged
+ * and __vfio_pci_memory_enabled() to refuse re-faulting while the device
+ * is in the revoked state.
+ *
+ * Must be called with vdev->memory_lock held for writing.
  */
-void vfio_cxl_zap_region_locked(struct vfio_pci_core_device *vdev)
+void vfio_cxl_zap_dpa(struct vfio_pci_core_device *vdev)
 {
 	struct vfio_device *core_vdev = &vdev->vdev;
 	struct vfio_pci_cxl_state *cxl = vdev->cxl;
@@ -742,7 +766,6 @@ void vfio_cxl_zap_region_locked(struct vfio_pci_core_device *vdev)
 	if (!cxl || cxl->dpa_region_idx < 0)
 		return;
 
-	WRITE_ONCE(cxl->region_active, false);
 	unmap_mapping_range(core_vdev->inode->i_mapping,
 			    VFIO_PCI_INDEX_TO_OFFSET(VFIO_PCI_NUM_REGIONS +
 						     cxl->dpa_region_idx),
@@ -750,13 +773,34 @@ void vfio_cxl_zap_region_locked(struct vfio_pci_core_device *vdev)
 }
 
 /*
- * vfio_cxl_reactivate_region - Re-enable DPA region after successful reset.
+ * vfio_cxl_prepare_reset - Invalidate all DPA region PTEs.
+ *
+ * Must be called with vdev->memory_lock held for writing.  Sets
+ * region_active=false before zapping so any subsequent I/O to the region
+ * sees the inactive state and returns an error rather than accessing
+ * stale mappings.
+ */
+void vfio_cxl_prepare_reset(struct vfio_pci_core_device *vdev)
+{
+	struct vfio_pci_cxl_state *cxl = vdev->cxl;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	if (!cxl || cxl->dpa_region_idx < 0)
+		return;
+
+	WRITE_ONCE(cxl->region_active, false);
+	vfio_cxl_zap_dpa(vdev);
+}
+
+/*
+ * vfio_cxl_finish_reset - Re-enable DPA region after reset.
  *
  * Must be called with vdev->memory_lock held for writing.  Re-reads the
- * HDM decoder state from hardware (FLR cleared it) and sets region_active
- * so that subsequent I/O to the region is permitted again.
+ * HDM decoder state from hardware and sets region_active so that
+ * subsequent I/O to the region is permitted again.
  */
-void vfio_cxl_reactivate_region(struct vfio_pci_core_device *vdev)
+void vfio_cxl_finish_reset(struct vfio_pci_core_device *vdev)
 {
 	struct vfio_pci_cxl_state *cxl = vdev->cxl;
 
@@ -766,8 +810,8 @@ void vfio_cxl_reactivate_region(struct vfio_pci_core_device *vdev)
 		return;
 	/*
 	 * Re-initialise the emulated HDM comp_reg_virt[] from hardware.
-	 * After FLR the decoder registers read as zero; mirror that in
-	 * the emulated state so QEMU sees a clean slate.
+	 * A reset clears decoder registers; mirror that in the emulated
+	 * state so the guest device manager sees the post-reset hardware.
 	 */
 	vfio_cxl_reinit_comp_regs(cxl);
 
@@ -817,6 +861,17 @@ static ssize_t vfio_cxl_region_rw(struct vfio_pci_core_device *core_dev,
 	 * produce a Synchronous External Abort.
 	 */
 	down_read(&core_dev->memory_lock);
+
+	/*
+	 * Mirror the BAR-rw / fault gates: refuse fd I/O while the device is
+	 * runtime suspended or has Memory Space / power state that makes the
+	 * memremap'd window inaccessible.
+	 */
+	if (core_dev->pm_runtime_engaged ||
+	    !__vfio_pci_memory_enabled(core_dev)) {
+		ret = -EIO;
+		goto out;
+	}
 
 	if (!cxl->region_active || !cxl->region_vaddr) {
 		ret = -EIO;
@@ -933,7 +988,7 @@ int vfio_cxl_register_cxl_region(struct vfio_pci_core_device *vdev)
 	 * Cache the vdev->region[] index before activating the region.
 	 * vfio_pci_core_register_dev_region() placed the new entry at
 	 * vdev->region[num_regions - 1] and incremented num_regions.
-	 * vfio_cxl_zap_region_locked() uses this to avoid scanning
+	 * vfio_cxl_prepare_reset() uses this to avoid scanning
 	 * vdev->region[] on every FLR.
 	 */
 	cxl->dpa_region_idx = vdev->num_regions - 1;
