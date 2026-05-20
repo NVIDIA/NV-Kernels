@@ -126,8 +126,10 @@ static inline bool vfio_pci_is_vga(struct pci_dev *pdev)
 
 void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev);
 void vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev);
-void vfio_cxl_zap_region_locked(struct vfio_pci_core_device *vdev);
-void vfio_cxl_reactivate_region(struct vfio_pci_core_device *vdev);
+bool vfio_cxl_reset_capable(struct vfio_pci_core_device *vdev);
+void vfio_cxl_prepare_reset(struct vfio_pci_core_device *vdev);
+void vfio_cxl_finish_reset(struct vfio_pci_core_device *vdev);
+void vfio_cxl_zap_dpa(struct vfio_pci_core_device *vdev);
 void vfio_cxl_setup_dvsec_perms(struct vfio_pci_core_device *vdev);
 int vfio_cxl_register_cxl_region(struct vfio_pci_core_device *vdev);
 void vfio_cxl_unregister_cxl_region(struct vfio_pci_core_device *vdev);
@@ -147,10 +149,15 @@ static inline void
 vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev) { }
 static inline void
 vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev) { }
+static inline bool
+vfio_cxl_reset_capable(struct vfio_pci_core_device *vdev)
+{ return false; }
 static inline void
-vfio_cxl_zap_region_locked(struct vfio_pci_core_device *vdev) { }
+vfio_cxl_prepare_reset(struct vfio_pci_core_device *vdev) { }
 static inline void
-vfio_cxl_reactivate_region(struct vfio_pci_core_device *vdev) { }
+vfio_cxl_finish_reset(struct vfio_pci_core_device *vdev) { }
+static inline void
+vfio_cxl_zap_dpa(struct vfio_pci_core_device *vdev) { }
 static inline void
 vfio_cxl_setup_dvsec_perms(struct vfio_pci_core_device *vdev) { }
 static inline int
