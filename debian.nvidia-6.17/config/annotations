@@ -258,6 +258,7 @@ CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablem
 CONFIG_VFIO_CXL_CORE                            policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_VFIO_CXL_CORE                            note<'Enable VFIO CXL core for CXL Type-2 device passthrough support'>
 
+
 # ---- Annotations without notes ----
 
 CONFIG_ACPI_MPAM                                policy<{'amd64': '-', 'arm64': 'y'}>
