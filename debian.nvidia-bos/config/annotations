@@ -45,9 +45,6 @@ CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE note<'Required for Grace enable
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE note<'Required for Grace enablement'>
 
-CONFIG_CACHEMAINT_FOR_HOTPLUG                   policy<{'amd64': '-', 'arm64': 'n'}>
-CONFIG_CACHEMAINT_FOR_HOTPLUG                   note<'Optional HiSilicon HHA cache maintenance driver; depends on GENERIC_CPU_CACHE_MAINTENANCE; not needed for NVIDIA platforms'>
-
 CONFIG_ARM_FFA_TRANSPORT                        policy<{'arm64': 'y'}>
 CONFIG_ARM_FFA_TRANSPORT                        note<'LP: #2111511'>
 
@@ -56,6 +53,9 @@ CONFIG_ARM_LFA                                  note<'LP: #2138342'>
 
 CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      note<'LP: #2095028'>
+
+CONFIG_CACHEMAINT_FOR_HOTPLUG                   policy<{'amd64': '-', 'arm64': 'n'}>
+CONFIG_CACHEMAINT_FOR_HOTPLUG                   note<'Optional HiSilicon HHA cache maintenance driver; depends on GENERIC_CPU_CACHE_MAINTENANCE; not needed for NVIDIA platforms'>
 
 CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '0'}>
 CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2150898'>
@@ -141,6 +141,15 @@ CONFIG_CXL_PORT                                 note<'Required for CXL port enum
 CONFIG_CXL_RAS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_CXL_RAS                                  note<'New def_bool replacing PCIEAER_CXL; auto-enabled with ACPI_APEI_GHES+PCIEAER+CXL_BUS; CXL RAS error handling support'>
 
+CONFIG_DEV_DAX                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX                                  note<'Override debian.master m-'>
+
+CONFIG_DEV_DAX_CXL                              policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_CXL                              note<'Override debian.master m-'>
+
+CONFIG_DEV_DAX_KMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m-'>
+
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
 
@@ -213,9 +222,6 @@ CONFIG_NOUVEAU_PLATFORM_DRIVER                  note<'Disable nouveau for NVIDIA
 CONFIG_NR_CPUS                                  policy<{'amd64': '8192', 'arm64': '512'}>
 CONFIG_NR_CPUS                                  note<'LP: #1864198'>
 
-CONFIG_PCIEAER_CXL                              policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_PCIEAER_CXL                              note<'Removed by commit d18f1b7beadf (PCI/AER: Replace PCIEAER_CXL symbol with CXL_RAS)'>
-
 CONFIG_NVGRACE_EGM                              policy<{'arm64': 'm'}>
 CONFIG_NVGRACE_EGM                              note<'LP: #2119656'>
 
@@ -227,6 +233,12 @@ CONFIG_NVIDIA_TEGRA410_C2C_PMU                  note<'LP: #2139315'>
 
 CONFIG_NVIDIA_TEGRA410_CMEM_LATENCY_PMU         policy<{'arm64': 'm'}>
 CONFIG_NVIDIA_TEGRA410_CMEM_LATENCY_PMU         note<'LP: #2139315'>
+
+CONFIG_PCIEAER_CXL                              policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_PCIEAER_CXL                              note<'Removed by commit d18f1b7beadf (PCI/AER: Replace PCIEAER_CXL symbol with CXL_RAS)'>
+
+CONFIG_PCI_CXL                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_PCI_CXL                                  note<'Hidden bool; auto-enabled by CXL_BUS; PCI core CXL DVSEC and HDM state save/restore support'>
 
 CONFIG_PID_IN_CONTEXTIDR                        policy<{'arm64': 'y'}>
 CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablement'>
@@ -264,18 +276,6 @@ CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM dri
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
 
-CONFIG_DEV_DAX                                  policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_DEV_DAX                                  note<'Override debian.master m->y; required built-in for DEV_DAX_CXL=y'>
-
-CONFIG_DEV_DAX_CXL                              policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_DEV_DAX_CXL                              note<'Override debian.master m->y; CXL RAM region DAX access; depends on CXL_BUS+CXL_REGION+DEV_DAX'>
-
-CONFIG_DEV_DAX_KMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m->y; map CXL DAX devices as System-RAM'>
-
-CONFIG_PCI_CXL                                  policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_PCI_CXL                                  note<'Hidden bool; auto-enabled by CXL_BUS; PCI core CXL DVSEC and HDM state save/restore support'>
-
 CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'n'}>
 CONFIG_VFIO_CONTAINER                           note<'LP: #2095028'>
 
@@ -286,4 +286,5 @@ CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
 # ---- Annotations without notes ----
 
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_HISI_SOC_HHA                             policy<{'arm64': '-'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
