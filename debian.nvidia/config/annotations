@@ -148,10 +148,10 @@ CONFIG_CXL_RAS                                  policy<{'amd64': 'y', 'arm64': '
 CONFIG_CXL_RAS                                  note<'New def_bool replacing PCIEAER_CXL; auto-enabled with ACPI_APEI_GHES+PCIEAER+CXL_BUS; CXL RAS error handling support'>
 
 CONFIG_DEV_DAX                                  policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_DEV_DAX                                  note<'Override debian.master m->y; required built-in for DEV_DAX_CXL=y'>
+CONFIG_DEV_DAX                                  note<'Override debian.master m-'>
 
 CONFIG_DEV_DAX_CXL                              policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_DEV_DAX_CXL                              note<'Override debian.master m->y; CXL RAM region DAX access; depends on CXL_BUS+CXL_REGION+DEV_DAX'>
+CONFIG_DEV_DAX_CXL                              note<'Override debian.master m-'>
 
 CONFIG_DEV_DAX_FSDEV                            policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_DEV_DAX_FSDEV                            note<'Override debian.master m-; follows DEV_DAX'>
@@ -160,7 +160,7 @@ CONFIG_DEV_DAX_HMEM                             policy<{'amd64': 'y', 'arm64': '
 CONFIG_DEV_DAX_HMEM                             note<'Override debian.master m-; required for DEV_DAX_CXL=y'>
 
 CONFIG_DEV_DAX_KMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m->y; map CXL DAX devices as System-RAM'>
+CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m-'>
 
 CONFIG_DRM_NOUVEAU                              policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_DRM_NOUVEAU                              note<'Disable nouveau for NVIDIA kernels'>
@@ -286,4 +286,5 @@ CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
 
 CONFIG_AS_VERSION                               policy<{'amd64': '24700', 'arm64': '24700'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc (Ubuntu 15.3.0-4ubuntu1) 15.3.0"', 'arm64': '"aarch64-linux-gnu-gcc (Ubuntu 15.3.0-4ubuntu1) 15.3.0"'}>
+CONFIG_HISI_SOC_HHA                             policy<{'arm64': '-'}>
 CONFIG_LD_VERSION                               policy<{'amd64': '24700', 'arm64': '24700'}>
