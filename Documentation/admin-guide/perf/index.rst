@@ -24,7 +24,7 @@ Performance monitor support
    thunderx2-pmu
    alibaba_pmu
    dwc_pcie_pmu
-   nvidia-tegra241-pmu
+   nvidia-pmu
    meson-ddr-pmu
    cxl
    ampere_cspmu
