@@ -313,7 +313,7 @@ flushed:
 	else
 		trace_svcrdma_wc_send_flush(wc, &ctxt->sc_cid);
 	svc_rdma_send_ctxt_put(rdma, ctxt);
-	svc_xprt_deferred_close(&rdma->sc_xprt);
+	svc_rdma_xprt_deferred_close(rdma);
 }
 
 /**
@@ -347,7 +347,8 @@ int svc_rdma_send(struct svcxprt_rdma *rdma, struct svc_rdma_send_ctxt *ctxt)
 			trace_svcrdma_sq_full(rdma, &ctxt->sc_cid);
 			atomic_add(sqecount, &rdma->sc_sq_avail);
 			wait_event(rdma->sc_send_wait,
-				   atomic_read(&rdma->sc_sq_avail) >= sqecount);
+				   atomic_read(&rdma->sc_sq_avail) >= sqecount ||
+				   test_bit(XPT_CLOSE, &rdma->sc_xprt.xpt_flags));
 			if (test_bit(XPT_CLOSE, &rdma->sc_xprt.xpt_flags))
 				return -ENOTCONN;
 			trace_svcrdma_sq_retry(rdma, &ctxt->sc_cid);
@@ -362,7 +363,7 @@ int svc_rdma_send(struct svcxprt_rdma *rdma, struct svc_rdma_send_ctxt *ctxt)
 	}
 
 	trace_svcrdma_sq_post_err(rdma, &ctxt->sc_cid, ret);
-	svc_xprt_deferred_close(&rdma->sc_xprt);
+	svc_rdma_xprt_deferred_close(rdma);
 	if (bad_wr == first_wr)
 		atomic_add(sqecount, &rdma->sc_sq_avail);
 	wake_up(&rdma->sc_send_wait);
@@ -1058,7 +1059,7 @@ put_ctxt:
 	svc_rdma_send_ctxt_put(rdma, sctxt);
 drop_connection:
 	trace_svcrdma_send_err(rqstp, ret);
-	svc_xprt_deferred_close(&rdma->sc_xprt);
+	svc_rdma_xprt_deferred_close(rdma);
 	return -ENOTCONN;
 }
 

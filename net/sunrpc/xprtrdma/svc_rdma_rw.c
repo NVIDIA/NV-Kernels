@@ -302,7 +302,7 @@ static void svc_rdma_write_done(struct ib_cq *cq, struct ib_wc *wc)
 	/* The RDMA Write has flushed, so the client won't get some of the
 	 * outgoing RPC message. Signal the loss by closing the connection.
 	 */
-	svc_xprt_deferred_close(&rdma->sc_xprt);
+	svc_rdma_xprt_deferred_close(rdma);
 }
 
 /**
@@ -347,7 +347,7 @@ static void svc_rdma_wc_read_done(struct ib_cq *cq, struct ib_wc *wc)
 	 */
 	svc_rdma_cc_release(rdma, cc, DMA_FROM_DEVICE);
 	svc_rdma_recv_ctxt_put(rdma, ctxt);
-	svc_xprt_deferred_close(&rdma->sc_xprt);
+	svc_rdma_xprt_deferred_close(rdma);
 }
 
 /*
@@ -395,12 +395,15 @@ static int svc_rdma_post_chunk_ctxt(struct svcxprt_rdma *rdma,
 		trace_svcrdma_sq_full(rdma, &cc->cc_cid);
 		atomic_add(cc->cc_sqecount, &rdma->sc_sq_avail);
 		wait_event(rdma->sc_send_wait,
-			   atomic_read(&rdma->sc_sq_avail) > cc->cc_sqecount);
+			   atomic_read(&rdma->sc_sq_avail) > cc->cc_sqecount ||
+			   test_bit(XPT_CLOSE, &rdma->sc_xprt.xpt_flags));
+		if (test_bit(XPT_CLOSE, &rdma->sc_xprt.xpt_flags))
+			return -ENOTCONN;
 		trace_svcrdma_sq_retry(rdma, &cc->cc_cid);
 	} while (1);
 
 	trace_svcrdma_sq_post_err(rdma, &cc->cc_cid, ret);
-	svc_xprt_deferred_close(&rdma->sc_xprt);
+	svc_rdma_xprt_deferred_close(rdma);
 
 	/* If even one was posted, there will be a completion. */
 	if (bad_wr != first_wr)
