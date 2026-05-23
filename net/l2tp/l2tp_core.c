@@ -312,12 +312,13 @@ struct l2tp_session *l2tp_session_get_by_ifname(const struct net *net,
 	rcu_read_lock_bh();
 	for (hash = 0; hash < L2TP_HASH_SIZE_2; hash++) {
 		hlist_for_each_entry_rcu(session, &pn->l2tp_session_hlist[hash], global_hlist) {
-			if (!strcmp(session->ifname, ifname)) {
-				refcount_inc(&session->ref_count);
-				rcu_read_unlock_bh();
+			if (strcmp(session->ifname, ifname))
+				continue;
+			if (!refcount_inc_not_zero(&session->ref_count))
+				continue;
+			rcu_read_unlock_bh();
 
-				return session;
-			}
+			return session;
 		}
 	}
 
