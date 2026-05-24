@@ -305,7 +305,7 @@ int smack_populate_secattr(struct smack_known *skp);
  */
 extern int smack_enabled __initdata;
 extern struct lsm_id smack_lsmid;
-extern int smack_cipso_auto_level[2];
+extern u8  smack_cipso_auto_level[2];
 #define smack_cipso_direct (+smack_cipso_auto_level[0])
 #define smack_cipso_mapped (+smack_cipso_auto_level[1])
 extern struct smack_known *smack_net_ambient;
