@@ -2376,6 +2376,12 @@ quirk_flags
           Skip the probe-time interface setup (usb_set_interface,
           init_pitch, init_sample_rate); redundant with
           snd_usb_endpoint_prepare() at stream-open time
+        * bit 29: ``ifb_silence_on_empty``
+          In implicit feedback mode, when an entire capture URB returns with
+          all iso_frame_desc[i].status != 0 (bytes==0), do not silently return
+          from snd_usb_handle_sync_urb. Instead fall through and enqueue a
+          packet_info containing only size-0 packets, so the OUT ring keeps
+          moving (emits silence). Needed by Behringer Flow 8 (1397:050c).
 
 This module supports multiple devices, autoprobe and hotplugging.
 
