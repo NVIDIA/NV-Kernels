@@ -1424,7 +1424,20 @@ static int acpi_battery_probe(struct platform_device *pdev)
 		return result;
 
 	battery->pm_nb.notifier_call = battery_notify;
-	return register_pm_notifier(&battery->pm_nb);
+	result = register_pm_notifier(&battery->pm_nb);
+	if (result)
+		return result;
+
+	/*
+	 * Some platforms declare _DEP on a battery device for unrelated
+	 * consumers. This driver is registered as a platform_driver whose
+	 * .probe path does not auto-clear consumer dep_unmet counters on
+	 * success, so do it explicitly here to allow those consumers to
+	 * probe once the battery is up.
+	 */
+	acpi_dev_clear_dependencies(device);
+
+	return 0;
 }
 
 static void acpi_battery_remove(struct platform_device *pdev)
