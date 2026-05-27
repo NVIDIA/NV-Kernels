@@ -1083,7 +1083,7 @@ static int pppol2tp_ioctl(struct socket *sock, unsigned int cmd,
 			return -ENOTCONN;
 
 		if (session->magic != L2TP_SESSION_MAGIC) {
-			l2tp_session_put(session);
+			sock_put(sock->sk);
 			return -EBADF;
 		}
 		break;
@@ -1157,7 +1157,7 @@ static int pppol2tp_ioctl(struct socket *sock, unsigned int cmd,
 	}
 
 	if (session)
-		l2tp_session_put(session);
+		sock_put(sock->sk);
 
 	return err;
 }
