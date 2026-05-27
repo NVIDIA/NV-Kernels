@@ -340,11 +340,10 @@ static struct svc_xprt *svc_rdma_create(struct svc_serv *serv,
 	ret = rdma_bind_addr(listen_id, sa);
 	if (ret)
 		goto err1;
-	cma_xprt->sc_cm_id = listen_id;
-
 	ret = rdma_listen(listen_id, RPCRDMA_LISTEN_BACKLOG);
 	if (ret)
 		goto err1;
+	cma_xprt->sc_cm_id = listen_id;
 
 	/*
 	 * We need to use the address from the cm_id in case the
@@ -358,7 +357,13 @@ static struct svc_xprt *svc_rdma_create(struct svc_serv *serv,
  err1:
 	rdma_destroy_id(listen_id);
  err0:
-	kfree(cma_xprt);
+	/* _svc_xprt_create() acquired one module reference and
+	 * puts it on xpo_create failure.  svc_xprt_free() puts
+	 * a second one when the kref drops to zero.  Take a
+	 * compensating reference so both puts are balanced.
+	 */
+	__module_get(cma_xprt->sc_xprt.xpt_class->xcl_owner);
+	svc_xprt_put(&cma_xprt->sc_xprt);
 	return ERR_PTR(ret);
 }
 
@@ -601,7 +606,8 @@ static void __svc_rdma_free(struct work_struct *work)
 		ib_dealloc_pd(rdma->sc_pd);
 
 	/* Destroy the CM ID */
-	rdma_destroy_id(rdma->sc_cm_id);
+	if (rdma->sc_cm_id)
+		rdma_destroy_id(rdma->sc_cm_id);
 
 	kfree(rdma);
 }
