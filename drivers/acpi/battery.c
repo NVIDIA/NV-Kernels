@@ -1264,6 +1264,15 @@ static int acpi_battery_probe(struct platform_device *pdev)
 	if (result)
 		goto fail_pm;
 
+	/*
+	 * Some platforms declare _DEP on a battery device for unrelated
+	 * consumers. This driver is registered as a platform_driver whose
+	 * .probe path does not auto-clear consumer dep_unmet counters on
+	 * success, so do it explicitly here to allow those consumers to
+	 * probe once the battery is up.
+	 */
+	acpi_dev_clear_dependencies(device);
+
 	return 0;
 
 fail_pm:
