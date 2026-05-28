@@ -2091,6 +2091,16 @@ static int nvme_update_ns_info_generic(struct nvme_ns *ns,
 	return 0;
 }
 
+#ifdef CONFIG_BLK_DEV_ZONED
+static void nvme_stack_zone_resources(struct gendisk *t,
+		const struct gendisk *b)
+{
+	t->max_open_zones = min_not_zero(t->max_open_zones, b->max_open_zones);
+	t->max_active_zones =
+		min_not_zero(t->max_active_zones, b->max_active_zones);
+}
+#endif
+
 static int nvme_update_ns_info_block(struct nvme_ns *ns,
 		struct nvme_ns_info *info)
 {
@@ -2156,6 +2166,10 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 		nvme_mpath_revalidate_paths(ns);
 		blk_stack_limits(&ns->head->disk->queue->limits,
 				 &ns->queue->limits, 0);
+#ifdef CONFIG_BLK_DEV_ZONED
+		if (blk_queue_is_zoned(ns->head->disk->queue))
+			nvme_stack_zone_resources(ns->head->disk, ns->disk);
+#endif
 		disk_update_readahead(ns->head->disk);
 		blk_mq_unfreeze_queue(ns->head->disk->queue);
 	}
