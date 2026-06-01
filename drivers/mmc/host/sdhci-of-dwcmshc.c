@@ -861,13 +861,16 @@ static int dwcmshc_probe(struct platform_device *pdev)
 			goto free_pltfm;
 
 		priv->bus_clk = devm_clk_get(dev, "bus");
-		if (!IS_ERR(priv->bus_clk))
-			clk_prepare_enable(priv->bus_clk);
+		if (!IS_ERR(priv->bus_clk)) {
+			err = clk_prepare_enable(priv->bus_clk);
+			if (err)
+				goto err_clk;
+		}
 	}
 
 	err = mmc_of_parse(host->mmc);
 	if (err)
-		goto err_clk;
+		goto err_bus_clk;
 
 	sdhci_get_of_property(pdev);
 
@@ -881,7 +884,7 @@ static int dwcmshc_probe(struct platform_device *pdev)
 		rk_priv = devm_kzalloc(&pdev->dev, sizeof(struct rk35xx_priv), GFP_KERNEL);
 		if (!rk_priv) {
 			err = -ENOMEM;
-			goto err_clk;
+			goto err_bus_clk;
 		}
 
 		if (of_device_is_compatible(pdev->dev.of_node, "rockchip,rk3588-dwcmshc"))
@@ -893,7 +896,7 @@ static int dwcmshc_probe(struct platform_device *pdev)
 
 		err = dwcmshc_rk35xx_init(host, priv);
 		if (err)
-			goto err_clk;
+			goto err_bus_clk;
 	}
 
 	if (pltfm_data == &sdhci_dwcmshc_th1520_pdata) {
@@ -951,9 +954,10 @@ err_setup_host:
 err_rpm:
 	pm_runtime_disable(dev);
 	pm_runtime_put_noidle(dev);
+err_bus_clk:
+	clk_disable_unprepare(priv->bus_clk);
 err_clk:
 	clk_disable_unprepare(pltfm_host->clk);
-	clk_disable_unprepare(priv->bus_clk);
 	if (rk_priv)
 		clk_bulk_disable_unprepare(RK35xx_MAX_CLKS,
 					   rk_priv->rockchip_clks);
