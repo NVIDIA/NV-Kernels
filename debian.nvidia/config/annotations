@@ -273,3 +273,21 @@ CONFIG_SND_SOC_SDCA_HID                         policy<{'amd64': 'y', 'arm64': '
 CONFIG_SND_SOC_SDCA_IRQ                         policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_SND_SOC_SDW_UTILS                        policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_SND_SOC_TAS2783_SDW                      policy<{'amd64': 'm', 'arm64': 'n'}>
+
+CONFIG_ARM64_SECURE_LAUNCH                      policy<{'arm64': 'y'}>
+CONFIG_ARM64_SECURE_LAUNCH                      note<'DRTM Secure Launch support'>
+CONFIG_ARM64_SECURE_LAUNCH_SELFTEST             policy<{'arm64': 'n'}>
+CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT         policy<{'arm64': 'n'}>
+CONFIG_ARM64_SECURE_LAUNCH_KASLR                policy<{'arm64': 'y'}>
+CONFIG_ARM64_SECURE_LAUNCH_KASLR                note<'DRTM trusted linear-map KASLR; requires MEMORY_HOTPLUG=n'>
+CONFIG_MEMORY_HOTPLUG                           policy<{'arm64': 'n'}>
+CONFIG_MEMORY_HOTPLUG                           note<'off to enable ARM64_SECURE_LAUNCH_KASLR'>
+CONFIG_NVIDIA_FIRME_GUEST                       policy<{'arm64': 'm'}>
+CONFIG_NVIDIA_FIRME_GUEST                       note<'NVIDIA FIRME attestation driver for DRTM'>
+CONFIG_EFI_ZBOOT                                policy<{'arm64': 'n'}>
+CONFIG_EFI_ZBOOT                                note<'DRTM Secure Launch requires the non-zboot EFI stub path'>
+CONFIG_EFI_SBAT_FILE                            policy<{'arm64': '-'}>
+CONFIG_HAVE_KERNEL_GZIP                         policy<{'arm64': '-'}>
+CONFIG_HAVE_KERNEL_ZSTD                         policy<{'arm64': '-'}>
+CONFIG_KERNEL_GZIP                              policy<{'arm64': '-'}>
+CONFIG_KERNEL_ZSTD                              policy<{'arm64': '-'}>
