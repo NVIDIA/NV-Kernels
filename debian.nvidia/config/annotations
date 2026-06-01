@@ -221,3 +221,17 @@ CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
 
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
+
+CONFIG_ARM64_SECURE_LAUNCH                      policy<{'arm64': 'y'}>
+CONFIG_ARM64_SECURE_LAUNCH                      note<'DRTM Secure Launch support'>
+CONFIG_ARM64_SECURE_LAUNCH_SELFTEST             policy<{'arm64': 'n'}>
+CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT         policy<{'arm64': 'n'}>
+CONFIG_NVIDIA_FIRME_GUEST                       policy<{'arm64': 'm'}>
+CONFIG_NVIDIA_FIRME_GUEST                       note<'NVIDIA FIRME attestation driver for DRTM'>
+CONFIG_EFI_ZBOOT                                policy<{'arm64': 'n'}>
+CONFIG_EFI_ZBOOT                                note<'DRTM Secure Launch requires the non-zboot EFI stub path'>
+CONFIG_EFI_SBAT_FILE                            policy<{'arm64': '-'}>
+CONFIG_HAVE_KERNEL_GZIP                         policy<{'arm64': '-'}>
+CONFIG_HAVE_KERNEL_ZSTD                         policy<{'arm64': '-'}>
+CONFIG_KERNEL_GZIP                              policy<{'arm64': '-'}>
+CONFIG_KERNEL_ZSTD                              policy<{'arm64': '-'}>
