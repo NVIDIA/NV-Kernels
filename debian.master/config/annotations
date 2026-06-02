@@ -5327,6 +5327,7 @@ CONFIG_GENERIC_IRQ_DEBUGFS                      policy<{'amd64': 'n', 'arm64': '
 CONFIG_GENERIC_IRQ_EFFECTIVE_AFF_MASK           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'riscv64': 'y'}>
 CONFIG_GENERIC_IRQ_IPI                          policy<{'arm64': 'y', 'armhf': 'y', 'riscv64': 'y'}>
 CONFIG_GENERIC_IRQ_IPI_MUX                      policy<{'arm64': 'y', 'riscv64': 'y'}>
+CONFIG_GENERIC_IRQ_KEXEC_CLEAR_VM_FORWARD       policy<{'arm64': 'y'}>
 CONFIG_GENERIC_IRQ_MATRIX_ALLOCATOR             policy<{'amd64': 'y'}>
 CONFIG_GENERIC_IRQ_MIGRATION                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_GENERIC_IRQ_MULTI_HANDLER                policy<{'armhf': 'y', 'riscv64': 'y'}>
