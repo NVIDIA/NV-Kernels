@@ -24,6 +24,7 @@
 
 #include <linux/slab.h>
 #include "kfd_priv.h"
+#include "kfd_topology.h"
 
 void print_queue_properties(struct queue_properties *q)
 {
@@ -81,4 +82,43 @@ int init_queue(struct queue **q, const struct queue_properties *properties)
 void uninit_queue(struct queue *q)
 {
 	kfree(q);
+}
+
+#define CNTL_STACK_BYTES_PER_WAVE(gfxv)	\
+	((gfxv) >= 100100 ? 12 : 8)	/* GFX_VERSION_NAVI10*/
+
+#define SIZEOF_HSA_USER_CONTEXT_SAVE_AREA_HEADER 40
+
+void kfd_queue_ctx_save_restore_size(struct kfd_topology_device *dev)
+{
+	struct kfd_node_properties *props = &dev->node_props;
+	u32 gfxv = props->gfx_target_version;
+	u32 ctl_stack_size;
+	u32 wave_num;
+	u32 cu_num;
+
+	if (gfxv < 80001)	/* GFX_VERSION_CARRIZO */
+		return;
+
+	cu_num = props->simd_count / props->simd_per_cu /
+		 NUM_XCC(dev->gpu->xcc_mask);
+	wave_num = (gfxv < 100100) ?	/* GFX_VERSION_NAVI10 */
+		min(cu_num * 40,
+		    props->array_count / props->simd_arrays_per_engine * 512) :
+		cu_num * 32;
+
+	ctl_stack_size = wave_num * CNTL_STACK_BYTES_PER_WAVE(gfxv) + 8;
+	ctl_stack_size = ALIGN(SIZEOF_HSA_USER_CONTEXT_SAVE_AREA_HEADER +
+			       ctl_stack_size, PAGE_SIZE);
+
+	if ((gfxv / 10000 * 10000) == 100000) {
+		/*
+		 * HW design limits control stack size to 0x7000. This is
+		 * insufficient for theoretical PM4 cases but sufficient for AQL,
+		 * limited by SPI events.
+		 */
+		ctl_stack_size = min(ctl_stack_size, 0x7000);
+	}
+
+	props->ctl_stack_size = ctl_stack_size;
 }
