@@ -295,6 +295,23 @@ err_out:
 	for (j = 0, k = 0; j < ARRAY_SIZE(tests); j++, k = 0)	\
 		while ((t = tests[j][k++]) != NULL)
 
+static int test_suites__setup(void)
+{
+	struct test_suite *t;
+	unsigned int j, k;
+
+	for_each_suite(j, k, t) {
+		if (t->setup) {
+			int ret = t->setup(t);
+
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
 static int test_and_print(struct test_suite *t, int test_case)
 {
 	int err;
@@ -596,8 +613,12 @@ int cmd_test(int argc, const char **argv)
 	setvbuf(stdout, NULL, _IONBF, 0);
 
 	argc = parse_options_subcommand(argc, argv, test_options, test_subcommands, test_usage, 0);
-	if (argc >= 1 && !strcmp(argv[0], "list"))
+	if (argc >= 1 && !strcmp(argv[0], "list")) {
+		ret = test_suites__setup();
+		if (ret < 0)
+			return ret;
 		return perf_test__list(stdout, argc - 1, argv + 1);
+	}
 
 	if (workload)
 		return run_workload(workload, argc, argv);
@@ -615,6 +636,10 @@ int cmd_test(int argc, const char **argv)
 	 * default:
 	 */
 	rlimit__bump_memlock();
+
+	ret = test_suites__setup();
+	if (ret < 0)
+		return ret;
 
 	return __cmd_test(argc, argv, skiplist);
 }
