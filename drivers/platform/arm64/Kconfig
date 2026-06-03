@@ -103,8 +103,8 @@ config EC_LENOVO_YOGA_SLIM7X
 	  appropriate actions.
 
 config NVIDIA_FFA_EC
-       tristate "NVIDIA FFA EC services driver"
-       depends on ARM_FFA_TRANSPORT || COMPILE_TEST
+       bool "NVIDIA FFA EC services driver"
+       depends on ARM_FFA_TRANSPORT=y || COMPILE_TEST
        depends on ACPI
        depends on ACPI_FFH
        help
@@ -113,7 +113,7 @@ config NVIDIA_FFA_EC
 	 specification is being defined. It is currently in draft stage and maintained in
 	 https://github.com/OpenDevicePartnership/documentation/blob/main/bookshelf/Shelf%204%20Specifications/EC%20Interface/src/secure-ec-services-overview.md
 
-	 Say M or Y here to include this support.
+	 Say Y here to include this support.
 
 source "drivers/platform/arm64/nvidia/Kconfig"
 
