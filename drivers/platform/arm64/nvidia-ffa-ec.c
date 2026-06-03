@@ -1016,7 +1016,7 @@ static int __init nvidia_ffa_init(void)
 {
 	return platform_driver_register(&nvidia_ffa_driver);
 }
-module_init(nvidia_ffa_init);
+arch_initcall(nvidia_ffa_init);
 
 static void __exit nvidia_ffa_exit(void)
 {
