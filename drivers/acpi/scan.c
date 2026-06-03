@@ -2818,6 +2818,64 @@ static void __init acpi_get_spcr_uart_addr(void)
 
 static bool acpi_scan_initialized;
 
+/*
+ * Maximum ACPI scope depth for which pre-created ancestor
+ * struct acpi_devices are supported when early-enumerating a device
+ * before the full acpi_bus_scan(ACPI_ROOT_OBJECT).
+ */
+#define ACPI_SCAN_EARLY_ANCESTOR_MAX	8
+
+/*
+ * Ensure a struct acpi_device exists for every ancestor scope of
+ * @handle up to the ACPI root.
+ *
+ * Walk from @handle up collecting ancestor handles, then
+ * acpi_bus_check_add() each one top-down so every level has a real
+ * struct acpi_device before @handle itself is scanned.
+ */
+static acpi_status __init acpi_scan_ensure_ancestors(acpi_handle handle)
+{
+	acpi_handle chain[ACPI_SCAN_EARLY_ANCESTOR_MAX];
+	acpi_handle cur = handle;
+	int n = 0;
+
+	while (ACPI_SUCCESS(acpi_get_parent(cur, &cur))) {
+		if (cur == ACPI_ROOT_OBJECT)
+			break;
+		if (n >= ARRAY_SIZE(chain))
+			return AE_LIMIT;
+		chain[n++] = cur;
+	}
+
+	while (--n >= 0) {
+		struct acpi_device *adev = NULL;
+
+		if (acpi_fetch_acpi_dev(chain[n]))
+			continue;
+		acpi_bus_check_add(chain[n], true, &adev);
+	}
+
+	return AE_OK;
+}
+
+static acpi_status __init acpi_scan_one_handle_cb(acpi_handle handle, u32 level,
+						  void *context, void **ret)
+{
+	acpi_status s;
+	int err;
+
+	s = acpi_scan_ensure_ancestors(handle);
+	if (ACPI_FAILURE(s))
+		acpi_handle_warn(handle,
+				 "early ACPI ancestor scan failed: %d\n", s);
+
+	err = acpi_bus_scan(handle);
+	if (err)
+		acpi_handle_warn(handle, "early ACPI bus scan failed: %d\n", err);
+
+	return AE_CTRL_TERMINATE;
+}
+
 void __init acpi_scan_init(void)
 {
 	acpi_status status;
@@ -2865,6 +2923,14 @@ void __init acpi_scan_init(void)
 	 * hotplug/hotunplug operations.
 	 */
 	mutex_lock(&acpi_scan_lock);
+
+	/*
+	 * Enumerate the ARM FF-A EC bridge devices before the full namespace scan
+	 * so that they are available early for ACPI consumers that depend on them.
+	 */
+	acpi_get_devices("ARML0002", acpi_scan_one_handle_cb, NULL, NULL);
+	acpi_get_devices("MSFT000C", acpi_scan_one_handle_cb, NULL, NULL);
+
 	/*
 	 * Enumerate devices in the ACPI namespace.
 	 */
