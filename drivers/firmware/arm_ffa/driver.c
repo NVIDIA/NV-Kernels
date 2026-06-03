@@ -2192,7 +2192,6 @@ free_drv_info:
 	drv_info = NULL;
 	return ret;
 }
-
 static void ffa_remove(struct platform_device *pdev)
 {
 	struct ffa_drv_info *info = platform_get_drvdata(pdev);
@@ -2232,7 +2231,7 @@ static int __init ffa_init(void)
 
 	return ret;
 }
-module_init(ffa_init);
+arch_initcall(ffa_init);
 
 static void __exit ffa_exit(void)
 {
