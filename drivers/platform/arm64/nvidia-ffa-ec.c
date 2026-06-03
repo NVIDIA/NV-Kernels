@@ -4,12 +4,13 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/cleanup.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/acpi.h>
 #include <linux/arm_ffa.h>
+#include <linux/kref.h>
 #include <linux/list.h>
+#include <linux/slab.h>
 
 #define DRV_NAME "nvidia-ffa-ec"
 
@@ -105,19 +106,44 @@ static const guid_t nvidia_notify_dsm_guid =
 /* Message info field: bits[2:0] = 0b010 means notification registration */
 #define NVIDIA_EC_INTERPARTITION_MSG_NOTIF_REG	0x2
 
+/*
+ * Per-notification mapping: a cookie from ACPI _DSD paired with the
+ * physical notification ID (0-63) handed out by the global bitmap
+ * nvidia_ffa_notif_id_map.
+ */
+struct nvidia_ec_notification {
+	u32 cookie;    /* cookie value from ACPI _DSD property */
+	u8  notif_id;  /* allocated physical notification ID (0-63) */
+};
+
 /* EC service FFA device structure */
 struct nvidia_ec_ffa_device {
 	struct ffa_device *ffa_dev;
+	struct kref refcnt;
 	u8 notification_count;
-	u8 notification_id[NVIDIA_FFA_MAX_NOTIFICATIONS];
+	struct nvidia_ec_notification notifications[NVIDIA_FFA_MAX_NOTIFICATIONS];
 	struct list_head list;
 };
+
+static void nvidia_ec_ffa_device_release(struct kref *kref)
+{
+	struct nvidia_ec_ffa_device *ec_ffa_dev =
+		container_of(kref, struct nvidia_ec_ffa_device, refcnt);
+
+	kfree(ec_ffa_dev);
+}
 
 /* List to contain all EC services FFA device */
 static LIST_HEAD(nvidia_ec_ffa_dev_head);
 
 /* Lock to serialize EC services FFA device list access */
 static DEFINE_MUTEX(nvidia_ffa_lock);
+
+/*
+ * Bitmap of allocated physical notification IDs (0-63), shared across all
+ * EC services. Protected by nvidia_ffa_lock.
+ */
+static DECLARE_BITMAP(nvidia_ffa_notif_id_map, NVIDIA_FFA_MAX_NOTIFICATIONS);
 
 /*
  * EC secure services FFA packet structure — MSFT000C (FFH offset 4).
@@ -352,7 +378,7 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 	/*
 	 * Traverse the array of notification map packages. Each entry has a
 	 * UUID and a package of cookie integers. Match UUID against the FFA
-	 * device and populate notification_id[].
+	 * device and populate notifications[].cookie.
 	 */
 	for (i = 2; i < pkg4->package.count; i++) {
 		union acpi_object *pkg5_uuid, *pkg5 = &pkg4->package.elements[i];
@@ -379,6 +405,16 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 		if (!uuid_equal(&uuid, &ec_ffa_dev->ffa_dev->uuid))
 			continue;
 
+		/*
+		 * Reject firmware _DSD that declares more cookies than the
+		 * fixed-size notifications[] array can hold, before storing
+		 * any of them.
+		 */
+		if (pkg6->package.count > NVIDIA_FFA_MAX_NOTIFICATIONS) {
+			kfree(output.pointer);
+			return -E2BIG;
+		}
+
 		for (j = 0; j < pkg6->package.count; j++) {
 			union acpi_object *pkg6_notify_id = &pkg6->package.elements[j];
 
@@ -387,7 +423,14 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 				return -EINVAL;
 			}
 
-			ec_ffa_dev->notification_id[j] = pkg6_notify_id->integer.value;
+			/* Cookie is u32 in _DSD; reject out-of-range firmware values. */
+			if (pkg6_notify_id->integer.value > U32_MAX) {
+				kfree(output.pointer);
+				return -ERANGE;
+			}
+
+			ec_ffa_dev->notifications[j].cookie =
+				(u32)pkg6_notify_id->integer.value;
 		}
 
 		ec_ffa_dev->notification_count = pkg6->package.count;
@@ -401,25 +444,65 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 
 /*
  * Notification EC service callback.
- * Get the ffa device from callback data and invoke notification _DSM with
- * notify_id.
+ *
+ * notify_id is the physical notification ID (bit position, 0-63) registered
+ * with notify_request. cb_data is the ffa_device * passed to notify_request;
+ * its lifetime is drained by the FF-A core (ffa_notifications_cleanup()
+ * flushes the pcpu notification workqueue before ffa_partitions_cleanup()
+ * frees ffa_devices), so it is safe to dereference here.
+ *
+ * Resolve cb_data to our per-service nvidia_ec_ffa_device under
+ * nvidia_ffa_lock, which is also held around list_del + the final kref_put
+ * in the remove and probe-failure-unwind paths. On a lookup miss (removal
+ * or unwind has already run for this service) skip the _DSM invocation
+ * entirely rather than fabricate a cookie for firmware.
  */
 static void nvidia_ffa_ec_service_notif_callback(int notify_id, void *cb_data)
 {
-	struct acpi_device *adev = ACPI_COMPANION(&ffa_pdev->dev);
-	struct ffa_device *ffa_dev = (struct ffa_device *)cb_data;
+	struct acpi_device *adev;
+	struct ffa_device *ffa_dev = cb_data;
+	struct nvidia_ec_ffa_device *cur, *ec_ffa_dev = NULL;
 	union acpi_object args[2], input_pkg;
-	union acpi_object  *output;
+	union acpi_object *output;
+	u32 cookie = 0;
 	u8 uuid[UUID_SIZE];
+	int i;
 
-	nvidia_uuid_to_aml_uuid_buf(&ffa_dev->uuid, uuid);
+	if (!ffa_pdev)
+		return;
+
+	adev = ACPI_COMPANION(&ffa_pdev->dev);
+	if (!adev)
+		return;
+
+	mutex_lock(&nvidia_ffa_lock);
+	list_for_each_entry(cur, &nvidia_ec_ffa_dev_head, list) {
+		if (cur->ffa_dev != ffa_dev)
+			continue;
+
+		for (i = 0; i < cur->notification_count; i++) {
+			if (cur->notifications[i].notif_id != (u8)notify_id)
+				continue;
+			cookie = cur->notifications[i].cookie;
+			ec_ffa_dev = cur;
+			kref_get(&ec_ffa_dev->refcnt);
+			break;
+		}
+		break;
+	}
+	mutex_unlock(&nvidia_ffa_lock);
+
+	if (!ec_ffa_dev)
+		return;
+
+	nvidia_uuid_to_aml_uuid_buf(&ec_ffa_dev->ffa_dev->uuid, uuid);
 
 	args[0].type = ACPI_TYPE_BUFFER;
 	args[0].buffer.length = sizeof(uuid);
 	args[0].buffer.pointer = uuid;
 
 	args[1].type = ACPI_TYPE_INTEGER;
-	args[1].integer.value = notify_id;
+	args[1].integer.value = cookie;
 
 	input_pkg.type = ACPI_TYPE_PACKAGE;
 	input_pkg.package.count = 2;
@@ -431,6 +514,8 @@ static void nvidia_ffa_ec_service_notif_callback(int notify_id, void *cb_data)
 		dev_err(&ffa_pdev->dev, "Failed to execute notify\n");
 	else
 		ACPI_FREE(output);
+
+	kref_put(&ec_ffa_dev->refcnt, nvidia_ec_ffa_device_release);
 }
 
 /*
@@ -440,7 +525,7 @@ static void nvidia_ffa_ec_service_notif_callback(int notify_id, void *cb_data)
  * https://github.com/OpenDevicePartnership/documentation/blob/0f7b6bad77a3eb07b66b66d0e3af718db2ec1c24/bookshelf/Shelf%204%20Specifications/EC%20Interface/src/secure-ec-services-overview.md#register-notification
  */
 static int nvidia_ffa_notification_setup_msft000c(struct nvidia_ec_ffa_device *ec_ffa_dev,
-						  u8 notification_id)
+						  u32 cookie, u8 notif_id)
 {
 	struct ffa_send_direct_data2 ffa_data = { 0 };
 	u8 *uuid = (u8 *)&ec_ffa_dev->ffa_dev->uuid;
@@ -459,8 +544,8 @@ static int nvidia_ffa_notification_setup_msft000c(struct nvidia_ec_ffa_device *e
 	/* X7: number of notification mappings */
 	ffa_data.data[3] = 1;
 
-	/* X8: notification ID used as both cookie and bitmap bit number */
-	ffa_data.data[4] = ((u64)notification_id << 32) | notification_id;
+	/* X8: cookie in upper 32 bits, physical notification ID in lower 32 bits */
+	ffa_data.data[4] = ((u64)cookie << 32) | notif_id;
 
 	if (!control_ffa_dev->ops ||
 	    !control_ffa_dev->ops->msg_ops ||
@@ -471,15 +556,15 @@ static int nvidia_ffa_notification_setup_msft000c(struct nvidia_ec_ffa_device *e
 							       &ffa_data);
 	if (ret) {
 		dev_err(&ec_ffa_dev->ffa_dev->dev,
-			"Failed to send NOTIFY_SETUP id=%d error=%d\n",
-			notification_id, ret);
+			"Failed to send NOTIFY_SETUP cookie=%u notif_id=%u error=%d\n",
+			cookie, notif_id, ret);
 		return ret;
 	}
 
 	if (ffa_data.data[0]) {
 		dev_err(&ec_ffa_dev->ffa_dev->dev,
-			"NOTIFY_SETUP returned failure id=%d error=%ld\n",
-			notification_id, ffa_data.data[0]);
+			"NOTIFY_SETUP returned failure cookie=%u notif_id=%u error=%ld\n",
+			cookie, notif_id, ffa_data.data[0]);
 
 		/*
 		 * TODO: destroy operation is not yet implemented in the firmware
@@ -497,7 +582,7 @@ static int nvidia_ffa_notification_setup_msft000c(struct nvidia_ec_ffa_device *e
  * Uses the inter-partition setup protocol UUID.
  */
 static int nvidia_ffa_notification_setup_arml0002(struct nvidia_ec_ffa_device *ec_ffa_dev,
-						  u8 notification_id)
+						  u32 cookie, u8 notif_id)
 {
 	struct ffa_send_direct_data2 ffa_data = { 0 };
 	u8 *svc_uuid = (u8 *)&ec_ffa_dev->ffa_dev->uuid;
@@ -518,8 +603,8 @@ static int nvidia_ffa_notification_setup_arml0002(struct nvidia_ec_ffa_device *e
 	/* X10: one tuple */
 	ffa_data.data[6] = 1;
 
-	/* X11: tuple — cookie = notification_id, bitmap position = notification_id */
-	ffa_data.data[7] = NVIDIA_EC_NOTIF_TUPLE(notification_id, notification_id);
+	/* X11: cookie in upper 32 bits, physical notification ID in bits[31:23] */
+	ffa_data.data[7] = NVIDIA_EC_NOTIF_TUPLE(cookie, notif_id);
 
 	if (!control_ffa_dev->ops ||
 	    !control_ffa_dev->ops->msg_ops ||
@@ -530,15 +615,15 @@ static int nvidia_ffa_notification_setup_arml0002(struct nvidia_ec_ffa_device *e
 							      &ffa_data);
 	if (ret) {
 		dev_err(&ec_ffa_dev->ffa_dev->dev,
-			"Failed to send NOTIFY_SETUP id=%d error=%d\n",
-			notification_id, ret);
+			"Failed to send NOTIFY_SETUP cookie=%u notif_id=%u error=%d\n",
+			cookie, notif_id, ret);
 		return ret;
 	}
 
 	if (ffa_data.data[0]) {
 		dev_err(&ec_ffa_dev->ffa_dev->dev,
-			"NOTIFY_SETUP returned failure id=%d error=%ld\n",
-			notification_id, ffa_data.data[0]);
+			"NOTIFY_SETUP returned failure cookie=%u notif_id=%u error=%ld\n",
+			cookie, notif_id, ffa_data.data[0]);
 		return -EIO;
 	}
 
@@ -546,17 +631,17 @@ static int nvidia_ffa_notification_setup_arml0002(struct nvidia_ec_ffa_device *e
 }
 
 static int nvidia_ffa_notification_setup(struct nvidia_ec_ffa_device *ec_ffa_dev,
-					 u8 notification_id)
+					 u32 cookie, u8 notif_id)
 {
 	if (!ffa_ec_legacy_spec)
-		return nvidia_ffa_notification_setup_arml0002(ec_ffa_dev, notification_id);
+		return nvidia_ffa_notification_setup_arml0002(ec_ffa_dev, cookie, notif_id);
 
-	return nvidia_ffa_notification_setup_msft000c(ec_ffa_dev, notification_id);
+	return nvidia_ffa_notification_setup_msft000c(ec_ffa_dev, cookie, notif_id);
 }
 
-/* Destroy notification setup for the notification_id */
+/* Destroy notification setup for the given physical notification ID */
 static void nvidia_ffa_notification_destroy(struct nvidia_ec_ffa_device *ec_ffa_dev,
-					    u8 notification_id)
+					    u8 notif_id)
 {
 	/*
 	 * TODO: destroy operation is not yet implemented in the firmware.
@@ -589,39 +674,85 @@ static int nvidia_ffa_create_notifications(struct nvidia_ec_ffa_device *ec_ffa_d
 	}
 
 	for (i = 0; i < ec_ffa_dev->notification_count; i++) {
-		ret = nvidia_ffa_notification_setup(ec_ffa_dev,
-						    ec_ffa_dev->notification_id[i]);
+		struct nvidia_ec_notification *n = &ec_ffa_dev->notifications[i];
+
+		if (ffa_ec_legacy_spec) {
+			/*
+			 * MSFT000C (draft spec) firmware predates the
+			 * cookie/notif_id split and rejects NOTIFY_SETUP when
+			 * the two halves of X8 differ. Use the cookie itself
+			 * as the physical notification ID; the AML-declared
+			 * cookie must fit in the FFA framework's 6-bit
+			 * notification ID space.
+			 */
+			if (n->cookie >= NVIDIA_FFA_MAX_NOTIFICATIONS) {
+				dev_err(&ec_ffa_dev->ffa_dev->dev,
+					"MSFT000C cookie=%u exceeds notification ID range\n",
+					n->cookie);
+				ret = -EINVAL;
+				break;
+			}
+			n->notif_id = (u8)n->cookie;
+		} else {
+			/*
+			 * ARML0002: allocate a free physical notification ID
+			 * from the global bitmap.
+			 */
+			unsigned int id;
+
+			mutex_lock(&nvidia_ffa_lock);
+			id = find_first_zero_bit(nvidia_ffa_notif_id_map,
+						 NVIDIA_FFA_MAX_NOTIFICATIONS);
+			if (id >= NVIDIA_FFA_MAX_NOTIFICATIONS) {
+				mutex_unlock(&nvidia_ffa_lock);
+				dev_err(&ec_ffa_dev->ffa_dev->dev,
+					"No free notification IDs (cookie=%u)\n",
+					n->cookie);
+				ret = -ENOSPC;
+				break;
+			}
+			set_bit(id, nvidia_ffa_notif_id_map);
+			n->notif_id = (u8)id;
+			mutex_unlock(&nvidia_ffa_lock);
+		}
+
+		ret = nvidia_ffa_notification_setup(ec_ffa_dev, n->cookie, n->notif_id);
 		if (ret) {
 			dev_err(&ec_ffa_dev->ffa_dev->dev,
-				"Failed to setup notification id=%d error=%d\n",
-				ec_ffa_dev->notification_id[i], ret);
+				"Failed to setup notification cookie=%u notif_id=%u error=%d\n",
+				n->cookie, n->notif_id, ret);
+			if (!ffa_ec_legacy_spec)
+				clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
 			break;
 		}
 
 		ret = ec_ffa_dev->ffa_dev->ops->notifier_ops->notify_request(
 				ec_ffa_dev->ffa_dev, false,
 				nvidia_ffa_ec_service_notif_callback,
-				ec_ffa_dev->ffa_dev, ec_ffa_dev->notification_id[i]);
+				ec_ffa_dev->ffa_dev, n->notif_id);
 		if (ret) {
-			nvidia_ffa_notification_destroy(ec_ffa_dev,
-							ec_ffa_dev->notification_id[i]);
+			nvidia_ffa_notification_destroy(ec_ffa_dev, n->notif_id);
+			if (!ffa_ec_legacy_spec)
+				clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
 			dev_err(&ec_ffa_dev->ffa_dev->dev,
-				"Failed to request notification id=%d error=%d\n",
-				ec_ffa_dev->notification_id[i], ret);
+				"Failed to request notification cookie=%u notif_id=%u error=%d\n",
+				n->cookie, n->notif_id, ret);
 			break;
 		}
 	}
 
-	/* Remove already setup notification in case of error */
+	/* Remove already setup notifications in case of error */
 	if (ret) {
 		int j;
 
 		for (j = 0; j < i; j++) {
+			struct nvidia_ec_notification *n = &ec_ffa_dev->notifications[j];
+
 			ec_ffa_dev->ffa_dev->ops->notifier_ops->notify_relinquish(
-				ec_ffa_dev->ffa_dev,
-				ec_ffa_dev->notification_id[j]);
-			nvidia_ffa_notification_destroy(ec_ffa_dev,
-							ec_ffa_dev->notification_id[j]);
+				ec_ffa_dev->ffa_dev, n->notif_id);
+			if (!ffa_ec_legacy_spec)
+				clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
+			nvidia_ffa_notification_destroy(ec_ffa_dev, n->notif_id);
 		}
 
 		ec_ffa_dev->notification_count = 0;
@@ -636,11 +767,13 @@ static void nvidia_ffa_remove_notifications(struct nvidia_ec_ffa_device *ec_ffa_
 	int i;
 
 	for (i = 0; i < ec_ffa_dev->notification_count; i++) {
+		struct nvidia_ec_notification *n = &ec_ffa_dev->notifications[i];
+
 		ec_ffa_dev->ffa_dev->ops->notifier_ops->notify_relinquish(
-			ec_ffa_dev->ffa_dev,
-			ec_ffa_dev->notification_id[i]);
-		nvidia_ffa_notification_destroy(ec_ffa_dev,
-						ec_ffa_dev->notification_id[i]);
+			ec_ffa_dev->ffa_dev, n->notif_id);
+		if (!ffa_ec_legacy_spec)
+			clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
+		nvidia_ffa_notification_destroy(ec_ffa_dev, n->notif_id);
 	}
 }
 
@@ -660,27 +793,26 @@ static int nvidia_ffh_do_ffa_send(uuid_t uuid, u8 *rawdata,
 	struct nvidia_ec_ffa_device *cur, *ec_dev = NULL;
 	int ret;
 
-	/*
-	 * Hold nvidia_ffa_lock across the whole lookup + send so ec_dev
-	 * cannot be freed by a concurrent nvidia_ffa_ec_service_remove()
-	 * while its ->ffa_dev is still being dereferenced here.
-	 */
-	guard(mutex)(&nvidia_ffa_lock);
-
+	mutex_lock(&nvidia_ffa_lock);
 	list_for_each_entry(cur, &nvidia_ec_ffa_dev_head, list) {
 		if (uuid_equal(&uuid, &cur->ffa_dev->uuid)) {
 			ec_dev = cur;
+			kref_get(&ec_dev->refcnt);
+			get_device(&ec_dev->ffa_dev->dev);
 			break;
 		}
 	}
+	mutex_unlock(&nvidia_ffa_lock);
 
 	if (!ec_dev)
 		return -ENODEV;
 
 	if (!ec_dev->ffa_dev->ops ||
 	    !ec_dev->ffa_dev->ops->msg_ops ||
-	    !ec_dev->ffa_dev->ops->msg_ops->sync_send_receive2)
-		return -EINVAL;
+	    !ec_dev->ffa_dev->ops->msg_ops->sync_send_receive2) {
+		ret = -EINVAL;
+		goto out_put;
+	}
 
 	memcpy(ffa_data.data, rawdata, input_len);
 
@@ -688,11 +820,16 @@ static int nvidia_ffh_do_ffa_send(uuid_t uuid, u8 *rawdata,
 	if (ret) {
 		dev_err(&ec_dev->ffa_dev->dev,
 			"Failed to send FFA messages error=%d\n", ret);
-		return ret;
+		goto out_put;
 	}
 
 	memcpy(rawdata, ffa_data.data, output_len);
-	return 0;
+	ret = 0;
+
+out_put:
+	put_device(&ec_dev->ffa_dev->dev);
+	kref_put(&ec_dev->refcnt, nvidia_ec_ffa_device_release);
+	return ret;
 }
 
 /* FFH handler — MSFT000C (FFH offset 4) */
@@ -798,28 +935,38 @@ static int nvidia_ffa_ec_service_probe(struct ffa_device *ffa_dev)
 		return -ENODEV;
 	}
 
-	nvidia_ec_ffa_dev = devm_kzalloc(&ffa_dev->dev,
-					 sizeof(*nvidia_ec_ffa_dev),
-					 GFP_KERNEL);
+	nvidia_ec_ffa_dev = kzalloc(sizeof(*nvidia_ec_ffa_dev), GFP_KERNEL);
 	if (!nvidia_ec_ffa_dev) {
 		dev_err(&ffa_dev->dev, "Failed to allocate memory\n");
 		return -ENOMEM;
 	}
 
 	nvidia_ec_ffa_dev->ffa_dev = ffa_dev;
+	kref_init(&nvidia_ec_ffa_dev->refcnt);
 	INIT_LIST_HEAD(&nvidia_ec_ffa_dev->list);
+
+	/*
+	 * Publish nvidia_ec_ffa_dev on the global list before
+	 * notify_request() is issued from nvidia_ffa_create_notifications().
+	 * The framework can start dispatching the callback as soon as
+	 * notify_request() returns; the callback walks
+	 * nvidia_ec_ffa_dev_head under nvidia_ffa_lock, so the entry must
+	 * already be visible by then.
+	 */
+	mutex_lock(&nvidia_ffa_lock);
+	list_add(&nvidia_ec_ffa_dev->list, &nvidia_ec_ffa_dev_head);
+	mutex_unlock(&nvidia_ffa_lock);
 
 	ret = nvidia_ffa_create_notifications(nvidia_ec_ffa_dev);
 	if (ret) {
 		dev_err(&ffa_dev->dev,
 			"Failed to create ffa notifications error=%d\n", ret);
-		devm_kfree(&ffa_dev->dev, nvidia_ec_ffa_dev);
+		mutex_lock(&nvidia_ffa_lock);
+		list_del(&nvidia_ec_ffa_dev->list);
+		mutex_unlock(&nvidia_ffa_lock);
+		kref_put(&nvidia_ec_ffa_dev->refcnt, nvidia_ec_ffa_device_release);
 		return ret;
 	}
-
-	mutex_lock(&nvidia_ffa_lock);
-	list_add(&nvidia_ec_ffa_dev->list, &nvidia_ec_ffa_dev_head);
-	mutex_unlock(&nvidia_ffa_lock);
 
 	/*
 	 * When acpi subsystem probes all ACPI devices, it executes _STA
@@ -844,8 +991,9 @@ static void nvidia_ffa_ec_service_remove(struct ffa_device *ffa_dev)
 		if (cur->ffa_dev == ffa_dev) {
 			list_del(&cur->list);
 			nvidia_ffa_remove_notifications(cur);
-			devm_kfree(&ffa_dev->dev, cur);
-			break;
+			mutex_unlock(&nvidia_ffa_lock);
+			kref_put(&cur->refcnt, nvidia_ec_ffa_device_release);
+			return;
 		}
 	}
 	mutex_unlock(&nvidia_ffa_lock);
