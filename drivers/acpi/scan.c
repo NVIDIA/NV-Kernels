@@ -848,6 +848,8 @@ static const char * const acpi_ignore_dep_ids[] = {
 	"PNP0D80", /* Windows-compatible System Power Management Controller */
 	"INT33BD", /* Intel Baytrail Mailbox Device */
 	"LATT2021", /* Lattice FW Update Client Driver */
+	"ARML0002", /* ARM FF-A EC services bridge (DEN0077A) */
+	"MSFT000C", /* OpenDevicePartnership FF-A EC services bridge */
 	NULL
 };
 
