@@ -8,6 +8,7 @@
 #include <linux/platform_device.h>
 #include <linux/acpi.h>
 #include <linux/arm_ffa.h>
+#include <linux/delay.h>
 #include <linux/kref.h>
 #include <linux/list.h>
 #include <linux/slab.h>
@@ -56,6 +57,9 @@ static const guid_t nvidia_notify_dsm_guid =
 	GUID_INIT(0x7681541e, 0x8827, 0x4239, 0x8d, 0x9d, 0x36, 0xbe, 0x7f, 0xe1, 0x25, 0x42);
 
 #define NVIDIA_FFA_MAX_NOTIFICATIONS	64
+
+/* Timeout for retrying transient failures from sync_send_receive2() */
+#define NVIDIA_FFA_SEND_TIMEOUT_MS	10
 
 /* Revision values for the "arm-arml0002-ffa-ntf-bind" property package */
 #define NVIDIA_FFA_NTF_BIND_REV_MSFT000C		1
@@ -731,6 +735,7 @@ static int nvidia_ffh_do_ffa_send(uuid_t uuid, u8 *rawdata,
 {
 	struct ffa_send_direct_data2 ffa_data = { 0 };
 	struct nvidia_ec_ffa_device *cur, *ec_dev = NULL;
+	ktime_t deadline;
 	int ret;
 
 	mutex_lock(&nvidia_ffa_lock);
@@ -756,7 +761,24 @@ static int nvidia_ffh_do_ffa_send(uuid_t uuid, u8 *rawdata,
 
 	memcpy(ffa_data.data, rawdata, input_len);
 
-	ret = ec_dev->ffa_dev->ops->msg_ops->sync_send_receive2(ec_dev->ffa_dev, &ffa_data);
+	/*
+	 * Some SP implementations return a transient failure when a previous
+	 * FFA request is still in flight. Retry with a short backoff until
+	 * NVIDIA_FFA_SEND_TIMEOUT_MS has elapsed.
+	 */
+	deadline = ktime_add_ms(ktime_get(), NVIDIA_FFA_SEND_TIMEOUT_MS);
+	while (true) {
+		ret = ec_dev->ffa_dev->ops->msg_ops->sync_send_receive2(ec_dev->ffa_dev,
+								       &ffa_data);
+		if (ret != -EBUSY)
+			break;
+
+		if (ktime_after(ktime_get(), deadline))
+			break;
+
+		usleep_range(500, 1000);
+	}
+
 	if (ret) {
 		dev_err(&ec_dev->ffa_dev->dev,
 			"Failed to send FFA messages error=%d\n", ret);
