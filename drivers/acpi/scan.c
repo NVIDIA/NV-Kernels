@@ -851,6 +851,8 @@ static const char * const acpi_ignore_dep_ids[] = {
 	"INTC10DE", /* Intel CVS LNL */
 	"INTC10E0", /* Intel CVS ARL */
 	"LATT2021", /* Lattice FW Update Client Driver */
+	"ARML0002", /* ARM FF-A EC services bridge (DEN0077A) */
+	"MSFT000C", /* OpenDevicePartnership FF-A EC services bridge */
 	NULL
 };
 
