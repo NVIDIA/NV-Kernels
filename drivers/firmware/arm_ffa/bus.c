@@ -249,7 +249,7 @@ static int __init arm_ffa_bus_init(void)
 {
 	return bus_register(&ffa_bus_type);
 }
-subsys_initcall(arm_ffa_bus_init);
+arch_initcall(arm_ffa_bus_init);
 
 static void __exit arm_ffa_bus_exit(void)
 {
