@@ -62,6 +62,9 @@ MODULE_PARM_DESC(asym_threshold,
  * @remove_work: Work used to remove any unplugged routers after
  *		 runtime resume
  * @groups: Bandwidth groups used in this domain.
+ * @pci_nb: PCI bus notifier to detect when a display driver binds
+ * @display_bound: Set when a PCI display driver has bound
+ * @display_retry_work: Work to retry DP tunneling after display driver binds
  */
 struct tb_cm {
 	struct list_head tunnel_list;
@@ -69,6 +72,9 @@ struct tb_cm {
 	bool hotplug_active;
 	struct delayed_work remove_work;
 	struct tb_bandwidth_group groups[MAX_GROUPS];
+	struct notifier_block pci_nb;
+	bool display_bound;
+	struct work_struct display_retry_work;
 };
 
 static inline struct tb *tcm_to_tb(struct tb_cm *tcm)
@@ -1922,6 +1928,58 @@ static struct tb_port *tb_find_dp_out(struct tb *tb, struct tb_port *in)
 	return NULL;
 }
 
+static void tb_tunnel_dp(struct tb *tb);
+
+/*
+ * Check if any PCI display class (0x03xx) device has a driver bound.
+ * Used to decide whether to defer DPRX polling at boot.
+ */
+static bool tb_is_display_driver_bound(void)
+{
+	struct pci_dev *pdev = NULL;
+
+	while ((pdev = pci_get_base_class(PCI_BASE_CLASS_DISPLAY, pdev))) {
+		if (pdev->driver) {
+			pci_dev_put(pdev);
+			return true;
+		}
+	}
+	return false;
+}
+
+static void tb_display_retry_work_fn(struct work_struct *work)
+{
+	struct tb_cm *tcm = container_of(work, struct tb_cm, display_retry_work);
+	struct tb *tb = tcm_to_tb(tcm);
+
+	mutex_lock(&tb->lock);
+	tb_dbg(tb, "display driver bound, retrying DP tunneling\n");
+	tb_tunnel_dp(tb);
+	mutex_unlock(&tb->lock);
+}
+
+static int tb_pci_notifier_fn(struct notifier_block *nb, unsigned long action,
+			      void *data)
+{
+	struct tb_cm *tcm = container_of(nb, struct tb_cm, pci_nb);
+	struct device *dev = data;
+	struct pci_dev *pdev;
+
+	if (action != BUS_NOTIFY_BOUND_DRIVER)
+		return NOTIFY_OK;
+
+	pdev = to_pci_dev(dev);
+	if ((pdev->class >> 16) != PCI_BASE_CLASS_DISPLAY)
+		return NOTIFY_OK;
+
+	if (!tcm->display_bound) {
+		tcm->display_bound = true;
+		schedule_work(&tcm->display_retry_work);
+	}
+
+	return NOTIFY_OK;
+}
+
 static void tb_dp_tunnel_active(struct tb_tunnel *tunnel, void *data)
 {
 	struct tb_port *in = tunnel->src_port;
@@ -1963,6 +2021,7 @@ static void tb_dp_tunnel_active(struct tb_tunnel *tunnel, void *data)
 		}
 	} else {
 		struct tb_port *in = tunnel->src_port;
+		struct tb_cm *tcm = tb_priv(tb);
 
 		/*
 		 * This tunnel failed to establish. This means DPRX
@@ -1971,16 +2030,26 @@ static void tb_dp_tunnel_active(struct tb_tunnel *tunnel, void *data)
 		 * loaded or not all DP cables where connected to the
 		 * discrete router.
 		 *
-		 * In both cases we remove the DP IN adapter from the
-		 * available resources as it is not usable. This will
-		 * also tear down the tunnel and try to re-use the
-		 * released DP OUT.
+		 * If no display driver has bound yet (common during boot
+		 * with FDE/LUKS where the GPU driver loads late from
+		 * the encrypted root filesystem), tear down the tunnel
+		 * but keep the DP IN resource available. The PCI bus
+		 * notifier will trigger a retry once a display driver
+		 * binds.
 		 *
-		 * It will be added back only if there is hotplug for
-		 * the DP IN again.
+		 * Otherwise, remove the DP IN adapter from available
+		 * resources as it is not usable. It will be added back
+		 * only if there is hotplug for the DP IN again.
 		 */
-		tb_tunnel_warn(tunnel, "not active, tearing down\n");
-		tb_dp_resource_unavailable(tb, in, "DPRX negotiation failed");
+		if (!tcm->display_bound && !tb_is_display_driver_bound()) {
+			tb_tunnel_warn(tunnel,
+				       "not active, deferring until display driver loads\n");
+			tb_deactivate_and_free_tunnel(tunnel);
+		} else {
+			tb_tunnel_warn(tunnel, "not active, tearing down\n");
+			tb_dp_resource_unavailable(tb, in,
+						   "DPRX negotiation failed");
+		}
 	}
 	mutex_unlock(&tb->lock);
 
@@ -2992,6 +3061,9 @@ static void tb_deinit(struct tb *tb)
 	struct tb_cm *tcm = tb_priv(tb);
 	int i;
 
+	bus_unregister_notifier(&pci_bus_type, &tcm->pci_nb);
+	cancel_work_sync(&tcm->display_retry_work);
+
 	/* Cancel all the release bandwidth workers */
 	for (i = 0; i < ARRAY_SIZE(tcm->groups); i++)
 		cancel_delayed_work_sync(&tcm->groups[i].release_work);
@@ -3418,7 +3490,15 @@ struct tb *tb_probe(struct tb_nhi *nhi)
 	INIT_LIST_HEAD(&tcm->tunnel_list);
 	INIT_LIST_HEAD(&tcm->dp_resources);
 	INIT_DELAYED_WORK(&tcm->remove_work, tb_remove_work);
+	INIT_WORK(&tcm->display_retry_work, tb_display_retry_work_fn);
 	tb_init_bandwidth_groups(tcm);
+
+	/* Check if a display driver is already bound (e.g. hotplug after boot) */
+	tcm->display_bound = tb_is_display_driver_bound();
+
+	/* Watch for display driver binding to defer DPRX until GPU is ready */
+	tcm->pci_nb.notifier_call = tb_pci_notifier_fn;
+	bus_register_notifier(&pci_bus_type, &tcm->pci_nb);
 
 	tb_dbg(tb, "using software connection manager\n");
 
