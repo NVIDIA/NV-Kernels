@@ -249,6 +249,9 @@ CONFIG_PINCTRL_MT8901                           note<'LP: #2117784'>
 CONFIG_R8127                                    policy<{'amd64': 'n', 'arm64': 'm'}>
 CONFIG_R8127                                    note<'LP: #2109730'>
 
+CONFIG_RESCTRL_FS                               policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_RESCTRL_FS                               note<'LP: #2122432'>
+
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablement'>
 
@@ -285,11 +288,14 @@ CONFIG_VFIO_CXL_CORE                            note<'Enable VFIO CXL core for C
 CONFIG_VFIO_IOMMU_TYPE1                         policy<{'amd64': 'm', 'arm64': '-'}>
 CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
 
-CONFIG_RESCTRL_FS				policy<{'amd64': 'y', 'arm64': 'y'}>
-CONFIG_RESCTRL_FS				note<'LP: #2122432'>
 
 # ---- Annotations without notes ----
 
+CONFIG_ARCH_HAS_CPU_RESCTRL                     policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ARM64_MPAM_RESCTRL_FS                    policy<{'arm64': 'y'}>
 CONFIG_BCH                                      policy<{'amd64': 'm', 'arm64': 'y'}>
 CONFIG_HISI_SOC_HHA                             policy<{'arm64': '-'}>
 CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': 'y'}>
+CONFIG_PROC_CPU_RESCTRL                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_RESCTRL_IOMMU                            policy<{'arm64': 'y'}>
+CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID           policy<{'arm64': 'y'}>
