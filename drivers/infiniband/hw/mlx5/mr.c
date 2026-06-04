@@ -1537,6 +1537,10 @@ struct ib_mr *mlx5_ib_reg_user_mr_dmabuf(struct ib_pd *pd, u64 offset,
 
 	atomic_add(ib_umem_num_pages(mr->umem), &dev->mdev->priv.reg_pages);
 	umem_dmabuf->private = mr;
+	err = mlx5r_odp_create_eq(dev, &dev->odp_pf_eq);
+	if (err)
+		goto err_dereg_mr;
+
 	err = mlx5r_store_odp_mkey(dev, &mr->mmkey);
 	if (err)
 		goto err_dereg_mr;
