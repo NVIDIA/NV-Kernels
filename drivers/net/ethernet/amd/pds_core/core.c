@@ -411,6 +411,8 @@ int pdsc_setup(struct pdsc *pdsc, bool init)
 	int numdescs;
 	int err;
 
+	pci_set_master(pdsc->pdev);
+
 	err = pdsc_dev_init(pdsc);
 	if (err)
 		return err;
@@ -466,6 +468,9 @@ void pdsc_teardown(struct pdsc *pdsc, bool removing)
 
 	if (!pdsc->pdev->is_virtfn)
 		pdsc_devcmd_reset(pdsc);
+
+	pci_clear_master(pdsc->pdev);
+
 	/* Free adminqcq first: its work accesses notifyqcq, so we must
 	 * disable its IRQ and drain its work before freeing notifyqcq.
 	 */
