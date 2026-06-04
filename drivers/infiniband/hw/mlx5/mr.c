@@ -1850,7 +1850,7 @@ struct ib_mr *mlx5_ib_rereg_user_mr(struct ib_mr *ib_mr, int flags, u64 start,
 		 */
 		if (!mr->umem || is_odp_mr(mr) || is_dmabuf_mr(mr) ||
 		    mr->umem->is_peer)
-			goto recreate;
+			return ERR_PTR(-EOPNOTSUPP);
 
 		/*
 		 * Only one active MR can refer to a umem at one time, revoke
