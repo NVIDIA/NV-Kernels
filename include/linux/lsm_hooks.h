@@ -158,6 +158,8 @@ struct lsm_info {
 	unsigned long flags;	/* Optional: flags describing LSM */
 	int *enabled;		/* Optional: controlled by CONFIG_LSM */
 	int (*init)(void);	/* Required. */
+	int (*initcall_late)(void);	/* Optional: late_initcall setup. */
+	int (*initcall_late_sync)(void); /* Optional: late_initcall_sync setup. */
 	struct lsm_blob_sizes *blobs; /* Optional: for blob sharing. */
 };
 

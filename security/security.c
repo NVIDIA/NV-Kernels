@@ -322,6 +322,47 @@ static void __init initialize_lsm(struct lsm_info *lsm)
 	}
 }
 
+static int __init lsm_initcall_late(bool sync)
+{
+	struct lsm_info **lsm;
+	int rc = 0;
+
+	for (lsm = ordered_lsms; *lsm; lsm++) {
+		int (*fn)(void);
+		int ret;
+
+		if (!is_enabled(*lsm))
+			continue;
+
+		fn = sync ? (*lsm)->initcall_late_sync :
+			    (*lsm)->initcall_late;
+		if (!fn)
+			continue;
+
+		init_debug("running %s %s initcall\n", (*lsm)->name,
+			   sync ? "late_sync" : "late");
+		ret = fn();
+		WARN(ret, "%s %s initcall failed: %d\n", (*lsm)->name,
+		     sync ? "late_sync" : "late", ret);
+		if (ret && !rc)
+			rc = ret;
+	}
+
+	return rc;
+}
+
+static int __init security_initcall_late(void)
+{
+	return lsm_initcall_late(false);
+}
+late_initcall(security_initcall_late);
+
+static int __init security_initcall_late_sync(void)
+{
+	return lsm_initcall_late(true);
+}
+late_initcall_sync(security_initcall_late_sync);
+
 /*
  * Current index to use while initializing the lsm id list.
  */
