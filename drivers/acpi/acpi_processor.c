@@ -17,7 +17,6 @@
 #include <linux/dmi.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/overflow.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 
@@ -1114,6 +1113,7 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 	unsigned int lpi_pkg_count, state_idx;
 	struct acpi_lpi_state *lpi_state;
 	acpi_status status;
+	u64 level_id;
 	int ret = 0;
 
 	status = acpi_evaluate_object(handle, "_LPI", NULL, &buffer);
@@ -1132,7 +1132,19 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 		goto end;
 	}
 
-	lpi_pkg_count = lpi_data->package.elements[2].integer.value;
+	if (lpi_data->package.elements[1].type != ACPI_TYPE_INTEGER) {
+		acpi_handle_debug(handle, "Invalid _LPI level ID type\n");
+		ret = -ENODATA;
+		goto end;
+	}
+	level_id = lpi_data->package.elements[1].integer.value;
+
+	if (obj_get_integer(&lpi_data->package.elements[2],
+			    &lpi_pkg_count)) {
+		acpi_handle_debug(handle, "Invalid _LPI state count type\n");
+		ret = -ENODATA;
+		goto end;
+	}
 
 	/* Validate number of power states. */
 	if (!lpi_pkg_count || lpi_pkg_count != lpi_data->package.count - 3) {
@@ -1155,6 +1167,7 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 
 	for (state_idx = 1; state_idx <= lpi_pkg_count; state_idx++) {
 		lpi_state->index = state_idx;
+		lpi_state->level_id = level_id;
 		process_lpi_state_package(lpi_pkg++, lpi_state++, handle,
 					  state_idx, strict);
 	}
@@ -1163,51 +1176,6 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 end:
 	kfree(buffer.pointer);
 	return ret;
-}
-
-/**
- * combine_lpi_states - combine local and parent LPI states
- * @local: local LPI state
- * @parent: parent LPI state
- * @result: composite LPI state
- *
- * Return: true if @local and @parent can form a composite entry.
- */
-static bool combine_lpi_states(const struct acpi_lpi_state *local,
-			       const struct acpi_lpi_state *parent,
-			       struct acpi_lpi_state *result)
-{
-	memset(result, 0, sizeof(*result));
-
-	if (parent->entry_method == ACPI_CSTATE_INTEGER) {
-		if (check_add_overflow(local->address, parent->address,
-				       &result->address))
-			return false;
-		result->entry_method = local->entry_method;
-	} else {
-		result->address = parent->address;
-		result->entry_method = parent->entry_method;
-	}
-
-	/*
-	 * ACPI accumulates wake latency across hierarchy levels, but defines
-	 * minimum residency independently at each level.  The selected parent
-	 * state's value therefore becomes the composite value at this level.
-	 */
-	result->min_residency = parent->min_residency;
-	if (check_add_overflow(local->wake_latency, parent->wake_latency,
-			       &result->wake_latency))
-		return false;
-	result->enable_parent_state = parent->enable_parent_state;
-
-	result->flags = parent->flags;
-	result->arch_flags = parent->arch_flags;
-	result->res_cnt_freq = parent->res_cnt_freq;
-	result->index = parent->index;
-
-	scnprintf(result->desc, ACPI_CX_DESC_LEN, "%s+%s", local->desc,
-		  parent->desc);
-	return true;
 }
 
 #define ACPI_LPI_STATE_FLAGS_ENABLED			BIT(0)
@@ -1260,7 +1228,9 @@ static unsigned int flatten_lpi_states(acpi_handle handle,
 			if (parent_lpi->index > local_lpi->enable_parent_state)
 				continue;
 
-			if (!combine_lpi_states(local_lpi, parent_lpi, flpi))
+			if (!acpi_processor_combine_lpi_states(local_lpi,
+							       parent_lpi,
+							       flpi))
 				continue;
 
 			stash_composite_state(curr, flpi);
@@ -1275,13 +1245,33 @@ static unsigned int flatten_lpi_states(acpi_handle handle,
 	return state_count;
 }
 
-int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
-				    struct acpi_processor_power *pr_power,
-				    bool strict)
+/**
+ * acpi_processor_extract_lpi_info_cb - Extract processor _LPI data with a callback
+ * @pr_handle: ACPI handle for the processor device.
+ * @pr_power: Processor power data populated with flattened _LPI states.
+ * @strict: Whether to reject _LPI packages that do not meet all requirements.
+ * @cb: Optional callback invoked for each _LPI hierarchy level after parsing.
+ * @data: Caller-supplied callback data passed to @cb.
+ *
+ * Evaluate the processor _LPI object and any parent processor-container _LPI
+ * objects. The callback sees the raw _LPI states at each level before they are
+ * folded into @pr_power. Level 0 is the processor leaf level, and each parent
+ * container increments the level by one.
+ *
+ * If @cb returns an error, extraction aborts.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
+int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
+				       struct acpi_processor_power *pr_power,
+				       bool strict,
+				       acpi_processor_lpi_level_cb cb,
+				       void *data)
 {
-	struct acpi_lpi_states_array info[2], *prev, *curr;
+	struct acpi_lpi_states_array info[2] = {}, *prev, *curr;
 	acpi_handle handle = pr_handle;
 	unsigned int state_count = 0;
+	unsigned int level = 0;
 	unsigned int i;
 	int ret;
 
@@ -1293,7 +1283,13 @@ int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
 
 	ret = acpi_processor_evaluate_lpi(handle, curr, strict);
 	if (ret)
-		return ret;
+		goto out_free;
+
+	if (cb) {
+		ret = cb(handle, curr->entries, curr->size, level, data);
+		if (ret)
+			goto out_free;
+	}
 
 	/* Copy all of the usable first-level states to power.lpi_states[]. */
 	for (i = 0; i < curr->size; i++) {
@@ -1317,6 +1313,7 @@ int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
 	}
 
 	kfree(curr->entries);
+	curr->entries = NULL;
 
 	/*
 	 * If there are no _LPI states at the first level, there are no _LPI
@@ -1341,18 +1338,31 @@ int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
 
 		if (strcmp(acpi_device_hid(d), ACPI_PROCESSOR_CONTAINER_HID))
 			break;
+		if (!acpi_has_method(handle, "_LPI"))
+			break;
 
+		level++;
 		curr->composite_states_size = 0;
 
 		ret = acpi_processor_evaluate_lpi(handle, curr, strict);
-		if (ret)
+		if (ret) {
+			if (cb)
+				goto out_free;
 			break;
+		}
+
+		if (cb) {
+			ret = cb(handle, curr->entries, curr->size, level, data);
+			if (ret)
+				goto out_free;
+		}
 
 		/* flatten all the LPI states in this level of hierarchy */
 		state_count = flatten_lpi_states(pr_handle, pr_power->lpi_states,
 						 state_count, curr, prev);
 
 		kfree(curr->entries);
+		curr->entries = NULL;
 
 		tmp = prev, prev = curr, curr = tmp;
 	}
@@ -1364,6 +1374,19 @@ int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
 	pr_power->count = state_count;
 
 	return 0;
+
+out_free:
+	kfree(curr->entries);
+	return ret;
+}
+EXPORT_SYMBOL_NS_GPL(acpi_processor_extract_lpi_info_cb, "ACPI_PROCESSOR_IDLE");
+
+int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
+				    struct acpi_processor_power *pr_power,
+				    bool strict)
+{
+	return acpi_processor_extract_lpi_info_cb(pr_handle, pr_power, strict,
+						  NULL, NULL);
 }
 EXPORT_SYMBOL_NS_GPL(acpi_processor_extract_lpi_info, "ACPI_PROCESSOR_IDLE");
 #endif /* CONFIG_ACPI_PROCESSOR_IDLE */

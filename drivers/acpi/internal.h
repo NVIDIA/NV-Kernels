@@ -181,6 +181,23 @@ void acpi_idle_rescan_dead_smt_siblings(void);
 static inline void acpi_idle_rescan_dead_smt_siblings(void) {}
 #endif
 
+#ifdef CONFIG_ACPI_PROCESSOR_IDLE
+struct acpi_lpi_state;
+struct acpi_processor_power;
+
+typedef int (*acpi_processor_lpi_level_cb)(acpi_handle handle,
+					   const struct acpi_lpi_state *states,
+					   unsigned int state_count,
+					   unsigned int level,
+					   void *data);
+
+int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
+				       struct acpi_processor_power *pr_power,
+				       bool strict,
+				       acpi_processor_lpi_level_cb cb,
+				       void *data);
+#endif
+
 /* --------------------------------------------------------------------------
                                   Embedded Controller
    -------------------------------------------------------------------------- */
