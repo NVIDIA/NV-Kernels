@@ -171,7 +171,7 @@ struct genpd_governor_data {
 	ktime_t last_enter;
 	bool reflect_residency;
 	bool cached_power_down_ok;
-	bool cached_power_down_state_idx;
+	unsigned int cached_power_down_state_idx;
 };
 
 struct genpd_power_state {
