@@ -914,13 +914,16 @@ static int lan966x_fdma_reload(struct lan966x *lan966x, int new_mtu)
 	struct page_pool *page_pool;
 	dma_addr_t rx_dma;
 	void *rx_dcbs;
+	int page_order, max_mtu;
 	u32 size;
-	int err;
+	int err, i;
 
 	/* Store these for later to free them */
 	rx_dma = lan966x->rx.dma;
 	rx_dcbs = lan966x->rx.dcbs;
 	page_pool = lan966x->rx.page_pool;
+	page_order = lan966x->rx.page_order;
+	max_mtu = lan966x->rx.max_mtu;
 
 	napi_synchronize(&lan966x->napi);
 	napi_disable(&lan966x->napi);
@@ -947,8 +950,25 @@ static int lan966x_fdma_reload(struct lan966x *lan966x, int new_mtu)
 	return err;
 restore:
 	lan966x->rx.page_pool = page_pool;
+	lan966x->rx.page_order = page_order;
+	lan966x->rx.max_mtu = max_mtu;
 	lan966x->rx.dma = rx_dma;
 	lan966x->rx.dcbs = rx_dcbs;
+	/*
+	 * lan966x_fdma_rx_alloc_page_pool() registered the new pool with
+	 * each port's XDP RXQ before the allocation failed. The new pool is
+	 * destroyed by lan966x_fdma_rx_alloc(), so restore the old pool's
+	 * registration before restarting RX.
+	 */
+	for (i = 0; i < lan966x->num_phys_ports; i++) {
+		if (!lan966x->ports[i])
+			continue;
+
+		xdp_rxq_info_unreg_mem_model(&lan966x->ports[i]->xdp_rxq);
+		xdp_rxq_info_reg_mem_model(&lan966x->ports[i]->xdp_rxq,
+					   MEM_TYPE_PAGE_POOL, page_pool);
+	}
+
 	lan966x_fdma_rx_start(&lan966x->rx);
 
 	return err;
