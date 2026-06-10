@@ -31,6 +31,7 @@
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
 #include <linux/jiffies.h>
+#include <linux/limits.h>
 #include <linux/of.h>
 #include <linux/delay.h>
 #include <linux/util_macros.h>
@@ -351,10 +352,11 @@ static int ina2xx_read_reg(struct device *dev, int reg, unsigned int *regval)
 	return -ENODEV;
 }
 
-static int ina2xx_get_value(struct ina2xx_data *data, u8 reg,
-			    unsigned int regval)
+static long ina2xx_get_value(struct ina2xx_data *data, u8 reg,
+			     unsigned int regval)
 {
-	int val;
+	s64 val64;
+	long val;
 
 	switch (reg) {
 	case INA2XX_SHUNT_VOLTAGE:
@@ -368,13 +370,18 @@ static int ina2xx_get_value(struct ina2xx_data *data, u8 reg,
 		val = DIV_ROUND_CLOSEST(val, 1000);
 		break;
 	case INA2XX_POWER:
-		val = regval * data->power_lsb_uW;
+		val = min_t(u64, (u64)regval * data->power_lsb_uW,
+			    LONG_MAX);
 		break;
 	case INA2XX_CURRENT:
 		/* signed register, result in mA */
-		val = ((s16)regval >> data->config->current_shift) *
-		  data->current_lsb_uA;
-		val = DIV_ROUND_CLOSEST(val, 1000);
+		val64 = (s64)((s16)regval >> data->config->current_shift) *
+			data->current_lsb_uA;
+		if (val64 < 0)
+			val64 = -DIV_ROUND_CLOSEST_ULL(-val64, 1000);
+		else
+			val64 = DIV_ROUND_CLOSEST_ULL(val64, 1000);
+		val = clamp_val(val64, LONG_MIN, LONG_MAX);
 		break;
 	case INA2XX_CALIBRATION:
 		val = regval;
@@ -401,10 +408,11 @@ static ssize_t ina2xx_value_show(struct device *dev,
 	if (err < 0)
 		return err;
 
-	return sysfs_emit(buf, "%d\n", ina2xx_get_value(data, attr->index, regval));
+	return sysfs_emit(buf, "%ld\n",
+			  ina2xx_get_value(data, attr->index, regval));
 }
 
-static int ina226_reg_to_alert(struct ina2xx_data *data, u8 bit, u16 regval)
+static long ina226_reg_to_alert(struct ina2xx_data *data, u8 bit, u16 regval)
 {
 	int reg;
 
@@ -433,22 +441,33 @@ static int ina226_reg_to_alert(struct ina2xx_data *data, u8 bit, u16 regval)
  * Turns alert limit values into register values.
  * Opposite of the formula in ina2xx_get_value().
  */
-static s16 ina226_alert_to_reg(struct ina2xx_data *data, u8 bit, int val)
+static u16 ina226_alert_to_reg(struct ina2xx_data *data, u8 bit,
+			       unsigned long val)
 {
 	switch (bit) {
 	case INA226_SHUNT_OVER_VOLTAGE_BIT:
 	case INA226_SHUNT_UNDER_VOLTAGE_BIT:
-		val *= data->config->shunt_div;
-		val <<= data->config->shunt_voltage_shift;
-		return clamp_val(val, SHRT_MIN, SHRT_MAX);
+		val = min_t(unsigned long, val,
+			    DIV_ROUND_CLOSEST(SHRT_MAX,
+					      data->config->shunt_div));
+		return min_t(unsigned long,
+			     (val * data->config->shunt_div) <<
+				data->config->shunt_voltage_shift,
+			     SHRT_MAX);
 	case INA226_BUS_OVER_VOLTAGE_BIT:
 	case INA226_BUS_UNDER_VOLTAGE_BIT:
-		val = (val * 1000) << data->config->bus_voltage_shift;
-		val = DIV_ROUND_CLOSEST(val, data->config->bus_voltage_lsb);
-		return clamp_val(val, 0, SHRT_MAX);
+		val = min_t(unsigned long, val, 130000);
+		return min_t(unsigned long,
+			     DIV_ROUND_CLOSEST((val * 1000) <<
+					       data->config->bus_voltage_shift,
+					       data->config->bus_voltage_lsb),
+			     USHRT_MAX);
 	case INA226_POWER_OVER_LIMIT_BIT:
-		val = DIV_ROUND_CLOSEST(val, data->power_lsb_uW);
-		return clamp_val(val, 0, USHRT_MAX);
+		val = min_t(unsigned long, val,
+			    LONG_MAX - data->power_lsb_uW);
+		return min_t(unsigned long,
+			     DIV_ROUND_CLOSEST(val, data->power_lsb_uW),
+			     USHRT_MAX);
 	default:
 		/* programmer goofed */
 		WARN_ON_ONCE(1);
@@ -462,7 +481,7 @@ static ssize_t ina226_alert_show(struct device *dev,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
 	struct ina2xx_data *data = dev_get_drvdata(dev);
 	int regval;
-	int val = 0;
+	long val = 0;
 	int ret;
 
 	mutex_lock(&data->config_lock);
@@ -477,7 +496,7 @@ static ssize_t ina226_alert_show(struct device *dev,
 		val = ina226_reg_to_alert(data, attr->index, regval);
 	}
 
-	ret = sysfs_emit(buf, "%d\n", val);
+	ret = sysfs_emit(buf, "%ld\n", val);
 abort:
 	mutex_unlock(&data->config_lock);
 	return ret;
@@ -550,6 +569,7 @@ static ssize_t sy24655_average_power_show(struct device *dev,
 	struct ina2xx_data *data = dev_get_drvdata(dev);
 	u8 values[6];
 	long accumulator, sample_count, val;
+	u64 val64;
 	int ret;
 
 	ret = i2c_smbus_read_i2c_block_data(data->client, SY24655_EIN,
@@ -561,8 +581,10 @@ static ssize_t sy24655_average_power_show(struct device *dev,
 
 	accumulator = (values[3] << 16) | (values[4] << 8) | values[5];
 	sample_count = (values[0] << 16) | (values[1] << 8) | values[2];
-	val = sample_count ? DIV_ROUND_CLOSEST(accumulator, sample_count) *
-			     data->power_lsb_uW : 0;
+	val64 = sample_count ?
+		(u64)DIV_ROUND_CLOSEST(accumulator, sample_count) *
+		data->power_lsb_uW : 0;
+	val = min_t(u64, val64, LONG_MAX);
 
 	return sysfs_emit(buf, "%ld\n", val);
 }
