@@ -187,6 +187,24 @@ static int optee_ffa_from_msg_param(struct optee *optee,
 	return 0;
 }
 
+/*
+ * OP-TEE FF-A memory objects use 4 KiB pages while the kernel page size may
+ * be larger, for example 64 KiB on arm64. The FF-A descriptor is registered
+ * from the 4 KiB page containing the start of the shared buffer, so
+ * internal_offs contains only the offset into that page. Keep shm_offs
+ * unchanged: it is returned to callers and may be reused for a subsequent
+ * invocation.
+ */
+static void optee_ffa_set_fmem_offsets(struct optee_msg_param_fmem *fmem,
+				       struct tee_shm *shm, u64 shm_offs)
+{
+	unsigned long page_offs = tee_shm_get_page_offset(shm);
+
+	fmem->internal_offs = page_offs & (FFA_PAGE_SIZE - 1);
+	fmem->offs_low = shm_offs;
+	fmem->offs_high = shm_offs >> 32;
+}
+
 static int to_msg_param_ffa_mem(struct optee_msg_param *mp,
 				const struct tee_param *p)
 {
@@ -196,14 +214,10 @@ static int to_msg_param_ffa_mem(struct optee_msg_param *mp,
 		   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
 
 	if (shm) {
-		u64 shm_offs = p->u.memref.shm_offs;
-
-		mp->u.fmem.internal_offs = shm->offset;
-
-		mp->u.fmem.offs_low = shm_offs;
-		mp->u.fmem.offs_high = shm_offs >> 32;
+		optee_ffa_set_fmem_offsets(&mp->u.fmem, shm,
+					   p->u.memref.shm_offs);
 		/* Check that the entire offset could be stored. */
-		if (mp->u.fmem.offs_high != shm_offs >> 32)
+		if (mp->u.fmem.offs_high != p->u.memref.shm_offs >> 32)
 			return -EINVAL;
 
 		mp->u.fmem.global_id = shm->sec_world_id;
@@ -284,14 +298,22 @@ static int optee_ffa_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 		.nattrs = 1,
 	};
 	struct sg_table sgt;
+	size_t page_offs = tee_shm_get_page_offset(shm);
+	size_t ffa_offs = round_down(page_offs, FFA_PAGE_SIZE);
+	size_t ffa_size = num_pages * PAGE_SIZE - ffa_offs;
 	int rc;
 
 	rc = optee_check_mem_type(start, num_pages);
 	if (rc)
 		return rc;
 
-	rc = sg_alloc_table_from_pages(&sgt, pages, num_pages, 0,
-				       num_pages * PAGE_SIZE, GFP_KERNEL);
+	/*
+	 * Start the FF-A descriptor at the 4 KiB page containing the shared
+	 * buffer. This leaves only page_offs % FFA_PAGE_SIZE for internal_offs
+	 * and preserves shm_offs when an FMEM parameter is returned to Linux.
+	 */
+	rc = sg_alloc_table_from_pages(&sgt, pages, num_pages, ffa_offs,
+				       ffa_size, GFP_KERNEL);
 	if (rc)
 		return rc;
 	args.sg = sgt.sgl;
@@ -458,8 +480,8 @@ static void handle_ffa_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
 		.attr = OPTEE_MSG_ATTR_TYPE_FMEM_OUTPUT,
 		.u.fmem.size = tee_shm_get_size(shm),
 		.u.fmem.global_id = shm->sec_world_id,
-		.u.fmem.internal_offs = shm->offset,
 	};
+	optee_ffa_set_fmem_offsets(&arg->params[0].u.fmem, shm, 0);
 
 	arg->ret = TEEC_SUCCESS;
 }
