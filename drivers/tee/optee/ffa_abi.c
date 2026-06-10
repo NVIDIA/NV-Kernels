@@ -187,6 +187,28 @@ static int optee_ffa_from_msg_param(struct optee *optee,
 	return 0;
 }
 
+/*
+ * OP-TEE FF-A memory objects use 4 KiB pages while the kernel page size may
+ * be larger, for example 64 KiB on arm64. When the shared memory offset from
+ * the start of its first kernel page exceeds 4 KiB, pass it in offs_low and
+ * offs_high instead of internal_offs.
+ */
+static void optee_ffa_set_fmem_offsets(struct optee_msg_param_fmem *fmem,
+				       struct tee_shm *shm, u64 shm_offs)
+{
+	unsigned long page_offs = tee_shm_get_page_offset(shm);
+
+	if (page_offs < FFA_PAGE_SIZE) {
+		fmem->internal_offs = page_offs;
+	} else {
+		fmem->internal_offs = 0;
+		shm_offs += page_offs;
+	}
+
+	fmem->offs_low = shm_offs;
+	fmem->offs_high = shm_offs >> 32;
+}
+
 static int to_msg_param_ffa_mem(struct optee_msg_param *mp,
 				const struct tee_param *p)
 {
@@ -196,14 +218,15 @@ static int to_msg_param_ffa_mem(struct optee_msg_param *mp,
 		   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
 
 	if (shm) {
-		u64 shm_offs = p->u.memref.shm_offs;
+		u64 total_offs = p->u.memref.shm_offs;
 
-		mp->u.fmem.internal_offs = shm->offset;
+		if (tee_shm_get_page_offset(shm) >= FFA_PAGE_SIZE)
+			total_offs += tee_shm_get_page_offset(shm);
 
-		mp->u.fmem.offs_low = shm_offs;
-		mp->u.fmem.offs_high = shm_offs >> 32;
+		optee_ffa_set_fmem_offsets(&mp->u.fmem, shm,
+					   p->u.memref.shm_offs);
 		/* Check that the entire offset could be stored. */
-		if (mp->u.fmem.offs_high != shm_offs >> 32)
+		if (mp->u.fmem.offs_high != total_offs >> 32)
 			return -EINVAL;
 
 		mp->u.fmem.global_id = shm->sec_world_id;
@@ -458,8 +481,8 @@ static void handle_ffa_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
 		.attr = OPTEE_MSG_ATTR_TYPE_FMEM_OUTPUT,
 		.u.fmem.size = tee_shm_get_size(shm),
 		.u.fmem.global_id = shm->sec_world_id,
-		.u.fmem.internal_offs = shm->offset,
 	};
+	optee_ffa_set_fmem_offsets(&arg->params[0].u.fmem, shm, 0);
 
 	arg->ret = TEEC_SUCCESS;
 }
