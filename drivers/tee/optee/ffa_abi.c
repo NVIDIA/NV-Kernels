@@ -187,6 +187,40 @@ static int optee_ffa_from_msg_param(struct optee *optee,
 	return 0;
 }
 
+/*
+ * OP-TEE FF-A memory objects use 4 KiB pages while the kernel page size may
+ * be larger, for example 64 KiB on arm64. The FF-A descriptor is registered
+ * from the 4 KiB page containing the start of the shared buffer, so
+ * internal_offs is the offset into that page.
+ */
+static void optee_ffa_set_internal_offs(struct optee_msg_param_fmem *fmem,
+					struct tee_shm *shm)
+{
+	size_t page_offs = tee_shm_get_page_offset(shm);
+
+	BUILD_BUG_ON(PAGE_SIZE < FFA_PAGE_SIZE);
+
+	fmem->internal_offs = page_offs & (FFA_PAGE_SIZE - 1);
+}
+
+/*
+ * Keep shm_offs unchanged in offs_low/offs_high: it is returned to callers
+ * and may be reused for a subsequent invocation.
+ */
+static int optee_ffa_set_fmem_offsets(struct optee_msg_param_fmem *fmem,
+				      struct tee_shm *shm, u64 shm_offs)
+{
+	optee_ffa_set_internal_offs(fmem, shm);
+
+	fmem->offs_low = shm_offs;
+	fmem->offs_high = shm_offs >> 32;
+	/* Check that the entire offset could be stored. */
+	if (fmem->offs_high != shm_offs >> 32)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int to_msg_param_ffa_mem(struct optee_msg_param *mp,
 				const struct tee_param *p)
 {
@@ -196,14 +230,8 @@ static int to_msg_param_ffa_mem(struct optee_msg_param *mp,
 		   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
 
 	if (shm) {
-		u64 shm_offs = p->u.memref.shm_offs;
-
-		mp->u.fmem.internal_offs = shm->offset;
-
-		mp->u.fmem.offs_low = shm_offs;
-		mp->u.fmem.offs_high = shm_offs >> 32;
-		/* Check that the entire offset could be stored. */
-		if (mp->u.fmem.offs_high != shm_offs >> 32)
+		if (optee_ffa_set_fmem_offsets(&mp->u.fmem, shm,
+					       p->u.memref.shm_offs))
 			return -EINVAL;
 
 		mp->u.fmem.global_id = shm->sec_world_id;
@@ -284,14 +312,30 @@ static int optee_ffa_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 		.nattrs = 1,
 	};
 	struct sg_table sgt;
+	size_t page_offs;
+	size_t ffa_offs;
+	size_t ffa_size;
 	int rc;
+
+	if (!num_pages)
+		return -EINVAL;
 
 	rc = optee_check_mem_type(start, num_pages);
 	if (rc)
 		return rc;
 
-	rc = sg_alloc_table_from_pages(&sgt, pages, num_pages, 0,
-				       num_pages * PAGE_SIZE, GFP_KERNEL);
+	page_offs = tee_shm_get_page_offset(shm);
+	ffa_offs = round_down(page_offs, FFA_PAGE_SIZE);
+	ffa_size = num_pages * PAGE_SIZE - ffa_offs;
+
+	/*
+	 * Start the FF-A descriptor at the 4 KiB page containing the shared
+	 * buffer, skipping unused leading 4 KiB pages when PAGE_SIZE is
+	 * larger. Same approach as optee_fill_pages_list() in the SMC ABI.
+	 * This leaves only page_offs & (FFA_PAGE_SIZE - 1) for internal_offs.
+	 */
+	rc = sg_alloc_table_from_pages(&sgt, pages, num_pages, ffa_offs,
+				       ffa_size, GFP_KERNEL);
 	if (rc)
 		return rc;
 	args.sg = sgt.sgl;
@@ -458,8 +502,8 @@ static void handle_ffa_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
 		.attr = OPTEE_MSG_ATTR_TYPE_FMEM_OUTPUT,
 		.u.fmem.size = tee_shm_get_size(shm),
 		.u.fmem.global_id = shm->sec_world_id,
-		.u.fmem.internal_offs = shm->offset,
 	};
+	optee_ffa_set_internal_offs(&arg->params[0].u.fmem, shm);
 
 	arg->ret = TEEC_SUCCESS;
 }
