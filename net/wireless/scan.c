@@ -3150,6 +3150,7 @@ cfg80211_inform_single_bss_frame_data(struct wiphy *wiphy,
 	struct ieee80211_ext *ext = NULL;
 	u8 *bssid, *variable;
 	u16 capability, beacon_int;
+	u64 tsf;
 	size_t ielen, min_hdr_len;
 	int bss_type;
 	size_t s1g_optional_len;
@@ -3217,10 +3218,13 @@ cfg80211_inform_single_bss_frame_data(struct wiphy *wiphy,
 		bssid = ext->u.s1g_beacon.sa;
 		capability = le16_to_cpu(compat->compat_info);
 		beacon_int = le16_to_cpu(compat->beacon_int);
+		tsf = le32_to_cpu(ext->u.s1g_beacon.timestamp);
+		tsf |= (u64)le32_to_cpu(compat->tsf_completion) << 32;
 	} else {
 		bssid = mgmt->bssid;
 		beacon_int = le16_to_cpu(mgmt->u.probe_resp.beacon_int);
 		capability = le16_to_cpu(mgmt->u.probe_resp.capab_info);
+		tsf = le64_to_cpu(mgmt->u.probe_resp.timestamp);
 	}
 
 	if (channel->band == NL80211_BAND_60GHZ) {
@@ -3237,7 +3241,7 @@ cfg80211_inform_single_bss_frame_data(struct wiphy *wiphy,
 	if (!ies)
 		return NULL;
 	ies->len = ielen;
-	ies->tsf = le64_to_cpu(mgmt->u.probe_resp.timestamp);
+	ies->tsf = tsf;
 	ies->from_beacon = ieee80211_is_beacon(mgmt->frame_control) ||
 			   ieee80211_is_s1g_beacon(mgmt->frame_control);
 	memcpy(ies->data, variable, ielen);
