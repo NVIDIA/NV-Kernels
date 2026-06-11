@@ -571,7 +571,8 @@ static int kvm_loongarch_get_cpucfg_attr(struct kvm_vcpu *vcpu,
 	if (ret)
 		return ret;
 
-	put_user(val, uaddr);
+	if (put_user(val, uaddr))
+		return -EFAULT;
 
 	return ret;
 }
