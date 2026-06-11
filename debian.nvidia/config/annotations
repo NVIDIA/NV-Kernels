@@ -27,6 +27,9 @@ CONFIG_ARM64_ERRATUM_2224489                    note<'Required for Grace enablem
 CONFIG_ARM64_ERRATUM_2253138                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_2253138                    note<'Required for Grace enablement'>
 
+CONFIG_ARM64_ERRATUM_4118414                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_4118414                    note<'Required for Grace and Vera enablement'>
+
 CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE note<'Required for Grace enablement'>
 
