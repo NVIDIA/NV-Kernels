@@ -393,8 +393,132 @@ void __init slaunch_early_init(void)
 		fdt_magic, fdt_size);
 }
 
-/* Placeholder; populated by a subsequent patch. */
-void __init slaunch_setup(void) { }
+/*
+ * Validate all untrusted EFI inputs BEFORE efi_init() consumes them
+ * (it reads systab tables and walks the EFI mmap into memblock). The
+ * early validators below operate on the raw firmware buffers, not
+ * efi.memmap, which does not exist yet at this stage.
+ */
+struct sl_efi_info {
+	bool present;
+	u64  systab_pa;
+	u64  mmap_pa;
+	u64  mmap_size;
+	u32  desc_size;
+	u32  desc_ver;
+};
+
+/* Forward decls — bodies defined later (or stubbed out by #ifdef
+ * gating below).
+ */
+#ifdef CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT
+static void __init slaunch_inject_fault(struct sl_efi_info *info);
+#else
+static inline void slaunch_inject_fault(struct sl_efi_info *info) { }
+#endif
+#ifdef CONFIG_ARM64_SECURE_LAUNCH_SELFTEST
+static void __init slaunch_selftest(void);
+#else
+static inline void slaunch_selftest(void) { }
+#endif
+
+static void __init slaunch_read_chosen_efi(struct sl_efi_info *info)
+{
+	const void *fdt = initial_boot_params;
+	const __be64 *p64;
+	const __be32 *p32;
+	int node, len;
+
+	memset(info, 0, sizeof(*info));
+	if (!fdt)
+		return;
+	node = fdt_path_offset(fdt, "/chosen");
+	if (node < 0)
+		return;
+
+#define _GET64(name, field)							\
+	do {									\
+		p64 = fdt_getprop(fdt, node, name, &len);			\
+		if (!p64 || len < (int)sizeof(__be64))				\
+			return;							\
+		info->field = be64_to_cpu(*p64);				\
+	} while (0)
+#define _GET32(name, field)							\
+	do {									\
+		p32 = fdt_getprop(fdt, node, name, &len);			\
+		if (!p32 || len < (int)sizeof(__be32))				\
+			return;							\
+		info->field = be32_to_cpu(*p32);				\
+	} while (0)
+	_GET64("linux,uefi-system-table",   systab_pa);
+	_GET64("linux,uefi-mmap-start",     mmap_pa);
+	_GET32("linux,uefi-mmap-size",      mmap_size);
+	_GET32("linux,uefi-mmap-desc-size", desc_size);
+	_GET32("linux,uefi-mmap-desc-ver",  desc_ver);
+#undef _GET64
+#undef _GET32
+	info->present = true;
+}
+/*
+ * Process DRTM state early in setup_arch() (address map already parsed
+ * by slaunch_early_init): reserve DLME data in memblock, CLOSE_LOCALITY,
+ * assert full-range DMA lockdown, and disable EFI runtime services.
+ */
+void __init slaunch_setup(void)
+{
+	struct dlme_data_header *hdr;
+	phys_addr_t dlme_data_pa;
+
+	if (!sl_dlme_region_pa)
+		return;
+
+	pr_info("slaunch: DRTM Secure Launch detected\n");
+
+	/* Map DLME data header for reservation */
+	dlme_data_pa = sl_dlme_region_pa + sl_dlme_data_offset;
+	hdr = early_memremap(dlme_data_pa, sizeof(*hdr));
+	if (!hdr) {
+		pr_err("slaunch: failed to map DLME data header at 0x%llx\n",
+		       (u64)dlme_data_pa);
+		return;
+	}
+
+	pr_info("slaunch: DLME data version: %u\n",
+		le16_to_cpu(hdr->version));
+	pr_info("slaunch: DLME data size: %llu\n",
+		le64_to_cpu(hdr->dlme_data_size));
+	pr_info("slaunch: Event log size: %llu\n",
+		le64_to_cpu(hdr->drtm_event_log_size));
+
+	/* Enforce full-lockdown assumption. Called from
+	 * slaunch_setup (not slaunch_early_init) so panic prints —
+	 * earlycon is registered by this point. */
+	slaunch_assert_full_lockdown(dlme_data_pa,
+				     le16_to_cpu(hdr->this_hdr_size),
+				     le64_to_cpu(hdr->protected_regions_size));
+
+	/* Reserve DLME data region in memblock so kernel won't reuse it.
+	 * NOTE: efi_init() runs after us and calls memblock_remove(0,
+	 * PHYS_ADDR_MAX) which wipes this reservation. slaunch_validate_efi
+	 * re-reserves using the saved values below. */
+	sl_dlme_data_pa = dlme_data_pa;
+	sl_dlme_data_size = le64_to_cpu(hdr->dlme_data_size);
+	memblock_reserve(sl_dlme_data_pa, sl_dlme_data_size);
+
+	early_memunmap(hdr, sizeof(*hdr));
+
+	slaunch_tpm_setup();
+
+	/*
+	 * Unconditionally disable EFI runtime services: their pointers come
+	 * from untrusted pre-DRTM firmware. Defense-in-depth backstop to the
+	 * stub's efi=noruntime gate. Clearing EFI_RUNTIME_SERVICES and
+	 * runtime_supported_mask makes all runtime dispatch see "unsupported".
+	 */
+	clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+	efi.runtime_supported_mask = 0;
+	pr_info("slaunch: EFI runtime services unconditionally disabled\n");
+}
 
 /* Placeholder; populated by a subsequent patch. */
 void __init slaunch_measure_post_efi(void) { }
