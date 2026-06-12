@@ -1267,4 +1267,13 @@ void arch_accept_memory(phys_addr_t start, phys_addr_t end);
 efi_status_t efi_zboot_decompress_init(unsigned long *alloc_size);
 efi_status_t efi_zboot_decompress(u8 *out, unsigned long outlen);
 
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+bool efi_slaunch_enabled(const char *cmdline);
+void efi_slaunch_get_dlme_data_size(void);
+extern unsigned long sl_dlme_data_reserve;
+extern bool sl_drtm_available;
+void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
+				 unsigned long fdt_addr);
+#endif
+
 #endif

@@ -36,6 +36,15 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 	kernel_codesize = __inittext_end - _text;
 	kernel_memsize = kernel_size + (_end - _edata);
 	*reserve_size = kernel_memsize;
+
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+	/*
+	 * Reserve DLME data space (size from DRTM_FEATURES) after kernel
+	 * BSS for D-CRTM to populate (address map, event log, etc.).
+	 */
+	efi_slaunch_get_dlme_data_size();
+	*reserve_size += sl_dlme_data_reserve;
+#endif
 	*image_addr = (unsigned long)_text;
 
 	return efi_kaslr_relocate_kernel(image_addr, reserve_addr, reserve_size,
