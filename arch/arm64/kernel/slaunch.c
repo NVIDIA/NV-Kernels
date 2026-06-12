@@ -1090,6 +1090,85 @@ static bool __init slaunch_ranges_overlap(u64 a_start, u64 a_size,
 	return a_start < b_end && b_start < a_end;
 }
 
+#ifdef CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT
+static bool __init sl_cmdline_has(const char *tok);
+static void __init slaunch_inject_initrd(u64 *start, u64 *size);
+#endif
+
+/*
+ * Measure the bootloader-supplied initramfs. The buffer sits in
+ * untrusted DRAM not covered by D-CRTM, so its extent is validated
+ * before any read and failures are fatal. Absence is legitimate and
+ * logged (no marker hash); the verifier infers coverage from the event.
+ */
+static void __init slaunch_measure_initrd(void)
+{
+	u64 start = phys_initrd_start;
+	u64 size = phys_initrd_size;
+	u64 end, dlme_size, off = 0, remaining;
+	struct sha256_ctx sctx;
+	u8 hash[SHA256_DIGEST_SIZE];
+	struct slaunch_measurement *m;
+	void *p;
+
+	if (!start || !size) {
+		pr_info("slaunch: no initrd present, skipping measurement\n");
+		return;
+	}
+
+#ifdef CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT
+	slaunch_inject_initrd(&start, &size);
+#endif
+
+	if (!IS_ALIGNED(start, PAGE_SIZE))
+		panic("slaunch: initrd start 0x%llx not page-aligned\n",
+		      start);
+
+	if (check_add_overflow(start, size, &end))
+		panic("slaunch: initrd [0x%llx + %llu] wraps u64\n",
+		      start, size);
+
+	if (!dcrtm_range_in_normal(start, size))
+		panic("slaunch: initrd [0x%llx+%llu] NOT in NORMAL region\n",
+		      start, size);
+
+	dlme_size = (sl_dlme_data_pa + sl_dlme_data_size) - sl_dlme_region_pa;
+	if (slaunch_ranges_overlap(start, size,
+				   sl_dlme_region_pa, dlme_size))
+		panic("slaunch: initrd [0x%llx+%llu] overlaps DLME region [0x%llx+%llu]\n",
+		      start, size, (u64)sl_dlme_region_pa, dlme_size);
+
+	/*
+	 * Chunked early_memremap + streaming SHA-256: the initrd can
+	 * exceed a single early_memremap and the linear map is not
+	 * reliable here, so map one page at a time, feed into
+	 * sha256_update, then sha256_final.
+	 */
+	sha256_init(&sctx);
+	remaining = size;
+	while (remaining > 0) {
+		size_t chunk = min_t(u64, remaining, (u64)PAGE_SIZE);
+
+		p = early_memremap(start + off, chunk);
+		if (!p)
+			panic("slaunch: initrd chunk remap failed at 0x%llx (chunk %zu)\n",
+			      start + off, chunk);
+		sha256_update(&sctx, p, chunk);
+		early_memunmap(p, chunk);
+		off += chunk;
+		remaining -= chunk;
+	}
+	sha256_final(&sctx, hash);
+
+	pr_info("slaunch: measured initrd (%llu bytes) SHA-256: %*phN\n",
+		size, SHA256_DIGEST_SIZE, hash);
+
+	slaunch_measurements_reserve(slaunch_measurement_count + 1);
+	m = &slaunch_measurements[slaunch_measurement_count++];
+	strscpy(m->desc, "initrd", sizeof(m->desc));
+	memcpy(m->hash, hash, SHA256_DIGEST_SIZE);
+}
+
 /*
  * Extend the DRTM event log with DLME-side measurements. DCE writes a
  * TCG log into the DLME data region; we append one TCG_PCR_EVENT2 per
@@ -1243,8 +1322,9 @@ static void __init slaunch_extend_drtm_event_log(void)
 	}
 }
 /*
- * Adds event-log extension: re-reserve DLME data,
- * verify hash algo, measure ACPI tables, extend the DRTM event log.
+ * Adds initrd measurement: re-reserve DLME data,
+ * verify hash algo, measure ACPI tables, measure initrd, extend the
+ * DRTM event log.
  */
 void __init slaunch_measure_post_efi(void)
 {
@@ -1257,6 +1337,7 @@ void __init slaunch_measure_post_efi(void)
 	slaunch_measurements_init();
 	slaunch_verify_hash_algo();
 	slaunch_measure_acpi();
+	slaunch_measure_initrd();
 	slaunch_extend_drtm_event_log();
 
 	if (dcrtm_regions) {
