@@ -2427,7 +2427,8 @@ config EFI
 config ARM64_SECURE_LAUNCH
 	bool "ARM64 DRTM Secure Launch support"
 	depends on ARM64 && EFI
-	default n
+	depends on !EFI_ZBOOT
+	default y
 	select CRYPTO_LIB_SHA256
 	select CRYPTO_LIB_SHA512
 	help
