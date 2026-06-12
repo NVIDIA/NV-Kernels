@@ -129,11 +129,15 @@ extern unsigned long sl_dlme_data_offset;
 
 void slaunch_early_init(void);
 void slaunch_setup(void);
+void slaunch_validate_initrd(void);
+void slaunch_reserve_dlme_data(void);
 void slaunch_exit(void);
 void slaunch_measure_post_efi(void);
 #else
 static inline void slaunch_early_init(void) { }
 static inline void slaunch_setup(void) { }
+static inline void slaunch_validate_initrd(void) { }
+static inline void slaunch_reserve_dlme_data(void) { }
 static inline void slaunch_exit(void) { }
 static inline void slaunch_measure_post_efi(void) { }
 #endif
