@@ -3901,6 +3901,15 @@ static int arm_smmu_group_set_mpam(struct device *dev, u16 partid,
 		return -EIO;
 	smmu = master->smmu;
 
+	/*
+	 * Do not rewrite an adopted STE before the deferred attach has
+	 * replaced it. The kdump kernel may still be relying on the crashed
+	 * kernel's live STE while endpoint DMA is being quiesced.
+	 */
+	if ((smmu->options & ARM_SMMU_OPT_KDUMP_ADOPT) &&
+	    dev->iommu->attach_deferred)
+		return -EBUSY;
+
 	arm_smmu_cmdq_batch_init(smmu, &cmds, &cmd);
 
 	for (i = 0; i < master->num_streams; i++) {
