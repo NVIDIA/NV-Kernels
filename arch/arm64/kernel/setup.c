@@ -322,6 +322,8 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	 */
 	cpu_uninstall_idmap();
 
+	slaunch_setup();
+
 	xen_early_init();
 	efi_init();
 
