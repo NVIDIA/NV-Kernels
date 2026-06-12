@@ -1075,9 +1075,176 @@ static void __init slaunch_measure_acpi(void)
 	else
 		pr_info("slaunch: FACS absent (HW-reduced ACPI) — no measurement needed\n");
 }
+
+/* Half-open range overlap. Fails closed (returns true) on u64 wrap of
+ * either range — refuse to consume rather than silently miscompute. */
+static bool __init slaunch_ranges_overlap(u64 a_start, u64 a_size,
+					  u64 b_start, u64 b_size)
+{
+	u64 a_end, b_end;
+
+	if (check_add_overflow(a_start, a_size, &a_end))
+		return true;
+	if (check_add_overflow(b_start, b_size, &b_end))
+		return true;
+	return a_start < b_end && b_start < a_end;
+}
+
 /*
- * Re-reserve DLME data after memblock teardown, verify the D-CRTM
- * hash algorithm, and measure ACPI tables into the DRTM event log.
+ * Extend the DRTM event log with DLME-side measurements. DCE writes a
+ * TCG log into the DLME data region; we append one TCG_PCR_EVENT2 per
+ * DLME measurement into the trailing slack and bump drtm_event_log_size,
+ * so a verifier sees one chain (DEN0113 v1.2 §3.17/§4.8.4; TCG PFP §10.2.2).
+ */
+#define SL_TPM_ALG_SHA256		0x000B
+/*
+ * TODO: no Arm event type (DEN0113 v1.2 §3.17.2 Table 19, base 0x9000)
+ * matches a DLME-side ACPI measurement, so generic TCG
+ * EV_PLATFORM_CONFIG_FLAGS (0x0A) is used; switch to a dedicated
+ * EVTYPE_ARM_* once one is registered.
+ */
+#define SL_EV_PLATFORM_CONFIG_FLAGS	0x0000000A
+#define SL_DRTM_PCR_INDEX		18	/* DEN0113 v1.2: PCR[18] DLME schema, §4.8.4 Table 40 */
+
+/*
+ * Write one TCG_PCR_EVENT2 at *off in buf (advances *off); -ENOSPC if no
+ * room within max. Packed LE layout: u32 PCRIndex, EventType,
+ * digest_count; per digest u16 hashAlg + hash[]; u32 EventSize + Event[].
+ */
+static int __init sl_evlog_append_event2(u8 *buf, size_t *off, size_t max,
+					 u32 pcr, u32 type,
+					 const u8 hash[SHA256_DIGEST_SIZE],
+					 const void *event_data,
+					 u32 event_size)
+{
+	size_t need = 4 + 4 + 4 + 2 + SHA256_DIGEST_SIZE + 4 + event_size;
+	u8 *p;
+
+	if (*off + need > max)
+		return -ENOSPC;
+
+	p = buf + *off;
+	*(__le32 *)(p +  0) = cpu_to_le32(pcr);
+	*(__le32 *)(p +  4) = cpu_to_le32(type);
+	*(__le32 *)(p +  8) = cpu_to_le32(1);
+	*(__le16 *)(p + 12) = cpu_to_le16(SL_TPM_ALG_SHA256);
+	memcpy(p + 14, hash, SHA256_DIGEST_SIZE);
+	*(__le32 *)(p + 14 + SHA256_DIGEST_SIZE) = cpu_to_le32(event_size);
+	if (event_size)
+		memcpy(p + 14 + SHA256_DIGEST_SIZE + 4, event_data, event_size);
+	*off += need;
+	return 0;
+}
+
+static void __init slaunch_extend_drtm_event_log(void)
+{
+	phys_addr_t dlme_data_pa, evlog_pa;
+	struct dlme_data_header *hdr;
+	u64 hdr_size, prot_size, map_size, dlme_data_size;
+	u64 evlog_size_initial;
+	size_t evlog_max, evlog_off;
+	u8 *evlog_va;
+	unsigned int i;
+
+	if (!sl_dlme_region_pa)
+		return;
+
+	dlme_data_pa = sl_dlme_region_pa + sl_dlme_data_offset;
+
+	/* Read offsets from the DLME data header. Unmap before we touch
+	 * the event log to avoid fixmap-slot overlap on the same page.
+	 */
+	hdr = early_memremap(dlme_data_pa, sizeof(*hdr));
+	if (!hdr)
+		panic("slaunch: event log: cannot map DLME data header\n");
+	hdr_size            = le16_to_cpu(hdr->this_hdr_size);
+	prot_size           = le64_to_cpu(hdr->protected_regions_size);
+	map_size            = le64_to_cpu(hdr->address_map_size);
+	dlme_data_size      = le64_to_cpu(hdr->dlme_data_size);
+	evlog_size_initial  = le64_to_cpu(hdr->drtm_event_log_size);
+	early_memunmap(hdr, sizeof(*hdr));
+
+	if (evlog_size_initial == 0)
+		panic("slaunch: DCE published empty DRTM event log\n");
+
+	/*
+	 * Event log runs from after header+protected_regions+address_map to
+	 * the end of the DLME data region: evlog_max is capacity, DCE used
+	 * the first evlog_size_initial bytes, DLME appends into the slack.
+	 * Guard the sub-region arithmetic against u64 wrap/underflow.
+	 */
+	{
+		u64 sub_total;
+
+		if (check_add_overflow(hdr_size, prot_size, &sub_total) ||
+		    check_add_overflow(sub_total, map_size, &sub_total))
+			panic("slaunch: DLME header sub-region sizes wrap u64 (hdr=%llu prot=%llu map=%llu)\n",
+			      hdr_size, prot_size, map_size);
+		if (sub_total > sl_dlme_data_size)
+			panic("slaunch: DLME header sub-region total %llu exceeds dlme_data_size %llu\n",
+			      sub_total, sl_dlme_data_size);
+
+		evlog_pa  = dlme_data_pa + sub_total;
+		evlog_max = (size_t)(sl_dlme_data_size - sub_total);
+	}
+
+	pr_info("slaunch: DRTM event log buffer: PA 0x%llx, capacity %zu B, DCE used %llu B, slack %zu B\n",
+		(u64)evlog_pa, evlog_max, evlog_size_initial,
+		evlog_max - (size_t)evlog_size_initial);
+
+	evlog_va = early_memremap(evlog_pa, evlog_max);
+	if (!evlog_va)
+		panic("slaunch: cannot map DRTM event log at 0x%llx (%zu B)\n",
+		      (u64)evlog_pa, evlog_max);
+
+	/* Append DLME events after DCE's events, in-place in DLME data. */
+	evlog_off = (size_t)evlog_size_initial;
+	for (i = 0; i < slaunch_measurement_count; i++) {
+		const struct slaunch_measurement *m = &slaunch_measurements[i];
+		size_t dlen = strnlen(m->desc, sizeof(m->desc));
+
+		if (sl_evlog_append_event2(evlog_va, &evlog_off, evlog_max,
+					   SL_DRTM_PCR_INDEX,
+					   SL_EV_PLATFORM_CONFIG_FLAGS,
+					   m->hash, m->desc, (u32)dlen))
+			panic("slaunch: event log overflow at DLME entry %u (%s) — bump Preamble's sl_dlme_data_reserve\n",
+			      i, m->desc);
+	}
+
+	pr_info("slaunch: DRTM event log: appended %u DLME entries (%zu B); new total %zu B\n",
+		slaunch_measurement_count,
+		evlog_off - (size_t)evlog_size_initial, evlog_off);
+
+	/* Canonical event-log bytes (DCE + DLME) are what a verifier
+	 * replays; exposed for inspection rather than dumped to the log.
+	 */
+	pr_info("slaunch: DRTM event log canonical size (DCE + DLME): %zu B\n",
+		evlog_off);
+
+	early_memunmap(evlog_va, evlog_max);
+
+	/* Update the DLME data header so drtm_event_log_size reflects
+	 * what we just wrote. Verifier reads (PA, size) from the header
+	 * to know what to replay.
+	 */
+	hdr = early_memremap(dlme_data_pa, sizeof(*hdr));
+	if (!hdr)
+		panic("slaunch: cannot re-map DLME data header to update size\n");
+	hdr->drtm_event_log_size = cpu_to_le64(evlog_off);
+	early_memunmap(hdr, sizeof(*hdr));
+
+	pr_info("slaunch: DLME event log entries (PCR %u, EV_PLATFORM_CONFIG_FLAGS):\n",
+		SL_DRTM_PCR_INDEX);
+	for (i = 0; i < slaunch_measurement_count; i++) {
+		const struct slaunch_measurement *m = &slaunch_measurements[i];
+
+		pr_info("slaunch:   [%2u] %-12s SHA-256: %*phN\n",
+			i, m->desc, SHA256_DIGEST_SIZE, m->hash);
+	}
+}
+/*
+ * Adds event-log extension: re-reserve DLME data,
+ * verify hash algo, measure ACPI tables, extend the DRTM event log.
  */
 void __init slaunch_measure_post_efi(void)
 {
@@ -1090,6 +1257,7 @@ void __init slaunch_measure_post_efi(void)
 	slaunch_measurements_init();
 	slaunch_verify_hash_algo();
 	slaunch_measure_acpi();
+	slaunch_extend_drtm_event_log();
 
 	if (dcrtm_regions) {
 		early_memunmap(dcrtm_regions,
