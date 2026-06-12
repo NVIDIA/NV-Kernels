@@ -871,14 +871,9 @@ void __init slaunch_setup(void)
 				     le16_to_cpu(hdr->this_hdr_size),
 				     le64_to_cpu(hdr->protected_regions_size));
 
-	/* Reserve DLME data region in memblock so kernel won't reuse it.
-	 * NOTE: efi_init() runs after us and calls memblock_remove(0,
-	 * PHYS_ADDR_MAX) which wipes this reservation. slaunch_validate_efi
-	 * re-reserves using the saved values below.
-	 */
+	/* Stash for slaunch_reserve_dlme_data() to reserve post-efi_init. */
 	sl_dlme_data_pa = dlme_data_pa;
 	sl_dlme_data_size = le64_to_cpu(hdr->dlme_data_size);
-	memblock_reserve(sl_dlme_data_pa, sl_dlme_data_size);
 
 	early_memunmap(hdr, sizeof(*hdr));
 
@@ -905,6 +900,14 @@ void __init slaunch_setup(void)
 		slaunch_inject_fault(&efi_info);
 		slaunch_validate_efi_early(&efi_info);
 	}
+}
+
+/* Reserve DLME data after efi_init's memblock_remove(0, PHYS_ADDR_MAX). */
+void __init slaunch_reserve_dlme_data(void)
+{
+	if (!sl_dlme_data_pa || !sl_dlme_data_size)
+		return;
+	memblock_reserve(sl_dlme_data_pa, sl_dlme_data_size);
 }
 
 /*
@@ -1130,9 +1133,11 @@ static void __init slaunch_measure_acpi(void)
 		panic("slaunch: RSDP header remap failed at 0x%llx\n",
 		      (u64)rsdp_pa);
 
+	/* ACPI 2.0+ RSDP must be >= 36 bytes so xsdt_pa (offset 24-31) is measured. */
 	rsdp_len = *(u32 *)((u8 *)rsdp + RSDP_OFF_LEN);
-	if (!rsdp_len)
-		rsdp_len = RSDP_SIZE_V1;
+	if (rsdp_len < RSDP_MIN_MAP)
+		panic("slaunch: RSDP length %u < %u\n",
+		      rsdp_len, (u32)RSDP_MIN_MAP);
 	xsdt_pa = *(u64 *)((u8 *)rsdp + RSDP_OFF_XSDT);
 	early_memunmap(rsdp, RSDP_MIN_MAP);
 
@@ -1277,20 +1282,15 @@ static void __init slaunch_inject_initrd(u64 *start, u64 *size);
  * before any read and failures are fatal. Absence is legitimate and
  * logged (no marker hash); the verifier infers coverage from the event.
  */
-static void __init slaunch_measure_initrd(void)
+/* Returns validated (post-inject) start/size, or false if no initrd. */
+static bool __init slaunch_validate_initrd_extents(u64 *out_start, u64 *out_size)
 {
 	u64 start = phys_initrd_start;
 	u64 size = phys_initrd_size;
-	u64 end, dlme_size, off = 0, remaining;
-	struct sha256_ctx sctx;
-	u8 hash[SHA256_DIGEST_SIZE];
-	struct slaunch_measurement *m;
-	void *p;
+	u64 end, dlme_size;
 
-	if (!start || !size) {
-		pr_info("slaunch: no initrd present, skipping measurement\n");
-		return;
-	}
+	if (!start || !size)
+		return false;
 
 #ifdef CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT
 	slaunch_inject_initrd(&start, &size);
@@ -1313,6 +1313,34 @@ static void __init slaunch_measure_initrd(void)
 				   sl_dlme_region_pa, dlme_size))
 		panic("slaunch: initrd [0x%llx+%llu] overlaps DLME region [0x%llx+%llu]\n",
 		      start, size, (u64)sl_dlme_region_pa, dlme_size);
+
+	*out_start = start;
+	*out_size = size;
+	return true;
+}
+
+/* Called from slaunch_setup, before arm64_memblock_init consumes the extents. */
+void __init slaunch_validate_initrd(void)
+{
+	u64 start, size;
+
+	if (!sl_dlme_region_pa)
+		return;
+	if (!slaunch_validate_initrd_extents(&start, &size))
+		pr_info("slaunch: no initrd present, skipping measurement\n");
+}
+
+static void __init slaunch_measure_initrd(void)
+{
+	u64 start, size;
+	u64 off = 0, remaining;
+	struct sha256_ctx sctx;
+	u8 hash[SHA256_DIGEST_SIZE];
+	struct slaunch_measurement *m;
+	void *p;
+
+	if (!slaunch_validate_initrd_extents(&start, &size))
+		return;
 
 	/*
 	 * Chunked early_memremap + streaming SHA-256: the initrd can
