@@ -1562,6 +1562,15 @@ void __init slaunch_measure_post_efi(void)
 	slaunch_selftest();
 	slaunch_verify_hash_algo();
 	slaunch_measure_acpi();
+
+	/*
+	 * Measure the effective kernel command line (boot_command_line, the
+	 * post-/chosen cmdline the kernel actually used). Per-deployment
+	 * variance makes the hash vary, so verifier policy must allow for it
+	 * (or pin it via CONFIG_CMDLINE_FORCE).
+	 */
+	slaunch_measure("CMDLINE", boot_command_line, strlen(boot_command_line));
+
 	slaunch_measure_initrd();
 	slaunch_extend_drtm_event_log();
 
