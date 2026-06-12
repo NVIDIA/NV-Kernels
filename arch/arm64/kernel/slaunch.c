@@ -1321,10 +1321,234 @@ static void __init slaunch_extend_drtm_event_log(void)
 			i, m->desc, SHA256_DIGEST_SIZE, m->hash);
 	}
 }
+
+#ifdef CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT
 /*
- * Adds initrd measurement: re-reserve DLME data,
- * verify hash algo, measure ACPI tables, measure initrd, extend the
- * DRTM event log.
+ * Negative-test fault injection (slaunch_inject=<token>): mutates the
+ * raw EFI mmap before slaunch_validate_efi_early so the validator panics
+ * (a passing negative test). Tokens: mmap_wrap, mmap_pages_overflow,
+ * mmap_size_huge, systab_nr_tables_huge. Not for production.
+ */
+static bool __init sl_cmdline_has(const char *tok)
+{
+	return strstr(boot_command_line, tok);
+}
+
+/* Mutate one descriptor in the raw EFI mmap buffer. Returns true if
+ * we found a CONVENTIONAL_MEMORY descriptor and applied the mutation.
+ */
+typedef void (*sl_md_mutator_t)(efi_memory_desc_t *md);
+
+static bool __init slaunch_inject_raw_mmap(const struct sl_efi_info *info,
+					   sl_md_mutator_t mutate)
+{
+	void *mmap;
+	u64 offset;
+	bool applied = false;
+
+	mmap = early_memremap(info->mmap_pa, info->mmap_size);
+	if (!mmap) {
+		pr_warn("slaunch: INJECT: failed to map raw mmap\n");
+		return false;
+	}
+	for (offset = 0; offset < info->mmap_size; offset += info->desc_size) {
+		efi_memory_desc_t *md =
+			(efi_memory_desc_t *)((u8 *)mmap + offset);
+
+		if (md->type != EFI_CONVENTIONAL_MEMORY)
+			continue;
+		mutate(md);
+		applied = true;
+		break;
+	}
+	early_memunmap(mmap, info->mmap_size);
+	return applied;
+}
+
+static void __init sl_mutate_mmap_wrap(efi_memory_desc_t *md)
+{
+	/* phys_addr + num_pages*4096 wraps past U64_MAX */
+	md->num_pages = (~md->phys_addr / EFI_PAGE_SIZE) + 2;
+	pr_warn("slaunch: INJECT mmap_wrap on phys=0x%llx -> num_pages=%llu (expect panic 'wraps u64')\n",
+		md->phys_addr, md->num_pages);
+}
+
+static void __init sl_mutate_mmap_pages_overflow(efi_memory_desc_t *md)
+{
+	/* num_pages * EFI_PAGE_SIZE itself overflows */
+	md->num_pages = (U64_MAX / EFI_PAGE_SIZE) + 2;
+	pr_warn("slaunch: INJECT mmap_pages_overflow on phys=0x%llx -> num_pages=%llu (expect panic 'overflows u64')\n",
+		md->phys_addr, md->num_pages);
+}
+
+static void __init slaunch_inject_fault(struct sl_efi_info *info)
+{
+	if (!info->present) {
+		/* Nothing to inject into. */
+		return;
+	}
+
+	if (sl_cmdline_has("slaunch_inject=mmap_wrap")) {
+		if (!slaunch_inject_raw_mmap(info, sl_mutate_mmap_wrap))
+			pr_warn("slaunch: INJECT mmap_wrap: no EFI_CONVENTIONAL_MEMORY descriptor found\n");
+		return;
+	}
+	if (sl_cmdline_has("slaunch_inject=mmap_pages_overflow")) {
+		if (!slaunch_inject_raw_mmap(info, sl_mutate_mmap_pages_overflow))
+			pr_warn("slaunch: INJECT mmap_pages_overflow: no EFI_CONVENTIONAL_MEMORY descriptor found\n");
+		return;
+	}
+	if (sl_cmdline_has("slaunch_inject=mmap_size_huge")) {
+		/*
+		 * Inflate the local mmap size (a 48-multiple, so the
+		 * multiple-of-desc guard is not what trips) past any NORMAL
+		 * region so the containment check in validate_raw_mmap fires.
+		 */
+		info->mmap_size = (0x10000000000ULL / 48ULL) * 48ULL;
+		pr_warn("slaunch: INJECT mmap_size_huge: info->mmap_size=%llu (expect panic 'NOT entirely in NORMAL')\n",
+			info->mmap_size);
+		return;
+	}
+	if (sl_cmdline_has("slaunch_inject=systab_nr_tables_huge")) {
+		/*
+		 * Inflate nr_tables in-place so nr_tables * sizeof(entry)
+		 * overflows and check_mul_overflow in validate_raw_systab panics.
+		 */
+		efi_system_table_t *systab;
+
+		systab = early_memremap(info->systab_pa,
+					sizeof(efi_system_table_t));
+		if (!systab) {
+			pr_warn("slaunch: INJECT systab_nr_tables_huge: remap failed\n");
+			return;
+		}
+		systab->nr_tables =
+			(ULONG_MAX / sizeof(efi_config_table_t)) + 1UL;
+		pr_warn("slaunch: INJECT systab_nr_tables_huge: nr_tables=%lu (expect panic 'overflows tbl_size')\n",
+			(unsigned long)systab->nr_tables);
+		early_memunmap(systab, sizeof(efi_system_table_t));
+		return;
+	}
+}
+
+/*
+ * Negative-test fault injection for initrd measurement (cmdline
+ * slaunch_inject=<token>). Mutates the local start/size copies before
+ * validation, exercising the same path an attacker-controlled DTB would.
+ * Tokens: initrd_wrap, initrd_size_huge, initrd_outside_normal, _overlap_dlme.
+ */
+static void __init slaunch_inject_initrd(u64 *start, u64 *size)
+{
+	if (sl_cmdline_has("slaunch_inject=initrd_wrap")) {
+		*size = (~(*start)) + 2;
+		pr_warn("slaunch: INJECT initrd_wrap: start=0x%llx size=%llu (expect panic 'wraps u64')\n",
+			*start, *size);
+		return;
+	}
+	if (sl_cmdline_has("slaunch_inject=initrd_size_huge")) {
+		/*
+		 * Force the initrd end past its NORMAL region with a size just
+		 * below the u64 wrap, so check_add_overflow passes and the
+		 * NORMAL-containment check is what panics.
+		 */
+		if (*start && U64_MAX - *start > 1ULL)
+			*size = U64_MAX - *start - 1ULL;
+		else
+			*size = (1ULL << 62);
+		pr_warn("slaunch: INJECT initrd_size_huge: size=%llu (expect panic 'NOT in NORMAL region')\n",
+			*size);
+		return;
+	}
+	if (sl_cmdline_has("slaunch_inject=initrd_outside_normal")) {
+		*start = 0x1c090000ULL;
+		*size = PAGE_SIZE;
+		pr_warn("slaunch: INJECT initrd_outside_normal: start=0x%llx (expect panic 'NOT in NORMAL region')\n",
+			*start);
+		return;
+	}
+	if (sl_cmdline_has("slaunch_inject=initrd_overlap_dlme")) {
+		*start = sl_dlme_region_pa;
+		*size = PAGE_SIZE;
+		pr_warn("slaunch: INJECT initrd_overlap_dlme: start=0x%llx (expect panic 'overlaps DLME')\n",
+			*start);
+		return;
+	}
+}
+#endif /* CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT */
+
+#ifdef CONFIG_ARM64_SECURE_LAUNCH_SELFTEST
+/*
+ * Self-test of the validation guards (end of slaunch_measure_post_efi).
+ * Calls the helpers with crafted wrapping inputs plus valid ones; the
+ * helpers must reject the bad and accept the good, else panic with a
+ * "selftest:" prefix that the harness flags as a regression.
+ */
+static void __init slaunch_selftest(void)
+{
+	/* T1: dcrtm_range_in_normal MUST reject wrapping start+size */
+	if (dcrtm_range_in_normal(0xFFFFFFFFFFFFE000ULL, 0x10000ULL))
+		panic("selftest: dcrtm_range_in_normal accepted wrapping range\n");
+
+	/* T2: dcrtm_range_in_normal MUST reject size==0 */
+	if (dcrtm_range_in_normal(0x80000000ULL, 0))
+		panic("selftest: dcrtm_range_in_normal accepted size=0\n");
+
+	/* T3: dcrtm_range_in_normal MUST accept a known-good NORMAL range
+	 * (one page in NS DRAM). Regression check.
+	 */
+	if (!dcrtm_range_in_normal(0x80000000ULL, EFI_PAGE_SIZE))
+		panic("selftest: dcrtm_range_in_normal rejected known NORMAL range (regression)\n");
+
+	/* T4: dcrtm_range_overlaps_non_normal MUST fail closed on wrap
+	 * (returns RSVD instead of -1).
+	 */
+	if (dcrtm_range_overlaps_non_normal(0xFFFFFFFFFFFFE000ULL,
+					    0x10000ULL) != DRTM_REGION_TYPE_RSVD)
+		panic("selftest: dcrtm_range_overlaps_non_normal did not fail closed on wrap\n");
+
+	/* T5: efi_regions_overlap MUST fail closed (true) on either wrap */
+	if (!efi_regions_overlap(0xFFFFFFFFFFFFE000ULL, 0x10000ULL,
+				 0x80000000ULL, EFI_PAGE_SIZE))
+		panic("selftest: efi_regions_overlap did not fail closed on wrap\n");
+
+	/* T6: efi_regions_overlap on disjoint ranges MUST return false */
+	if (efi_regions_overlap(0x80000000ULL, 0x1000ULL,
+				0x90000000ULL, 0x1000ULL))
+		panic("selftest: efi_regions_overlap reported false overlap on disjoint ranges\n");
+
+	/* T7: efi_regions_overlap on truly-overlapping ranges MUST return true */
+	if (!efi_regions_overlap(0x80000000ULL, 0x10000ULL,
+				 0x80008000ULL, 0x10000ULL))
+		panic("selftest: efi_regions_overlap missed real overlap\n");
+
+	/* T8: check_mul_overflow catches num_pages * EFI_PAGE_SIZE wrap
+	 * (the macro behind the slaunch_validate_efi guard).
+	 */
+	{
+		u64 out;
+
+		if (!check_mul_overflow((u64)0x10000000000000ULL,
+					(u64)EFI_PAGE_SIZE, &out))
+			panic("selftest: check_mul_overflow missed num_pages*PAGE_SIZE wrap\n");
+	}
+
+	pr_info("slaunch: ALL SELFTESTS PASSED (8/8)\n");
+}
+#endif /* CONFIG_ARM64_SECURE_LAUNCH_SELFTEST */
+
+/*
+ * All validation of untrusted EFI inputs happens in slaunch_setup()
+ * via slaunch_validate_efi_early() — before efi_init() ingests them.
+ * This post-efi_init slot keeps only the jobs that require
+ * efi_init's outputs:
+ *
+ *  - Re-reserve DLME data in memblock (efi_init's
+ *    memblock_remove(0, PHYS_ADDR_MAX) wipes the slaunch_setup
+ *    reservation).
+ *  - Measure ACPI tables via efi.acpi20 (which efi_init populated
+ *    from the now pre-validated ConfigurationTable).
+ *  - Run the validation-helper self-test
+ *    (CONFIG_ARM64_SECURE_LAUNCH_SELFTEST).
  */
 void __init slaunch_measure_post_efi(void)
 {
@@ -1335,11 +1559,17 @@ void __init slaunch_measure_post_efi(void)
 		memblock_reserve(sl_dlme_data_pa, sl_dlme_data_size);
 
 	slaunch_measurements_init();
+	slaunch_selftest();
 	slaunch_verify_hash_algo();
 	slaunch_measure_acpi();
 	slaunch_measure_initrd();
 	slaunch_extend_drtm_event_log();
 
+	/*
+	 * Release the dcrtm_regions early_memremap_ro slot; no further
+	 * validators consume it. NULLing the pointer makes any stray
+	 * post-init caller fail-fast in dcrtm_range_in_normal's guard.
+	 */
 	if (dcrtm_regions) {
 		early_memunmap(dcrtm_regions,
 			       dcrtm_num_regions * sizeof(*dcrtm_regions));
@@ -1347,5 +1577,40 @@ void __init slaunch_measure_post_efi(void)
 	}
 }
 
-/* Placeholder; populated by a subsequent patch. */
-void slaunch_exit(void) { }
+/*
+ * Release DRTM DMA protection after IOMMU/SMMU drivers have
+ * established their own DMA isolation.
+ */
+static int __init slaunch_unprotect_memory(void)
+{
+	struct arm_smccc_res res;
+
+	if (!sl_dlme_region_pa)
+		return 0;
+
+	pr_info("slaunch: Calling DRTM_UNPROTECT_MEMORY\n");
+	arm_smccc_smc(DRTM_SMC_UNPROTECT_MEMORY, 0, 0, 0, 0, 0, 0, 0, &res);
+	if (res.a0 != DRTM_SUCCESS) {
+		pr_err("slaunch: UNPROTECT_MEMORY failed: %ld\n",
+		       (long)res.a0);
+		return -EIO;
+	}
+
+	pr_info("slaunch: DMA protection released\n");
+	return 0;
+}
+late_initcall(slaunch_unprotect_memory);
+
+/*
+ * Clean up DRTM state before kexec or reboot. Do not call
+ * DRTM_SET_ERROR(0): per DEN0113 v1.2 §3.8 its argument is the persisted
+ * error code, zero is reserved, and no "clear errors" semantics exists.
+ */
+void slaunch_exit(void)
+{
+	if (!sl_dlme_region_pa)
+		return;
+
+	pr_info("slaunch: Cleaning DRTM state before kexec/reboot\n");
+	sl_dlme_region_pa = 0;
+}
