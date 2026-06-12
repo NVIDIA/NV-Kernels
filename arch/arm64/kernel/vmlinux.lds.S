@@ -239,7 +239,20 @@ SECTIONS
 	__init_begin = .;
 	__inittext_begin = .;
 
-	INIT_TEXT_SECTION(8)
+	/*
+	 * Inlined INIT_TEXT_SECTION(8) with extra .efistub.text/.rodata
+	 * catchers so the renamed EFI-stub text/rodata stays inside
+	 * [_sinittext, _einittext) and the PE/COFF .text range; otherwise
+	 * the stub entry point lands in PE .data and the loader rejects it.
+	 */
+	. = ALIGN(8);
+	.init.text : {
+		_sinittext = .;
+		INIT_TEXT
+		*(.efistub.text  .efistub.text.*)
+		*(.efistub.rodata .efistub.rodata.*)
+		_einittext = .;
+	}
 
 	__exittext_begin = .;
 	.exit.text : {
@@ -270,7 +283,9 @@ SECTIONS
 		INIT_CALLS
 		CON_INITCALL
 		INIT_RAM_FS
-		*(.init.altinstructions .init.bss)	/* from the EFI stub */
+		*(.init.altinstructions .init.bss)	/* from PI / EFI stub */
+		/* .efistub.data / .efistub.bss are placed past _edata
+		 * in their own .efistub PROGBITS block, see below. */
 	}
 	.exit.data : {
 		EXIT_DATA
@@ -327,8 +342,29 @@ SECTIONS
 	}
 
 	PECOFF_EDATA_PADDING
-	__pecoff_data_rawsize = ABSOLUTE(. - __initdata_begin);
 	_edata = .;
+
+	/*
+	 * EFI-stub writable statics (.efistub.data/.bss) placed AFTER _edata
+	 * so the DRTM measurement bounds [_text, _edata) never cover
+	 * stub-mutable data; __pecoff_data_rawsize is computed past
+	 * __efistub_end. Stub text/rodata stay in PE .text (buckets above).
+	 */
+	. = ALIGN(PAGE_SIZE);
+	__efistub_start = .;
+	.efistub : ALIGN(PAGE_SIZE) {
+		*(.efistub.data  .efistub.data.*)
+		*(.efistub.bss   .efistub.bss.*)
+	}
+	__efistub_end = .;
+
+	/*
+	 * Materialize the trailing PE/COFF FileAlignment padding as a real
+	 * PROGBITS section so `objcopy -O binary` writes the bytes; else the
+	 * PE rawsize claims more than the file holds and the loader rejects it.
+	 */
+	.efistub_pad : { BYTE(0); . = ALIGN(PECOFF_FILE_ALIGNMENT); }
+	__pecoff_data_rawsize = ABSOLUTE(. - __initdata_begin);
 
 	/* start of zero-init region */
 	BSS_SECTION(SBSS_ALIGN, 0, 0)
