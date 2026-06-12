@@ -73,7 +73,11 @@ struct drtm_parameters {
 	u64	mem_prot_table_size;
 } __packed;
 
-/* Memory Region Descriptor Table (DEN0113 v1.2 §3.14, Table 11) */
+/*
+ * Memory Region Descriptor Table (DEN0113 v1.2 §3.14, Table 11): header
+ * followed by num_regions descriptors, consumed in place from the DLME
+ * data region (no fixed-size copy, no region-count cap).
+ */
 struct drtm_mem_region_hdr {
 	u16	revision;
 	u16	reserved;
