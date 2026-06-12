@@ -47,9 +47,19 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 #endif
 	*image_addr = (unsigned long)_text;
 
-	return efi_kaslr_relocate_kernel(image_addr, reserve_addr, reserve_size,
-					 kernel_size, kernel_codesize, kernel_memsize,
-					 efi_kaslr_get_phys_seed(image_handle));
+	{
+		efi_status_t st;
+
+		st = efi_kaslr_relocate_kernel(image_addr, reserve_addr,
+					       reserve_size, kernel_size,
+					       kernel_codesize, kernel_memsize,
+					       efi_kaslr_get_phys_seed(image_handle));
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+		if (st == EFI_SUCCESS)
+			efi_slaunch_scrub_imagebase(*image_addr);
+#endif
+		return st;
+	}
 }
 
 asmlinkage void primary_entry(void);
