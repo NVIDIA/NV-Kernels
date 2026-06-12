@@ -137,7 +137,7 @@ STUBCOPY_RELOC-$(CONFIG_ARM)	:= R_ARM_ABS
 # a verification pass to see if any absolute relocations exist in any of the
 # object files.
 #
-STUBCOPY_FLAGS-$(CONFIG_ARM64)	+= --prefix-alloc-sections=.init \
+STUBCOPY_FLAGS-$(CONFIG_ARM64)	+= --prefix-alloc-sections=.efistub \
 				   --prefix-symbols=__efistub_
 STUBCOPY_RELOC-$(CONFIG_ARM64)	:= R_AARCH64_ABS
 
