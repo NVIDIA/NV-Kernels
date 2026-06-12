@@ -136,6 +136,60 @@ void efi_slaunch_get_dlme_data_size(void)
 }
 
 /*
+ * Zero the PE/COFF Optional Header ImageBase on the relocated kernel
+ * buffer (pre-EBS): LoadImage patched it with the load PA, diverging the
+ * D-CRTM-measured bytes from the on-disk Image. Pre-EBS because
+ * efi_remap_image() marked the header RO; flip RW, zero, restore RO.
+ */
+void efi_slaunch_scrub_imagebase(unsigned long kernel_addr)
+{
+	efi_guid_t guid = EFI_MEMORY_ATTRIBUTE_PROTOCOL_GUID;
+	efi_memory_attribute_protocol_t *memattr;
+	efi_status_t status;
+	u32 e_lfanew;
+	volatile u64 *image_base_ptr;
+	unsigned long page_base;
+
+	if (!kernel_addr)
+		return;
+
+	e_lfanew = *(volatile u32 *)((char *)kernel_addr + 0x3c);
+	image_base_ptr = (volatile u64 *)((char *)kernel_addr +
+					  e_lfanew + 4 + 20 + 0x18);
+	page_base = (unsigned long)image_base_ptr & ~(SL_DRTM_PAGE_SIZE - 1UL);
+
+	status = efi_bs_call(locate_protocol, &guid, NULL, (void **)&memattr);
+	if (status != EFI_SUCCESS) {
+		efi_warn("DRTM: no EFI_MEMORY_ATTRIBUTE_PROTOCOL; "
+			 "skipping PE ImageBase scrub\n");
+		return;
+	}
+
+	status = memattr->clear_memory_attributes(memattr, page_base,
+						  SL_DRTM_PAGE_SIZE,
+						  EFI_MEMORY_RO);
+	if (status != EFI_SUCCESS) {
+		efi_warn("DRTM: clear EFI_MEMORY_RO failed for PE header page: 0x%lx\n",
+			 status);
+		return;
+	}
+
+	*image_base_ptr = 0;
+	sl_dc_cvac_range((unsigned long)image_base_ptr, 8);
+	asm volatile("dsb sy" : : : "memory");
+
+	status = memattr->set_memory_attributes(memattr, page_base,
+						SL_DRTM_PAGE_SIZE,
+						EFI_MEMORY_RO);
+	if (status != EFI_SUCCESS)
+		efi_warn("DRTM: restore EFI_MEMORY_RO on PE header page failed: 0x%lx\n",
+			 status);
+
+	efi_info("DRTM: PE ImageBase zeroed at 0x%lx\n",
+		 (unsigned long)image_base_ptr);
+}
+
+/*
  * Token-aware cmdline match: true iff `tok` is a standalone
  * whitespace-delimited word in `cmdline`, not a substring of another
  * option (so "drtm=on" does not match "nodrtm=on" or "root=...drtm=on").
@@ -238,6 +292,11 @@ void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 	sl_dc_cvac_range((unsigned long)params, sizeof(*params));
 	sl_dc_cvac_range(kernel_addr + dlme_data_offset +
 			 SL_DLME_DTB_SLOT_OFFSET, sizeof(u64));
+	/*
+	 * NOTE: the PE ImageBase scrub happens pre-EBS in
+	 * efi_slaunch_scrub_imagebase(); the memory-attribute protocol used
+	 * to unprotect the header page is unreachable after boot services exit.
+	 */
 	asm volatile("dsb sy" : : : "memory");
 
 	/*
