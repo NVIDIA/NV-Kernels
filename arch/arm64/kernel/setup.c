@@ -338,6 +338,12 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	paging_init();
 
+	/*
+	 * Measure ACPI tables before acpi_boot_table_init() consumes them;
+	 * after paging_init() so memblock_alloc() returns linear-mapped ptrs.
+	 */
+	slaunch_measure_post_efi();
+
 	acpi_table_upgrade();
 
 	/* Parse the ACPI tables for possible boot-time configuration */
