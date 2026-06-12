@@ -459,10 +459,207 @@ static void __init slaunch_read_chosen_efi(struct sl_efi_info *info)
 #undef _GET32
 	info->present = true;
 }
+
+/*
+ * Per-GUID minimum sizes for known EFI ConfigurationTable entries (spec
+ * entry-point minimums, e.g. RSDP v2.0+ = 36 B); the validator checks
+ * NORMAL containment of this size, not a flat 4 KB. Unknown GUIDs use
+ * SL_CFGTBL_UNKNOWN_BOUND.
+ */
+struct sl_cfgtbl_size_entry {
+	efi_guid_t	guid;
+	u32		min_size;
+};
+
+static const struct sl_cfgtbl_size_entry sl_cfgtbl_sizes[] __initconst = {
+	{ ACPI_20_TABLE_GUID,			36 },	/* RSDP v2.0+ */
+	{ SMBIOS3_TABLE_GUID,			24 },	/* SMBIOS3 entry point */
+	{ EFI_RT_PROPERTIES_TABLE_GUID,		8  },	/* version + flags */
+	{ LINUX_EFI_MEMRESERVE_TABLE_GUID,	32 },	/* header struct */
+	{ LINUX_EFI_RANDOM_SEED_TABLE_GUID,	32 },	/* header struct */
+};
+
+#define SL_CFGTBL_UNKNOWN_BOUND		EFI_PAGE_SIZE
+
+static u32 __init sl_cfgtbl_min_size(const efi_guid_t *guid)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(sl_cfgtbl_sizes); i++) {
+		if (efi_guidcmp(*guid, sl_cfgtbl_sizes[i].guid) == 0)
+			return sl_cfgtbl_sizes[i].min_size;
+	}
+	return SL_CFGTBL_UNKNOWN_BOUND;
+}
+
+/* Validate System Table + ConfigurationTable pointers against D-CRTM
+ * map. Runs pre-efi_init, panics on bad input.
+ */
+static void __init slaunch_validate_raw_systab(u64 systab_pa)
+{
+	efi_system_table_t *systab;
+	efi_config_table_t *cfgtbl;
+	unsigned long tables_pa;
+	unsigned long nr_tables;
+	size_t tbl_size;
+	unsigned long j;
+
+	if (!dcrtm_range_in_normal(systab_pa, sizeof(efi_system_table_t)))
+		panic("slaunch: EFI System Table PA 0x%llx NOT in NORMAL region\n",
+		      systab_pa);
+
+	systab = early_memremap_ro(systab_pa, sizeof(efi_system_table_t));
+	if (!systab)
+		panic("slaunch: failed to map EFI System Table at 0x%llx\n",
+		      systab_pa);
+
+	nr_tables = systab->nr_tables;
+	tables_pa = (unsigned long)systab->tables;
+	early_memunmap(systab, sizeof(efi_system_table_t));
+
+	if (nr_tables == 0 || !tables_pa) {
+		pr_info("slaunch: EFI System Table has no ConfigurationTable entries\n");
+		return;
+	}
+	/*
+	 * Reject nr_tables that overflow when multiplied by the per-entry
+	 * size; NORMAL containment then caps any structurally too-large value.
+	 */
+	if (check_mul_overflow(nr_tables,
+			       (unsigned long)sizeof(efi_config_table_t),
+			       &tbl_size))
+		panic("slaunch: EFI System Table nr_tables=%lu overflows tbl_size\n",
+		      nr_tables);
+
+	if (!dcrtm_range_in_normal(tables_pa, tbl_size))
+		panic("slaunch: EFI ConfigurationTable array at 0x%lx NOT in NORMAL region\n",
+		      tables_pa);
+
+	cfgtbl = early_memremap_ro(tables_pa, tbl_size);
+	if (!cfgtbl)
+		panic("slaunch: failed to map ConfigurationTable at 0x%lx\n",
+		      tables_pa);
+
+	for (j = 0; j < nr_tables; j++) {
+		unsigned long tbl_ptr = (unsigned long)cfgtbl[j].table;
+		u32 size;
+
+		if (!tbl_ptr)
+			continue;
+		size = sl_cfgtbl_min_size(&cfgtbl[j].guid);
+		if (!dcrtm_range_in_normal(tbl_ptr, size))
+			panic("slaunch: EFI ConfigurationTable[%lu] 0x%lx [size %u] NOT in NORMAL region\n",
+			      j, tbl_ptr, size);
+	}
+	early_memunmap(cfgtbl, tbl_size);
+	pr_info("slaunch: early EFI System Table validation PASSED (%lu entries)\n",
+		nr_tables);
+}
+
+/*
+ * Validate the raw EFI memory map at /chosen/linux,uefi-mmap-start.
+ * Walks descriptors at desc-size stride (NOT sizeof(efi_memory_desc_t),
+ * which can differ for forward compatibility), pre-efi_init.
+ */
+static void __init slaunch_validate_raw_mmap(const struct sl_efi_info *info)
+{
+	void *mmap;
+	u64 offset;
+	u32 ndesc, nchecked = 0;
+
+	/* Validate desc-size / desc-ver / mmap-size sanity. */
+	if (info->desc_ver != 1)
+		panic("slaunch: linux,uefi-mmap-desc-ver=%u (expected 1)\n",
+		      info->desc_ver);
+	if (info->desc_size < sizeof(efi_memory_desc_t) || info->desc_size > 128)
+		panic("slaunch: linux,uefi-mmap-desc-size=%u out of sane range\n",
+		      info->desc_size);
+	if (info->mmap_size == 0 ||
+	    info->mmap_size % info->desc_size != 0)
+		panic("slaunch: linux,uefi-mmap-size=%llu not a multiple of desc-size=%u\n",
+		      info->mmap_size, info->desc_size);
+
+	/*
+	 * mmap_pa + mmap_size must not wrap u64 and must lie in a NORMAL
+	 * region; containment caps mmap_size, rejecting over-large values.
+	 */
+	{
+		u64 mmap_end;
+
+		if (check_add_overflow(info->mmap_pa, info->mmap_size, &mmap_end))
+			panic("slaunch: linux,uefi-mmap [0x%llx + %llu] wraps u64\n",
+			      info->mmap_pa, info->mmap_size);
+	}
+
+	/* The full mmap buffer must be in NORMAL memory. */
+	if (!dcrtm_range_in_normal(info->mmap_pa, info->mmap_size))
+		panic("slaunch: linux,uefi-mmap [0x%llx+0x%llx] NOT entirely in NORMAL\n",
+		      info->mmap_pa, info->mmap_size);
+
+	mmap = early_memremap_ro(info->mmap_pa, info->mmap_size);
+	if (!mmap)
+		panic("slaunch: failed to map raw EFI mmap at 0x%llx (size %llu)\n",
+		      info->mmap_pa, info->mmap_size);
+
+	ndesc = (u32)(info->mmap_size / info->desc_size);
+	for (offset = 0; offset < info->mmap_size; offset += info->desc_size) {
+		efi_memory_desc_t *md = (efi_memory_desc_t *)((u8 *)mmap + offset);
+		u64 phys = md->phys_addr;
+		u64 region_size, phys_end;
+		int otype;
+
+		/* Skip MMIO and EfiReservedMemoryType: secure carveouts are
+		 * reserved in the UEFI map but excluded from the NS-DRAM D-CRTM
+		 * map and never ingested as usable RAM, so need not be NORMAL. */
+		if (md->type == EFI_MEMORY_MAPPED_IO ||
+		    md->type == EFI_MEMORY_MAPPED_IO_PORT_SPACE ||
+		    md->type == EFI_RESERVED_TYPE)
+			continue;
+
+		/* num_pages * page_size overflow guard. */
+		if (check_mul_overflow(md->num_pages, (u64)EFI_PAGE_SIZE,
+				       &region_size))
+			panic("slaunch: raw EFI mmap[%llu]: type=%u num_pages=%llu overflows u64\n",
+			      offset / info->desc_size, md->type, md->num_pages);
+		/* phys_addr + region_size address-wrap guard. */
+		if (region_size &&
+		    check_add_overflow(phys, region_size, &phys_end))
+			panic("slaunch: raw EFI mmap[%llu]: [0x%012llx + 0x%llx] type=%u wraps u64\n",
+			      offset / info->desc_size, phys, region_size,
+			      md->type);
+
+		if (!dcrtm_range_in_normal(phys, region_size))
+			panic("slaunch: raw EFI mmap[%llu]: region [0x%012llx-0x%012llx] type=%u NOT in NORMAL\n",
+			      offset / info->desc_size, phys,
+			      phys + region_size, md->type);
+
+		otype = dcrtm_range_overlaps_non_normal(phys, region_size);
+		if (otype >= 0)
+			panic("slaunch: raw EFI mmap[%llu]: region [0x%012llx-0x%012llx] type=%u OVERLAPS %s\n",
+			      offset / info->desc_size, phys,
+			      phys + region_size, md->type,
+			      dcrtm_type_name(otype));
+		nchecked++;
+	}
+	early_memunmap(mmap, info->mmap_size);
+	pr_info("slaunch: early raw EFI mmap validation PASSED (%u of %u descriptors checked)\n",
+		nchecked, ndesc);
+}
+
+static void __init slaunch_validate_efi_early(const struct sl_efi_info *info)
+{
+	if (!info->present) {
+		pr_info("slaunch: /chosen does not have all linux,uefi-* properties — skipping early EFI validation\n");
+		return;
+	}
+	slaunch_validate_raw_systab(info->systab_pa);
+	slaunch_validate_raw_mmap(info);
+}
+
 /*
  * Process DRTM state early in setup_arch() (address map already parsed
  * by slaunch_early_init): reserve DLME data in memblock, CLOSE_LOCALITY,
- * assert full-range DMA lockdown, and disable EFI runtime services.
+ * disable EFI runtime services, and validate the DTB /chosen EFI pointers.
  */
 void __init slaunch_setup(void)
 {
@@ -490,9 +687,10 @@ void __init slaunch_setup(void)
 	pr_info("slaunch: Event log size: %llu\n",
 		le64_to_cpu(hdr->drtm_event_log_size));
 
-	/* Enforce full-lockdown assumption. Called from
-	 * slaunch_setup (not slaunch_early_init) so panic prints —
-	 * earlycon is registered by this point. */
+	/* Enforce full-lockdown assumption per DEN0113 v1.2 §4.6.2.
+	 * Called from slaunch_setup (not slaunch_early_init) so panic
+	 * prints — earlycon is registered by this point.
+	 */
 	slaunch_assert_full_lockdown(dlme_data_pa,
 				     le16_to_cpu(hdr->this_hdr_size),
 				     le64_to_cpu(hdr->protected_regions_size));
@@ -500,7 +698,8 @@ void __init slaunch_setup(void)
 	/* Reserve DLME data region in memblock so kernel won't reuse it.
 	 * NOTE: efi_init() runs after us and calls memblock_remove(0,
 	 * PHYS_ADDR_MAX) which wipes this reservation. slaunch_validate_efi
-	 * re-reserves using the saved values below. */
+	 * re-reserves using the saved values below.
+	 */
 	sl_dlme_data_pa = dlme_data_pa;
 	sl_dlme_data_size = le64_to_cpu(hdr->dlme_data_size);
 	memblock_reserve(sl_dlme_data_pa, sl_dlme_data_size);
@@ -518,6 +717,18 @@ void __init slaunch_setup(void)
 	clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
 	efi.runtime_supported_mask = 0;
 	pr_info("slaunch: EFI runtime services unconditionally disabled\n");
+
+	/*
+	 * Validate all untrusted EFI inputs before efi_init() consumes them:
+	 * read /chosen, optionally inject a fault, then run the validators.
+	 */
+	{
+		struct sl_efi_info efi_info;
+
+		slaunch_read_chosen_efi(&efi_info);
+		slaunch_inject_fault(&efi_info);
+		slaunch_validate_efi_early(&efi_info);
+	}
 }
 
 /* Placeholder; populated by a subsequent patch. */
