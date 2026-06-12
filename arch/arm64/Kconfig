@@ -2424,6 +2424,61 @@ config EFI
 	  allow the kernel to be booted as an EFI application. This
 	  is only useful on systems that have UEFI firmware.
 
+config ARM64_SECURE_LAUNCH
+	bool "ARM64 DRTM Secure Launch support"
+	depends on ARM64 && EFI
+	default n
+	select CRYPTO_LIB_SHA256
+	select CRYPTO_LIB_SHA512
+	help
+	  Enable support for ARM DRTM (Dynamic Root of Trust for Measurement)
+	  Secure Launch. When enabled, the kernel can act as a DLME, receiving
+	  control after a DRTM dynamic launch with MMU off at EL2.
+
+	  The EFI stub triggers DRTM_DYNAMIC_LAUNCH after ExitBootServices
+	  when "drtm=on" is on the kernel command line. D-CRTM measures the
+	  kernel and returns control. The kernel then parses DLME data and
+	  manages DRTM SMC calls during boot.
+
+	  If unsure, say N.
+
+config ARM64_SECURE_LAUNCH_SELFTEST
+	bool "ARM64 DRTM Secure Launch validation self-tests"
+	depends on ARM64_SECURE_LAUNCH
+	default n
+	help
+	  Build slaunch_selftest() into the kernel. At the end of
+	  slaunch_measure_post_efi() the self-test calls the address-map
+	  validation helpers (dcrtm_range_in_normal,
+	  dcrtm_range_overlaps_non_normal, efi_regions_overlap) with
+	  crafted inputs that previously bypassed validation due to
+	  integer overflow. The helpers must reject the bad inputs and
+	  accept the good ones; mismatch panics with selftest:* message.
+
+	  Useful for proving the overflow / wrap guards work as designed.
+
+	  If unsure, say N.
+
+config ARM64_SECURE_LAUNCH_FAULT_INJECT
+	bool "ARM64 DRTM Secure Launch fault injection"
+	depends on ARM64_SECURE_LAUNCH
+	default n
+	help
+	  Build slaunch_inject_fault() into the kernel. When the kernel
+	  command line contains "slaunch_inject=<token>", mutate the EFI
+	  memory map (or other tainted inputs) in-place before
+	  slaunch_validate_efi_early() runs the real validation. The new
+	  guard is expected to panic with a specific message; the harness
+	  treats that as a passing negative test.
+
+	  Tokens implemented: mmap_wrap, mmap_pages_overflow,
+	  mmap_size_huge, systab_nr_tables_huge.
+
+	  Useful for proving end-to-end that the validation pipeline
+	  catches the canonical exploits. Intended for development testing only; leave disabled in production builds.
+
+	  If unsure, say N.
+
 config COMPRESSED_INSTALL
 	bool "Install compressed image by default"
 	help
