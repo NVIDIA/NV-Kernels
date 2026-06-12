@@ -42,6 +42,10 @@ PROVIDE(__efistub_sysfb_primary_display	= sysfb_primary_display);
 #endif
 PROVIDE(__efistub__ctype		= _ctype);
 
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+PROVIDE(__efistub_sl_entry		= sl_entry);
+#endif
+
 PROVIDE(__pi___memcpy			= __pi_memcpy);
 PROVIDE(__pi___memmove			= __pi_memmove);
 PROVIDE(__pi___memset			= __pi_memset);
