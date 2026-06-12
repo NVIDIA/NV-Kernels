@@ -323,9 +323,11 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	cpu_uninstall_idmap();
 
 	slaunch_setup();
+	slaunch_validate_initrd();
 
 	xen_early_init();
 	efi_init();
+	slaunch_reserve_dlme_data();
 
 	if (!efi_enabled(EFI_BOOT)) {
 		if ((u64)_text % MIN_KIMG_ALIGN)
