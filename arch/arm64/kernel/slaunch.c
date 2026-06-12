@@ -731,8 +731,372 @@ void __init slaunch_setup(void)
 	}
 }
 
-/* Placeholder; populated by a subsequent patch. */
-void __init slaunch_measure_post_efi(void) { }
+/*
+ * Record an in-memory SHA-256 measurement into slaunch_measurements[]
+ * for later replay into the DRTM event log on PCR 18. The table is
+ * memblock_alloc-backed and grows geometrically, so platforms with many
+ * ACPI tables are not capped (seeded by slaunch_measurements_init()).
+ */
+struct slaunch_measurement {
+	char	desc[16];
+	u8	hash[SHA256_DIGEST_SIZE];
+};
+
+static struct slaunch_measurement *slaunch_measurements __initdata;
+static unsigned int slaunch_measurement_count __initdata;
+static unsigned int slaunch_measurement_capacity __initdata;
+
+static void __init slaunch_measurements_init(void)
+{
+	size_t bytes;
+
+	if (slaunch_measurements)
+		return;
+
+	slaunch_measurement_capacity = 256;
+	bytes = (size_t)slaunch_measurement_capacity *
+		sizeof(*slaunch_measurements);
+	slaunch_measurements = memblock_alloc(bytes, SMP_CACHE_BYTES);
+	if (!slaunch_measurements)
+		panic("slaunch: memblock_alloc for measurement table failed (%zu bytes)\n",
+		      bytes);
+}
+
+static void __init slaunch_measurements_reserve(unsigned int needed)
+{
+	struct slaunch_measurement *new_arr;
+	unsigned int new_cap;
+	size_t new_bytes, old_bytes;
+
+	if (needed <= slaunch_measurement_capacity)
+		return;
+
+	new_cap = slaunch_measurement_capacity ?
+		  slaunch_measurement_capacity : 1;
+	while (new_cap < needed)
+		new_cap *= 2;
+
+	new_bytes = (size_t)new_cap * sizeof(*slaunch_measurements);
+	old_bytes = (size_t)slaunch_measurement_capacity *
+		    sizeof(*slaunch_measurements);
+
+	new_arr = memblock_alloc(new_bytes, SMP_CACHE_BYTES);
+	if (!new_arr)
+		panic("slaunch: measurement table grow failed at %u entries\n",
+		      slaunch_measurement_count);
+
+	if (slaunch_measurements && old_bytes) {
+		memcpy(new_arr, slaunch_measurements,
+		       slaunch_measurement_count *
+		       sizeof(*slaunch_measurements));
+		memblock_free(slaunch_measurements, old_bytes);
+	}
+
+	slaunch_measurements = new_arr;
+	slaunch_measurement_capacity = new_cap;
+}
+
+static void __init slaunch_measure(const char *desc, const void *data,
+				   size_t size)
+{
+	u8 hash[SHA256_DIGEST_SIZE];
+	struct slaunch_measurement *m;
+
+	sha256(data, size, hash);
+
+	pr_info("slaunch: measured %s (%zu bytes) SHA-256: "
+		"%*phN\n", desc, size, SHA256_DIGEST_SIZE, hash);
+
+	/* Future revision: also extend this hash into a hardware measurement
+	 * engine (TPM HASH_START or platform-specific equivalent) so the
+	 * measurement is anchored beyond the in-memory event log.
+	 */
+
+	slaunch_measurements_reserve(slaunch_measurement_count + 1);
+
+	m = &slaunch_measurements[slaunch_measurement_count++];
+	strscpy(m->desc, desc, sizeof(m->desc));
+	memcpy(m->hash, hash, SHA256_DIGEST_SIZE);
+}
+
+/*
+ * Measure ACPI tables (RSDP, XSDT, and each XSDT-referenced table) while
+ * DMA protection is still active (before the slaunch_unprotect_memory
+ * late_initcall), so no device can tamper with them. The hashes are
+ * attestation evidence a remote verifier compares to known-good values.
+ */
+/*
+ * RSDP layout (ACPI 2.0+): we only need xsdt_physical_address at offset 24
+ * and length at offset 20. Avoid depending on <acpi/acpi.h> for the struct.
+ */
+/* Minimal ACPI table header — avoid full <acpi/acpi.h> dependency.
+ * Full header is 36 bytes; XSDT entries follow after this.
+ */
+struct slaunch_acpi_hdr {
+	char signature[4];
+	u32 length;
+	u8 revision;
+	u8 checksum;
+	char oem_id[6];
+	char oem_table_id[8];
+	u32 oem_revision;
+	u32 creator_id;
+	u32 creator_revision;
+} __packed;
+
+#define RSDP_SIZE_V1	20
+#define RSDP_OFF_LEN	20	/* u32 length (ACPI 2.0+) */
+#define RSDP_OFF_XSDT	24	/* u64 xsdt_physical_address */
+#define RSDP_MIN_MAP	36	/* enough to read through xsdt_physical_address */
+
+/* FADT field offsets (ACPI 6.x §5.2.9) — used to follow indirection
+ * to DSDT and FACS. Local copies to avoid pulling in <acpi/actbl.h>.
+ */
+#define FADT_FIRMWARE_CTRL_OFF		36	/* u32 */
+#define FADT_DSDT_OFF			40	/* u32 */
+#define FADT_X_FIRMWARE_CTRL_OFF	132	/* u64, ACPI 2.0+ */
+#define FADT_X_DSDT_OFF			140	/* u64, ACPI 2.0+ */
+
+/* Validate PA + length against D-CRTM map, then measure. Every
+ * failure is fatal — silent skip breaks attestation soundness.
+ */
+static void __init slaunch_measure_one_acpi(phys_addr_t pa, const char *desc)
+{
+	struct slaunch_acpi_hdr *tbl;
+	u32 tbl_len;
+
+	if (!pa)
+		panic("slaunch: %s PA is 0 — cannot measure\n", desc);
+	if (!dcrtm_range_in_normal(pa, sizeof(*tbl)))
+		panic("slaunch: %s PA 0x%llx (header) NOT in NORMAL region\n",
+		      desc, (u64)pa);
+
+	tbl = early_memremap(pa, sizeof(*tbl));
+	if (!tbl)
+		panic("slaunch: %s header remap failed at 0x%llx\n",
+		      desc, (u64)pa);
+	tbl_len = tbl->length;
+	early_memunmap(tbl, sizeof(*tbl));
+
+	if (tbl_len < sizeof(*tbl))
+		panic("slaunch: %s length %u < header size %zu\n",
+		      desc, tbl_len, sizeof(*tbl));
+	if (!dcrtm_range_in_normal(pa, tbl_len))
+		panic("slaunch: %s [0x%llx+%u] NOT in NORMAL region\n",
+		      desc, (u64)pa, tbl_len);
+
+	tbl = early_memremap(pa, tbl_len);
+	if (!tbl)
+		panic("slaunch: %s full remap failed at 0x%llx (size %u)\n",
+		      desc, (u64)pa, tbl_len);
+	slaunch_measure(desc, tbl, tbl_len);
+	early_memunmap(tbl, tbl_len);
+}
+
+/*
+ * Query the D-CRTM TPM hash algorithm (DRTM_FEATURES feature 0x1,
+ * DEN0113 v1.2 §3.3) and refuse to proceed on mismatch, else the
+ * event-log digests would not replay against the attester's chain.
+ * Field layout: firmware_hash_algo [15:0] (0xB SHA-256, 0xC SHA-384).
+ */
+#define SL_DRTM_FW_HASH_SHA256		0x000B
+#define SL_DRTM_FW_HASH_SHA384		0x000C
+#define SL_DRTM_FW_HASH_MASK		0xFFFFULL
+
+static void __init slaunch_verify_hash_algo(void)
+{
+	struct arm_smccc_res res;
+	u64 features;
+	u32 algo;
+
+	/*
+	 * Feature 0x1 = TPM features (bit 63 set per spec). TF-A returns
+	 * a0 = 1 or DRTM_NOT_SUPPORTED, a1 = the tpm_features bitfield.
+	 */
+	arm_smccc_smc(DRTM_SMC_FEATURES, (1ULL << 63) | 0x1,
+		      0, 0, 0, 0, 0, 0, &res);
+	if ((s64)res.a0 == DRTM_NOT_SUPPORTED) {
+		pr_warn("slaunch: DRTM_FEATURES(TPM) not supported; assuming SHA-256\n");
+		return;
+	}
+
+	features = res.a1;
+	algo = features & SL_DRTM_FW_HASH_MASK;
+	pr_info("slaunch: DCE firmware hash algorithm: 0x%x\n", algo);
+
+	if (algo != SL_DRTM_FW_HASH_SHA256)
+		panic("slaunch: DCE reports hash algo 0x%x; kernel only implements SHA-256 (0xB). Add SHA-384 path or use a SHA-256 DCE.\n",
+		      algo);
+}
+
+static void __init slaunch_measure_acpi(void)
+{
+	struct slaunch_acpi_hdr *xsdt;
+	phys_addr_t rsdp_pa, xsdt_pa;
+	phys_addr_t dsdt_pa = 0, facs_pa = 0;
+	u32 rsdp_len, xsdt_len, num_entries, i;
+	u64 *entry_ptrs;
+	void *rsdp;
+
+	/* Every failure below is fatal. The "kernel acts on unmeasured
+	 * bytes" case breaks the attestation-based trust model.
+	 */
+	rsdp_pa = efi.acpi20;
+	if (rsdp_pa == EFI_INVALID_TABLE_ADDR || !rsdp_pa)
+		panic("slaunch: no ACPI RSDP in EFI System Table (DRTM requires ACPI)\n");
+
+	if (!dcrtm_range_in_normal(rsdp_pa, RSDP_MIN_MAP))
+		panic("slaunch: RSDP PA 0x%llx NOT in NORMAL region\n",
+		      (u64)rsdp_pa);
+
+	rsdp = early_memremap(rsdp_pa, RSDP_MIN_MAP);
+	if (!rsdp)
+		panic("slaunch: RSDP header remap failed at 0x%llx\n",
+		      (u64)rsdp_pa);
+
+	rsdp_len = *(u32 *)((u8 *)rsdp + RSDP_OFF_LEN);
+	if (!rsdp_len)
+		rsdp_len = RSDP_SIZE_V1;
+	xsdt_pa = *(u64 *)((u8 *)rsdp + RSDP_OFF_XSDT);
+	early_memunmap(rsdp, RSDP_MIN_MAP);
+
+	if (!dcrtm_range_in_normal(rsdp_pa, rsdp_len))
+		panic("slaunch: RSDP [0x%llx+%u] NOT in NORMAL region\n",
+		      (u64)rsdp_pa, rsdp_len);
+	rsdp = early_memremap(rsdp_pa, rsdp_len);
+	if (!rsdp)
+		panic("slaunch: RSDP full remap failed at 0x%llx (size %u)\n",
+		      (u64)rsdp_pa, rsdp_len);
+	slaunch_measure("RSDP", rsdp, rsdp_len);
+	early_memunmap(rsdp, rsdp_len);
+
+	if (!dcrtm_range_in_normal(xsdt_pa, sizeof(*xsdt)))
+		panic("slaunch: XSDT PA 0x%llx NOT in NORMAL region\n", xsdt_pa);
+	xsdt = early_memremap(xsdt_pa, sizeof(*xsdt));
+	if (!xsdt)
+		panic("slaunch: XSDT header remap failed at 0x%llx\n", xsdt_pa);
+	xsdt_len = xsdt->length;
+	early_memunmap(xsdt, sizeof(*xsdt));
+
+	if (xsdt_len < sizeof(*xsdt))
+		panic("slaunch: XSDT length %u < header size %zu\n",
+		      xsdt_len, sizeof(*xsdt));
+	if (!dcrtm_range_in_normal(xsdt_pa, xsdt_len))
+		panic("slaunch: XSDT [0x%llx+%u] NOT in NORMAL region\n",
+		      xsdt_pa, xsdt_len);
+	xsdt = early_memremap(xsdt_pa, xsdt_len);
+	if (!xsdt)
+		panic("slaunch: XSDT full remap failed at 0x%llx (size %u)\n",
+		      xsdt_pa, xsdt_len);
+	slaunch_measure("XSDT", xsdt, xsdt_len);
+
+	/* Walk XSDT entries. Each is a 64-bit PA to a top-level ACPI table. */
+	num_entries = (xsdt_len - sizeof(*xsdt)) / sizeof(u64);
+	entry_ptrs = (u64 *)((u8 *)xsdt + sizeof(*xsdt));
+
+	for (i = 0; i < num_entries; i++) {
+		struct slaunch_acpi_hdr *tbl;
+		u64 tbl_pa = entry_ptrs[i];
+		u32 tbl_len;
+		char desc[32];
+
+		if (!dcrtm_range_in_normal(tbl_pa, sizeof(*tbl)))
+			panic("slaunch: XSDT entry[%u] PA 0x%llx (hdr) NOT in NORMAL\n",
+			      i, tbl_pa);
+		tbl = early_memremap(tbl_pa, sizeof(*tbl));
+		if (!tbl)
+			panic("slaunch: XSDT entry[%u] header remap failed at 0x%llx\n",
+			      i, tbl_pa);
+		tbl_len = tbl->length;
+		early_memunmap(tbl, sizeof(*tbl));
+
+		if (tbl_len < sizeof(*tbl))
+			panic("slaunch: XSDT entry[%u] length %u < header size %zu\n",
+			      i, tbl_len, sizeof(*tbl));
+		if (!dcrtm_range_in_normal(tbl_pa, tbl_len))
+			panic("slaunch: XSDT entry[%u] [0x%llx+%u] NOT in NORMAL\n",
+			      i, tbl_pa, tbl_len);
+		tbl = early_memremap(tbl_pa, tbl_len);
+		if (!tbl)
+			panic("slaunch: XSDT entry[%u] full remap failed at 0x%llx (size %u)\n",
+			      i, tbl_pa, tbl_len);
+
+		snprintf(desc, sizeof(desc), "ACPI:%.4s", tbl->signature);
+		slaunch_measure(desc, tbl, tbl_len);
+
+		/* Capture FADT indirection while FADT is mapped. Prefer
+		 * 64-bit X_* fields (ACPI 2.0+); fall back to 32-bit
+		 * fields if FADT length is too short to carry them.
+		 */
+		if (!memcmp(tbl->signature, "FACP", 4)) {
+			if (tbl_len >= FADT_X_DSDT_OFF + sizeof(u64))
+				memcpy(&dsdt_pa,
+				       (u8 *)tbl + FADT_X_DSDT_OFF,
+				       sizeof(u64));
+			if (!dsdt_pa &&
+			    tbl_len >= FADT_DSDT_OFF + sizeof(u32)) {
+				u32 d32;
+
+				memcpy(&d32,
+				       (u8 *)tbl + FADT_DSDT_OFF,
+				       sizeof(u32));
+				dsdt_pa = d32;
+			}
+			if (tbl_len >= FADT_X_FIRMWARE_CTRL_OFF + sizeof(u64))
+				memcpy(&facs_pa,
+				       (u8 *)tbl + FADT_X_FIRMWARE_CTRL_OFF,
+				       sizeof(u64));
+			if (!facs_pa &&
+			    tbl_len >= FADT_FIRMWARE_CTRL_OFF + sizeof(u32)) {
+				u32 f32;
+
+				memcpy(&f32,
+				       (u8 *)tbl + FADT_FIRMWARE_CTRL_OFF,
+				       sizeof(u32));
+				facs_pa = f32;
+			}
+		}
+		early_memunmap(tbl, tbl_len);
+	}
+
+	early_memunmap(xsdt, xsdt_len);
+
+	/*
+	 * Follow FADT indirections (not in XSDT): DSDT carries the AML
+	 * executed by ACPICA — mandatory; FACS is optional on HW-reduced
+	 * ACPI. Other indirect tables (BERT/ERST/HEST/EINJ/PCCT) are data,
+	 * not boot-TCB, so they are deliberately not followed.
+	 */
+	if (!dsdt_pa)
+		panic("slaunch: FADT present but X_Dsdt/Dsdt both zero — DSDT cannot be measured\n");
+	slaunch_measure_one_acpi(dsdt_pa, "DSDT");
+	if (facs_pa)
+		slaunch_measure_one_acpi(facs_pa, "FACS");
+	else
+		pr_info("slaunch: FACS absent (HW-reduced ACPI) — no measurement needed\n");
+}
+/*
+ * Re-reserve DLME data after memblock teardown, verify the D-CRTM
+ * hash algorithm, and measure ACPI tables into the DRTM event log.
+ */
+void __init slaunch_measure_post_efi(void)
+{
+	if (!sl_dlme_region_pa)
+		return;
+
+	if (sl_dlme_data_size)
+		memblock_reserve(sl_dlme_data_pa, sl_dlme_data_size);
+
+	slaunch_measurements_init();
+	slaunch_verify_hash_algo();
+	slaunch_measure_acpi();
+
+	if (dcrtm_regions) {
+		early_memunmap(dcrtm_regions,
+			       dcrtm_num_regions * sizeof(*dcrtm_regions));
+		dcrtm_regions = NULL;
+	}
+}
 
 /* Placeholder; populated by a subsequent patch. */
 void slaunch_exit(void) { }
