@@ -18,6 +18,7 @@
 #include <crypto/sha2.h>
 
 #include <asm/drtm.h>
+#include <asm/memory.h>
 #include <asm/setup.h>
 
 /* FDT magic number (big-endian 0xd00dfeed at offset 0) */
@@ -38,6 +39,24 @@ static u32 dcrtm_num_regions;
  */
 static phys_addr_t sl_dlme_data_pa;
 static u64 sl_dlme_data_size;
+
+/*
+ * Validated UEFI SRTM TPM event log location, captured in
+ * slaunch_validate_raw_systab() so the main-vs-final-events "last writer
+ * wins" selection can prefer the primary log. The SRTM log is a pre-DRTM
+ * (untrusted) artifact, so it is validated for in-bounds extent only, not
+ * measured. Zero when firmware published no GUID (e.g. FVP without Tcg2Dxe).
+ */
+static phys_addr_t sl_srtm_log_pa;
+static size_t      sl_srtm_log_size;	/* includes sizeof(linux_efi_tpm_eventlog) */
+
+/*
+ * Raw EFI memory map extent saved by slaunch_validate_raw_mmap() and
+ * read by slaunch_validate_srtm_log() so the SRTM log extent can be
+ * rejected if it overlaps the raw mmap buffer.
+ */
+static phys_addr_t sl_efi_mmap_pa;
+static u64         sl_efi_mmap_size;
 
 /*
  * Close TPM locality 2 — the DLME's locality, per DEN0113 v1.2 §4.6.1.
@@ -492,6 +511,145 @@ static u32 __init sl_cfgtbl_min_size(const efi_guid_t *guid)
 	return SL_CFGTBL_UNKNOWN_BOUND;
 }
 
+/* Forward decl — definition lives near slaunch_measure_initrd. */
+static bool __init slaunch_ranges_overlap(u64 a_start, u64 a_size,
+					  u64 b_start, u64 b_size);
+
+/*
+ * Validate a UEFI SRTM TPM event log Configuration Table entry against
+ * the D-CRTM address map: cover the full header+body extent and reject
+ * overlap with DLME/DTB/mmap so firmware cannot alias an input. The log
+ * is a pre-DRTM artifact, so this validates its extent only (it is not
+ * measured); on success captures sl_srtm_log_pa/size.
+ */
+static void __init slaunch_validate_srtm_log(u64 log_pa,
+					     const efi_guid_t *guid)
+{
+	efi_guid_t main_guid  = LINUX_EFI_TPM_EVENT_LOG_GUID;
+	efi_guid_t final_guid = EFI_TCG2_FINAL_EVENTS_TABLE_GUID;
+	size_t hdr_size;
+	u64 body_size;
+	u64 total_size;
+	u64 dlme_size;
+	u64 fdt_size = 0;
+	phys_addr_t dtb_pa = __fdt_pointer;
+	bool is_main = (efi_guidcmp(*guid, main_guid) == 0);
+	bool is_final = (efi_guidcmp(*guid, final_guid) == 0);
+
+	if (!is_main && !is_final)
+		return;
+
+	if (!log_pa)
+		panic("slaunch: SRTM log GUID entry has NULL vendor_table\n");
+
+	hdr_size = is_main ? sizeof(struct linux_efi_tpm_eventlog)
+			   : sizeof(struct efi_tcg2_final_events_table);
+
+	/* Header extent must be in NORMAL before we can read the size
+	 * field. dcrtm_range_in_normal rejects size==0 and u64 wrap. */
+	if (!dcrtm_range_in_normal(log_pa, hdr_size))
+		panic("slaunch: SRTM log PA 0x%llx (header %zu B) NOT in NORMAL region\n",
+		      log_pa, hdr_size);
+
+	/* Header extent must not alias the DLME region, DTB, or raw EFI
+	 * mmap buffer (an attacker could otherwise coerce the validator
+	 * into mis-interpreting attestation-critical bytes). */
+	dlme_size = (sl_dlme_data_pa + sl_dlme_data_size) - sl_dlme_region_pa;
+	if (slaunch_ranges_overlap(log_pa, hdr_size,
+				   sl_dlme_region_pa, dlme_size))
+		panic("slaunch: SRTM log header [0x%llx+%zu] overlaps DLME region [0x%llx+%llu]\n",
+		      log_pa, hdr_size, (u64)sl_dlme_region_pa, dlme_size);
+
+	if (dtb_pa) {
+		/* Read fdt_totalsize from the (already-validated) DTB. */
+		u32 *p = early_memremap(dtb_pa, sizeof(u32) * 2);
+
+		if (p) {
+			fdt_size = be32_to_cpu(p[1]);
+			early_memunmap(p, sizeof(u32) * 2);
+		}
+	}
+	if (fdt_size && slaunch_ranges_overlap(log_pa, hdr_size,
+					       dtb_pa, fdt_size))
+		panic("slaunch: SRTM log header [0x%llx+%zu] overlaps DTB [0x%llx+%llu]\n",
+		      log_pa, hdr_size, (u64)dtb_pa, fdt_size);
+
+	if (sl_efi_mmap_size &&
+	    slaunch_ranges_overlap(log_pa, hdr_size,
+				   sl_efi_mmap_pa, sl_efi_mmap_size))
+		panic("slaunch: SRTM log header [0x%llx+%zu] overlaps raw EFI mmap [0x%llx+%llu]\n",
+		      log_pa, hdr_size, (u64)sl_efi_mmap_pa,
+		      sl_efi_mmap_size);
+
+	/* Read the firmware-published body size from the header. */
+	if (is_main) {
+		struct linux_efi_tpm_eventlog *log_tbl;
+
+		log_tbl = early_memremap(log_pa, hdr_size);
+		if (!log_tbl)
+			panic("slaunch: SRTM log header remap failed at 0x%llx\n",
+			      log_pa);
+		body_size = log_tbl->size;
+		early_memunmap(log_tbl, hdr_size);
+	} else {
+		struct efi_tcg2_final_events_table *final_tbl;
+
+		final_tbl = early_memremap(log_pa, hdr_size);
+		if (!final_tbl)
+			panic("slaunch: SRTM final-events header remap failed at 0x%llx\n",
+			      log_pa);
+		/*
+		 * Final-events per-event encoding needs the primary log's
+		 * algorithm-set descriptor we may not have seen, so treat
+		 * events[] as opaque. version must be 1 per TCG2 ACPI spec;
+		 * reject otherwise before nr_events.
+		 */
+		if (final_tbl->version != 1)
+			panic("slaunch: SRTM final-events table version %llu != 1\n",
+			      final_tbl->version);
+		body_size = 0;
+		(void)final_tbl->nr_events;
+		early_memunmap(final_tbl, hdr_size);
+	}
+
+	if (check_add_overflow(log_pa, (u64)hdr_size + body_size,
+			       &total_size))
+		panic("slaunch: SRTM log PA + size wraps u64 (pa 0x%llx + %zu + %llu)\n",
+		      log_pa, hdr_size, body_size);
+
+	total_size = (u64)hdr_size + body_size;
+
+	if (!dcrtm_range_in_normal(log_pa, total_size))
+		panic("slaunch: SRTM log [0x%llx+%llu] NOT in NORMAL region (full extent)\n",
+		      log_pa, total_size);
+
+	if (slaunch_ranges_overlap(log_pa, total_size,
+				   sl_dlme_region_pa, dlme_size))
+		panic("slaunch: SRTM log [0x%llx+%llu] overlaps DLME region [0x%llx+%llu]\n",
+		      log_pa, total_size, (u64)sl_dlme_region_pa, dlme_size);
+	if (fdt_size &&
+	    slaunch_ranges_overlap(log_pa, total_size, dtb_pa, fdt_size))
+		panic("slaunch: SRTM log [0x%llx+%llu] overlaps DTB [0x%llx+%llu]\n",
+		      log_pa, total_size, (u64)dtb_pa, fdt_size);
+	if (sl_efi_mmap_size &&
+	    slaunch_ranges_overlap(log_pa, total_size,
+				   sl_efi_mmap_pa, sl_efi_mmap_size))
+		panic("slaunch: SRTM log [0x%llx+%llu] overlaps raw EFI mmap [0x%llx+%llu]\n",
+		      log_pa, total_size, (u64)sl_efi_mmap_pa,
+		      sl_efi_mmap_size);
+
+	/* Last writer wins when both GUIDs are present — both are
+	 * structurally validated above; the main TPM event log is the
+	 * preferred measurement target. */
+	if (is_main || !sl_srtm_log_pa) {
+		sl_srtm_log_pa   = log_pa;
+		sl_srtm_log_size = (size_t)total_size;
+	}
+	pr_info("slaunch: SRTM TPM event log validated: PA 0x%llx, %llu B (%s)\n",
+		log_pa, total_size,
+		is_main ? "LINUX_EFI_TPM_EVENT_LOG" : "EFI_TCG2_FINAL_EVENTS");
+}
+
 /* Validate System Table + ConfigurationTable pointers against D-CRTM
  * map. Runs pre-efi_init, panics on bad input.
  */
@@ -550,6 +708,11 @@ static void __init slaunch_validate_raw_systab(u64 systab_pa)
 		if (!dcrtm_range_in_normal(tbl_ptr, size))
 			panic("slaunch: EFI ConfigurationTable[%lu] 0x%lx [size %u] NOT in NORMAL region\n",
 			      j, tbl_ptr, size);
+		/* If the entry advertises an SRTM TPM event log (header
+		 * + variable-length body), extend the structural check to
+		 * cover the full body extent (validate-only; the log is a
+		 * pre-DRTM artifact and is not measured). */
+		slaunch_validate_srtm_log((u64)tbl_ptr, &cfgtbl[j].guid);
 	}
 	early_memunmap(cfgtbl, tbl_size);
 	pr_info("slaunch: early EFI System Table validation PASSED (%lu entries)\n",
@@ -644,6 +807,12 @@ static void __init slaunch_validate_raw_mmap(const struct sl_efi_info *info)
 	early_memunmap(mmap, info->mmap_size);
 	pr_info("slaunch: early raw EFI mmap validation PASSED (%u of %u descriptors checked)\n",
 		nchecked, ndesc);
+
+	/* Remember raw mmap extent for later overlap checks (e.g. the SRTM
+	 * TPM event log validator must reject a published log PA that aliases
+	 * the firmware-provided memory map buffer). */
+	sl_efi_mmap_pa   = info->mmap_pa;
+	sl_efi_mmap_size = info->mmap_size;
 }
 
 static void __init slaunch_validate_efi_early(const struct sl_efi_info *info)
@@ -652,6 +821,13 @@ static void __init slaunch_validate_efi_early(const struct sl_efi_info *info)
 		pr_info("slaunch: /chosen does not have all linux,uefi-* properties — skipping early EFI validation\n");
 		return;
 	}
+	/*
+	 * Stage the raw EFI mmap extent before the systab validator so
+	 * slaunch_validate_srtm_log() can reject an SRTM log PA aliasing it;
+	 * validate_raw_mmap() re-publishes these values after its own checks.
+	 */
+	sl_efi_mmap_pa   = info->mmap_pa;
+	sl_efi_mmap_size = info->mmap_size;
 	slaunch_validate_raw_systab(info->systab_pa);
 	slaunch_validate_raw_mmap(info);
 }
@@ -1325,9 +1501,9 @@ static void __init slaunch_extend_drtm_event_log(void)
 #ifdef CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT
 /*
  * Negative-test fault injection (slaunch_inject=<token>): mutates the
- * raw EFI mmap before slaunch_validate_efi_early so the validator panics
- * (a passing negative test). Tokens: mmap_wrap, mmap_pages_overflow,
- * mmap_size_huge, systab_nr_tables_huge. Not for production.
+ * raw EFI mmap/systab/SRTM-log before slaunch_validate_efi_early so the
+ * validator panics. Tokens: mmap_*, systab_nr_tables_huge, srtm_log_*.
+ * Not for production.
  */
 static bool __init sl_cmdline_has(const char *tok)
 {
@@ -1381,12 +1557,97 @@ static void __init sl_mutate_mmap_pages_overflow(efi_memory_desc_t *md)
 		md->phys_addr, md->num_pages);
 }
 
+/* Overwrite the first non-null EFI ConfigurationTable entry in the raw
+ * systab's cfgtbl array with a synthetic SRTM-log entry. Returns true
+ * if we managed to plant the entry. Used by srtm_log_* injectors only;
+ * not safe for production. */
+static bool __init slaunch_inject_srtm_cfgtbl(const struct sl_efi_info *info,
+					      u64 vendor_pa)
+{
+	efi_guid_t srtm_guid = LINUX_EFI_TPM_EVENT_LOG_GUID;
+	efi_system_table_t *systab;
+	efi_config_table_t *cfgtbl;
+	unsigned long tables_pa;
+	unsigned long nr_tables;
+	size_t tbl_size;
+	unsigned long j;
+	bool applied = false;
+
+	systab = early_memremap(info->systab_pa, sizeof(*systab));
+	if (!systab) {
+		pr_warn("slaunch: INJECT srtm_log: systab remap failed\n");
+		return false;
+	}
+	nr_tables = systab->nr_tables;
+	tables_pa = (unsigned long)systab->tables;
+	early_memunmap(systab, sizeof(*systab));
+
+	if (!nr_tables || !tables_pa) {
+		pr_warn("slaunch: INJECT srtm_log: systab has no cfgtbl entries\n");
+		return false;
+	}
+	tbl_size = nr_tables * sizeof(*cfgtbl);
+	cfgtbl = early_memremap(tables_pa, tbl_size);
+	if (!cfgtbl) {
+		pr_warn("slaunch: INJECT srtm_log: cfgtbl remap failed\n");
+		return false;
+	}
+	for (j = 0; j < nr_tables; j++) {
+		if (!cfgtbl[j].table)
+			continue;
+		cfgtbl[j].guid = srtm_guid;
+		cfgtbl[j].table = (void *)(unsigned long)vendor_pa;
+		applied = true;
+		break;
+	}
+	early_memunmap(cfgtbl, tbl_size);
+	return applied;
+}
+
+static void __init slaunch_inject_srtm_log(const struct sl_efi_info *info)
+{
+	u64 vendor_pa;
+	const char *tag = NULL;
+
+	if (sl_cmdline_has("slaunch_inject=srtm_log_overlap_dlme")) {
+		/* Aim the entry at the start of the DLME region. The header
+		 * extent overlap check in slaunch_validate_srtm_log fires
+		 * before any size field is read. */
+		vendor_pa = sl_dlme_region_pa;
+		tag = "srtm_log_overlap_dlme";
+	} else if (sl_cmdline_has("slaunch_inject=srtm_log_outside_normal")) {
+		/* FVP PL011 UART base — a DEVICE region per DEN0113 v1.2
+		 * Table 11. dcrtm_range_in_normal must reject. */
+		vendor_pa = 0x1c090000ULL;
+		tag = "srtm_log_outside_normal";
+	} else if (sl_cmdline_has("slaunch_inject=srtm_log_overlap_mmap")) {
+		/*
+		 * Aim the entry at the raw EFI mmap PA: it is NORMAL so the
+		 * range check passes and only the overlap-with-mmap guard in
+		 * slaunch_validate_srtm_log rejects it.
+		 */
+		vendor_pa = info->mmap_pa;
+		tag = "srtm_log_overlap_mmap";
+	} else {
+		return;
+	}
+
+	if (!slaunch_inject_srtm_cfgtbl(info, vendor_pa))
+		pr_warn("slaunch: INJECT %s: could not plant cfgtbl entry\n",
+			tag);
+	else
+		pr_warn("slaunch: INJECT %s: planted SRTM-log entry PA=0x%llx (expect panic)\n",
+			tag, vendor_pa);
+}
+
 static void __init slaunch_inject_fault(struct sl_efi_info *info)
 {
 	if (!info->present) {
 		/* Nothing to inject into. */
 		return;
 	}
+
+	slaunch_inject_srtm_log(info);
 
 	if (sl_cmdline_has("slaunch_inject=mmap_wrap")) {
 		if (!slaunch_inject_raw_mmap(info, sl_mutate_mmap_wrap))
