@@ -281,6 +281,7 @@ static int spear_adc_probe(struct platform_device *pdev)
 
 	st = iio_priv(indio_dev);
 
+	init_completion(&st->completion);
 	mutex_init(&st->lock);
 
 	st->np = np;
@@ -329,8 +330,6 @@ static int spear_adc_probe(struct platform_device *pdev)
 	of_property_read_u32(np, "vref-external", &st->vref_external);
 
 	spear_adc_configure(st);
-
-	init_completion(&st->completion);
 
 	indio_dev->name = SPEAR_ADC_MOD_NAME;
 	indio_dev->info = &spear_adc_info;
