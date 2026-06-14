@@ -21,6 +21,64 @@
 #include <asm/memory.h>
 #include <asm/setup.h>
 
+/*
+ * Hash algorithm dispatch. The DLME must match the D-CRTM firmware hash
+ * algo (DRTM_FEATURES feature 0x1) or the event-log chain cannot replay.
+ * Supports SHA-256 (0x000B) and SHA-384 (0x000C) via the kernel library
+ * API, whose arch SIMD paths are static-key gated until subsys_initcall.
+ */
+#define SL_TPM_ALG_SHA256		0x000B
+#define SL_TPM_ALG_SHA384		0x000C
+
+enum sl_hash_algo {
+	SL_HASH_SHA256 = 0,
+	SL_HASH_SHA384 = 1,
+};
+
+#define SL_HASH_MAX_DIGEST_SIZE		SHA512_DIGEST_SIZE	/* 64 */
+
+struct sl_hash_alg_info {
+	const char	*name;
+	u16		tpm_alg_id;
+	u8		digest_size;
+};
+
+static const struct sl_hash_alg_info sl_hash_algs[] = {
+	[SL_HASH_SHA256] = {
+		.name		= "SHA-256",
+		.tpm_alg_id	= SL_TPM_ALG_SHA256,
+		.digest_size	= SHA256_DIGEST_SIZE,
+	},
+	[SL_HASH_SHA384] = {
+		.name		= "SHA-384",
+		.tpm_alg_id	= SL_TPM_ALG_SHA384,
+		.digest_size	= SHA384_DIGEST_SIZE,
+	},
+};
+
+/* Active algo for the lifetime of this boot. Default SHA-256 until
+ * slaunch_verify_hash_algo() updates it from DRTM_FEATURES.
+ */
+static enum sl_hash_algo sl_active_algo __initdata = SL_HASH_SHA256;
+
+static inline const struct sl_hash_alg_info *sl_active_alg_info(void)
+{
+	return &sl_hash_algs[sl_active_algo];
+}
+
+/*
+ * Hash one contiguous in-RAM buffer with the active algorithm; out must
+ * hold sl_active_alg_info()->digest_size bytes. Uses sha256()/sha384()
+ * (safe in setup_arch(); see the dispatch comment above).
+ */
+static void __init sl_hash_data(const void *data, size_t size, u8 *out)
+{
+	if (sl_active_algo == SL_HASH_SHA384)
+		sha384(data, size, out);
+	else
+		sha256(data, size, out);
+}
+
 /* FDT magic number (big-endian 0xd00dfeed at offset 0) */
 #define FDT_HEADER_MAGIC	0xd00dfeed
 
@@ -916,9 +974,16 @@ void __init slaunch_reserve_dlme_data(void)
  * memblock_alloc-backed and grows geometrically, so platforms with many
  * ACPI tables are not capped (seeded by slaunch_measurements_init()).
  */
+/*
+ * hash is sized for the largest digest (SHA-512, 64 B) so one struct
+ * serves SHA-256 and SHA-384; digest_size marks the live bytes and
+ * tpm_alg_id records the algorithm at measurement time.
+ */
 struct slaunch_measurement {
 	char	desc[16];
-	u8	hash[SHA256_DIGEST_SIZE];
+	u8	hash[SL_HASH_MAX_DIGEST_SIZE];
+	u8	digest_size;
+	u16	tpm_alg_id;
 };
 
 static struct slaunch_measurement *slaunch_measurements __initdata;
@@ -978,13 +1043,20 @@ static void __init slaunch_measurements_reserve(unsigned int needed)
 static void __init slaunch_measure(const char *desc, const void *data,
 				   size_t size)
 {
-	u8 hash[SHA256_DIGEST_SIZE];
+	const struct sl_hash_alg_info *ainfo = sl_active_alg_info();
+	u8 hash[SL_HASH_MAX_DIGEST_SIZE];
 	struct slaunch_measurement *m;
 
-	sha256(data, size, hash);
+	/*
+	 * Hash with the active algorithm via sl_hash_data() (sha256()/
+	 * sha384()), safe in setup_arch() since the arch SIMD fast-paths
+	 * are static-key gated until subsys_initcall.
+	 */
+	sl_hash_data(data, size, hash);
 
-	pr_info("slaunch: measured %s (%zu bytes) SHA-256: "
-		"%*phN\n", desc, size, SHA256_DIGEST_SIZE, hash);
+	pr_info("slaunch: measured %s (%zu bytes) %s: %*phN\n",
+		desc, size, ainfo->name,
+		(int)ainfo->digest_size, hash);
 
 	/* Future revision: also extend this hash into a hardware measurement
 	 * engine (TPM HASH_START or platform-specific equivalent) so the
@@ -995,7 +1067,12 @@ static void __init slaunch_measure(const char *desc, const void *data,
 
 	m = &slaunch_measurements[slaunch_measurement_count++];
 	strscpy(m->desc, desc, sizeof(m->desc));
-	memcpy(m->hash, hash, SHA256_DIGEST_SIZE);
+	memcpy(m->hash, hash, ainfo->digest_size);
+	if (ainfo->digest_size < SL_HASH_MAX_DIGEST_SIZE)
+		memset(m->hash + ainfo->digest_size, 0,
+		       SL_HASH_MAX_DIGEST_SIZE - ainfo->digest_size);
+	m->digest_size = ainfo->digest_size;
+	m->tpm_alg_id = ainfo->tpm_alg_id;
 }
 
 /*
@@ -1074,19 +1151,22 @@ static void __init slaunch_measure_one_acpi(phys_addr_t pa, const char *desc)
 
 /*
  * Query the D-CRTM TPM hash algorithm (DRTM_FEATURES feature 0x1,
- * DEN0113 v1.2 §3.3) and refuse to proceed on mismatch, else the
- * event-log digests would not replay against the attester's chain.
- * Field layout: firmware_hash_algo [15:0] (0xB SHA-256, 0xC SHA-384).
+ * DEN0113 v1.2 §3.3), setting sl_active_algo so later measurements use
+ * the matching path; refuse to proceed on mismatch. Supports 0xB SHA-256
+ * / 0xC SHA-384. FAULT_INJECT adds sha384_force / sha_algo_bad tokens.
  */
-#define SL_DRTM_FW_HASH_SHA256		0x000B
-#define SL_DRTM_FW_HASH_SHA384		0x000C
 #define SL_DRTM_FW_HASH_MASK		0xFFFFULL
+
+#ifdef CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT
+static bool __init sl_cmdline_has(const char *tok);
+#endif
 
 static void __init slaunch_verify_hash_algo(void)
 {
 	struct arm_smccc_res res;
 	u64 features;
 	u32 algo;
+	bool fw_features_supported = true;
 
 	/*
 	 * Feature 0x1 = TPM features (bit 63 set per spec). TF-A returns
@@ -1096,16 +1176,46 @@ static void __init slaunch_verify_hash_algo(void)
 		      0, 0, 0, 0, 0, 0, &res);
 	if ((s64)res.a0 == DRTM_NOT_SUPPORTED) {
 		pr_warn("slaunch: DRTM_FEATURES(TPM) not supported; assuming SHA-256\n");
-		return;
+		fw_features_supported = false;
+		algo = SL_TPM_ALG_SHA256;
+	} else {
+		features = res.a1;
+		algo = features & SL_DRTM_FW_HASH_MASK;
 	}
 
-	features = res.a1;
-	algo = features & SL_DRTM_FW_HASH_MASK;
 	pr_info("slaunch: DCE firmware hash algorithm: 0x%x\n", algo);
 
-	if (algo != SL_DRTM_FW_HASH_SHA256)
-		panic("slaunch: DCE reports hash algo 0x%x; kernel only implements SHA-256 (0xB). Add SHA-384 path or use a SHA-256 DCE.\n",
+#ifdef CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT
+	/*
+	 * Fault-injection override (FAULT_INJECT only): coerce a SHA-256
+	 * firmware (FVP) into the SHA-384 path to regression-test it without
+	 * a separate TF-A build, plus a "bad algo" token to check the
+	 * dispatch panics on an unsupported algorithm.
+	 */
+	if (sl_cmdline_has("slaunch_inject=sha384_force")) {
+		pr_warn("slaunch: INJECT: overriding hash algo -> SHA-384\n");
+		algo = SL_TPM_ALG_SHA384;
+	} else if (sl_cmdline_has("slaunch_inject=sha_algo_bad")) {
+		pr_warn("slaunch: INJECT: overriding hash algo -> 0xDEAD (unsupported)\n");
+		algo = 0xDEAD;
+	}
+#endif
+
+	switch (algo) {
+	case SL_TPM_ALG_SHA256:
+		sl_active_algo = SL_HASH_SHA256;
+		break;
+	case SL_TPM_ALG_SHA384:
+		sl_active_algo = SL_HASH_SHA384;
+		break;
+	default:
+		panic("slaunch: DCE reports hash algo 0x%x; kernel only implements SHA-256 (0xB) and SHA-384 (0xC). Add new algo to sl_hash_algs[] or use a supported DCE.\n",
 		      algo);
+	}
+
+	pr_info("slaunch: DLME will use %s for the measurement chain%s\n",
+		sl_active_alg_info()->name,
+		fw_features_supported ? "" : " (DRTM_FEATURES unavailable)");
 }
 
 static void __init slaunch_measure_acpi(void)
@@ -1332,10 +1442,12 @@ void __init slaunch_validate_initrd(void)
 
 static void __init slaunch_measure_initrd(void)
 {
+	const struct sl_hash_alg_info *ainfo = sl_active_alg_info();
 	u64 start, size;
 	u64 off = 0, remaining;
-	struct sha256_ctx sctx;
-	u8 hash[SHA256_DIGEST_SIZE];
+	struct sha256_ctx sctx256;
+	struct sha384_ctx sctx384;
+	u8 hash[SL_HASH_MAX_DIGEST_SIZE];
 	struct slaunch_measurement *m;
 	void *p;
 
@@ -1343,12 +1455,16 @@ static void __init slaunch_measure_initrd(void)
 		return;
 
 	/*
-	 * Chunked early_memremap + streaming SHA-256: the initrd can
-	 * exceed a single early_memremap and the linear map is not
-	 * reliable here, so map one page at a time, feed into
-	 * sha256_update, then sha256_final.
+	 * Chunked early_memremap + streaming hash with the active algorithm:
+	 * map one page at a time, feed into the streaming context, finalise.
+	 * Both APIs (sha256/sha384_init/update/final) are safe in setup_arch()
+	 * (see the sl_hash_data() comment).
 	 */
-	sha256_init(&sctx);
+	if (sl_active_algo == SL_HASH_SHA384)
+		sha384_init(&sctx384);
+	else
+		sha256_init(&sctx256);
+
 	remaining = size;
 	while (remaining > 0) {
 		size_t chunk = min_t(u64, remaining, (u64)PAGE_SIZE);
@@ -1357,20 +1473,31 @@ static void __init slaunch_measure_initrd(void)
 		if (!p)
 			panic("slaunch: initrd chunk remap failed at 0x%llx (chunk %zu)\n",
 			      start + off, chunk);
-		sha256_update(&sctx, p, chunk);
+		if (sl_active_algo == SL_HASH_SHA384)
+			sha384_update(&sctx384, p, chunk);
+		else
+			sha256_update(&sctx256, p, chunk);
 		early_memunmap(p, chunk);
 		off += chunk;
 		remaining -= chunk;
 	}
-	sha256_final(&sctx, hash);
+	if (sl_active_algo == SL_HASH_SHA384)
+		sha384_final(&sctx384, hash);
+	else
+		sha256_final(&sctx256, hash);
 
-	pr_info("slaunch: measured initrd (%llu bytes) SHA-256: %*phN\n",
-		size, SHA256_DIGEST_SIZE, hash);
+	pr_info("slaunch: measured initrd (%llu bytes) %s: %*phN\n",
+		size, ainfo->name, (int)ainfo->digest_size, hash);
 
 	slaunch_measurements_reserve(slaunch_measurement_count + 1);
 	m = &slaunch_measurements[slaunch_measurement_count++];
 	strscpy(m->desc, "initrd", sizeof(m->desc));
-	memcpy(m->hash, hash, SHA256_DIGEST_SIZE);
+	memcpy(m->hash, hash, ainfo->digest_size);
+	if (ainfo->digest_size < SL_HASH_MAX_DIGEST_SIZE)
+		memset(m->hash + ainfo->digest_size, 0,
+		       SL_HASH_MAX_DIGEST_SIZE - ainfo->digest_size);
+	m->digest_size = ainfo->digest_size;
+	m->tpm_alg_id = ainfo->tpm_alg_id;
 }
 
 /*
@@ -1379,7 +1506,6 @@ static void __init slaunch_measure_initrd(void)
  * DLME measurement into the trailing slack and bump drtm_event_log_size,
  * so a verifier sees one chain (DEN0113 v1.2 §3.17/§4.8.4; TCG PFP §10.2.2).
  */
-#define SL_TPM_ALG_SHA256		0x000B
 /*
  * TODO: no Arm event type (DEN0113 v1.2 §3.17.2 Table 19, base 0x9000)
  * matches a DLME-side ACPI measurement, so generic TCG
@@ -1391,17 +1517,24 @@ static void __init slaunch_measure_initrd(void)
 
 /*
  * Write one TCG_PCR_EVENT2 at *off in buf (advances *off); -ENOSPC if no
- * room within max. Packed LE layout: u32 PCRIndex, EventType,
- * digest_count; per digest u16 hashAlg + hash[]; u32 EventSize + Event[].
+ * room within max. Packed LE: u32 PCRIndex, EventType, digest_count;
+ * per digest u16 hashAlg + hash[digest_size]; u32 EventSize + Event[].
+ * digest_size/alg are variable (SHA-256 32 B, SHA-384 48 B) per record.
  */
 static int __init sl_evlog_append_event2(u8 *buf, size_t *off, size_t max,
 					 u32 pcr, u32 type,
-					 const u8 hash[SHA256_DIGEST_SIZE],
+					 u16 tpm_alg_id,
+					 const u8 *hash, u8 digest_size,
 					 const void *event_data,
 					 u32 event_size)
 {
-	size_t need = 4 + 4 + 4 + 2 + SHA256_DIGEST_SIZE + 4 + event_size;
+	size_t need;
 	u8 *p;
+
+	if (digest_size == 0 || digest_size > SL_HASH_MAX_DIGEST_SIZE)
+		return -EINVAL;
+
+	need = 4 + 4 + 4 + 2 + digest_size + 4 + event_size;
 
 	if (*off + need > max)
 		return -ENOSPC;
@@ -1410,11 +1543,11 @@ static int __init sl_evlog_append_event2(u8 *buf, size_t *off, size_t max,
 	*(__le32 *)(p +  0) = cpu_to_le32(pcr);
 	*(__le32 *)(p +  4) = cpu_to_le32(type);
 	*(__le32 *)(p +  8) = cpu_to_le32(1);
-	*(__le16 *)(p + 12) = cpu_to_le16(SL_TPM_ALG_SHA256);
-	memcpy(p + 14, hash, SHA256_DIGEST_SIZE);
-	*(__le32 *)(p + 14 + SHA256_DIGEST_SIZE) = cpu_to_le32(event_size);
+	*(__le16 *)(p + 12) = cpu_to_le16(tpm_alg_id);
+	memcpy(p + 14, hash, digest_size);
+	*(__le32 *)(p + 14 + digest_size) = cpu_to_le32(event_size);
 	if (event_size)
-		memcpy(p + 14 + SHA256_DIGEST_SIZE + 4, event_data, event_size);
+		memcpy(p + 14 + digest_size + 4, event_data, event_size);
 	*off += need;
 	return 0;
 }
@@ -1489,7 +1622,9 @@ static void __init slaunch_extend_drtm_event_log(void)
 		if (sl_evlog_append_event2(evlog_va, &evlog_off, evlog_max,
 					   SL_DRTM_PCR_INDEX,
 					   SL_EV_PLATFORM_CONFIG_FLAGS,
-					   m->hash, m->desc, (u32)dlen))
+					   m->tpm_alg_id,
+					   m->hash, m->digest_size,
+					   m->desc, (u32)dlen))
 			panic("slaunch: event log overflow at DLME entry %u (%s) — bump Preamble's sl_dlme_data_reserve\n",
 			      i, m->desc);
 	}
@@ -1520,9 +1655,14 @@ static void __init slaunch_extend_drtm_event_log(void)
 		SL_DRTM_PCR_INDEX);
 	for (i = 0; i < slaunch_measurement_count; i++) {
 		const struct slaunch_measurement *m = &slaunch_measurements[i];
+		const char *algo_name =
+			(m->tpm_alg_id == SL_TPM_ALG_SHA384) ? "SHA-384" :
+			(m->tpm_alg_id == SL_TPM_ALG_SHA256) ? "SHA-256" :
+			"UNKNOWN";
 
-		pr_info("slaunch:   [%2u] %-12s SHA-256: %*phN\n",
-			i, m->desc, SHA256_DIGEST_SIZE, m->hash);
+		pr_info("slaunch:   [%2u] %-12s %s: %*phN\n",
+			i, m->desc, algo_name,
+			(int)m->digest_size, m->hash);
 	}
 }
 
@@ -1530,8 +1670,8 @@ static void __init slaunch_extend_drtm_event_log(void)
 /*
  * Negative-test fault injection (slaunch_inject=<token>): mutates the
  * raw EFI mmap/systab/SRTM-log before slaunch_validate_efi_early so the
- * validator panics. Tokens: mmap_*, systab_nr_tables_huge, srtm_log_*.
- * Not for production.
+ * validator panics. Tokens: mmap_*, systab_nr_tables_huge, srtm_log_*,
+ * sha384_force, sha_algo_bad. Not for production.
  */
 static bool __init sl_cmdline_has(const char *tok)
 {
