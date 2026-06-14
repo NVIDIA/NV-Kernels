@@ -2472,7 +2472,8 @@ config ARM64_SECURE_LAUNCH_FAULT_INJECT
 	  treats that as a passing negative test.
 
 	  Tokens implemented: mmap_wrap, mmap_pages_overflow,
-	  mmap_size_huge, systab_nr_tables_huge.
+	  mmap_size_huge, systab_nr_tables_huge, sha384_force,
+	  sha_algo_bad.
 
 	  Useful for proving end-to-end that the validation pipeline
 	  catches the canonical exploits. Intended for development testing only; leave disabled in production builds.
