@@ -5,6 +5,7 @@
 #include <linux/moduleparam.h>
 #include <linux/module.h>
 #include <linux/delay.h>
+#include <linux/err.h>
 #include <linux/sizes.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
@@ -1028,7 +1029,7 @@ static void cxl_reset_done(struct pci_dev *pdev)
 	 * that no longer exists.
 	 */
 	guard(device)(&cxlmd->dev);
-	if (cxlmd->endpoint &&
+	if (!IS_ERR_OR_NULL(cxlmd->endpoint) &&
 	    cxl_endpoint_decoder_reset_detected(cxlmd->endpoint)) {
 		dev_crit(dev, "SBR happened without memory regions removal.\n");
 		dev_crit(dev, "System may be unstable if regions hosted system memory.\n");
