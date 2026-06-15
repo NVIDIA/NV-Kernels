@@ -1380,10 +1380,31 @@ static void write_msmon_ctl_flt_vals(struct mon_read *m, u32 ctl_val,
 	}
 }
 
-static u64 mpam_msmon_overflow_val(enum mpam_device_features type)
+static u64 __mpam_msmon_overflow_val(enum mpam_device_features type)
 {
-	/* TODO: scaling, and long counters */
-	return BIT_ULL(hweight_long(MSMON___VALUE));
+	/* TODO: implement scaling counters */
+	switch (type) {
+	case mpam_feat_msmon_mbwu_63counter:
+		return BIT_ULL(hweight_long(MSMON___LWD_VALUE));
+	case mpam_feat_msmon_mbwu_44counter:
+		return BIT_ULL(hweight_long(MSMON___L_VALUE));
+	case mpam_feat_msmon_mbwu_31counter:
+		return BIT_ULL(hweight_long(MSMON___VALUE));
+	default:
+		return 0;
+	}
+}
+
+static u64 mpam_msmon_overflow_val(enum mpam_device_features type,
+				   struct mpam_msc *msc)
+{
+	u64 overflow_val = __mpam_msmon_overflow_val(type);
+
+	if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc) &&
+	    type != mpam_feat_msmon_mbwu_63counter)
+		overflow_val *= 64;
+
+	return overflow_val;
 }
 
 /* Call with MSC lock held */
@@ -1410,7 +1431,9 @@ static void __ris_msmon_read(void *arg)
 		  FIELD_PREP(MSMON_CFG_MON_SEL_RIS, ris->ris_idx);
 	mpam_write_monsel_reg(msc, CFG_MON_SEL, mon_sel);
 
-	if (m->type == mpam_feat_msmon_mbwu) {
+	if (m->type == mpam_feat_msmon_mbwu_31counter ||
+	    m->type == mpam_feat_msmon_mbwu_44counter ||
+	    m->type == mpam_feat_msmon_mbwu_63counter) {
 		mbwu_state = &ris->mbwu_state[ctx->mon];
 		if (mbwu_state) {
 			reset_on_next_read = mbwu_state->reset_on_next_read;
@@ -1423,7 +1446,12 @@ static void __ris_msmon_read(void *arg)
 	 * This saves waiting for 'nrdy' on subsequent reads.
 	 */
 	read_msmon_ctl_flt_vals(m, &cur_ctl, &cur_flt);
-	overflow = cur_ctl & MSMON_CFG_x_CTL_OFLOW_STATUS;
+
+	if (mpam_feat_msmon_mbwu_31counter == m->type)
+		overflow = cur_ctl & MSMON_CFG_x_CTL_OFLOW_STATUS;
+	else if (mpam_feat_msmon_mbwu_44counter == m->type ||
+		 mpam_feat_msmon_mbwu_63counter == m->type)
+		overflow = cur_ctl & MSMON_CFG_MBWU_CTL_OFLOW_STATUS_L;
 
 	clean_msmon_ctl_val(&cur_ctl);
 	gen_msmon_ctl_flt_vals(m, &ctl_val, &flt_val);
@@ -1435,7 +1463,9 @@ static void __ris_msmon_read(void *arg)
 		overflow = false;
 	} else if (overflow) {
 		mpam_write_monsel_reg(msc, CFG_MBWU_CTL,
-				      cur_ctl & ~MSMON_CFG_x_CTL_OFLOW_STATUS);
+				      cur_ctl &
+				      ~(MSMON_CFG_x_CTL_OFLOW_STATUS |
+					MSMON_CFG_MBWU_CTL_OFLOW_STATUS_L));
 	}
 
 	switch (m->type) {
@@ -1468,7 +1498,8 @@ static void __ris_msmon_read(void *arg)
 			now = FIELD_GET(MSMON___VALUE, now);
 		}
 
-		if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc))
+		if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc) &&
+		    m->type != mpam_feat_msmon_mbwu_63counter)
 			now *= 64;
 
 		if (nrdy)
@@ -1476,13 +1507,8 @@ static void __ris_msmon_read(void *arg)
 
 		mbwu_state = &ris->mbwu_state[ctx->mon];
 
-		if (overflow) {
-			u64 overflow_val = mpam_msmon_overflow_val(m->type);
-
-			if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc))
-				overflow_val *= 64;
-			mbwu_state->correction += overflow_val;
-		}
+		if (overflow)
+			mbwu_state->correction += mpam_msmon_overflow_val(m->type, msc);
 
 		/*
 		 * Include bandwidth consumed before the last hardware reset and
@@ -1545,10 +1571,10 @@ static enum mpam_device_features mpam_msmon_choose_counter(struct mpam_class *cl
 {
 	struct mpam_props *cprops = &class->props;
 
-	if (mpam_has_feature(mpam_feat_msmon_mbwu_44counter, cprops))
-		return mpam_feat_msmon_mbwu_44counter;
 	if (mpam_has_feature(mpam_feat_msmon_mbwu_63counter, cprops))
 		return mpam_feat_msmon_mbwu_63counter;
+	if (mpam_has_feature(mpam_feat_msmon_mbwu_44counter, cprops))
+		return mpam_feat_msmon_mbwu_44counter;
 
 	return mpam_feat_msmon_mbwu_31counter;
 }
