@@ -53,11 +53,13 @@ ifeq ($(DEB_SOURCE),linux)
 	do_tools_host = true
 endif
 
+ifneq ($(do_tools_noble_hwe),true)
 # The unversioned and unflavoured bpftools and linux-perf packages should only be built for the
 # linux source package.
 ifneq ($(DEB_SOURCE),linux)
 	do_tools_bpftool = false
 	do_tools_perf = false
+endif
 endif
 
 # The linux-source package may only be built for the linux source package
