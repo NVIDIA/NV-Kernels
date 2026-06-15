@@ -155,6 +155,7 @@ ifeq ($(do_tools_host),true)
 		$(hosttoolsman)/man1
 endif
 
+ifneq ($(do_tools_noble_hwe),true)
 ifeq ($(do_linux_tools),true)
   ifeq ($(do_tools_bpftool),true)
 	dh_prep -p$(bpftoolpkg)
@@ -169,6 +170,7 @@ ifeq ($(do_linux_tools),true)
 		$(bpftoolbashcomp)
   endif
 endif
+endif # do_tools_noble_hwe
 
 .PHONY: install-indep
 install-indep: $(stampdir)/stamp-install-headers install-source install-tools
