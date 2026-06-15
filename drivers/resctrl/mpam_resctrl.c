@@ -179,21 +179,6 @@ static void resctrl_reset_task_closids(void)
 	read_unlock(&tasklist_lock);
 }
 
-static struct mpam_resctrl_mon *mpam_resctrl_mon_from_res(struct mpam_resctrl_res *res)
-{
-	struct mpam_resctrl_mon *mon;
-	enum resctrl_event_id eventid;
-
-	if (!res->class)
-		return NULL;
-
-	for_each_mpam_resctrl_mon(mon, eventid) {
-		if (mon->class == res->class)
-			return mon;
-	}
-	return NULL;
-}
-
 static struct mpam_resctrl_res *mpam_resctrl_res_from_mon(struct mpam_resctrl_mon *mon)
 {
 	struct mpam_resctrl_res *res;
@@ -1337,7 +1322,7 @@ static void mpam_resctrl_pick_counters(void)
 					update_rmid_limits(cache_size);
 
 				counter_update_class(QOS_L3_OCCUP_EVENT_ID, class);
-				return;
+				break;
 			default:
 				return;
 			}
@@ -1350,25 +1335,7 @@ static void mpam_resctrl_pick_counters(void)
 		    traffic_matches_l3(class)))) {
 			pr_debug("class %u has usable MBWU, and matches L3 topology", class->level);
 
-			/*
-			 * MBWU counters may be 'local' or 'total' depending on
-			 * where they are in the topology. Counters on caches
-			 * are assumed to be local. If it's on the memory
-			 * controller, its assumed to be global.
-			 * TODO: check mbm_local matches NUMA boundaries...
-			 */
-			switch (class->type) {
-			case MPAM_CLASS_CACHE:
-				counter_update_class(QOS_L3_MBM_LOCAL_EVENT_ID,
-						     class);
-				break;
-			case MPAM_CLASS_MEMORY:
-				counter_update_class(QOS_L3_MBM_TOTAL_EVENT_ID,
-						     class);
-				break;
-			default:
-				break;
-			}
+			counter_update_class(QOS_L3_MBM_TOTAL_EVENT_ID, class);
 		}
 	}
 
@@ -1417,16 +1384,13 @@ void resctrl_arch_config_cntr(struct rdt_resource *r, struct rdt_l3_mon_domain *
 
 bool resctrl_arch_mbm_cntr_assign_enabled(struct rdt_resource *r)
 {
-	struct mpam_resctrl_res *res;
-	struct mpam_resctrl_mon *mon;
-
-	res = container_of(r, struct mpam_resctrl_res, resctrl_res);
-
-	mon = mpam_resctrl_mon_from_res(res);
-	if (!mon)
-		return false;
-
-	return mon->assigned_counters ? true : false;
+	/*
+	 * mbm_cntr_assignable is set only when ABMC is initialised on this
+	 * resource. Multiple monitor events may share res->class (e.g.
+	 * occupancy and MBWU), so assignment support must not be inferred
+	 * from mon->assigned_counters via a class lookup on the wrong event.
+	 */
+	return r->mon.mbm_cntr_assignable;
 }
 
 int resctrl_arch_mbm_cntr_assign_set(struct rdt_resource *r, bool enable)
@@ -1641,18 +1605,17 @@ static int mpam_resctrl_monitor_init(struct mpam_resctrl_mon *mon,
 	 */
 	r->mon.num_rmid = resctrl_arch_system_num_rmid_idx();
 
+	if (type == QOS_L3_MBM_TOTAL_EVENT_ID) {
+		mpam_resctrl_monitor_init_abmc(mon);
+		/*
+		 * Bind mbm_total_bytes to the resource backing this monitor
+		 * (L3 or MBA) so mon_data, mbm_*_assignments, and events align.
+		 */
+		resctrl_mon_event_set_resource(type, r->rid);
+	}
+
 	if (resctrl_enable_mon_event(type, false, 0, NULL))
 		r->mon_capable = true;
-
-	switch (type) {
-	case QOS_L3_MBM_LOCAL_EVENT_ID:
-	case QOS_L3_MBM_TOTAL_EVENT_ID:
-		mpam_resctrl_monitor_init_abmc(mon);
-
-		return 0;
-	default:
-		return 0;
-	}
 
 	return 0;
 }
