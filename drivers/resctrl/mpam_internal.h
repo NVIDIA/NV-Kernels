@@ -327,7 +327,7 @@ struct msmon_mbwu_state {
 
 	/*
 	 * The value to add to the new reading to account for power management,
-	 * and shifts to trigger the overflow interrupt.
+	 * and overflow.
 	 */
 	u64		correction;
 

@@ -1382,17 +1382,8 @@ static void write_msmon_ctl_flt_vals(struct mon_read *m, u32 ctl_val,
 
 static u64 mpam_msmon_overflow_val(enum mpam_device_features type)
 {
-	/* TODO: implement scaling counters */
-	switch (type) {
-	case mpam_feat_msmon_mbwu_63counter:
-		return GENMASK_ULL(62, 0);
-	case mpam_feat_msmon_mbwu_44counter:
-		return GENMASK_ULL(43, 0);
-	case mpam_feat_msmon_mbwu_31counter:
-		return GENMASK_ULL(30, 0);
-	default:
-		return 0;
-	}
+	/* TODO: scaling, and long counters */
+	return BIT_ULL(hweight_long(MSMON___VALUE));
 }
 
 /* Call with MSC lock held */
@@ -1400,8 +1391,9 @@ static void __ris_msmon_read(void *arg)
 {
 	bool nrdy = false;
 	bool config_mismatch;
+	bool overflow = false;
 	struct mon_read *m = arg;
-	u64 now, overflow_val = 0;
+	u64 now;
 	struct mon_cfg *ctx = m->ctx;
 	bool reset_on_next_read = false;
 	struct mpam_msc_ris *ris = m->ris;
@@ -1431,13 +1423,20 @@ static void __ris_msmon_read(void *arg)
 	 * This saves waiting for 'nrdy' on subsequent reads.
 	 */
 	read_msmon_ctl_flt_vals(m, &cur_ctl, &cur_flt);
+	overflow = cur_ctl & MSMON_CFG_x_CTL_OFLOW_STATUS;
+
 	clean_msmon_ctl_val(&cur_ctl);
 	gen_msmon_ctl_flt_vals(m, &ctl_val, &flt_val);
 	config_mismatch = cur_flt != flt_val ||
 			  cur_ctl != (ctl_val | MSMON_CFG_x_CTL_EN);
 
-	if (config_mismatch || reset_on_next_read)
+	if (config_mismatch || reset_on_next_read) {
 		write_msmon_ctl_flt_vals(m, ctl_val, flt_val);
+		overflow = false;
+	} else if (overflow) {
+		mpam_write_monsel_reg(msc, CFG_MBWU_CTL,
+				      cur_ctl & ~MSMON_CFG_x_CTL_OFLOW_STATUS);
+	}
 
 	switch (m->type) {
 	case mpam_feat_msmon_csu:
@@ -1477,18 +1476,18 @@ static void __ris_msmon_read(void *arg)
 
 		mbwu_state = &ris->mbwu_state[ctx->mon];
 
-		/* Add any pre-overflow value to the mbwu_state->val */
-		if (mbwu_state->prev_val > now) {
-			overflow_val = mpam_msmon_overflow_val(m->type);
+		if (overflow) {
+			u64 overflow_val = mpam_msmon_overflow_val(m->type);
+
 			if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc))
 				overflow_val *= 64;
-			overflow_val -= mbwu_state->prev_val;
+			mbwu_state->correction += overflow_val;
 		}
 
-		mbwu_state->prev_val = now;
-		mbwu_state->correction += overflow_val;
-
-		/* Include bandwidth consumed before the last hardware reset */
+		/*
+		 * Include bandwidth consumed before the last hardware reset and
+		 * a counter size increment for each overflow.
+		 */
 		now += mbwu_state->correction;
 		break;
 	default:
