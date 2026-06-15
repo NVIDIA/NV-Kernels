@@ -16,6 +16,7 @@ do_tools_perf_jvmti = true
 do_tools_perf_python = true
 do_tools_bpftool = true
 do_tools_rtla = true
+do_tools_noble_hwe = true
 
 do_dtbs		= true
 
