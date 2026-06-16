@@ -6007,7 +6007,7 @@ CONFIG_HSR                                      policy<{'amd64': 'm', 'arm64': '
 CONFIG_HT16K33                                  policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_HTC_EGPIO                                policy<{'armhf': 'y'}>
 CONFIG_HTE                                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'n', 's390x': 'n'}>
-CONFIG_HTE_TEGRA194                             policy<{'arm64': 'm'}>
+CONFIG_HTE_TEGRA194                             policy<{'arm64': 'm', 'armhf': 'n'}>
 CONFIG_HTE_TEGRA194_TEST                        policy<{'arm64': 'm'}>
 CONFIG_HTS221                                   policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_HTS221_I2C                               policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
