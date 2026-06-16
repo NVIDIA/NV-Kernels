@@ -468,7 +468,6 @@ static void rxrpc_do_process_connection(struct rxrpc_connection *conn)
 			goto protocol_error;
 		case -ENOMEM:
 		case -EAGAIN:
-			goto requeue_and_leave;
 		case -ECONNABORTED:
 		default:
 			rxrpc_free_skb(skb, rxrpc_skb_freed);
