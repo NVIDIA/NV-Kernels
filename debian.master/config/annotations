@@ -5170,7 +5170,7 @@ CONFIG_FSL_DPAA2_ETH                            policy<{'arm64': 'm'}>
 CONFIG_FSL_DPAA2_ETH_DCB                        policy<{'arm64': 'y'}>
 CONFIG_FSL_DPAA2_PTP_CLOCK                      policy<{'arm64': 'm'}>
 CONFIG_FSL_DPAA2_QDMA                           policy<{'arm64': 'm'}>
-CONFIG_FSL_DPAA2_SWITCH                         policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_FSL_DPAA2_SWITCH                         policy<{'arm64': 'm'}>
 CONFIG_FSL_DPAA_CHECKING                        policy<{'arm64': 'y'}>
 CONFIG_FSL_DPAA_ETH                             policy<{'arm64': 'm'}>
 CONFIG_FSL_EDMA                                 policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
