@@ -261,7 +261,7 @@ struct ATTRIB *mi_enum_attr(struct mft_inode *mi, struct ATTRIB *attr)
 			return NULL;
 
 		t32 = le32_to_cpu(attr->res.data_size);
-		if (t32 > asize - t16)
+		if (t16 + t32 > asize)
 			return NULL;
 
 		if (attr->name_len &&
