@@ -76,6 +76,7 @@ struct htable_gc {
 	struct delayed_work dwork;
 	struct ip_set *set;	/* Set the gc belongs to */
 	u32 region;		/* Last gc run position */
+	bool stopped;
 };
 
 /* The hash table: the table size stored here in order to make resizing easy */
@@ -589,7 +590,9 @@ mtype_gc(struct work_struct *work)
 		mtype_ahash_destroy(set, t, false);
 	}
 
-	queue_delayed_work(system_power_efficient_wq, &gc->dwork, next_run);
+	if (!READ_ONCE(gc->stopped))
+		queue_delayed_work(system_power_efficient_wq, &gc->dwork,
+				   next_run);
 
 }
 
@@ -605,8 +608,10 @@ mtype_cancel_gc(struct ip_set *set)
 {
 	struct htype *h = set->data;
 
-	if (SET_WITH_TIMEOUT(set))
+	if (SET_WITH_TIMEOUT(set)) {
+		WRITE_ONCE(h->gc.stopped, true);
 		cancel_delayed_work_sync(&h->gc.dwork);
+	}
 }
 
 static int
