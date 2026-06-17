@@ -29,6 +29,8 @@
 #include <linux/suspend.h>
 #include <linux/pgtable.h>
 
+#include <asm/drtm.h>
+
 #include <acpi/ghes.h>
 #include <acpi/processor.h>
 #include <asm/cputype.h>
@@ -282,6 +284,11 @@ pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
 
 	u64 attr;
 
+	/* Never let the untrusted EFI attribute device-map kernel RAM or
+	 * the measured DLME; force cacheable for those. */
+	if (slaunch_phys_is_protected_ram(addr))
+		return PAGE_KERNEL;
+
 	attr = efi_mem_attributes(addr);
 	if (attr & EFI_MEMORY_WB)
 		return PAGE_KERNEL;
@@ -369,6 +376,14 @@ void __iomem *acpi_os_ioremap(acpi_physical_address phys, acpi_size size)
 			fallthrough;
 
 		default:
+			/* Refuse a non-RAM descriptor whose span reaches kernel
+			 * RAM or the measured DLME: a device alias of normal
+			 * memory is unsafe. Check the whole range — a span may
+			 * start in MMIO and extend into protected memory. */
+			if (slaunch_phys_range_overlaps_protected_ram(phys, size)) {
+				pr_warn(FW_BUG "DRTM: refusing device-map of kernel RAM/DLME @ %pa\n", &phys);
+				return NULL;
+			}
 			if (region->attribute & EFI_MEMORY_WB)
 				prot = PAGE_KERNEL;
 			else if (region->attribute & EFI_MEMORY_WC)
@@ -376,6 +391,11 @@ void __iomem *acpi_os_ioremap(acpi_physical_address phys, acpi_size size)
 			else if (region->attribute & EFI_MEMORY_WT)
 				prot = __acpi_get_writethrough_mem_attribute();
 		}
+	} else if (slaunch_phys_range_overlaps_protected_ram(phys, size)) {
+		/* Span absent from the EFI map but reaching kernel RAM or the
+		 * DLME: refuse rather than device-map it. */
+		pr_warn(FW_BUG "DRTM: refusing device-map of unmapped kernel RAM/DLME @ %pa\n", &phys);
+		return NULL;
 	}
 	return __ioremap_prot(phys, size, prot);
 }

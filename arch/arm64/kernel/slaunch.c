@@ -416,6 +416,43 @@ static bool __init efi_regions_overlap(u64 s1, u64 sz1, u64 s2, u64 sz2)
 	return (s1 < e2) && (s2 < e1);
 }
 
+/* True when @pa is kernel RAM or in the measured DLME extent; such a PA
+ * must never be device-mapped from the untrusted EFI map. False when DRTM
+ * is inactive; runtime-callable since the DLME handoff values persist. */
+bool slaunch_phys_is_protected_ram(phys_addr_t pa)
+{
+	if (!sl_dlme_region_pa)
+		return false;
+	if (memblock_is_map_memory(pa))
+		return true;
+	return sl_dlme_data_size &&
+	       pa >= sl_dlme_region_pa &&
+	       pa < sl_dlme_data_pa + sl_dlme_data_size;
+}
+
+/* True if [pa, pa+size) touches kernel RAM or the measured DLME extent.
+ * A range that wraps is refused. Used by the ACPI ioremap path, where a
+ * span may start outside protected memory and extend into it. */
+bool slaunch_phys_range_overlaps_protected_ram(phys_addr_t pa, size_t size)
+{
+	phys_addr_t p, end;
+
+	if (!sl_dlme_region_pa)
+		return false;
+	if (check_add_overflow(pa, (phys_addr_t)size, &end))
+		return true;
+
+	if (sl_dlme_data_size &&
+	    pa < sl_dlme_data_pa + sl_dlme_data_size &&
+	    sl_dlme_region_pa < end)
+		return true;
+
+	for (p = ALIGN_DOWN(pa, PAGE_SIZE); p < end; p += PAGE_SIZE)
+		if (memblock_is_map_memory(p))
+			return true;
+	return false;
+}
+
 /*
  * slaunch_early_init() -- earliest DRTM validation, called BEFORE
  * setup_machine_fdt() (after early_ioremap_init). Parses the D-CRTM
@@ -893,6 +930,35 @@ static void __init slaunch_validate_raw_mmap(const struct sl_efi_info *info)
 			      dcrtm_type_name(otype));
 		nchecked++;
 	}
+
+	/* Defense-in-depth: warn on any overlapping descriptor pair.
+	 * First-match attribute lookups would let a planted MMIO descriptor
+	 * order-pick the type for a measured PA; the acpi_os_ioremap consumer
+	 * guard blocks the RAM/DLME case regardless, so this is non-fatal. */
+	for (offset = 0; offset < info->mmap_size; offset += info->desc_size) {
+		efi_memory_desc_t *a = (efi_memory_desc_t *)((u8 *)mmap + offset);
+		u64 asz, off2;
+
+		if (check_mul_overflow(a->num_pages, (u64)EFI_PAGE_SIZE, &asz))
+			continue;
+		for (off2 = offset + info->desc_size; off2 < info->mmap_size;
+		     off2 += info->desc_size) {
+			efi_memory_desc_t *b =
+				(efi_memory_desc_t *)((u8 *)mmap + off2);
+			u64 bsz;
+
+			if (check_mul_overflow(b->num_pages,
+					       (u64)EFI_PAGE_SIZE, &bsz))
+				continue;
+			if (efi_regions_overlap(a->phys_addr, asz,
+						b->phys_addr, bsz))
+				pr_warn("slaunch: raw EFI mmap descriptors [%llu]/[%llu] OVERLAP @ 0x%012llx (types %u/%u)\n",
+					offset / info->desc_size,
+					off2 / info->desc_size,
+					a->phys_addr, a->type, b->type);
+		}
+	}
+
 	early_memunmap(mmap, info->mmap_size);
 	pr_info("slaunch: early raw EFI mmap validation PASSED (%u of %u descriptors checked)\n",
 		nchecked, ndesc);
