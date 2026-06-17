@@ -1902,6 +1902,41 @@ static void __init sl_mutate_mmap_pages_overflow(efi_memory_desc_t *md)
 		md->phys_addr, md->num_pages);
 }
 
+/* Force two CONVENTIONAL descriptors to overlap so the overlap
+ * detector in slaunch_validate_raw_mmap fires its WARN (non-fatal). */
+static void __init slaunch_inject_mmap_overlap(const struct sl_efi_info *info)
+{
+	void *mmap;
+	u64 off;
+	efi_memory_desc_t *first = NULL;
+
+	mmap = early_memremap(info->mmap_pa, info->mmap_size);
+	if (!mmap) {
+		pr_warn("slaunch: INJECT mmap_overlap: map failed\n");
+		return;
+	}
+	for (off = 0; off < info->mmap_size; off += info->desc_size) {
+		efi_memory_desc_t *md =
+			(efi_memory_desc_t *)((u8 *)mmap + off);
+
+		if (md->type != EFI_CONVENTIONAL_MEMORY)
+			continue;
+		if (!first) {
+			first = md;
+			continue;
+		}
+		md->phys_addr = first->phys_addr;
+		if (!md->num_pages)
+			md->num_pages = 1;
+		pr_warn("slaunch: INJECT mmap_overlap: 2nd CONV desc -> phys=0x%llx (expect 'OVERLAP')\n",
+			md->phys_addr);
+		early_memunmap(mmap, info->mmap_size);
+		return;
+	}
+	pr_warn("slaunch: INJECT mmap_overlap: <2 CONVENTIONAL descriptors\n");
+	early_memunmap(mmap, info->mmap_size);
+}
+
 /* Overwrite the first non-null EFI ConfigurationTable entry in the raw
  * systab's cfgtbl array with a synthetic SRTM-log entry. Returns true
  * if we managed to plant the entry. Used by srtm_log_* injectors only;
@@ -2002,6 +2037,10 @@ static void __init slaunch_inject_fault(struct sl_efi_info *info)
 	if (sl_cmdline_has("slaunch_inject=mmap_pages_overflow")) {
 		if (!slaunch_inject_raw_mmap(info, sl_mutate_mmap_pages_overflow))
 			pr_warn("slaunch: INJECT mmap_pages_overflow: no EFI_CONVENTIONAL_MEMORY descriptor found\n");
+		return;
+	}
+	if (sl_cmdline_has("slaunch_inject=mmap_overlap")) {
+		slaunch_inject_mmap_overlap(info);
 		return;
 	}
 	if (sl_cmdline_has("slaunch_inject=mmap_size_huge")) {
@@ -2138,7 +2177,17 @@ static void __init slaunch_selftest(void)
 			panic("selftest: check_mul_overflow missed num_pages*PAGE_SIZE wrap\n");
 	}
 
-	pr_info("slaunch: ALL SELFTESTS PASSED (8/8)\n");
+	/* T9: slaunch_phys_is_protected_ram is the exact predicate
+	 * acpi_os_ioremap/__acpi_get_mem_attribute gate on. It MUST flag the
+	 * measured DLME region and MUST NOT flag a non-RAM PA. */
+	if (sl_dlme_region_pa) {
+		if (!slaunch_phys_is_protected_ram(sl_dlme_region_pa))
+			panic("selftest: slaunch_phys_is_protected_ram missed DLME region\n");
+		if (slaunch_phys_is_protected_ram(0))
+			panic("selftest: slaunch_phys_is_protected_ram flagged non-RAM PA\n");
+	}
+
+	pr_info("slaunch: ALL SELFTESTS PASSED (9/9)\n");
 }
 #endif /* CONFIG_ARM64_SECURE_LAUNCH_SELFTEST */
 
