@@ -42,4 +42,6 @@ chmod +x 'drivers/net/ethernet/realtek/r8127/rtl_eeprom.h'
 chmod +x 'drivers/net/ethernet/realtek/r8127/rtltool.c'
 chmod +x 'drivers/net/ethernet/realtek/r8127/rtltool.h'
 # Remove any files deleted from the orig.
+rm -f 'arch/parisc/lib/checksum.c'
+rm -f 'tools/testing/selftests/mqueue/setting'
 exit 0
