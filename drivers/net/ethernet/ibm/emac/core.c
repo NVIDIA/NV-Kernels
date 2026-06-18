@@ -3086,7 +3086,6 @@ static int emac_probe(struct platform_device *ofdev)
 
 	dev->emacp = devm_platform_ioremap_resource(ofdev, 0);
 	if (IS_ERR(dev->emacp)) {
-		dev_err(&ofdev->dev, "can't map device registers");
 		err = PTR_ERR(dev->emacp);
 		goto err_irq_unmap;
 	}
