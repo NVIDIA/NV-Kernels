@@ -6,6 +6,12 @@
 
 include "../../debian.nvidia/config/annotations"
 
+CONFIG_DRM_NOVA                                 policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_DRM_NOVA                                 note<'LP: #2150845'>
+
+CONFIG_NOVA_CORE                                policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_NOVA_CORE                                note<'LP: #2150845'>
+
 CONFIG_RUST                                     policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_RUST                                     note<'TODO: update note'>
 
@@ -25,7 +31,6 @@ CONFIG_CC_HAS_MULTIDIMENSIONAL_NONSTRING        policy<{'amd64': '-', 'arm64': '
 CONFIG_CC_HAS_SANE_FUNCTION_ALIGNMENT           policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"'}>
 CONFIG_CPUFREQ_DT_RUST                          policy<{'arm64': '-'}>
-CONFIG_DRM_NOVA                                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_DRM_TYR                                  policy<{'arm64': '-'}>
 CONFIG_FIND_BIT_BENCHMARK_RUST                  policy<{'amd64': '-', 'arm64': '-'}>
@@ -35,7 +40,6 @@ CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64
 CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_44             policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_65             policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_87             policy<{'amd64': '-', 'arm64': '-'}>
-CONFIG_NOVA_CORE                                policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_OPENSSL_SUPPORTS_ML_DSA                  policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125'}>
 CONFIG_RELR                                     policy<{'arm64': '-'}>
