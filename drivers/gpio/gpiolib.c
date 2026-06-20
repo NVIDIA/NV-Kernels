@@ -3327,7 +3327,7 @@ static int gpiochip_set_multiple(struct gpio_chip *gc,
 				 unsigned long *mask, unsigned long *bits)
 {
 	unsigned int i;
-	int ret;
+	int ret = 0;
 
 	if (WARN_ON(unlikely(!gc->set_multiple && !gc->set_multiple_rv &&
 			     !gc->set && !gc->set_rv)))
