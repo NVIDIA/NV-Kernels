@@ -113,11 +113,29 @@ bool resctrl_arch_alloc_capable(void)
 
 bool resctrl_arch_mon_capable(void)
 {
-	struct mpam_resctrl_res *res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
-	struct rdt_resource *l3 = &res->resctrl_res;
+	enum resctrl_event_id eventid;
+	struct mpam_resctrl_mon *mon;
+	struct mpam_resctrl_res *res;
+	struct rdt_resource *r;
 
-	/* All monitors are presented as being on the L3 cache */
-	return l3->mon_capable;
+	for_each_mpam_resctrl_mon(mon, eventid) {
+		struct mpam_class *class = mon->class;
+
+		if (!class)
+			continue;	// dummy resource
+
+		if ((class->type == MPAM_CLASS_MEMORY) && (class->level > 3))
+			res = &mpam_resctrl_controls[RDT_RESOURCE_MBA];
+		else
+			res = &mpam_resctrl_controls[RDT_RESOURCE_L3];
+
+		r = &res->resctrl_res;
+
+		if (r->mon_capable)
+			return true;
+	}
+
+	return false;
 }
 
 /*
