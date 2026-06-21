@@ -1,0 +1,11 @@
+--- kernel/bpf/verifier.c
++++ kernel/bpf/verifier.c
+@@ -16443,7 +16652,7 @@ static bool regsafe(struct bpf_verifier_env *env, struct bpf_reg_state *rold,
+ 		 *
+ 		 * First verification path is [1-6]:
+ 		 * - at (4) same bpf_reg_state::id (b) would be assigned to r6 and r7;
+-		 * - at (5) r6 would be marked <= X, find_equal_scalars() would also mark
++		 * - at (5) r6 would be marked <= X, sync_linked_regs() would also mark
+ 		 *   r7 <= X, because r6 and r7 share same id.
+ 		 * Next verification path is [1-4, 6].
+ 		 *
