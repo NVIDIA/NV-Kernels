@@ -946,7 +946,6 @@ int cec_transmit_msg_fh(struct cec_adapter *adap, struct cec_msg *msg,
 	 */
 	mutex_unlock(&adap->lock);
 	err = wait_for_completion_killable(&data->c);
-	cancel_delayed_work_sync(&data->work);
 	mutex_lock(&adap->lock);
 
 	if (err)
@@ -966,6 +965,13 @@ int cec_transmit_msg_fh(struct cec_adapter *adap, struct cec_msg *msg,
 		list_del(&data->list);
 	if (WARN_ON(!list_empty(&data->xfer_list)))
 		list_del(&data->xfer_list);
+	/* Drain any pending delayed work before freeing data. cec_data_cancel()
+	 * above detached data from all CEC scheduling paths while holding
+	 * adap->lock, so cancel_delayed_work_sync() is safe here.
+	 */
+	mutex_unlock(&adap->lock);
+	cancel_delayed_work_sync(&data->work);
+	mutex_lock(&adap->lock);
 	kfree(data);
 	return 0;
 }
