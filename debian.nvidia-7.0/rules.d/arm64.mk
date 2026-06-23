@@ -1,8 +1,8 @@
 build_arch	= arm64
 defconfig	= defconfig
 flavours	= nvidia nvidia-64k
-build_image	= Image.gz
-kernel_file	= arch/$(build_arch)/boot/Image.gz
+build_image	= Image
+kernel_file	= arch/$(build_arch)/boot/Image
 install_file	= vmlinuz
 no_dumpfile = true
 uefi_signed     = true
