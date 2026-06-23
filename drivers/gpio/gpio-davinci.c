@@ -597,6 +597,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
 					      davinci_gpio_irq_data),
 					      GFP_KERNEL);
 		if (!irqdata) {
+			irq_domain_remove(chips->irq_domain);
 			clk_disable_unprepare(clk);
 			return -ENOMEM;
 		}
