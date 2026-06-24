@@ -3174,6 +3174,9 @@ static int unix_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 			mutex_lock(&u->iolock);
 
+			if (sk->sk_type != SOCK_STREAM)
+				return -EOPNOTSUPP;
+
 			skb = skb_peek(&sk->sk_receive_queue);
 			if (skb) {
 				struct sk_buff *oob_skb = READ_ONCE(u->oob_skb);
