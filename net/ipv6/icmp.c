@@ -856,6 +856,10 @@ void icmpv6_notify(struct sk_buff *skb, u8 type, u8 code, __be32 info)
 	if (!pskb_may_pull(skb, inner_offset+8))
 		goto out;
 
+	/* IPPROTO_RAW sockets are not supposed to receive anything. */
+	if (nexthdr == IPPROTO_RAW)
+		goto out;
+
 	/* BUGGG_FUTURE: we should try to parse exthdrs in this packet.
 	   Without this we will not able f.e. to make source routed
 	   pmtu discovery.
