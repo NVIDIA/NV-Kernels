@@ -49,7 +49,7 @@
 #define ACPI_CSTATE_HALT	2
 #define ACPI_CSTATE_INTEGER	3
 
-#define ACPI_CX_DESC_LEN	32
+#define ACPI_CX_DESC_LEN	64
 
 /* Power Management */
 
