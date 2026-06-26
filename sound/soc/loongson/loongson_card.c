@@ -104,8 +104,10 @@ static int loongson_card_parse_acpi(struct loongson_card_data *data)
 	for (i = 0; i < card->num_links; i++)
 		loongson_dai_links[i].codecs->name = codec_name;
 
-	device_property_read_string(card->dev, "codec-dai-name",
-				    &codec_dai_name);
+	ret = device_property_read_string(card->dev, "codec-dai-name",
+					  &codec_dai_name);
+	if (ret)
+		return ret;
 	for (i = 0; i < card->num_links; i++)
 		loongson_dai_links[i].codecs->dai_name = codec_dai_name;
 
