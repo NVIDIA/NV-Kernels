@@ -18,7 +18,7 @@
 
 #define CPUIDLE_STATE_MAX	10
 #define CPUIDLE_NAME_LEN	16
-#define CPUIDLE_DESC_LEN	32
+#define CPUIDLE_DESC_LEN	64
 
 struct module;
 
