@@ -107,7 +107,7 @@ static int __start_server(int type, int protocol, const struct sockaddr *addr,
 	if (settimeo(fd, timeout_ms))
 		goto error_close;
 
-	if (type == SOCK_STREAM &&
+	if ((type & SOCK_TYPE_MASK) == SOCK_STREAM &&
 	    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))) {
 		log_err("Failed to enable SO_REUSEADDR");
 		goto error_close;
@@ -124,7 +124,7 @@ static int __start_server(int type, int protocol, const struct sockaddr *addr,
 		goto error_close;
 	}
 
-	if (type == SOCK_STREAM) {
+	if ((type & SOCK_TYPE_MASK) == SOCK_STREAM) {
 		if (listen(fd, 1) < 0) {
 			log_err("Failed to listed on socket");
 			goto error_close;
