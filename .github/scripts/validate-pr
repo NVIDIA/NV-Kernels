@@ -130,24 +130,114 @@ def describe_added_sob_order(message, added):
     return None
 
 
-def get_patch_id(commit):
+def get_patch_id(commit, zero_context=False):
     """Return the stable patch-ID string for a commit, or None on failure."""
-    show = subprocess.run(
-        ['git', 'show', commit.hexsha],
-        capture_output=True,
-        cwd=commit.repo.working_dir,
+    show_args = ['git', 'show']
+    if zero_context:
+        show_args.extend([
+            '--format=', '--no-color', '--no-ext-diff', '--no-textconv',
+            '--full-index', '--binary', '--unified=0',
+        ])
+    show_args.append(commit.hexsha)
+    try:
+        show = subprocess.run(
+            show_args,
+            capture_output=True,
+            cwd=commit.repo.working_dir,
+        )
+        if show.returncode != 0:
+            return None
+        pid = subprocess.run(
+            ['git', 'patch-id', '--stable'],
+            input=show.stdout,
+            capture_output=True,
+            cwd=commit.repo.working_dir,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    if pid.returncode != 0:
+        return None
+    match = re.fullmatch(
+        br'(?:(?P<sha1>[0-9a-f]{40}) [0-9a-f]{40}|'
+        br'(?P<sha256>[0-9a-f]{64}) [0-9a-f]{64})\n?',
+        pid.stdout,
     )
-    pid = subprocess.run(
-        ['git', 'patch-id', '--stable'],
-        input=show.stdout,
-        capture_output=True,
-        cwd=commit.repo.working_dir,
-    )
-    if pid.returncode == 0 and pid.stdout:
-        parts = pid.stdout.decode().strip().split()
-        if parts:
-            return parts[0]
-    return None
+    if match is None:
+        return None
+    return (match.group('sha1') or match.group('sha256')).decode('ascii')
+
+
+def is_equivalent_replay(local_commit, upstream_commit,
+                         local_patch_id, upstream_patch_id):
+    """Return whether the upstream change replays to the exact local tree."""
+    if not local_patch_id or not upstream_patch_id:
+        return False
+
+    try:
+        if local_patch_id != upstream_patch_id:
+            local_zero = get_patch_id(local_commit, zero_context=True)
+            upstream_zero = get_patch_id(upstream_commit, zero_context=True)
+            if not local_zero or local_zero != upstream_zero:
+                return False
+
+        if len(local_commit.parents) != 1 or len(upstream_commit.parents) != 1:
+            return False
+
+        object_path = subprocess.run(
+            ['git', 'rev-parse', '--git-path', 'objects'],
+            capture_output=True,
+            cwd=local_commit.repo.working_dir,
+            text=True,
+        )
+        if object_path.returncode != 0 or not object_path.stdout.strip():
+            return False
+        object_dir = object_path.stdout.strip()
+        if not os.path.isabs(object_dir):
+            object_dir = os.path.abspath(os.path.join(
+                local_commit.repo.working_dir, object_dir))
+
+        with tempfile.TemporaryDirectory() as replay_object_dir:
+            env = os.environ.copy()
+            # Git treats a double-quoted entry as a C-style quoted path, so
+            # separators in the object directory do not create extra entries.
+            quoted_object_dir = object_dir.replace('\\', '\\\\').replace(
+                '"', '\\"')
+            alternates = ['"{}"'.format(quoted_object_dir)]
+            if env.get('GIT_ALTERNATE_OBJECT_DIRECTORIES'):
+                alternates.append(env['GIT_ALTERNATE_OBJECT_DIRECTORIES'])
+            env['GIT_OBJECT_DIRECTORY'] = replay_object_dir
+            env['GIT_ALTERNATE_OBJECT_DIRECTORIES'] = os.pathsep.join(
+                alternates)
+            replay = subprocess.run(
+                [
+                    'git', 'merge-tree', '--write-tree',
+                    '--merge-base={}'.format(upstream_commit.parents[0].hexsha),
+                    local_commit.parents[0].hexsha,
+                    upstream_commit.hexsha,
+                ],
+                capture_output=True,
+                cwd=local_commit.repo.working_dir,
+                env=env,
+                text=True,
+            )
+        if replay.returncode != 0:
+            detail = replay.stderr.strip() or "git merge-tree exited {}".format(
+                replay.returncode)
+            print("W: unable to verify patch replay: {}".format(detail),
+                  file=sys.stderr)
+            return False
+        lines = replay.stdout.splitlines()
+        if len(lines) != 1:
+            return False
+        tree_oid = lines[0]
+        if not re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', tree_oid):
+            return False
+        return tree_oid == local_commit.tree.hexsha
+    except (OSError, subprocess.SubprocessError, UnicodeError) as error:
+        print("W: unable to verify patch replay: {}".format(error),
+              file=sys.stderr)
+        return False
 
 
 def describe_sob_chain(local_commit, upstream_commit):
@@ -497,8 +587,11 @@ def build_digest(commits, repo, upstream_remote=None):
         # Patch-ID
         local_pid    = get_patch_id(commit)
         upstream_pid = get_patch_id(upstream)
-        if local_pid and upstream_pid and local_pid == upstream_pid:
-            pid_status = 'match'
+        patch_ids_match = bool(
+            local_pid and upstream_pid and local_pid == upstream_pid)
+        if is_equivalent_replay(
+                commit, upstream, local_pid, upstream_pid):
+            pid_status = 'match' if patch_ids_match else 'context'
             pid_error  = False
         else:
             pid_status = 'MISMATCH'
