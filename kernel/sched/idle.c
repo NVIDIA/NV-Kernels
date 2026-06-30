@@ -7,6 +7,7 @@
  *        tasks which are handled in sched/fair.c )
  */
 #include <linux/cpuidle.h>
+#include <linux/pm_qos.h>
 #include <linux/suspend.h>
 #include <linux/livepatch.h>
 #include "sched.h"
@@ -214,8 +215,14 @@ static void cpuidle_idle_call(bool stop_tick)
 		u64 max_latency_ns;
 
 		if (idle_should_enter_s2idle()) {
-			max_latency_ns = cpu_wakeup_latency_qos_limit() *
-					 NSEC_PER_USEC;
+			s32 latency_limit_us = cpu_wakeup_latency_qos_limit();
+
+			if (latency_limit_us ==
+			    PM_QOS_RESUME_LATENCY_NO_CONSTRAINT)
+				max_latency_ns = U64_MAX;
+			else
+				max_latency_ns = (u64)latency_limit_us *
+						 NSEC_PER_USEC;
 
 			entered_state = call_cpuidle_s2idle(drv, dev,
 							    max_latency_ns);
