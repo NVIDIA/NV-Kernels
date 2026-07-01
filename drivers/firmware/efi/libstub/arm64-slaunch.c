@@ -272,7 +272,10 @@ void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 	/* Build DRTM_PARAMETERS */
 	params->revision = DRTM_PARAMS_REVISION;
 	params->reserved = 0;
-	params->launch_features = 0; /* bits[5:3]=0: complete DMA protection */
+	/* bits[5:3]=0: complete DMA protection. bit 7: request Secure-interrupt
+	 * disable for the launch window (DEN0113 Table 9); the DLME re-enables
+	 * post-launch via DRTM_ENABLE_SECURE_INTERRUPTS. */
+	params->launch_features = DRTM_LAUNCH_FEAT_MEM_PROT_ALL | DRTM_LAUNCH_FEAT_SEC_INT_DISABLE;
 	params->dlme_region_address = kernel_addr;
 	params->dlme_region_size = dlme_data_offset + sl_dlme_data_reserve;
 	params->dlme_image_start = 0;

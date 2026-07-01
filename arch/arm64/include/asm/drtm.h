@@ -21,6 +21,7 @@
 #define DRTM_SMC_SET_ERROR		(DRTM_SMC_FN_BASE + 0x07)
 #define DRTM_SMC_SET_TCB_HASH		(DRTM_SMC_FN_BASE + 0x08)
 #define DRTM_SMC_LOCK_TCB_HASH		(DRTM_SMC_FN_BASE + 0x09)
+#define DRTM_SMC_ENABLE_SECURE_INTERRUPTS (DRTM_SMC_FN_BASE + 0x0A) /* 0xC400011A */
 
 /* DRTM Return Codes (DEN0113 v1.2 §3.18, Table 20) */
 #define DRTM_SUCCESS			0
@@ -34,6 +35,7 @@
 
 /* Launch features */
 #define DRTM_LAUNCH_FEAT_MEM_PROT_ALL	(0x0 << 3)
+#define DRTM_LAUNCH_FEAT_SEC_INT_DISABLE (0x1 << 7) /* DEN0113 Table 9 */
 
 /* DRTM page size */
 #define DRTM_PAGE_SIZE			0x1000
