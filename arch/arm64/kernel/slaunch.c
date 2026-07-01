@@ -159,6 +159,27 @@ static void __init slaunch_tpm_setup(void)
 }
 
 /*
+ * Re-enable Secure interrupts we requested be disabled for the launch window
+ * via launch_features bit 7 (DEN0113 §3.11). Best-effort: DENIED/NOT_SUPPORTED
+ * mean the platform never disabled them, not an error.
+ */
+static void __init slaunch_enable_secure_ints(void)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(DRTM_SMC_ENABLE_SECURE_INTERRUPTS, 0, 0, 0, 0, 0, 0, 0, &res);
+	if (res.a0 == (unsigned long)DRTM_NOT_SUPPORTED ||
+	    res.a0 == (unsigned long)DRTM_DENIED)
+		pr_info("slaunch: Secure interrupts not disabled by platform (%ld)\n",
+			(long)res.a0);
+	else if (res.a0 != DRTM_SUCCESS)
+		pr_err("slaunch: ENABLE_SECURE_INTERRUPTS failed: %ld\n",
+		       (long)res.a0);
+	else
+		pr_info("slaunch: Secure interrupts re-enabled\n");
+}
+
+/*
  * Parse the D-CRTM address map (at header_size + protected_regions_size
  * within DLME data). A trusted EL3-populated input describing physical
  * memory layout; stored for validating untrusted data (DTB, EFI mmap).
@@ -1038,6 +1059,7 @@ void __init slaunch_setup(void)
 	early_memunmap(hdr, sizeof(*hdr));
 
 	slaunch_tpm_setup();
+	slaunch_enable_secure_ints();
 
 	/*
 	 * Unconditionally disable EFI runtime services: their pointers come
