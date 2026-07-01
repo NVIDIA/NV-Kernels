@@ -159,6 +159,28 @@ static void __init slaunch_tpm_setup(void)
 }
 
 /*
+ * Re-enable Secure interrupts requested disabled via launch_features bit 7
+ * (DEN0113 §3.11). Runs as the first post-launch step so no failable init
+ * path can leave them stranded disabled. NOT_SUPPORTED/DENIED mean they were
+ * never disabled; any other failure after an explicit request is ambiguous.
+ */
+static void __init slaunch_enable_secure_ints(void)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(DRTM_SMC_ENABLE_SECURE_INTERRUPTS, 0, 0, 0, 0, 0, 0, 0, &res);
+	if (res.a0 == (unsigned long)DRTM_NOT_SUPPORTED ||
+	    res.a0 == (unsigned long)DRTM_DENIED)
+		pr_info("slaunch: Secure interrupts not disabled by platform (%ld)\n",
+			(long)res.a0);
+	else if (res.a0 != DRTM_SUCCESS)
+		panic("slaunch: ENABLE_SECURE_INTERRUPTS failed: %ld\n",
+		      (long)res.a0);
+	else
+		pr_info("slaunch: Secure interrupts re-enabled\n");
+}
+
+/*
  * Parse the D-CRTM address map (at header_size + protected_regions_size
  * within DLME data). A trusted EL3-populated input describing physical
  * memory layout; stored for validating untrusted data (DTB, EFI mmap).
@@ -469,6 +491,9 @@ void __init slaunch_early_init(void)
 
 	if (!sl_dlme_region_pa)
 		return;
+
+	/* First post-launch action: nothing failable may run before this. */
+	slaunch_enable_secure_ints();
 
 	pr_info("slaunch: DRTM early init -- validating DTB before consumption\n");
 	pr_info("slaunch: DLME region PA: 0x%lx, data offset: 0x%lx\n",
