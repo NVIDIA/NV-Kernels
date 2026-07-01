@@ -645,7 +645,7 @@ static void __ioam6_fill_trace_data(struct sk_buff *skb,
 				    struct ioam6_namespace *ns,
 				    struct ioam6_trace_hdr *trace,
 				    struct ioam6_schema *sc,
-				    unsigned int sclen)
+				    u8 sclen)
 {
 	struct __kernel_sock_timeval ts;
 	u64 raw64;
@@ -863,7 +863,7 @@ void ioam6_fill_trace_data(struct sk_buff *skb,
 			   struct ioam6_trace_hdr *trace)
 {
 	struct ioam6_schema *sc;
-	unsigned int sclen = 0;
+	u8 sclen = 0;
 
 	/* Skip if Overflow flag is set
 	 */
