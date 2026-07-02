@@ -125,6 +125,7 @@ v3d_open(struct drm_device *dev, struct drm_file *file)
 					    1, NULL);
 		if (ret)
 			goto err_sched;
+	}
 
 	v3d_perfmon_open_file(v3d_priv);
 	file->driver_priv = v3d_priv;
