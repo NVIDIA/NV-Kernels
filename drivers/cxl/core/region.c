@@ -4,6 +4,7 @@
 #include <linux/genalloc.h>
 #include <linux/debugfs.h>
 #include <linux/device.h>
+#include <linux/err.h>
 #include <linux/module.h>
 #include <linux/memory.h>
 #include <linux/slab.h>
@@ -837,7 +838,7 @@ struct cxl_root_decoder *cxl_get_hpa_freespace(struct cxl_memdev *cxlmd,
 	struct cxl_port *endpoint;
 
 	endpoint = cxlmd->endpoint;
-	if (!endpoint) {
+	if (IS_ERR_OR_NULL(endpoint)) {
 		dev_dbg(&cxlmd->dev, "endpoint not linked to memdev\n");
 		return ERR_PTR(-ENXIO);
 	}
@@ -3230,7 +3231,7 @@ struct cxl_region *cxl_dpa_to_region(const struct cxl_memdev *cxlmd, u64 dpa)
 	ctx = (struct cxl_dpa_to_region_context) {
 		.dpa = dpa,
 	};
-	if (cxl_num_decoders_committed(port))
+	if (!IS_ERR_OR_NULL(port) && cxl_num_decoders_committed(port))
 		device_for_each_child(&port->dev, &ctx, __cxl_dpa_to_region);
 
 	return ctx.cxlr;
