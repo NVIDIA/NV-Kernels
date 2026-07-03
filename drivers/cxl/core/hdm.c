@@ -3,6 +3,7 @@
 #include <linux/seq_file.h>
 #include <linux/device.h>
 #include <linux/delay.h>
+#include <linux/err.h>
 
 #include "cxlmem.h"
 #include "core.h"
@@ -677,6 +678,9 @@ cxl_find_free_decoder(struct cxl_memdev *cxlmd)
 	struct cxl_port *endpoint = cxlmd->endpoint;
 	struct device *dev;
 
+	if (IS_ERR_OR_NULL(endpoint))
+		return NULL;
+
 	guard(rwsem_read)(&cxl_rwsem.dpa);
 	dev = device_find_child(&endpoint->dev, NULL, find_free_decoder);
 	if (!dev)
@@ -819,7 +823,7 @@ struct cxl_endpoint_decoder *cxl_get_committed_decoder(struct cxl_memdev *cxlmd,
 	struct cxl_endpoint_decoder *cxled;
 	struct device *cxled_dev;
 
-	if (!endpoint)
+	if (IS_ERR_OR_NULL(endpoint))
 		return NULL;
 
 	guard(rwsem_read)(&cxl_rwsem.dpa);
