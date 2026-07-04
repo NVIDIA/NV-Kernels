@@ -55,6 +55,7 @@ struct cifs_sb_info {
 	struct smb3_fs_context *ctx;
 	atomic_t active;
 	unsigned int mnt_cifs_flags;
+	atomic_t outstanding_aio;	/* nr of aio ctxs not yet fully released */
 	struct delayed_work prune_tlinks;
 	struct rcu_head rcu;
 
