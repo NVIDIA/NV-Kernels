@@ -2233,7 +2233,9 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 	if (ret)
 		goto out_vf;
 
-	vfio_pci_cxl_detect_and_init(vdev);
+	ret = vfio_pci_cxl_detect_and_init(vdev);
+	if (ret)
+		goto out_vga;
 
 	vfio_pci_probe_power_state(vdev);
 
@@ -2260,11 +2262,9 @@ int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev)
 
 out_power:
 	/*
-	 * vfio_pci_cxl_detect_and_init() may have assigned vdev->cxl and
-	 * allocated comp_reg_virt[] / hdm_iobase / region state above.  The
-	 * normal teardown via vfio_pci_core_unregister_device() will not run
-	 * if registration failed, so release the CXL state here.  No-op when
-	 * vdev->cxl is NULL (non-CXL device or detect skipped).
+	 * Registration failed after CXL setup. Release VFIO-owned mappings and
+	 * clear vdev->cxl; PCI devres unwinds the memdev and autoregion when
+	 * driver probe returns failure.
 	 */
 	vfio_pci_cxl_cleanup(vdev);
 
@@ -2272,6 +2272,8 @@ out_power:
 		pm_runtime_get_noresume(dev);
 
 	pm_runtime_forbid(dev);
+out_vga:
+	vfio_pci_vga_uninit(vdev);
 out_vf:
 	vfio_pci_vf_uninit(vdev);
 	return ret;

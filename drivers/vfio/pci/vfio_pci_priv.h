@@ -147,7 +147,7 @@ static inline void vfio_pci_dma_buf_move(struct vfio_pci_core_device *vdev,
 
 #if IS_ENABLED(CONFIG_VFIO_CXL_CORE)
 
-void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev);
+int vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev);
 void vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev);
 bool vfio_cxl_reset_capable(struct vfio_pci_core_device *vdev);
 void vfio_cxl_prepare_reset(struct vfio_pci_core_device *vdev);
@@ -168,8 +168,8 @@ bool vfio_cxl_mmap_overlaps_comp_regs(struct vfio_pci_core_device *vdev,
 
 #else
 
-static inline void
-vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev) { }
+static inline int
+vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev) { return 0; }
 static inline void
 vfio_pci_cxl_cleanup(struct vfio_pci_core_device *vdev) { }
 static inline bool

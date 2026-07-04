@@ -8,7 +8,6 @@
 #include <linux/bitfield.h>
 #include <linux/node.h>
 #include <linux/ioport.h>
-#include <linux/pci.h>
 #include <cxl/mailbox.h>
 #include <uapi/cxl/cxl_regs.h>
 
@@ -177,36 +176,6 @@ struct cxl_dpa_partition {
 
 #define CXL_NR_PARTITIONS_MAX 2
 
-/*
- * cxl_decoder flags that define the type of memory / devices this decoder
- * supports as well as configuration lock status.
- */
-#define CXL_DECODER_F_RAM   BIT(0)
-#define CXL_DECODER_F_PMEM  BIT(1)
-#define CXL_DECODER_F_TYPE2 BIT(2)
-#define CXL_DECODER_F_TYPE3 BIT(3)
-#define CXL_DECODER_F_LOCK  BIT(4)
-#define CXL_DECODER_F_ENABLE    BIT(5)
-#define CXL_DECODER_F_MASK  GENMASK(5, 0)
-
-struct cxl_memdev_attach {
-	int (*probe)(struct cxl_memdev *cxlmd);
-};
-
-/**
- * struct cxl_attach_region - accelerator region handling
- * @attach: invoked at cxl_memdev_attach_region() with endpoint device locked.
- * @detach: invoked at endpoint release.
- * @data: pointer referencing accelerator data for attach and detach calls.
- * @region: initialised with autodiscovered region values linked to memdev.
- */
-struct cxl_attach_region {
-	int (*attach)(void *);
-	void (*detach)(void *);
-	void *data;
-	struct range region;
-};
-
 /**
  * struct cxl_dev_state - The driver device state
  *
@@ -283,27 +252,6 @@ struct cxl_dev_state *_devm_cxl_dev_state_create(struct device *dev,
 	})
 
 int cxl_set_capacity(struct cxl_dev_state *cxlds, u64 capacity);
-struct cxl_memdev *devm_cxl_add_memdev(struct cxl_dev_state *cxlds,
-				       const struct cxl_memdev_attach *attach);
-struct cxl_region;
-struct cxl_endpoint_decoder *cxl_get_committed_decoder(struct cxl_memdev *cxlmd,
-						       struct cxl_region **cxlr);
-int cxl_get_region_range(struct cxl_region *region, struct range *range);
-void cxl_unregister_region(struct cxl_region *cxlr);
-struct cxl_port;
-struct cxl_root_decoder *cxl_get_hpa_freespace(struct cxl_memdev *cxlmd,
-					       int interleave_ways,
-					       unsigned long flags,
-					       resource_size_t *max);
-void cxl_put_root_decoder(struct cxl_root_decoder *cxlrd);
-struct cxl_endpoint_decoder *cxl_request_dpa(struct cxl_memdev *cxlmd,
-					     enum cxl_partition_mode mode,
-					     resource_size_t alloc);
-int cxl_dpa_free(struct cxl_endpoint_decoder *cxled);
-struct cxl_region *cxl_create_region(struct cxl_root_decoder *cxlrd,
-				     struct cxl_endpoint_decoder **cxled,
-				     int ways);
-int cxl_memdev_attach_region(struct cxl_memdev *cxlmd, struct cxl_attach_region *attach);
 
 #ifdef CONFIG_CXL_REGION
 bool cxl_region_contains_soft_reserve(struct resource *res);
@@ -327,4 +275,6 @@ int cxl_get_hdm_info(struct cxl_dev_state *cxlds, u8 *count,
 
 #endif /* CONFIG_CXL_BUS */
 
+struct cxl_memdev *devm_cxl_probe_mem(struct cxl_dev_state *cxlds,
+				      struct range *range);
 #endif /* __CXL_CXL_H__ */

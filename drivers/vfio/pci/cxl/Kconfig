@@ -1,6 +1,6 @@
 config VFIO_CXL_CORE
 	bool "VFIO CXL core"
-	depends on VFIO_PCI_CORE && CXL_BUS && CXL_MEM
+	depends on VFIO_PCI_CORE && CXL_BUS && CXL_MEM && CXL_REGION
 	help
 	    Extends vfio-pci-core with CXL.mem passthrough for vendor-specific
 	    CXL devices (CXL_DEVTYPE_DEVMEM) that implement HDM-D or HDM-DB

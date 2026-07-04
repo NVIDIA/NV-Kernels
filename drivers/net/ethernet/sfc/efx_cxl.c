@@ -15,19 +15,16 @@
 
 #define EFX_CTPIO_BUFFER_SIZE	SZ_256M
 
-/* Called with cxl endpoint device locked for precluding potential related
- * cxl region removal triggered from user space, allowing safely mapping of
- * such cxl region by the sfc driver.
- */
-static int efx_cxl_map_region(void *data) {
+static int efx_cxl_map_region(void *data)
+{
 	struct efx_probe_data *probe_data = data;
 	struct efx_nic *efx = &probe_data->efx;
 	struct pci_dev *pci_dev = efx->pci_dev;
 	struct efx_cxl *cxl = probe_data->cxl;
-	struct range *cxl_pio_range = &cxl->attach_region.region;
+	struct range *cxl_pio_range = &cxl->region;
 
 	cxl->ctpio_cxl = ioremap(cxl_pio_range->start,
-				 cxl_pio_range->end - cxl_pio_range->start + 1);
+				 range_len(cxl_pio_range));
 	if (!cxl->ctpio_cxl) {
 		pci_err(pci_dev, "CXL ioremap region (%pra) failed\n",
 				 cxl_pio_range);
@@ -37,13 +34,21 @@ static int efx_cxl_map_region(void *data) {
 	return 0;
 }
 
-/* Called at driver exit or when user space triggers cxl region removal. */
-static void efx_cxl_unmap_region(void *data) {
+static void efx_cxl_unmap_region(void *data)
+{
 	struct efx_probe_data *probe_data = data;
 
 	efx_ef10_disable_piobufs(&probe_data->efx);
 	probe_data->cxl_pio_initialised = false;
 	iounmap(probe_data->cxl->ctpio_cxl);
+	probe_data->cxl->ctpio_cxl = NULL;
+}
+
+void efx_cxl_fini(struct efx_probe_data *probe_data)
+{
+	if (probe_data->cxl_pio_initialised)
+		devm_release_action(&probe_data->efx.pci_dev->dev,
+				    efx_cxl_unmap_region, probe_data);
 }
 
 int efx_cxl_init(struct efx_probe_data *probe_data)
@@ -107,22 +112,20 @@ int efx_cxl_init(struct efx_probe_data *probe_data)
 		return -ENODEV;
 	}
 
-	cxl->cxlmd = devm_cxl_add_memdev(&cxl->cxlds, NULL);
+	cxl->cxlmd = devm_cxl_probe_mem(&cxl->cxlds, &cxl->region);
 	if (IS_ERR(cxl->cxlmd)) {
 		pci_err(pci_dev, "CXL accel memdev creation failed\n");
 		return PTR_ERR(cxl->cxlmd);
 	}
 
-	cxl->attach_region.attach = efx_cxl_map_region;
-	cxl->attach_region.detach = efx_cxl_unmap_region;
-	cxl->attach_region.data = probe_data;
 	probe_data->cxl = cxl;
 
-	rc = cxl_memdev_attach_region(cxl->cxlmd, &cxl->attach_region);
+	rc = efx_cxl_map_region(probe_data);
 	if (rc)
 		return rc;
 
-	return 0;
+	return devm_add_action_or_reset(&pci_dev->dev,
+					efx_cxl_unmap_region, probe_data);
 }
 
 MODULE_IMPORT_NS("CXL");

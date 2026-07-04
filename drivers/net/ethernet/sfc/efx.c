@@ -962,6 +962,7 @@ static void efx_pci_remove(struct pci_dev *pci_dev)
 	efx = pci_get_drvdata(pci_dev);
 	if (!efx)
 		return;
+	probe_data = container_of(efx, struct efx_probe_data, efx);
 
 	/* Mark the NIC as fini, then stop the interface */
 	rtnl_lock();
@@ -979,11 +980,10 @@ static void efx_pci_remove(struct pci_dev *pci_dev)
 
 	efx_mtd_remove(efx);
 
+	efx_cxl_fini(probe_data);
 	efx_pci_remove_main(efx);
 
 	efx_fini_io(efx);
-
-	probe_data = container_of(efx, struct efx_probe_data, efx);
 
 	pci_dbg(efx->pci_dev, "shutdown successful\n");
 
@@ -1240,6 +1240,7 @@ static int efx_pci_probe(struct pci_dev *pci_dev,
 	return 0;
 
  fail3:
+	efx_cxl_fini(probe_data);
 	efx_fini_io(efx);
  fail2:
 	efx_fini_struct(efx);
