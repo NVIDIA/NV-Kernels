@@ -4322,54 +4322,62 @@ int cxl_memdev_attach_region(struct cxl_memdev *cxlmd)
 	struct cxl_endpoint_decoder *cxled;
 	struct cxl_region *cxlr;
 	int rc;
+
 	/* hold endpoint lock to setup autoremove of the region */
 	guard(device)(&endpoint->dev);
 	if (!endpoint->dev.driver)
 		return -ENXIO;
-	guard(rwsem_read)(&cxl_rwsem.region);
-	guard(rwsem_read)(&cxl_rwsem.dpa);
 
-	/*
-	 * TODO auto-instantiate a region, for now assume this will find an
-	 * auto-region
-	 */
-	struct device *dev __free(put_device) =
-		device_find_child(&endpoint->dev, NULL, first_mapped_decoder);
+	{
+		guard(rwsem_read)(&cxl_rwsem.region);
+		guard(rwsem_read)(&cxl_rwsem.dpa);
 
-	if (!dev) {
-		dev_dbg(cxlmd->cxlds->dev, "no region found for memdev %s\n",
-			dev_name(&cxlmd->dev));
-		return -ENXIO;
+		/*
+		 * TODO auto-instantiate a region, for now assume this will find an
+		 * auto-region
+		 */
+		struct device *dev __free(put_device) =
+			device_find_child(&endpoint->dev, NULL,
+					  first_mapped_decoder);
+
+		if (!dev) {
+			dev_dbg(cxlmd->cxlds->dev,
+				"no region found for memdev %s\n",
+				dev_name(&cxlmd->dev));
+			return -ENXIO;
+		}
+
+		cxled = to_cxl_endpoint_decoder(dev);
+		cxlr = cxled->cxld.region;
+
+		if (cxlr->params.state < CXL_CONFIG_COMMIT) {
+			dev_dbg(cxlmd->cxlds->dev,
+				"region %s not committed for memdev %s\n",
+				dev_name(&cxlr->dev), dev_name(&cxlmd->dev));
+			return -ENXIO;
+		}
+
+		if (cxlr->params.nr_targets > 1) {
+			dev_dbg(cxlmd->cxlds->dev,
+				"Only attach to local non-interleaved region\n");
+			return -ENXIO;
+		}
+
+		/* Only teardown regions that pass validation, ignore the rest */
+		get_device(&cxlr->dev);
+		rc = devm_add_action(&endpoint->dev,
+				     endpoint_unregister_region, cxlr);
+		if (!rc) {
+			attach->hpa_range = (struct range) {
+				.start = cxlr->params.res->start,
+				.end = cxlr->params.res->end,
+			};
+			return 0;
+		}
 	}
 
-	cxled = to_cxl_endpoint_decoder(dev);
-	cxlr = cxled->cxld.region;
-
-	if (cxlr->params.state < CXL_CONFIG_COMMIT) {
-		dev_dbg(cxlmd->cxlds->dev,
-			"region %s not committed for memdev %s\n",
-			dev_name(&cxlr->dev), dev_name(&cxlmd->dev));
-		return -ENXIO;
-	}
-
-	if (cxlr->params.nr_targets > 1) {
-		dev_dbg(cxlmd->cxlds->dev,
-			"Only attach to local non-interleaved region\n");
-		return -ENXIO;
-	}
-
-	/* Only teardown regions that pass validation, ignore the rest */
-	get_device(&cxlr->dev);
-	rc = devm_add_action_or_reset(&endpoint->dev,
-				      endpoint_unregister_region, cxlr);
-	if (rc)
-		return rc;
-
-	attach->hpa_range = (struct range) {
-		.start = cxlr->params.res->start,
-		.end = cxlr->params.res->end,
-	};
-	return 0;
+	endpoint_unregister_region(cxlr);
+	return rc;
 }
 EXPORT_SYMBOL_FOR_MODULES(cxl_memdev_attach_region, "cxl_mem");
 
