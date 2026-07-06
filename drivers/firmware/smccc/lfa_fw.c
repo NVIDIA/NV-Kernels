@@ -142,6 +142,7 @@ static const struct fw_image_uuid {
 };
 
 static struct kset *lfa_kset;
+static struct arm_smccc_device *lfa_smccc_dev;
 static struct workqueue_struct *fw_images_update_wq;
 static struct work_struct fw_images_update_work;
 static struct attribute *image_default_attrs[LFA_ATTR_NR_IMAGES + 1];
@@ -151,8 +152,10 @@ static struct attribute *image_default_attrs[LFA_ATTR_NR_IMAGES + 1];
  * leading to a re-order and thus re-assignment of the sequence IDs.
  * The lock protects the connection between a firmware image (through its
  * user visible UUID) and the sequence IDs. Anyone doing an SMC call with
- * a sequence ID needs to take the readers lock. Doing an activation requires
- * the writer lock, as that process might change the assocications.
+ * a sequence ID needs to take the readers lock. Deferred inventory cleanup
+ * also holds the readers lock through its uevent, so userspace cannot observe
+ * a partially refreshed tree. Doing an activation requires the writer lock,
+ * as that process might change the associations.
  */
 struct rw_semaphore smc_lock;
 
@@ -200,10 +203,31 @@ static void delete_fw_image_node(struct fw_image *image)
 	kobject_put(&image->kobj);
 }
 
+/*
+ * Per-image kobjects under /sys/firmware are not devices and provide no udev
+ * coldplug anchor. Use the SMCCC device when the initial inventory is settled
+ * and after runtime inventory updates. The worker holds smc_lock for reading
+ * so each event follows a settled inventory refresh.
+ */
+static void lfa_notify_inventory_update(void)
+{
+	int ret;
+
+	if (!lfa_smccc_dev)
+		return;
+
+	ret = kobject_uevent(&lfa_smccc_dev->dev.kobj, KOBJ_CHANGE);
+	if (ret)
+		pr_warn("failed to send firmware inventory change uevent: %d\n",
+			ret);
+}
+
 static void remove_invalid_fw_images(struct work_struct *work)
 {
 	struct kobject *kobj, *tmp;
 	struct list_head images_to_delete = LIST_HEAD_INIT(images_to_delete);
+
+	down_read(&smc_lock);
 
 	/*
 	 * Remove firmware images including directories that are no longer
@@ -229,6 +253,10 @@ static void remove_invalid_fw_images(struct work_struct *work)
 
 		delete_fw_image_node(image);
 	}
+
+	lfa_notify_inventory_update();
+
+	up_read(&smc_lock);
 }
 
 static void set_image_flags(struct fw_image *image, int seq_id,
@@ -945,11 +973,18 @@ static int lfa_smccc_probe(struct arm_smccc_device *sdev)
 	if (err)
 		goto err_cleanup;
 
+	/* Drain initial cleanup before publishing the event anchor. */
+	flush_workqueue(fw_images_update_wq);
+
 	if (!acpi_disabled) {
 		err = lfa_register_acpi(&sdev->dev);
 		if (!err) {
 			pr_info("registered LFA ACPI notification\n");
 
+			down_write(&smc_lock);
+			lfa_smccc_dev = sdev;
+			queue_work(fw_images_update_wq, &fw_images_update_work);
+			up_write(&smc_lock);
 			return 0;
 		}
 		if (err != -ENODEV)
@@ -962,6 +997,10 @@ static int lfa_smccc_probe(struct arm_smccc_device *sdev)
 	if (err && err != -ENODEV)
 		goto err_cleanup;
 
+	down_write(&smc_lock);
+	lfa_smccc_dev = sdev;
+	queue_work(fw_images_update_wq, &fw_images_update_work);
+	up_write(&smc_lock);
 	return 0;
 
 err_cleanup:
@@ -979,6 +1018,7 @@ static void lfa_smccc_remove(struct arm_smccc_device *sdev)
 		lfa_remove_acpi(&sdev->dev);
 	flush_workqueue(fw_images_update_wq);
 	destroy_workqueue(fw_images_update_wq);
+	lfa_smccc_dev = NULL;
 	clean_fw_images_tree();
 	kset_unregister(lfa_kset);
 }
