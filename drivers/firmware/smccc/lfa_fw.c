@@ -146,6 +146,7 @@ static struct arm_smccc_device *lfa_smccc_dev;
 static struct workqueue_struct *fw_images_update_wq;
 static struct work_struct fw_images_update_work;
 static struct attribute *image_default_attrs[LFA_ATTR_NR_IMAGES + 1];
+static unsigned int lfa_irq;
 
 /*
  * A successful image activation might change the number of available images,
@@ -936,6 +937,7 @@ static int lfa_register_dt(struct device *dev)
 {
 	struct device_node *np;
 	unsigned int irq;
+	int ret;
 
 	np = of_find_compatible_node(NULL, NULL, "arm,lfa");
 	if (!np)
@@ -946,9 +948,29 @@ static int lfa_register_dt(struct device *dev)
 	if (!irq)
 		return -ENODEV;
 
-	return devm_request_threaded_irq(dev, irq, lfa_irq_handler,
-					 lfa_irq_handler_thread,
-					 IRQF_COND_ONESHOT, NULL, NULL);
+	ret = devm_request_threaded_irq(dev, irq, lfa_irq_handler,
+					lfa_irq_handler_thread,
+					IRQF_COND_ONESHOT, NULL, NULL);
+	if (ret) {
+		irq_dispose_mapping(irq);
+
+		return ret;
+	}
+
+	lfa_irq = irq;
+
+	return 0;
+}
+
+static void lfa_remove_dt(struct device *dev)
+{
+	if (!lfa_irq)
+		return;
+
+	/* devres would release the IRQ only after the remove callback. */
+	devm_free_irq(dev, lfa_irq, NULL);
+	irq_dispose_mapping(lfa_irq);
+	lfa_irq = 0;
 }
 
 static int lfa_smccc_probe(struct arm_smccc_device *sdev)
@@ -1030,6 +1052,7 @@ static void lfa_smccc_remove(struct arm_smccc_device *sdev)
 {
 	if (!acpi_disabled)
 		lfa_remove_acpi(&sdev->dev);
+	lfa_remove_dt(&sdev->dev);
 	flush_workqueue(fw_images_update_wq);
 	destroy_workqueue(fw_images_update_wq);
 	lfa_smccc_dev = NULL;
