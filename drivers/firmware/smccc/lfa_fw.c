@@ -15,6 +15,7 @@
 #include <linux/ktime.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/nmi.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -111,6 +112,11 @@ struct fw_image {
 	struct kobj_attribute image_attrs[LFA_ATTR_NR_IMAGES];
 };
 
+struct lfa_activation_ctx {
+	struct fw_image *image;
+	int seq_id;
+};
+
 static struct fw_image *kobj_to_fw_image(struct kobject *kobj)
 {
 	return container_of(kobj, struct fw_image, kobj);
@@ -147,6 +153,14 @@ static struct workqueue_struct *fw_images_update_wq;
 static struct work_struct fw_images_update_work;
 static struct attribute *image_default_attrs[LFA_ATTR_NR_IMAGES + 1];
 static unsigned int lfa_irq;
+static bool lfa_shutting_down;
+
+/*
+ * Serialize activation with invalid image removal. Sysfs activation uses
+ * trylock because kobject_del() drains active sysfs callbacks. The lock order
+ * is lfa_activation_lock, smc_lock, then lfa_kset->list_lock.
+ */
+static DEFINE_MUTEX(lfa_activation_lock);
 
 /*
  * A successful image activation might change the number of available images,
@@ -228,6 +242,7 @@ static void remove_invalid_fw_images(struct work_struct *work)
 	struct kobject *kobj, *tmp;
 	struct list_head images_to_delete = LIST_HEAD_INIT(images_to_delete);
 
+	mutex_lock(&lfa_activation_lock);
 	down_read(&smc_lock);
 
 	/*
@@ -245,6 +260,7 @@ static void remove_invalid_fw_images(struct work_struct *work)
 			list_move_tail(&kobj->entry, &images_to_delete);
 	}
 	spin_unlock(&lfa_kset->list_lock);
+	up_read(&smc_lock);
 
 	/*
 	 * Now safely remove the sysfs kobjects for the deleted list items
@@ -255,9 +271,10 @@ static void remove_invalid_fw_images(struct work_struct *work)
 		delete_fw_image_node(image);
 	}
 
+	down_read(&smc_lock);
 	lfa_notify_inventory_update();
-
 	up_read(&smc_lock);
+	mutex_unlock(&lfa_activation_lock);
 }
 
 static void set_image_flags(struct fw_image *image, int seq_id,
@@ -297,14 +314,21 @@ static const char *get_image_name(const struct fw_image *image)
 	return kobject_name(&image->kobj);
 }
 
-static int lfa_cancel(void *data)
+static int lfa_cancel(struct fw_image *image, int seq_id)
 {
-	struct fw_image *image = data;
 	struct arm_smccc_1_2_regs reg = { 0 };
 
 	down_read(&smc_lock);
+	if (seq_id < 0)
+		seq_id = image->fw_seq_id;
+	if (seq_id < 0) {
+		up_read(&smc_lock);
+
+		return -ENOENT;
+	}
+
 	reg.a0 = ARM_SMCCC_LFA_CANCEL;
-	reg.a1 = image->fw_seq_id;
+	reg.a1 = seq_id;
 	arm_smccc_1_2_invoke(&reg, &reg);
 	up_read(&smc_lock);
 
@@ -332,12 +356,13 @@ static int lfa_cancel(void *data)
  */
 static int call_lfa_activate(void *data)
 {
-	struct fw_image *image = data;
+	struct lfa_activation_ctx *ctx = data;
+	struct fw_image *image = ctx->image;
 	struct arm_smccc_1_2_regs reg = { 0 }, res;
 
 	touch_nmi_watchdog();
 	reg.a0 = ARM_SMCCC_LFA_ACTIVATE;
-	reg.a1 = image->fw_seq_id;
+	reg.a1 = ctx->seq_id;
 	/*
 	 * As we do not support updates requiring a CPU reset (yet),
 	 * we pass 0 in reg.a3 and reg.a4, holding the entry point and
@@ -357,23 +382,31 @@ static int call_lfa_activate(void *data)
 	return 0;
 }
 
-static int activate_fw_image(struct fw_image *image)
+static int activate_fw_image(struct fw_image *image, int seq_id)
 {
+	struct lfa_activation_ctx ctx = {
+		.image = image,
+		.seq_id = seq_id,
+	};
 	ktime_t end = ktime_add_ms(ktime_get(), LFA_ACTIVATE_BUDGET_MS);
-	int ret;
+	int cancel_ret, ret;
 
 retry:
 	down_write(&smc_lock);
-	if (image->fw_seq_id == -1) {
-		up_write(&smc_lock);
+	if (lfa_shutting_down) {
+		ret = -ESHUTDOWN;
+		goto abort;
+	}
 
-		return -ENOENT;
+	if (image->fw_seq_id != seq_id) {
+		ret = -ENOENT;
+		goto abort;
 	}
 
 	if (image->cpu_rendezvous_forced || image->cpu_rendezvous)
-		ret = stop_machine(call_lfa_activate, image, cpu_online_mask);
+		ret = stop_machine(call_lfa_activate, &ctx, cpu_online_mask);
 	else
-		ret = call_lfa_activate(image);
+		ret = call_lfa_activate(&ctx);
 
 	if (!ret) {
 		update_fw_images_tree();
@@ -394,18 +427,26 @@ retry:
 		ret = -LFA_TIMED_OUT;
 	}
 
-	lfa_cancel(image);
+	lfa_cancel(image, seq_id);
 
 	pr_err("LFA_ACTIVATE for image %s failed: %s\n",
 	       get_image_name(image), lfa_error_string(ret));
 
 	return ret;
+
+abort:
+	up_write(&smc_lock);
+	cancel_ret = lfa_cancel(image, seq_id);
+
+	return cancel_ret ?: ret;
 }
 
-static int prime_fw_image(struct fw_image *image)
+static int prime_fw_image(struct fw_image *image, int *seq_id)
 {
 	struct arm_smccc_1_2_regs reg = { 0 }, res;
 	ktime_t end = ktime_add_ms(ktime_get(), LFA_PRIME_BUDGET_MS);
+	bool prime_started = false;
+	int cancel_ret, ret;
 
 	touch_nmi_watchdog();
 
@@ -418,10 +459,15 @@ retry:
 	 * reg.a1 will become 0 once the prime process completes.
 	 */
 	down_read(&smc_lock);
-	if (image->fw_seq_id == -1) {
-		up_read(&smc_lock);
+	if (lfa_shutting_down) {
+		ret = -ESHUTDOWN;
+		goto abort;
+	}
 
-		return -ENOENT;
+	if (image->fw_seq_id == -1 ||
+	    (prime_started && image->fw_seq_id != *seq_id)) {
+		ret = -ENOENT;
+		goto abort;
 	}
 
 	if (image->may_reset_cpu) {
@@ -431,21 +477,27 @@ retry:
 		return -EINVAL;
 	}
 
-	reg.a1 = image->fw_seq_id;
+	if (!prime_started)
+		*seq_id = image->fw_seq_id;
+	reg.a1 = *seq_id;
 	arm_smccc_1_2_invoke(&reg, &res);
 	up_read(&smc_lock);
 
 	if ((long)res.a0 < 0) {
+		ret = (long)res.a0;
 		pr_err("LFA_PRIME for image %s failed: %s\n",
 		       get_image_name(image),
 		       lfa_error_string(res.a0));
+		if (!prime_started)
+			return ret;
 
-		return res.a0;
+		cancel_ret = lfa_cancel(image, *seq_id);
+
+		return cancel_ret ?: ret;
 	}
+	prime_started = res.a0 == LFA_SUCCESS;
 
 	if (res.a1 & LFA_PRIME_CALL_AGAIN) {
-		int ret;
-
 		/* SMC returned with call_again flag set */
 		if (ktime_before(ktime_get(), end)) {
 			msleep_interruptible(LFA_PRIME_DELAY_MS);
@@ -455,7 +507,7 @@ retry:
 		pr_err("LFA_PRIME for image %s timed out",
 		       get_image_name(image));
 
-		ret = lfa_cancel(image);
+		ret = lfa_cancel(image, *seq_id);
 		if (ret != 0)
 			return ret;
 
@@ -463,6 +515,15 @@ retry:
 	}
 
 	return 0;
+
+abort:
+	up_read(&smc_lock);
+	if (!prime_started)
+		return ret;
+
+	cancel_ret = lfa_cancel(image, *seq_id);
+
+	return cancel_ret ?: ret;
 }
 
 static ssize_t name_show(struct kobject *kobj, struct kobj_attribute *attr,
@@ -481,9 +542,12 @@ static ssize_t activation_capable_show(struct kobject *kobj,
 	return sysfs_emit(buf, "%d\n", image->activation_capable);
 }
 
-static void _update_fw_image_pending(struct fw_image *image)
+static int _update_fw_image_pending(struct fw_image *image)
 {
 	struct arm_smccc_1_2_regs reg = { 0 };
+
+	if (image->fw_seq_id < 0)
+		return -ENOENT;
 
 	reg.a0 = ARM_SMCCC_LFA_GET_INVENTORY;
 	reg.a1 = image->fw_seq_id;
@@ -491,25 +555,34 @@ static void _update_fw_image_pending(struct fw_image *image)
 
 	if (reg.a0 == LFA_SUCCESS)
 		image->activation_pending = !!(reg.a3 & BIT(1));
+
+	return 0;
 }
 
-static void update_fw_image_pending(struct fw_image *image)
+static int update_fw_image_pending(struct fw_image *image)
 {
+	int ret;
+
 	down_read(&smc_lock);
-	_update_fw_image_pending(image);
+	ret = _update_fw_image_pending(image);
 	up_read(&smc_lock);
+
+	return ret;
 }
 
 static ssize_t activation_pending_show(struct kobject *kobj,
 				       struct kobj_attribute *attr, char *buf)
 {
 	struct fw_image *image = kobj_to_fw_image(kobj);
+	int ret;
 
 	/*
 	 * Activation pending status can change anytime thus we need to update
 	 * and return its current value
 	 */
-	update_fw_image_pending(image);
+	ret = update_fw_image_pending(image);
+	if (ret)
+		return ret;
 
 	return sysfs_emit(buf, "%d\n", image->activation_pending);
 }
@@ -575,6 +648,12 @@ static ssize_t pending_version_show(struct kobject *kobj,
 	 * update, we need to retrieve fresh info instead of stale information.
 	 */
 	down_read(&smc_lock);
+	if (image->fw_seq_id < 0) {
+		up_read(&smc_lock);
+
+		return sysfs_emit(buf, "N/A\n");
+	}
+
 	reg.a0 = ARM_SMCCC_LFA_GET_INVENTORY;
 	reg.a1 = image->fw_seq_id;
 	arm_smccc_1_2_invoke(&reg, &reg);
@@ -598,19 +677,20 @@ static ssize_t activate_store(struct kobject *kobj, struct kobj_attribute *attr,
 			      const char *buf, size_t count)
 {
 	struct fw_image *image = kobj_to_fw_image(kobj);
-	int ret;
+	int ret, seq_id;
 
-	ret = prime_fw_image(image);
-	if (ret)
-		return -ECANCELED;
+	if (!mutex_trylock(&lfa_activation_lock))
+		return -EBUSY;
 
-	ret = activate_fw_image(image);
-	if (ret)
-		return -ECANCELED;
+	ret = prime_fw_image(image, &seq_id);
+	if (!ret)
+		ret = activate_fw_image(image, seq_id);
+	if (!ret)
+		pr_info("%s: successfully activated\n", get_image_name(image));
 
-	pr_info("%s: successfully activated\n", get_image_name(image));
+	mutex_unlock(&lfa_activation_lock);
 
-	return count;
+	return ret ? -ECANCELED : count;
 }
 
 static ssize_t cancel_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -619,7 +699,7 @@ static ssize_t cancel_store(struct kobject *kobj, struct kobj_attribute *attr,
 	struct fw_image *image = kobj_to_fw_image(kobj);
 	int ret;
 
-	ret = lfa_cancel(image);
+	ret = lfa_cancel(image, -1);
 	if (ret != 0)
 		return ret;
 
@@ -687,6 +767,24 @@ static void clean_fw_images_tree(void)
 
 		delete_fw_image_node(image);
 	}
+}
+
+static void lfa_cleanup(void)
+{
+	down_write(&smc_lock);
+	lfa_shutting_down = true;
+	lfa_smccc_dev = NULL;
+	up_write(&smc_lock);
+
+	/* Let a primed transaction reach ACTIVATE or exact-ID CANCEL. */
+	mutex_lock(&lfa_activation_lock);
+	mutex_unlock(&lfa_activation_lock);
+
+	/* Drain sysfs callbacks while they can still use the workqueue. */
+	clean_fw_images_tree();
+	flush_workqueue(fw_images_update_wq);
+	destroy_workqueue(fw_images_update_wq);
+	kset_unregister(lfa_kset);
 }
 
 static int update_fw_image_node(char *fw_uuid, int seq_id,
@@ -810,7 +908,9 @@ static int activate_pending_image(void)
 	struct kobject *kobj;
 	bool found_pending = false;
 	struct fw_image *image;
-	int ret;
+	int ret, seq_id;
+
+	mutex_lock(&lfa_activation_lock);
 
 	down_read(&smc_lock);
 	spin_lock(&lfa_kset->list_lock);
@@ -832,17 +932,22 @@ static int activate_pending_image(void)
 	spin_unlock(&lfa_kset->list_lock);
 	up_read(&smc_lock);
 
-	if (!found_pending)
-		return -ENOENT;
+	if (!found_pending) {
+		ret = -ENOENT;
+		goto out_unlock;
+	}
 
-	ret = prime_fw_image(image);
+	ret = prime_fw_image(image, &seq_id);
 	if (!ret)
-		ret = activate_fw_image(image);
+		ret = activate_fw_image(image, seq_id);
 	if (!ret)
 		pr_info("%s: automatic activation succeeded\n",
 			get_image_name(image));
 
 	kobject_put(&image->kobj);
+
+out_unlock:
+	mutex_unlock(&lfa_activation_lock);
 
 	return ret;
 }
@@ -1004,8 +1109,11 @@ static int lfa_smccc_probe(struct arm_smccc_device *sdev)
 	}
 
 	init_rwsem(&smc_lock);
+	lfa_shutting_down = false;
 
+	mutex_lock(&lfa_activation_lock);
 	err = update_fw_images_tree();
+	mutex_unlock(&lfa_activation_lock);
 	if (err)
 		goto err_cleanup;
 
@@ -1040,10 +1148,7 @@ static int lfa_smccc_probe(struct arm_smccc_device *sdev)
 	return 0;
 
 err_cleanup:
-	flush_workqueue(fw_images_update_wq);
-	destroy_workqueue(fw_images_update_wq);
-	clean_fw_images_tree();
-	kset_unregister(lfa_kset);
+	lfa_cleanup();
 
 	return err;
 }
@@ -1053,11 +1158,7 @@ static void lfa_smccc_remove(struct arm_smccc_device *sdev)
 	if (!acpi_disabled)
 		lfa_remove_acpi(&sdev->dev);
 	lfa_remove_dt(&sdev->dev);
-	flush_workqueue(fw_images_update_wq);
-	destroy_workqueue(fw_images_update_wq);
-	lfa_smccc_dev = NULL;
-	clean_fw_images_tree();
-	kset_unregister(lfa_kset);
+	lfa_cleanup();
 }
 
 static const struct arm_smccc_device_id lfa_smccc_id_table[] = {
