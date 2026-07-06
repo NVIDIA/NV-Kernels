@@ -363,6 +363,12 @@ static int activate_fw_image(struct fw_image *image)
 
 retry:
 	down_write(&smc_lock);
+	if (image->fw_seq_id == -1) {
+		up_write(&smc_lock);
+
+		return -ENOENT;
+	}
+
 	if (image->cpu_rendezvous_forced || image->cpu_rendezvous)
 		ret = stop_machine(call_lfa_activate, image, cpu_online_mask);
 	else
@@ -400,12 +406,6 @@ static int prime_fw_image(struct fw_image *image)
 	struct arm_smccc_1_2_regs reg = { 0 }, res;
 	ktime_t end = ktime_add_ms(ktime_get(), LFA_PRIME_BUDGET_MS);
 
-	if (image->may_reset_cpu) {
-		pr_err("CPU reset not supported by kernel driver\n");
-
-		return -EINVAL;
-	}
-
 	touch_nmi_watchdog();
 
 	reg.a0 = ARM_SMCCC_LFA_PRIME;
@@ -417,6 +417,19 @@ retry:
 	 * reg.a1 will become 0 once the prime process completes.
 	 */
 	down_read(&smc_lock);
+	if (image->fw_seq_id == -1) {
+		up_read(&smc_lock);
+
+		return -ENOENT;
+	}
+
+	if (image->may_reset_cpu) {
+		up_read(&smc_lock);
+		pr_err("CPU reset not supported by kernel driver\n");
+
+		return -EINVAL;
+	}
+
 	reg.a1 = image->fw_seq_id;
 	arm_smccc_1_2_invoke(&reg, &res);
 	up_read(&smc_lock);
@@ -809,6 +822,8 @@ static int activate_pending_image(void)
 		_update_fw_image_pending(image);
 		if (image->activation_capable && image->activation_pending &&
 		    image->auto_activate) {
+			/* Pin the image while activation drops the inventory locks. */
+			kobject_get(&image->kobj);
 			found_pending = true;
 			break;
 		}
@@ -820,16 +835,15 @@ static int activate_pending_image(void)
 		return -ENOENT;
 
 	ret = prime_fw_image(image);
-	if (ret)
-		return ret;
+	if (!ret)
+		ret = activate_fw_image(image);
+	if (!ret)
+		pr_info("%s: automatic activation succeeded\n",
+			get_image_name(image));
 
-	ret = activate_fw_image(image);
-	if (ret)
-		return ret;
+	kobject_put(&image->kobj);
 
-	pr_info("%s: automatic activation succeeded\n", get_image_name(image));
-
-	return 0;
+	return ret;
 }
 
 #ifdef CONFIG_ACPI
