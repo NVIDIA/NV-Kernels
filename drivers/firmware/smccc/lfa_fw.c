@@ -6,11 +6,14 @@
 #include <linux/arm-smccc.h>
 #include <linux/arm-smccc-bus.h>
 #include <linux/array_size.h>
+#include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/kobject.h>
+#include <linux/ktime.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/nmi.h>
 #include <linux/psci.h>
 #include <linux/stop_machine.h>
 #include <linux/string.h>
@@ -26,6 +29,11 @@
 /* CALL_AGAIN flags (returned by SMC) */
 #define LFA_PRIME_CALL_AGAIN		BIT(0)
 #define LFA_ACTIVATE_CALL_AGAIN		BIT(0)
+
+#define LFA_PRIME_BUDGET_MS		30000		/* 30s cap */
+#define LFA_PRIME_DELAY_MS		10		/* 10ms between polls */
+#define LFA_ACTIVATE_BUDGET_MS		10000		/* 10s cap */
+#define LFA_ACTIVATE_DELAY_MS		10		/* 10ms between polls */
 
 /* LFA return values */
 #define LFA_SUCCESS			0
@@ -276,6 +284,7 @@ static int call_lfa_activate(void *data)
 	struct fw_image *image = data;
 	struct arm_smccc_1_2_regs reg = { 0 }, res;
 
+	touch_nmi_watchdog();
 	reg.a0 = ARM_SMCCC_LFA_ACTIVATE;
 	reg.a1 = image->fw_seq_id;
 	/*
@@ -299,6 +308,7 @@ static int call_lfa_activate(void *data)
 
 static int activate_fw_image(struct fw_image *image)
 {
+	ktime_t end = ktime_add_ms(ktime_get(), LFA_ACTIVATE_BUDGET_MS);
 	int ret;
 
 retry:
@@ -314,8 +324,14 @@ retry:
 	}
 
 	/* SMC returned with call_again flag set, or with LFA_BUSY */
-	if (ret == -LFA_CALL_AGAIN || ret == -LFA_BUSY)
-		goto retry;
+	if (ret == -LFA_CALL_AGAIN || ret == -LFA_BUSY) {
+		if (ktime_before(ktime_get(), end)) {
+			msleep_interruptible(LFA_ACTIVATE_DELAY_MS);
+			goto retry;
+		}
+
+		ret = -LFA_TIMED_OUT;
+	}
 
 	lfa_cancel(image);
 
@@ -328,12 +344,15 @@ retry:
 static int prime_fw_image(struct fw_image *image)
 {
 	struct arm_smccc_1_2_regs reg = { 0 }, res;
+	ktime_t end = ktime_add_ms(ktime_get(), LFA_PRIME_BUDGET_MS);
 
 	if (image->may_reset_cpu) {
 		pr_err("CPU reset not supported by kernel driver\n");
 
 		return -EINVAL;
 	}
+
+	touch_nmi_watchdog();
 
 	reg.a0 = ARM_SMCCC_LFA_PRIME;
 retry:
@@ -353,8 +372,24 @@ retry:
 		return res.a0;
 	}
 
-	if (res.a1 & LFA_PRIME_CALL_AGAIN)
-		goto retry;
+	if (res.a1 & LFA_PRIME_CALL_AGAIN) {
+		int ret;
+
+		/* SMC returned with call_again flag set */
+		if (ktime_before(ktime_get(), end)) {
+			msleep_interruptible(LFA_PRIME_DELAY_MS);
+			goto retry;
+		}
+
+		pr_err("LFA_PRIME for image %s timed out",
+		       get_image_name(image));
+
+		ret = lfa_cancel(image);
+		if (ret != 0)
+			return ret;
+
+		return -ETIMEDOUT;
+	}
 
 	return 0;
 }
