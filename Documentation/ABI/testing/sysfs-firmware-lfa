@@ -94,9 +94,10 @@ What:		/sys/firmware/lfa/<GUID>/name
 Date:		May 2026
 Contact:	Andre Przywara <andre.przywara@arm.com>
 Description:
-		(RO) Shows a human readable name for that firmware image, if
-		known. Depends on the kernel driver knowing this particular
-		GUID, via a built-in list.
+		(RO) Shows the known human-readable name for that firmware
+		image. If its GUID is not in the kernel driver's built-in
+		list, shows the firmware image GUID (the image kobject name)
+		instead.
 
 What:		/sys/firmware/lfa/<GUID>/pending_version
 Date:		May 2026

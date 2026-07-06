@@ -428,7 +428,7 @@ static ssize_t name_show(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	struct fw_image *image = kobj_to_fw_image(kobj);
 
-	return sysfs_emit(buf, "%s\n", image->image_name);
+	return sysfs_emit(buf, "%s\n", get_image_name(image));
 }
 
 static ssize_t activation_capable_show(struct kobject *kobj,
@@ -847,12 +847,18 @@ static int lfa_register_acpi(struct device *dev)
 static void lfa_remove_acpi(struct device *dev)
 {
 	struct acpi_device *acpi_dev = ACPI_COMPANION(dev);
-	acpi_handle handle = acpi_device_handle(acpi_dev);
+	acpi_handle handle;
+
+	if (!acpi_dev)
+		return;
+
+	handle = acpi_device_handle(acpi_dev);
 
 	if (handle)
 		acpi_remove_notify_handler(handle,
 					   ACPI_DEVICE_NOTIFY,
 					   lfa_acpi_notify_handler);
+	ACPI_COMPANION_SET(dev, NULL);
 	acpi_dev_put(acpi_dev);
 }
 #else	/* !CONFIG_ACPI */
@@ -936,27 +942,35 @@ static int lfa_smccc_probe(struct arm_smccc_device *sdev)
 	init_rwsem(&smc_lock);
 
 	err = update_fw_images_tree();
-	if (err != 0) {
-		kset_unregister(lfa_kset);
-		destroy_workqueue(fw_images_update_wq);
-	}
+	if (err)
+		goto err_cleanup;
 
 	if (!acpi_disabled) {
 		err = lfa_register_acpi(&sdev->dev);
-		if (err != -ENODEV) {
-			if (!err)
-				pr_info("registered LFA ACPI notification\n");
-			return err;
+		if (!err) {
+			pr_info("registered LFA ACPI notification\n");
+
+			return 0;
 		}
+		if (err != -ENODEV)
+			goto err_cleanup;
 	}
 
 	err = lfa_register_dt(&sdev->dev);
 	if (!err)
 		pr_info("registered LFA DT notification interrupt\n");
-	if (err != -ENODEV)
-		return err;
+	if (err && err != -ENODEV)
+		goto err_cleanup;
 
 	return 0;
+
+err_cleanup:
+	flush_workqueue(fw_images_update_wq);
+	destroy_workqueue(fw_images_update_wq);
+	clean_fw_images_tree();
+	kset_unregister(lfa_kset);
+
+	return err;
 }
 
 static void lfa_smccc_remove(struct arm_smccc_device *sdev)
