@@ -5178,11 +5178,12 @@ int cifs_sfu_make_node(unsigned int xid, struct inode *inode,
 		pdev->major = cpu_to_le64(MAJOR(dev));
 		pdev->minor = cpu_to_le64(MINOR(dev));
 	} else if (S_ISFIFO(mode)) {
-		memcpy(pdev->type, "LnxFIFO", 8);
+		/* SFU fifo is system file which is empty */
 	}
 
-	rc = server->ops->sync_write(xid, &fid, &io_parms,
-				     &bytes_written, iov, 1);
+	if (!S_ISFIFO(mode))
+		rc = server->ops->sync_write(xid, &fid, &io_parms,
+					     &bytes_written, iov, 1);
 	server->ops->close(xid, tcon, &fid);
 	d_drop(dentry);
 	/* FIXME: add code here to set EAs */
