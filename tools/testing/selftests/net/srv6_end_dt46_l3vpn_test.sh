@@ -510,12 +510,15 @@ host2gateway_tests()
 host_vpn_tests()
 {
 	log_section "SRv6 VPN connectivity test among hosts in the same tenant"
+	if ip route add help 2>&1 | grep -q -i End.DT46; then
+		check_and_log_hs_connectivity 1 2 100
+		check_and_log_hs_connectivity 2 1 100
 
-	check_and_log_hs_connectivity 1 2 100
-	check_and_log_hs_connectivity 2 1 100
-
-	check_and_log_hs_connectivity 3 4 200
-	check_and_log_hs_connectivity 4 3 200
+		check_and_log_hs_connectivity 3 4 200
+		check_and_log_hs_connectivity 4 3 200
+	else
+		echo "SKIP: SRv6 End.DT46 is not supported by the iproute2"
+	fi
 }
 
 host_vpn_isolation_tests()
