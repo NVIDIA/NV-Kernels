@@ -139,10 +139,12 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[pin];
 
+	mutex_lock(&hw->pinconf_lock);
 	switch (param) {
 	case PIN_CONFIG_BIAS_DISABLE:
 	case PIN_CONFIG_BIAS_PULL_UP:
 	case PIN_CONFIG_BIAS_PULL_DOWN:
+	case PIN_CONFIG_BIAS_BUS_HOLD:
 		if (!hw->soc->bias_get_combo)
 			break;
 		err = hw->soc->bias_get_combo(hw, desc, &pullup, &ret);
@@ -154,10 +156,13 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
 			if (ret != MTK_DISABLE)
 				err = -EINVAL;
 		} else if (param == PIN_CONFIG_BIAS_PULL_UP) {
-			if (!pullup || ret == MTK_DISABLE)
+			if (pullup != 1 || ret == MTK_DISABLE)
 				err = -EINVAL;
 		} else if (param == PIN_CONFIG_BIAS_PULL_DOWN) {
-			if (pullup || ret == MTK_DISABLE)
+			if (pullup != 0 || ret == MTK_DISABLE)
+				err = -EINVAL;
+		} else if (param == PIN_CONFIG_BIAS_BUS_HOLD) {
+			if (pullup != MTK_BUS_HOLD || ret == MTK_DISABLE)
 				err = -EINVAL;
 		}
 		break;
@@ -248,6 +253,7 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
 		err = hw->soc->adv_drive_get(hw, desc, &ret);
 		break;
 	}
+	mutex_unlock(&hw->pinconf_lock);
 
 	if (!err)
 		*config = pinconf_to_config_packed(param, ret);
@@ -268,6 +274,7 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[pin];
 
+	mutex_lock(&hw->pinconf_lock);
 	switch ((u32)param) {
 	case PIN_CONFIG_BIAS_DISABLE:
 		if (!hw->soc->bias_set_combo)
@@ -283,6 +290,13 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		if (!hw->soc->bias_set_combo)
 			break;
 		err = hw->soc->bias_set_combo(hw, desc, 0, arg);
+		break;
+	case PIN_CONFIG_BIAS_BUS_HOLD:
+		if (!hw->soc->bias_set_combo)
+			break;
+		/* bias-bus-hold takes no argument; its presence means enable. */
+		err = hw->soc->bias_set_combo(hw, desc, MTK_BUS_HOLD,
+					      MTK_ENABLE);
 		break;
 	case PIN_CONFIG_INPUT_ENABLE:
 		/* regard all non-zero value as enable */
@@ -346,6 +360,7 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		err = hw->soc->adv_drive_set(hw, desc, arg);
 		break;
 	}
+	mutex_unlock(&hw->pinconf_lock);
 
 	return err;
 }
@@ -1010,6 +1025,11 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
 	return 0;
 }
 
+static void mtk_paris_unregister_instance(void *data)
+{
+	mtk_pinctrl_unregister_instance(data);
+}
+
 int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -1056,6 +1076,7 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 		hw->rsel_si_unit = false;
 
 	spin_lock_init(&hw->lock);
+	mutex_init(&hw->pinconf_lock);
 
 	err = mtk_pctrl_build_state(pdev);
 	if (err)
@@ -1094,6 +1115,18 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 	if (err)
 		dev_warn(&pdev->dev,
 			 "Failed to add EINT, but pinctrl still can work\n");
+
+	/*
+	 * Publish the instance for mtk_pinctrl_program_bias_by_gpio() before
+	 * the gpiochip is added: the helper only needs the regmaps and SoC
+	 * table, and a failure to install the devm unregister action then
+	 * has nothing non-devm to unwind.
+	 */
+	mtk_pinctrl_register_instance(hw);
+
+	err = devm_add_action_or_reset(dev, mtk_paris_unregister_instance, hw);
+	if (err)
+		return err;
 
 	/* Build gpiochip should be after pinctrl_enable is done */
 	err = mtk_build_gpiochip(hw);
