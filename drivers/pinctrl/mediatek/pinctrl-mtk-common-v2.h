@@ -10,11 +10,14 @@
 #define __PINCTRL_MTK_COMMON_V2_H
 
 #include <linux/gpio/driver.h>
+#include <linux/mutex.h>
 
 #define MTK_INPUT      0
 #define MTK_OUTPUT     1
 #define MTK_DISABLE    0
 #define MTK_ENABLE     1
+#define MTK_BUS_HOLD   2
+/* 0 = pull-down, 1 = pull-up, 2 = bus-hold (keeper: PU and PD both on) */
 #define MTK_PULLDOWN   0
 #define MTK_PULLUP     1
 #define MTK_PULL_PU_PD_TYPE		BIT(0)
@@ -305,6 +308,14 @@ struct mtk_pinctrl {
 	/* identify rsel setting by si unit or rsel define in dts node */
 	bool rsel_si_unit;
 	struct pinctrl_gpio_range	range;
+	/* Registry node, see mtk_pinctrl_register_instance in common-v2.c */
+	struct list_head		instance_node;
+	/*
+	 * Serialises pinconf_set/get (called under the pinctrl core's
+	 * pctldev mutex) against mtk_pinctrl_program_bias_by_gpio(),
+	 * which bypasses the core. PU and PD are written separately.
+	 */
+	struct mutex			pinconf_lock;
 };
 
 void mtk_rmw(struct mtk_pinctrl *pctl, u8 i, u32 reg, u32 mask, u32 set);
@@ -342,6 +353,15 @@ int mtk_pinconf_bias_set_combo(struct mtk_pinctrl *hw,
 int mtk_pinconf_bias_get_combo(struct mtk_pinctrl *hw,
 			      const struct mtk_pin_desc *desc,
 			      u32 *pullup, u32 *enable);
+
+/*
+ * Internal registration hooks for the cross-driver bias helper.
+ * The public API (mtk_pinctrl_program_bias_by_gpio()) lives in
+ * <linux/soc/mediatek/mtk-pinctrl.h>.  Only mtk_paris_pinctrl_probe()
+ * should call these.
+ */
+void mtk_pinctrl_register_instance(struct mtk_pinctrl *hw);
+void mtk_pinctrl_unregister_instance(struct mtk_pinctrl *hw);
 
 int mtk_pinconf_drive_set(struct mtk_pinctrl *hw,
 			  const struct mtk_pin_desc *desc, u32 arg);
