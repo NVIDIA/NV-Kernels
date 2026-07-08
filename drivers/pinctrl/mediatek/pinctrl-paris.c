@@ -143,6 +143,7 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
 	case PIN_CONFIG_BIAS_DISABLE:
 	case PIN_CONFIG_BIAS_PULL_UP:
 	case PIN_CONFIG_BIAS_PULL_DOWN:
+	case PIN_CONFIG_BIAS_BUS_HOLD:
 		if (!hw->soc->bias_get_combo)
 			break;
 		err = hw->soc->bias_get_combo(hw, desc, &pullup, &ret);
@@ -154,10 +155,13 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
 			if (ret != MTK_DISABLE)
 				err = -EINVAL;
 		} else if (param == PIN_CONFIG_BIAS_PULL_UP) {
-			if (!pullup || ret == MTK_DISABLE)
+			if (pullup != 1 || ret == MTK_DISABLE)
 				err = -EINVAL;
 		} else if (param == PIN_CONFIG_BIAS_PULL_DOWN) {
-			if (pullup || ret == MTK_DISABLE)
+			if (pullup != 0 || ret == MTK_DISABLE)
+				err = -EINVAL;
+		} else if (param == PIN_CONFIG_BIAS_BUS_HOLD) {
+			if (pullup != MTK_BUS_HOLD || ret == MTK_DISABLE)
 				err = -EINVAL;
 		}
 		break;
@@ -283,6 +287,11 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		if (!hw->soc->bias_set_combo)
 			break;
 		err = hw->soc->bias_set_combo(hw, desc, 0, arg);
+		break;
+	case PIN_CONFIG_BIAS_BUS_HOLD:
+		if (!hw->soc->bias_set_combo)
+			break;
+		err = hw->soc->bias_set_combo(hw, desc, MTK_BUS_HOLD, arg);
 		break;
 	case PIN_CONFIG_INPUT_ENABLE:
 		/* regard all non-zero value as enable */
@@ -1012,6 +1021,11 @@ static int mtk_pctrl_build_state(struct platform_device *pdev)
 	return 0;
 }
 
+static void mtk_paris_unregister_instance(void *data)
+{
+	mtk_pinctrl_unregister_instance(data);
+}
+
 int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -1120,6 +1134,20 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 #endif
 
 	platform_set_drvdata(pdev, hw);
+
+	/*
+	 * Publish this instance so client drivers (e.g. mtk-soundwire, which
+	 * parses PinFunction() vendor encodings in its own _CRS) can look up
+	 * the owning controller by GPIO number. Tie the un-publish to the
+	 * device lifetime so hw is removed from the global list before devm
+	 * frees it, avoiding a use-after-free in mtk_pinctrl_program_bias_by_gpio().
+	 */
+	mtk_pinctrl_register_instance(hw);
+
+	err = devm_add_action_or_reset(&pdev->dev,
+				       mtk_paris_unregister_instance, hw);
+	if (err)
+		return err;
 
 	return 0;
 }
