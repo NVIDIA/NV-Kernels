@@ -1739,6 +1739,12 @@ static int elf_validity_cache_copy(struct load_info *info, int flags)
 	}
 
 	strhdr = &info->sechdrs[info->hdr->e_shstrndx];
+
+	if (strhdr->sh_type != SHT_STRTAB) {
+		pr_err("Invalid ELF section name table type: %u\n", strhdr->sh_type);
+		goto no_exec;
+	}
+
 	err = validate_section_offset(info, strhdr);
 	if (err < 0) {
 		pr_err("Invalid ELF section hdr(type %u)\n", strhdr->sh_type);
@@ -1836,6 +1842,13 @@ static int elf_validity_cache_copy(struct load_info *info, int flags)
 	info->index.sym = sym_idx;
 	shdr = &info->sechdrs[sym_idx];
 	info->index.str = shdr->sh_link;
+
+	if (info->sechdrs[info->index.str].sh_type != SHT_STRTAB) {
+		pr_err("Invalid ELF symbol string table type: %u\n",
+		       info->sechdrs[info->index.str].sh_type);
+		goto no_exec;
+	}
+
 	info->strtab = (char *)info->hdr + info->sechdrs[info->index.str].sh_offset;
 
 	/*
