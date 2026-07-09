@@ -317,10 +317,12 @@ static inline int acpi_processor_evaluate_cst(acpi_handle handle, u32 cpu,
 
 #ifdef CONFIG_ACPI_PROCESSOR_IDLE
 int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
-				    struct acpi_processor_power *pr_power);
+				    struct acpi_processor_power *pr_power,
+				    bool strict);
 #else
 static inline int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
-				    struct acpi_processor_power *pr_power)
+				    struct acpi_processor_power *pr_power,
+				    bool strict)
 {
 	return -ENODEV;
 }

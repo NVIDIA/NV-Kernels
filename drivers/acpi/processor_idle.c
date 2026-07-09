@@ -867,7 +867,7 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 	if (ret == -EOPNOTSUPP)
 		return ret;
 
-	ret = acpi_processor_extract_lpi_info(pr->handle, &pr->power);
+	ret = acpi_processor_extract_lpi_info(pr->handle, &pr->power, false);
 	if (ret)
 		return ret;
 
