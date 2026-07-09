@@ -1095,7 +1095,6 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 	struct acpi_lpi_states_array info[2], *prev, *curr;
 	acpi_handle handle = pr->handle;
 	unsigned int state_count = 0;
-	acpi_status status;
 	unsigned int i;
 	int ret;
 
@@ -1151,10 +1150,12 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 	prev = curr;
 	curr = &info[1];
 
-	status = acpi_get_parent(handle, &handle);
-	while (ACPI_SUCCESS(status)) {
+	for (;;) {
 		struct acpi_lpi_states_array *tmp;
 		struct acpi_device *d;
+
+		if (ACPI_FAILURE(acpi_get_parent(handle, &handle)))
+			break;
 
 		d = acpi_fetch_acpi_dev(handle);
 		if (!d)
@@ -1171,8 +1172,6 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 		state_count = flatten_lpi_states(pr, state_count, curr, prev);
 
 		tmp = prev, prev = curr, curr = tmp;
-
-		status = acpi_get_parent(handle, &handle);
 	}
 
 	/* reset the index after flattening */
