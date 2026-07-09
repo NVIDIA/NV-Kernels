@@ -134,6 +134,9 @@ struct cxl_hdm_info {
 	struct cxl_decoder_settings settings[] __counted_by(decoder_count);
 };
 
+int cxl_hdm_decode_decoder(struct cxl_decoder_settings *settings, int id,
+			   u32 ctrl, u64 base, u64 size, u64 target_or_skip,
+			   bool *committed);
 int cxl_commit(struct cxl_decoder_settings *settings, void __iomem *hdm);
 
 struct cxl_reg_map {
