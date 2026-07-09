@@ -869,6 +869,9 @@ static int obj_get_integer(union acpi_object *obj, u32 *value)
 	return 0;
 }
 
+#define lpi_state_debug(handle, message, state_idx)	\
+	acpi_handle_debug(handle, message " for _LPI state %u\n", state_idx)
+
 static void process_lpi_state_package(union acpi_object *lpi_pkg,
 				      struct acpi_lpi_state *lpi_state,
 				      acpi_handle handle,
@@ -887,17 +890,13 @@ static void process_lpi_state_package(union acpi_object *lpi_pkg,
 		struct acpi_power_register *reg;
 
 		if (obj->buffer.length < sizeof(*reg)) {
-			acpi_handle_debug(handle,
-				"Invalid register data for _LPI state %u\n",
-				state_idx);
+			lpi_state_debug(handle, "Invalid register data", state_idx);
 			return;
 		}
 
 		reg = (struct acpi_power_register *)obj->buffer.pointer;
 		if (reg->space_id != ACPI_ADR_SPACE_FIXED_HARDWARE) {
-			acpi_handle_debug(handle,
-				"Unsupported entry method for _LPI state %u\n",
-				state_idx);
+			lpi_state_debug(handle, "Unsupported entry method", state_idx);
 			return;
 		}
 
@@ -907,23 +906,17 @@ static void process_lpi_state_package(union acpi_object *lpi_pkg,
 		lpi_state->entry_method = ACPI_CSTATE_INTEGER;
 		lpi_state->address = obj->integer.value;
 	} else {
-		acpi_handle_debug(handle,
-				  "Invalid entry method for _LPI state %u\n",
-				  state_idx);
+		lpi_state_debug(handle, "Invalid entry method", state_idx);
 		return;
 	}
 
 	if (obj_get_integer(&lpi_pkg_elem[0], &lpi_state->min_residency)) {
-		acpi_handle_debug(handle,
-				  "Assuming 10 us min. residency for _LPI state %u\n",
-				  state_idx);
+		lpi_state_debug(handle, "Assuming 10 us min. residency", state_idx);
 		lpi_state->min_residency = 10;
 	}
 
 	if (obj_get_integer(&lpi_pkg_elem[1], &lpi_state->wake_latency)) {
-		acpi_handle_debug(handle,
-				  "Assuming 10 us wake latency for _LPI state %u\n",
-				  state_idx);
+		lpi_state_debug(handle, "Assuming 10 us wake latency", state_idx);
 		lpi_state->wake_latency = 10;
 	}
 
