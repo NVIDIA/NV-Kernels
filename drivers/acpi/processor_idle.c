@@ -872,12 +872,12 @@ static int obj_get_integer(union acpi_object *obj, u32 *value)
 static int acpi_processor_evaluate_lpi(acpi_handle handle,
 				       struct acpi_lpi_states_array *info)
 {
+	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *lpi_data, *lpi_pkg;
+	unsigned int lpi_pkg_count, state_idx;
+	struct acpi_lpi_state *lpi_state;
 	acpi_status status;
 	int ret = 0;
-	int pkg_count, state_idx = 1, loop;
-	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-	union acpi_object *lpi_data;
-	struct acpi_lpi_state *lpi_state;
 
 	status = acpi_evaluate_object(handle, "_LPI", NULL, &buffer);
 	if (ACPI_FAILURE(status)) {
@@ -895,41 +895,46 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 		goto end;
 	}
 
-	pkg_count = lpi_data->package.elements[2].integer.value;
+	lpi_pkg_count = lpi_data->package.elements[2].integer.value;
 
 	/* Validate number of power states. */
-	if (pkg_count < 1 || pkg_count != lpi_data->package.count - 3) {
+	if (!lpi_pkg_count || lpi_pkg_count != lpi_data->package.count - 3) {
 		acpi_handle_debug(handle, "Invalid _LPI state count\n");
 		ret = -ENODATA;
 		goto end;
 	}
 
-	lpi_state = kzalloc_objs(*lpi_state, pkg_count);
+	lpi_state = kzalloc_objs(*lpi_state, lpi_pkg_count);
 	if (!lpi_state) {
 		ret = -ENOMEM;
 		goto end;
 	}
 
-	info->size = pkg_count;
+	info->size = lpi_pkg_count;
 	info->entries = lpi_state;
 
-	/* LPI States start at index 3 */
-	for (loop = 3; state_idx <= pkg_count; loop++, state_idx++, lpi_state++) {
-		union acpi_object *element, *pkg_elem, *obj;
+	/* _LPI State packages start at index 3. */
+	lpi_pkg = &lpi_data->package.elements[3];
 
-		element = &lpi_data->package.elements[loop];
-		if (element->type != ACPI_TYPE_PACKAGE || element->package.count < 7)
+	for (state_idx = 1; state_idx <= lpi_pkg_count;
+	     state_idx++, lpi_state++, lpi_pkg++) {
+		union acpi_object *lpi_pkg_elem, *obj;
+
+		lpi_state->index = state_idx;
+
+		if (lpi_pkg->type != ACPI_TYPE_PACKAGE || lpi_pkg->package.count < 7)
 			continue;
 
-		pkg_elem = element->package.elements;
+		lpi_pkg_elem = lpi_pkg->package.elements;
 
-		obj = pkg_elem + 6;
+		/* Get the entry method first and skip the state if that fails. */
+		obj = &lpi_pkg_elem[6];
 		if (obj->type == ACPI_TYPE_BUFFER) {
 			struct acpi_power_register *reg;
 
 			if (obj->buffer.length < sizeof(*reg)) {
 				acpi_handle_debug(handle,
-					"Invalid register data for _LPI state %d\n",
+					"Invalid register data for _LPI state %u\n",
 					state_idx);
 				continue;
 			}
@@ -937,7 +942,7 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 			reg = (struct acpi_power_register *)obj->buffer.pointer;
 			if (reg->space_id != ACPI_ADR_SPACE_FIXED_HARDWARE) {
 				acpi_handle_debug(handle,
-					"Unsupported entry method for _LPI state %d\n",
+					"Unsupported entry method for _LPI state %u\n",
 					state_idx);
 				continue;
 			}
@@ -949,36 +954,35 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 			lpi_state->address = obj->integer.value;
 		} else {
 			acpi_handle_debug(handle,
-					  "Invalid entry method for _LPI state %d\n",
+					  "Invalid entry method for _LPI state %u\n",
 					  state_idx);
 			continue;
 		}
 
-		lpi_state->index = state_idx;
-		if (obj_get_integer(pkg_elem + 0, &lpi_state->min_residency)) {
+		if (obj_get_integer(&lpi_pkg_elem[0], &lpi_state->min_residency)) {
 			acpi_handle_debug(handle,
-					  "Assuming 10 us min. residency for _LPI state %d\n",
+					  "Assuming 10 us min. residency for _LPI state %u\n",
 					  state_idx);
 			lpi_state->min_residency = 10;
 		}
 
-		if (obj_get_integer(pkg_elem + 1, &lpi_state->wake_latency)) {
+		if (obj_get_integer(&lpi_pkg_elem[1], &lpi_state->wake_latency)) {
 			acpi_handle_debug(handle,
-					  "Assuming 10 us wake latency for _LPI state %d\n",
+					  "Assuming 10 us wake latency for _LPI state %u\n",
 					  state_idx);
 			lpi_state->wake_latency = 10;
 		}
 
-		if (obj_get_integer(pkg_elem + 2, &lpi_state->flags))
+		if (obj_get_integer(&lpi_pkg_elem[2], &lpi_state->flags))
 			lpi_state->flags = 0;
 
-		if (obj_get_integer(pkg_elem + 3, &lpi_state->arch_flags))
+		if (obj_get_integer(&lpi_pkg_elem[3], &lpi_state->arch_flags))
 			lpi_state->arch_flags = 0;
 
-		if (obj_get_integer(pkg_elem + 4, &lpi_state->res_cnt_freq))
+		if (obj_get_integer(&lpi_pkg_elem[4], &lpi_state->res_cnt_freq))
 			lpi_state->res_cnt_freq = 1;
 
-		if (obj_get_integer(pkg_elem + 5, &lpi_state->enable_parent_state))
+		if (obj_get_integer(&lpi_pkg_elem[5], &lpi_state->enable_parent_state))
 			lpi_state->enable_parent_state = 0;
 
 		/* Skip elements [7-8] i.e. Residency/Usage counters. */
@@ -987,16 +991,16 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 		 * Avoid out-of-bounds access if the size of the package is less
 		 * than expected.
 		 */
-		if (element->package.count < 10)
+		if (lpi_pkg->package.count < 10)
 			continue;
 
-		obj = pkg_elem + 9;
+		obj = &lpi_pkg_elem[9];
 		if (obj->type == ACPI_TYPE_STRING)
 			strscpy(lpi_state->desc, obj->string.pointer,
 				ACPI_CX_DESC_LEN);
 	}
 
-	acpi_handle_debug(handle, "Found %d power states\n", state_idx);
+	acpi_handle_debug(handle, "Found %u power states\n", lpi_pkg_count);
 end:
 	kfree(buffer.pointer);
 	return ret;
