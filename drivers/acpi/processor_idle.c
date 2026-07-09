@@ -1044,6 +1044,16 @@ static void stash_composite_state(struct acpi_lpi_states_array *curr_level,
 	curr_level->composite_states[curr_level->composite_states_size++] = t;
 }
 
+static bool too_many_states(acpi_handle handle, unsigned int state_count)
+{
+	if (state_count < ACPI_PROCESSOR_MAX_POWER)
+		return false;
+
+	acpi_handle_info(handle, "No space for more _LPI states than %d\n",
+			 ACPI_PROCESSOR_MAX_POWER);
+	return true;
+}
+
 static unsigned int flatten_lpi_states(struct acpi_processor *pr,
 				       unsigned int state_count,
 				       struct acpi_lpi_states_array *curr,
@@ -1064,12 +1074,8 @@ static unsigned int flatten_lpi_states(struct acpi_processor *pr,
 		if (!(parent_lpi->flags & ACPI_LPI_STATE_FLAGS_ENABLED))
 			continue;
 
-		if (state_count >= ACPI_PROCESSOR_MAX_POWER) {
-			acpi_handle_info(pr->handle,
-					 "No space for more _LPI states than %d\n",
-					 ACPI_PROCESSOR_MAX_POWER);
+		if (too_many_states(pr->handle, state_count))
 			break;
-		}
 
 		flpi = &pr->power.lpi_states[state_count];
 
@@ -1135,12 +1141,8 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 		    lpi->entry_method == ACPI_CSTATE_INTEGER)
 			continue;
 
-		if (state_count >= ACPI_PROCESSOR_MAX_POWER) {
-			acpi_handle_info(handle,
-					 "No space for more _LPI states than %d\n",
-					 ACPI_PROCESSOR_MAX_POWER);
+		if (too_many_states(pr->handle, state_count))
 			break;
-		}
 
 		flpi = &pr->power.lpi_states[state_count++];
 		memcpy(flpi, lpi, sizeof(*lpi));
