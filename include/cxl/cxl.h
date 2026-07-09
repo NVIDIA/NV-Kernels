@@ -10,6 +10,7 @@
 #include <linux/ioport.h>
 #include <linux/pci.h>
 #include <linux/range.h>
+#include <linux/errno.h>
 #include <cxl/mailbox.h>
 
 /**
@@ -154,6 +155,7 @@ int cxl_commit(struct cxl_decoder_settings *settings, void __iomem *hdm);
 #ifdef CONFIG_CXL_HDM
 void pci_cxl_hdm_init(struct pci_dev *pdev);
 void pci_cxl_hdm_release(struct pci_dev *pdev);
+int cxl_reset_function(struct pci_dev *pdev, bool probe);
 #else
 static inline void pci_cxl_hdm_init(struct pci_dev *pdev)
 {
@@ -161,6 +163,11 @@ static inline void pci_cxl_hdm_init(struct pci_dev *pdev)
 
 static inline void pci_cxl_hdm_release(struct pci_dev *pdev)
 {
+}
+
+static inline int cxl_reset_function(struct pci_dev *pdev, bool probe)
+{
+	return -ENOTTY;
 }
 #endif
 
