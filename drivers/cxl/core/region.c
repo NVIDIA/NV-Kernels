@@ -2921,9 +2921,9 @@ static int poison_by_decoder(struct device *dev, void *arg)
 	cxlds = cxlmd->cxlds;
 	mode = cxlds->part[cxled->part].mode;
 
-	if (cxled->skip) {
-		offset = cxled->dpa_res->start - cxled->skip;
-		length = cxled->skip;
+	if (cxled->cxld.skip) {
+		offset = cxled->dpa_res->start - cxled->cxld.skip;
+		length = cxled->cxld.skip;
 		rc = cxl_mem_get_poison(cxlmd, offset, length, NULL);
 		if (rc == -EFAULT && mode == CXL_PARTMODE_RAM)
 			rc = 0;
