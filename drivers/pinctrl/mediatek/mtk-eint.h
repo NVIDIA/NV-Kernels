@@ -31,6 +31,9 @@ struct mtk_eint_regs {
 	unsigned int	dbnc_ctrl;
 	unsigned int	dbnc_set;
 	unsigned int	dbnc_clr;
+	unsigned int	event;
+	unsigned int	event_set;
+	unsigned int	event_clr;
 };
 
 struct mtk_eint_hw {
@@ -83,6 +86,12 @@ struct mtk_eint {
 	const struct mtk_eint_regs *regs;
 	struct mtk_eint_pin *pins;
 	u16 num_db_time;
+
+	/* Wake-event pin list: bits to clear in event_clr after init/resume
+	 * so wake sources are not suppressed.
+	 */
+	const unsigned int *event_pins;
+	unsigned int num_event_pins;
 
 	/* Used to fit into various pinctrl device */
 	void *pctl;
