@@ -6,6 +6,7 @@ menuconfig CXL_BUS
 	select FW_UPLOAD
 	select PCI_DOE
 	select FIRMWARE_TABLE
+	select CXL_HDM
 	select NUMA_KEEP_MEMINFO if NUMA_MEMBLKS
 	select FWCTL if CXL_FEATURES
 	help
@@ -242,5 +243,8 @@ config CXL_ATL
 	def_bool y
 	depends on CXL_REGION
 	depends on ACPI_PRMT && AMD_NB
+
+config CXL_HDM
+	bool
 
 endif
