@@ -894,6 +894,11 @@ static int cxl_restore_hdm_decoders(struct cxl_reset_context *ctx)
 	return cxl_restore_hdm(ctx->target);
 }
 
+int cxl_restore_hdm_after_pci_reset(struct pci_dev *pdev)
+{
+	return cxl_restore_hdm(pdev);
+}
+
 static void cxl_hdm_range_context_init(struct cxl_hdm_range_context *ctx)
 {
 	INIT_LIST_HEAD(&ctx->ranges);
