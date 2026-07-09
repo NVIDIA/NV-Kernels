@@ -315,6 +315,17 @@ static inline int acpi_processor_evaluate_cst(acpi_handle handle, u32 cpu,
 }
 #endif
 
+#ifdef CONFIG_ACPI_PROCESSOR_IDLE
+int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
+				    struct acpi_processor_power *pr_power);
+#else
+static inline int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
+				    struct acpi_processor_power *pr_power)
+{
+	return -ENODEV;
+}
+#endif
+
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
 /* Arch dependent functions for cpu hotplug support */
 int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, u32 acpi_id,
