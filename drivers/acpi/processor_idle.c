@@ -1054,7 +1054,8 @@ static bool too_many_states(acpi_handle handle, unsigned int state_count)
 	return true;
 }
 
-static unsigned int flatten_lpi_states(struct acpi_processor *pr,
+static unsigned int flatten_lpi_states(acpi_handle handle,
+				       struct acpi_lpi_state *lpi_states,
 				       unsigned int state_count,
 				       struct acpi_lpi_states_array *curr,
 				       struct acpi_lpi_states_array *prev)
@@ -1074,10 +1075,10 @@ static unsigned int flatten_lpi_states(struct acpi_processor *pr,
 		if (!(parent_lpi->flags & ACPI_LPI_STATE_FLAGS_ENABLED))
 			continue;
 
-		if (too_many_states(pr->handle, state_count))
+		if (too_many_states(handle, state_count))
 			break;
 
-		flpi = &pr->power.lpi_states[state_count];
+		flpi = &lpi_states[state_count];
 
 		for (i = 0; i < prev->composite_states_size; i++) {
 			struct acpi_lpi_state *local_lpi = prev->composite_states[i];
@@ -1105,18 +1106,14 @@ int __weak acpi_processor_ffh_lpi_probe(unsigned int cpu)
 	return -EOPNOTSUPP;
 }
 
-static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
+static int acpi_processor_extract_lpi_info(acpi_handle pr_handle,
+					   struct acpi_processor_power *pr_power)
 {
 	struct acpi_lpi_states_array info[2], *prev, *curr;
-	acpi_handle handle = pr->handle;
+	acpi_handle handle = pr_handle;
 	unsigned int state_count = 0;
 	unsigned int i;
 	int ret;
-
-	/* make sure our architecture has support */
-	ret = acpi_processor_ffh_lpi_probe(pr->id);
-	if (ret == -EOPNOTSUPP)
-		return ret;
 
 	if (!osc_pc_lpi_support_confirmed)
 		return -EOPNOTSUPP;
@@ -1141,10 +1138,10 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 		    lpi->entry_method == ACPI_CSTATE_INTEGER)
 			continue;
 
-		if (too_many_states(pr->handle, state_count))
+		if (too_many_states(pr_handle, state_count))
 			break;
 
-		flpi = &pr->power.lpi_states[state_count++];
+		flpi = &pr_power->lpi_states[state_count++];
 		memcpy(flpi, lpi, sizeof(*lpi));
 		stash_composite_state(curr, flpi);
 	}
@@ -1182,7 +1179,8 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 			break;
 
 		/* flatten all the LPI states in this level of hierarchy */
-		state_count = flatten_lpi_states(pr, state_count, curr, prev);
+		state_count = flatten_lpi_states(pr_handle, pr_power->lpi_states,
+						 state_count, curr, prev);
 
 		kfree(curr->entries);
 
@@ -1191,9 +1189,25 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 
 	/* reset the index after flattening */
 	for (i = 0; i < state_count; i++)
-		pr->power.lpi_states[i].index = i;
+		pr_power->lpi_states[i].index = i;
 
-	pr->power.count = state_count;
+	pr_power->count = state_count;
+
+	return 0;
+}
+
+static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
+{
+	int ret;
+
+	/* make sure our architecture has support */
+	ret = acpi_processor_ffh_lpi_probe(pr->id);
+	if (ret == -EOPNOTSUPP)
+		return ret;
+
+	ret = acpi_processor_extract_lpi_info(pr->handle, &pr->power);
+	if (ret)
+		return ret;
 
 	/* Tell driver that _LPI is supported. */
 	pr->flags.has_lpi = 1;
