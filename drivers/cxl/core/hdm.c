@@ -84,18 +84,9 @@ static void parse_hdm_decoder_caps(struct cxl_hdm *cxlhdm)
 		cxlhdm->iw_cap_mask |= BIT(16);
 }
 
-static void clear_hdm_info(void *data)
-{
-	struct pci_dev *pdev = data;
-
-	WRITE_ONCE(pdev->hdm, NULL);
-}
-
-static int devm_cxl_pci_setup_hdm_info(struct cxl_hdm *cxlhdm)
+static struct pci_dev *cxl_hdm_to_pci_dev(struct cxl_hdm *cxlhdm)
 {
 	struct cxl_port *port = cxlhdm->port;
-	struct cxl_hdm_info *info;
-	struct pci_dev *pdev;
 	struct device *uport;
 
 	if (is_cxl_endpoint(port)) {
@@ -107,42 +98,42 @@ static int devm_cxl_pci_setup_hdm_info(struct cxl_hdm *cxlhdm)
 	}
 
 	if (!dev_is_pci(uport))
+		return NULL;
+
+	return to_pci_dev(uport);
+}
+
+static int devm_cxl_pci_setup_hdm_info(struct cxl_hdm *cxlhdm)
+{
+	struct cxl_hdm_info *info;
+	struct pci_dev *pdev;
+
+	pdev = cxl_hdm_to_pci_dev(cxlhdm);
+	if (!pdev)
 		return 0;
 
-	pdev = to_pci_dev(uport);
-	info = devm_kzalloc(&pdev->dev,
-			    struct_size(info, settings, cxlhdm->decoder_count),
-			    GFP_KERNEL);
-	if (!info)
-		return -ENOMEM;
+	guard(rwsem_read)(&cxl_rwsem.dpa);
+	info = pdev->hdm;
+	if (info) {
+		if (info->decoder_count != cxlhdm->decoder_count)
+			return -ENXIO;
+	}
 
-	info->decoder_count = cxlhdm->decoder_count;
-	WRITE_ONCE(pdev->hdm, info);
-
-	return devm_add_action_or_reset(&pdev->dev, clear_hdm_info, pdev);
+	return 0;
 }
 
 static void cxl_hdm_info_set_decoder(struct cxl_hdm *cxlhdm,
 				     struct cxl_decoder *cxld)
 {
-	struct cxl_port *port = cxlhdm->port;
 	struct cxl_hdm_info *info;
 	struct pci_dev *pdev;
-	struct device *uport;
 
-	if (is_cxl_endpoint(port)) {
-		struct cxl_memdev *cxlmd = to_cxl_memdev(port->uport_dev);
-
-		uport = cxlmd->dev.parent;
-	} else {
-		uport = port->uport_dev;
-	}
-
-	if (!dev_is_pci(uport))
+	pdev = cxl_hdm_to_pci_dev(cxlhdm);
+	if (!pdev)
 		return;
 
-	pdev = to_pci_dev(uport);
-	info = READ_ONCE(pdev->hdm);
+	guard(rwsem_write)(&cxl_rwsem.dpa);
+	info = pdev->hdm;
 	if (!info || cxld->id >= info->decoder_count)
 		return;
 
@@ -948,11 +939,11 @@ static int init_hdm_decoder(struct cxl_port *port, struct cxl_decoder *cxld,
 {
 	struct cxl_endpoint_decoder *cxled = NULL;
 	u64 size, base, skip, dpa_size, lo, hi;
+	struct cxl_decoder_settings settings;
 	bool committed;
 	u32 remainder;
 	int i, rc;
 	u32 ctrl;
-	struct cxl_decoder_settings settings;
 	union {
 		u64 value;
 		unsigned char target_id[8];
