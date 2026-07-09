@@ -283,7 +283,9 @@ struct mtk_pin_soc {
 			     const struct mtk_pin_desc *desc, u32 arg);
 	int (*adv_drive_get)(struct mtk_pinctrl *hw,
 			     const struct mtk_pin_desc *desc, u32 *val);
-
+	/* For wake event */
+	const unsigned int *eint_event;
+	const unsigned int total_wake_eints;
 	/* Specific driver data */
 	void				*driver_data;
 };
