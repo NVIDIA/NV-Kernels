@@ -122,6 +122,18 @@ struct cxl_regs {
 	);
 };
 
+/**
+ * struct cxl_hdm_info - PCI device HDM decoder programming cache
+ * @decoder_count: number of decoder settings entries
+ * @regs: mapped CXL component registers for this HDM decoder block
+ * @settings: cached per-decoder programming state
+ */
+struct cxl_hdm_info {
+	int decoder_count;
+	struct cxl_component_regs regs;
+	struct cxl_decoder_settings settings[] __counted_by(decoder_count);
+};
+
 int cxl_commit(struct cxl_decoder_settings *settings, void __iomem *hdm);
 
 struct cxl_reg_map {

@@ -84,6 +84,76 @@ static void parse_hdm_decoder_caps(struct cxl_hdm *cxlhdm)
 		cxlhdm->iw_cap_mask |= BIT(16);
 }
 
+static void clear_hdm_info(void *data)
+{
+	struct pci_dev *pdev = data;
+
+	WRITE_ONCE(pdev->hdm, NULL);
+}
+
+static int devm_cxl_pci_setup_hdm_info(struct cxl_hdm *cxlhdm)
+{
+	struct cxl_port *port = cxlhdm->port;
+	struct cxl_hdm_info *info;
+	struct pci_dev *pdev;
+	struct device *uport;
+
+	if (is_cxl_endpoint(port)) {
+		struct cxl_memdev *cxlmd = to_cxl_memdev(port->uport_dev);
+
+		uport = cxlmd->dev.parent;
+	} else {
+		uport = port->uport_dev;
+	}
+
+	if (!dev_is_pci(uport))
+		return 0;
+
+	pdev = to_pci_dev(uport);
+	info = devm_kzalloc(&pdev->dev,
+			    struct_size(info, settings, cxlhdm->decoder_count),
+			    GFP_KERNEL);
+	if (!info)
+		return -ENOMEM;
+
+	info->decoder_count = cxlhdm->decoder_count;
+	WRITE_ONCE(pdev->hdm, info);
+
+	return devm_add_action_or_reset(&pdev->dev, clear_hdm_info, pdev);
+}
+
+static void cxl_hdm_info_set_decoder(struct cxl_hdm *cxlhdm,
+				     struct cxl_decoder *cxld)
+{
+	struct cxl_port *port = cxlhdm->port;
+	struct cxl_hdm_info *info;
+	struct pci_dev *pdev;
+	struct device *uport;
+
+	if (is_cxl_endpoint(port)) {
+		struct cxl_memdev *cxlmd = to_cxl_memdev(port->uport_dev);
+
+		uport = cxlmd->dev.parent;
+	} else {
+		uport = port->uport_dev;
+	}
+
+	if (!dev_is_pci(uport))
+		return;
+
+	pdev = to_pci_dev(uport);
+	info = READ_ONCE(pdev->hdm);
+	if (!info || cxld->id >= info->decoder_count)
+		return;
+
+	if (cxld->flags & CXL_DECODER_F_ENABLE)
+		info->settings[cxld->id] = cxld->settings;
+	else
+		info->settings[cxld->id] = (struct cxl_decoder_settings) {
+			.id = cxld->id,
+		};
+}
+
 static bool should_emulate_decoders(struct cxl_endpoint_dvsec_info *info)
 {
 	struct cxl_hdm *cxlhdm;
@@ -747,6 +817,7 @@ static int cxl_decoder_commit(struct cxl_decoder *cxld)
 		return rc;
 	}
 	port->commit_end++;
+	cxl_hdm_info_set_decoder(cxlhdm, cxld);
 
 	return 0;
 }
@@ -819,6 +890,7 @@ static void cxl_decoder_reset(struct cxl_decoder *cxld)
 	writel(0, hdm + CXL_HDM_DECODER0_BASE_LOW_OFFSET(id));
 
 	cxld->flags &= ~CXL_DECODER_F_ENABLE;
+	cxl_hdm_info_set_decoder(cxlhdm, cxld);
 
 	/* Userspace is now responsible for reconfiguring this decoder */
 	if (is_endpoint_decoder(&cxld->dev)) {
@@ -990,6 +1062,7 @@ static int init_hdm_decoder(struct cxl_port *port, struct cxl_decoder *cxld,
 		lo = readl(hdm + CXL_HDM_DECODER0_TL_LOW(which));
 		hi = readl(hdm + CXL_HDM_DECODER0_TL_HIGH(which));
 		target_list.value = (hi << 32) + lo;
+		cxld->targets = target_list.value;
 		for (i = 0; i < cxld->interleave_ways; i++)
 			cxld->target_map[i] = target_list.target_id[i];
 
@@ -1063,11 +1136,16 @@ static int devm_cxl_enumerate_decoders(struct cxl_hdm *cxlhdm,
 	struct cxl_port *port = cxlhdm->port;
 	int i;
 	u64 dpa_base = 0;
+	int rc;
 
 	cxl_settle_decoders(cxlhdm);
 
+	rc = devm_cxl_pci_setup_hdm_info(cxlhdm);
+	if (rc)
+		return rc;
+
 	for (i = 0; i < cxlhdm->decoder_count; i++) {
-		int rc, target_count = cxlhdm->target_count;
+		int target_count = cxlhdm->target_count;
 		struct cxl_decoder *cxld;
 
 		if (is_cxl_endpoint(port)) {
@@ -1104,6 +1182,7 @@ static int devm_cxl_enumerate_decoders(struct cxl_hdm *cxlhdm,
 			put_device(&cxld->dev);
 			return rc;
 		}
+		cxl_hdm_info_set_decoder(cxlhdm, cxld);
 		rc = add_hdm_decoder(port, cxld);
 		if (rc) {
 			dev_warn(&port->dev,
