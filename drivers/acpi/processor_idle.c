@@ -935,14 +935,15 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 			}
 
 			reg = (struct acpi_power_register *)obj->buffer.pointer;
-			if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO &&
-			    reg->space_id != ACPI_ADR_SPACE_FIXED_HARDWARE)
+			if (reg->space_id != ACPI_ADR_SPACE_FIXED_HARDWARE) {
+				acpi_handle_debug(handle,
+					"Unsupported entry method for _LPI state %d\n",
+					state_idx);
 				continue;
+			}
 
+			lpi_state->entry_method = ACPI_CSTATE_FFH;
 			lpi_state->address = reg->address;
-			lpi_state->entry_method =
-				reg->space_id == ACPI_ADR_SPACE_FIXED_HARDWARE ?
-				ACPI_CSTATE_FFH : ACPI_CSTATE_SYSTEMIO;
 		} else if (obj->type == ACPI_TYPE_INTEGER) {
 			lpi_state->entry_method = ACPI_CSTATE_INTEGER;
 			lpi_state->address = obj->integer.value;
