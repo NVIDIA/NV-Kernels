@@ -875,6 +875,7 @@ static void vfio_cxl_region_release(struct vfio_pci_core_device *vdev,
 				    cxl->region_size, true);
 
 	if (cxl->region_vaddr) {
+		unregister_pfn_address_space(&cxl->dpa_pfn_space);
 		memunmap(cxl->region_vaddr);
 		cxl->region_vaddr = NULL;
 	}
@@ -885,6 +886,60 @@ static const struct vfio_pci_regops vfio_cxl_regops = {
 	.mmap		= vfio_cxl_region_mmap,
 	.release	= vfio_cxl_region_release,
 };
+
+/*
+ * Map a poisoned DPA pfn back to the file offset of every user mapping so
+ * memory_failure() can unmap it and signal the fd holder.  The DPA is a
+ * single linear range at region_hpa; recover the per-vma file offset the
+ * same way the fault handler derived the pfn.
+ */
+static int vfio_cxl_pfn_to_vma_pgoff(struct vm_area_struct *vma,
+				     unsigned long pfn, pgoff_t *pgoff)
+{
+	struct vfio_pci_region *region;
+	struct vfio_pci_cxl_state *cxl;
+	pgoff_t vma_off, pfn_off;
+	unsigned long start_pfn;
+
+	if (vma->vm_ops != &vfio_cxl_region_vm_ops)
+		return -ENOENT;
+
+	region = vma->vm_private_data;
+	cxl = region->data;
+
+	start_pfn = PHYS_PFN(cxl->region_hpa);
+	if (pfn < start_pfn || pfn >= start_pfn + (cxl->region_size >> PAGE_SHIFT))
+		return -EFAULT;
+
+	pfn_off = pfn - start_pfn;
+	vma_off = vma->vm_pgoff &
+		  ((1UL << (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT)) - 1);
+	/* Skip VMAs that do not map the pfn, e.g. a partial mmap of DPA */
+	if (pfn_off < vma_off || pfn_off - vma_off >= vma_pages(vma))
+		return -EFAULT;
+
+	*pgoff = vma->vm_pgoff + (pfn_off - vma_off);
+	return 0;
+}
+
+/*
+ * DPA is struct-page-less device memory, so a memory error on it cannot be
+ * routed through the normal page path.  Register the range with
+ * memory_failure() to contain such errors (unmap + SIGBUS to the fd holder)
+ * instead of letting them escalate to a host SError.
+ */
+static int vfio_cxl_register_pfn_space(struct vfio_pci_cxl_state *cxl)
+{
+	unsigned long start_pfn = PHYS_PFN(cxl->region_hpa);
+
+	cxl->dpa_pfn_space.node.start = start_pfn;
+	cxl->dpa_pfn_space.node.last =
+		start_pfn + (cxl->region_size >> PAGE_SHIFT) - 1;
+	cxl->dpa_pfn_space.mapping = cxl->vdev->vdev.inode->i_mapping;
+	cxl->dpa_pfn_space.pfn_to_vma_pgoff = vfio_cxl_pfn_to_vma_pgoff;
+
+	return register_pfn_address_space(&cxl->dpa_pfn_space);
+}
 
 int vfio_cxl_register_cxl_region(struct vfio_pci_core_device *vdev)
 {
@@ -908,13 +963,18 @@ int vfio_cxl_register_cxl_region(struct vfio_pci_core_device *vdev)
 	if (!cxl->region_vaddr)
 		return -ENOMEM;
 
-	/*
-	 * BOS/backport policy: do not advertise DPA mmap until the CXL DPA
-	 * backing is proven safe for userspace CPU mappings.  Keep fd
-	 * read/write available via the memremap() kernel mapping.
-	 */
+	/* -EOPNOTSUPP means CONFIG_MEMORY_FAILURE is off; run without it */
+	ret = vfio_cxl_register_pfn_space(cxl);
+	if (ret && ret != -EOPNOTSUPP) {
+		memunmap(cxl->region_vaddr);
+		cxl->region_vaddr = NULL;
+		return ret;
+	}
+
+	/* DPA is mmappable coherent device memory */
 	flags = VFIO_REGION_INFO_FLAG_READ |
-		VFIO_REGION_INFO_FLAG_WRITE;
+		VFIO_REGION_INFO_FLAG_WRITE |
+		VFIO_REGION_INFO_FLAG_MMAP;
 
 	ret = vfio_pci_core_register_dev_region(vdev,
 						PCI_VENDOR_ID_CXL |
@@ -924,6 +984,7 @@ int vfio_cxl_register_cxl_region(struct vfio_pci_core_device *vdev)
 						cxl->region_size, flags,
 						cxl);
 	if (ret) {
+		unregister_pfn_address_space(&cxl->dpa_pfn_space);
 		memunmap(cxl->region_vaddr);
 		cxl->region_vaddr = NULL;
 		return ret;
