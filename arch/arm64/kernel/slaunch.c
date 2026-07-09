@@ -1035,11 +1035,12 @@ void __init slaunch_setup(void)
 	/* Map DLME data header for reservation */
 	dlme_data_pa = sl_dlme_region_pa + sl_dlme_data_offset;
 	hdr = early_memremap(dlme_data_pa, sizeof(*hdr));
-	if (!hdr) {
-		pr_err("slaunch: failed to map DLME data header at 0x%llx\n",
-		       (u64)dlme_data_pa);
-		return;
-	}
+	/* The header locates the protected-regions table and event log that
+	 * the full-lockdown assertion and locality close below need; fail
+	 * closed if it cannot be mapped rather than boot on with them skipped. */
+	if (!hdr)
+		panic("slaunch: failed to map DLME data header at 0x%llx\n",
+		      (u64)dlme_data_pa);
 
 	pr_info("slaunch: DLME data version: %u\n",
 		le16_to_cpu(hdr->version));
