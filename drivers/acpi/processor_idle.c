@@ -890,7 +890,7 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 	/* There must be at least 4 elements = 3 elements + 1 package */
 	if (!lpi_data || lpi_data->type != ACPI_TYPE_PACKAGE ||
 	    lpi_data->package.count < 4) {
-		pr_debug("not enough elements in _LPI\n");
+		acpi_handle_debug(handle, "Not enough elements in _LPI\n");
 		ret = -ENODATA;
 		goto end;
 	}
@@ -899,7 +899,7 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 
 	/* Validate number of power states. */
 	if (pkg_count < 1 || pkg_count != lpi_data->package.count - 3) {
-		pr_debug("count given by _LPI is not valid\n");
+		acpi_handle_debug(handle, "Invalid _LPI state count\n");
 		ret = -ENODATA;
 		goto end;
 	}
@@ -948,19 +948,24 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 			lpi_state->entry_method = ACPI_CSTATE_INTEGER;
 			lpi_state->address = obj->integer.value;
 		} else {
-			pr_debug("Entry method of state-%d is invalid, disable it.\n",
-				 state_idx);
+			acpi_handle_debug(handle,
+					  "Invalid entry method for _LPI state %d\n",
+					  state_idx);
 			continue;
 		}
 
 		lpi_state->index = state_idx;
 		if (obj_get_integer(pkg_elem + 0, &lpi_state->min_residency)) {
-			pr_debug("No min. residency found, assuming 10 us\n");
+			acpi_handle_debug(handle,
+					  "Assuming 10 us min. residency for _LPI state %d\n",
+					  state_idx);
 			lpi_state->min_residency = 10;
 		}
 
 		if (obj_get_integer(pkg_elem + 1, &lpi_state->wake_latency)) {
-			pr_debug("No wakeup residency found, assuming 10 us\n");
+			acpi_handle_debug(handle,
+					  "Assuming 10 us wake latency for _LPI state %d\n",
+					  state_idx);
 			lpi_state->wake_latency = 10;
 		}
 
