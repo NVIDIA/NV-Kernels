@@ -1099,12 +1099,11 @@ int __weak acpi_processor_ffh_lpi_probe(unsigned int cpu)
 
 static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 {
-	int ret, i;
-	acpi_status status;
-	acpi_handle handle = pr->handle, pr_ahandle;
-	struct acpi_device *d = NULL;
-	struct acpi_lpi_states_array info[2], *tmp, *prev, *curr;
+	struct acpi_lpi_states_array info[2], *prev, *curr;
+	acpi_handle handle = pr->handle;
 	unsigned int state_count;
+	acpi_status status;
+	int ret, i;
 
 	/* make sure our architecture has support */
 	ret = acpi_processor_ffh_lpi_probe(pr->id);
@@ -1117,21 +1116,25 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 	if (!acpi_has_method(handle, "_LPI"))
 		return -EINVAL;
 
-	prev = &info[0];
-	curr = &info[1];
-	handle = pr->handle;
-	ret = acpi_processor_evaluate_lpi(handle, prev);
+	curr = &info[0];
+
+	ret = acpi_processor_evaluate_lpi(handle, curr);
 	if (ret)
 		return ret;
-	state_count = flatten_lpi_states(pr, 0, prev, NULL);
 
-	status = acpi_get_parent(handle, &pr_ahandle);
+	state_count = flatten_lpi_states(pr, 0, curr, NULL);
+
+	prev = curr;
+	curr = &info[1];
+
+	status = acpi_get_parent(handle, &handle);
 	while (ACPI_SUCCESS(status)) {
-		d = acpi_fetch_acpi_dev(pr_ahandle);
+		struct acpi_lpi_states_array *tmp;
+		struct acpi_device *d;
+
+		d = acpi_fetch_acpi_dev(handle);
 		if (!d)
 			break;
-
-		handle = pr_ahandle;
 
 		if (strcmp(acpi_device_hid(d), ACPI_PROCESSOR_CONTAINER_HID))
 			break;
@@ -1149,7 +1152,7 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 
 		tmp = prev, prev = curr, curr = tmp;
 
-		status = acpi_get_parent(handle, &pr_ahandle);
+		status = acpi_get_parent(handle, &handle);
 	}
 
 	/* reset the index after flattening */
