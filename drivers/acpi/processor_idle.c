@@ -1068,13 +1068,6 @@ static unsigned int flatten_lpi_states(struct acpi_processor *pr,
 
 		flpi = &pr->power.lpi_states[flat_state_cnt];
 
-		if (!prev_level) { /* leaf/processor node */
-			memcpy(flpi, t, sizeof(*t));
-			stash_composite_state(curr_level, flpi);
-			flat_state_cnt++;
-			continue;
-		}
-
 		for (i = 0; i < prev_level->composite_states_size; i++) {
 			p = prev_level->composite_states[i];
 			if (t->index <= p->enable_parent_state &&
@@ -1101,9 +1094,10 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 {
 	struct acpi_lpi_states_array info[2], *prev, *curr;
 	acpi_handle handle = pr->handle;
-	unsigned int state_count;
+	unsigned int state_count = 0;
 	acpi_status status;
-	int ret, i;
+	unsigned int i;
+	int ret;
 
 	/* make sure our architecture has support */
 	ret = acpi_processor_ffh_lpi_probe(pr->id);
@@ -1117,12 +1111,45 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 		return -EINVAL;
 
 	curr = &info[0];
+	curr->composite_states_size = 0;
 
 	ret = acpi_processor_evaluate_lpi(handle, curr);
 	if (ret)
 		return ret;
 
-	state_count = flatten_lpi_states(pr, 0, curr, NULL);
+	/* Copy all of the usable first-level states to power.lpi_states[]. */
+	for (i = 0; i < curr->size; i++) {
+		struct acpi_lpi_state *lpi = &curr->entries[i];
+		struct acpi_lpi_state *flpi;
+
+		/*
+		 * Skip states that are not enabled or have an inadequate entry
+		 * method for this level.
+		 */
+		if (!(lpi->flags & ACPI_LPI_STATE_FLAGS_ENABLED) ||
+		    lpi->entry_method == ACPI_CSTATE_INTEGER)
+			continue;
+
+		if (state_count >= ACPI_PROCESSOR_MAX_POWER) {
+			acpi_handle_info(handle,
+					 "No space for more _LPI states than %d\n",
+					 ACPI_PROCESSOR_MAX_POWER);
+			break;
+		}
+
+		flpi = &pr->power.lpi_states[state_count++];
+		memcpy(flpi, lpi, sizeof(*lpi));
+		stash_composite_state(curr, flpi);
+	}
+
+	kfree(curr->entries);
+
+	/*
+	 * If there are no _LPI states at the first level, there are no _LPI
+	 * states at all.
+	 */
+	if (!state_count)
+		return -ENODATA;
 
 	prev = curr;
 	curr = &info[1];
