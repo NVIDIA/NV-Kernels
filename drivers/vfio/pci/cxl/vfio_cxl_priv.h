@@ -10,6 +10,7 @@
 
 #include <cxl/cxl.h>
 #include <linux/types.h>
+#include <linux/memory-failure.h>
 #include <cxl/pci.h>
 
 struct vfio_pci_core_device;
@@ -31,6 +32,7 @@ struct vfio_pci_cxl_state {
 	resource_size_t		     region_hpa;
 	size_t			     region_size;
 	void			    *region_vaddr;
+	struct pfn_address_space      dpa_pfn_space;
 	resource_size_t              hdm_reg_offset;
 	size_t                       hdm_reg_size;
 	resource_size_t              comp_reg_offset;
