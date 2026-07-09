@@ -137,6 +137,10 @@ static void cxl_hdm_info_set_decoder(struct cxl_hdm *cxlhdm,
 	if (!info || cxld->id >= info->decoder_count)
 		return;
 
+	if (cxlhdm->regs.hdm_decoder)
+		info->global_ctrl = readl(cxlhdm->regs.hdm_decoder +
+					  CXL_HDM_DECODER_CTRL_OFFSET);
+
 	if (cxld->flags & CXL_DECODER_F_ENABLE)
 		info->settings[cxld->id] = cxld->settings;
 	else
