@@ -283,7 +283,9 @@ struct mtk_pin_soc {
 			     const struct mtk_pin_desc *desc, u32 arg);
 	int (*adv_drive_get)(struct mtk_pinctrl *hw,
 			     const struct mtk_pin_desc *desc, u32 *val);
-
+	/* EINTs whose event mask must be cleared so they can wake the SPM */
+	const unsigned int *eint_event_unmask;
+	const unsigned int num_eint_event_unmask;
 	/* Specific driver data */
 	void				*driver_data;
 };
