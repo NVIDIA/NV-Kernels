@@ -869,6 +869,90 @@ static int obj_get_integer(union acpi_object *obj, u32 *value)
 	return 0;
 }
 
+static void process_lpi_state_package(union acpi_object *lpi_pkg,
+				      struct acpi_lpi_state *lpi_state,
+				      acpi_handle handle,
+				      unsigned int state_idx)
+{
+	union acpi_object *lpi_pkg_elem, *obj;
+
+	if (lpi_pkg->type != ACPI_TYPE_PACKAGE || lpi_pkg->package.count < 7)
+		return;
+
+	lpi_pkg_elem = lpi_pkg->package.elements;
+
+	/* Get the entry method first and skip the state if that fails. */
+	obj = &lpi_pkg_elem[6];
+	if (obj->type == ACPI_TYPE_BUFFER) {
+		struct acpi_power_register *reg;
+
+		if (obj->buffer.length < sizeof(*reg)) {
+			acpi_handle_debug(handle,
+				"Invalid register data for _LPI state %u\n",
+				state_idx);
+			return;
+		}
+
+		reg = (struct acpi_power_register *)obj->buffer.pointer;
+		if (reg->space_id != ACPI_ADR_SPACE_FIXED_HARDWARE) {
+			acpi_handle_debug(handle,
+				"Unsupported entry method for _LPI state %u\n",
+				state_idx);
+			return;
+		}
+
+		lpi_state->entry_method = ACPI_CSTATE_FFH;
+		lpi_state->address = reg->address;
+	} else if (obj->type == ACPI_TYPE_INTEGER) {
+		lpi_state->entry_method = ACPI_CSTATE_INTEGER;
+		lpi_state->address = obj->integer.value;
+	} else {
+		acpi_handle_debug(handle,
+				  "Invalid entry method for _LPI state %u\n",
+				  state_idx);
+		return;
+	}
+
+	if (obj_get_integer(&lpi_pkg_elem[0], &lpi_state->min_residency)) {
+		acpi_handle_debug(handle,
+				  "Assuming 10 us min. residency for _LPI state %u\n",
+				  state_idx);
+		lpi_state->min_residency = 10;
+	}
+
+	if (obj_get_integer(&lpi_pkg_elem[1], &lpi_state->wake_latency)) {
+		acpi_handle_debug(handle,
+				  "Assuming 10 us wake latency for _LPI state %u\n",
+				  state_idx);
+		lpi_state->wake_latency = 10;
+	}
+
+	if (obj_get_integer(&lpi_pkg_elem[2], &lpi_state->flags))
+		lpi_state->flags = 0;
+
+	if (obj_get_integer(&lpi_pkg_elem[3], &lpi_state->arch_flags))
+		lpi_state->arch_flags = 0;
+
+	if (obj_get_integer(&lpi_pkg_elem[4], &lpi_state->res_cnt_freq))
+		lpi_state->res_cnt_freq = 1;
+
+	if (obj_get_integer(&lpi_pkg_elem[5], &lpi_state->enable_parent_state))
+		lpi_state->enable_parent_state = 0;
+
+	/* Skip elements [7-8] i.e. Residency/Usage counters. */
+
+	/*
+	 * Avoid out-of-bounds access if the size of the package is less than
+	 * expected.
+	 */
+	if (lpi_pkg->package.count < 10)
+		return;
+
+	obj = &lpi_pkg_elem[9];
+	if (obj->type == ACPI_TYPE_STRING)
+		strscpy(lpi_state->desc, obj->string.pointer, ACPI_CX_DESC_LEN);
+}
+
 static int acpi_processor_evaluate_lpi(acpi_handle handle,
 				       struct acpi_lpi_states_array *info)
 {
@@ -916,88 +1000,9 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 	/* _LPI State packages start at index 3. */
 	lpi_pkg = &lpi_data->package.elements[3];
 
-	for (state_idx = 1; state_idx <= lpi_pkg_count;
-	     state_idx++, lpi_state++, lpi_pkg++) {
-		union acpi_object *lpi_pkg_elem, *obj;
-
+	for (state_idx = 1; state_idx <= lpi_pkg_count; state_idx++) {
 		lpi_state->index = state_idx;
-
-		if (lpi_pkg->type != ACPI_TYPE_PACKAGE || lpi_pkg->package.count < 7)
-			continue;
-
-		lpi_pkg_elem = lpi_pkg->package.elements;
-
-		/* Get the entry method first and skip the state if that fails. */
-		obj = &lpi_pkg_elem[6];
-		if (obj->type == ACPI_TYPE_BUFFER) {
-			struct acpi_power_register *reg;
-
-			if (obj->buffer.length < sizeof(*reg)) {
-				acpi_handle_debug(handle,
-					"Invalid register data for _LPI state %u\n",
-					state_idx);
-				continue;
-			}
-
-			reg = (struct acpi_power_register *)obj->buffer.pointer;
-			if (reg->space_id != ACPI_ADR_SPACE_FIXED_HARDWARE) {
-				acpi_handle_debug(handle,
-					"Unsupported entry method for _LPI state %u\n",
-					state_idx);
-				continue;
-			}
-
-			lpi_state->entry_method = ACPI_CSTATE_FFH;
-			lpi_state->address = reg->address;
-		} else if (obj->type == ACPI_TYPE_INTEGER) {
-			lpi_state->entry_method = ACPI_CSTATE_INTEGER;
-			lpi_state->address = obj->integer.value;
-		} else {
-			acpi_handle_debug(handle,
-					  "Invalid entry method for _LPI state %u\n",
-					  state_idx);
-			continue;
-		}
-
-		if (obj_get_integer(&lpi_pkg_elem[0], &lpi_state->min_residency)) {
-			acpi_handle_debug(handle,
-					  "Assuming 10 us min. residency for _LPI state %u\n",
-					  state_idx);
-			lpi_state->min_residency = 10;
-		}
-
-		if (obj_get_integer(&lpi_pkg_elem[1], &lpi_state->wake_latency)) {
-			acpi_handle_debug(handle,
-					  "Assuming 10 us wake latency for _LPI state %u\n",
-					  state_idx);
-			lpi_state->wake_latency = 10;
-		}
-
-		if (obj_get_integer(&lpi_pkg_elem[2], &lpi_state->flags))
-			lpi_state->flags = 0;
-
-		if (obj_get_integer(&lpi_pkg_elem[3], &lpi_state->arch_flags))
-			lpi_state->arch_flags = 0;
-
-		if (obj_get_integer(&lpi_pkg_elem[4], &lpi_state->res_cnt_freq))
-			lpi_state->res_cnt_freq = 1;
-
-		if (obj_get_integer(&lpi_pkg_elem[5], &lpi_state->enable_parent_state))
-			lpi_state->enable_parent_state = 0;
-
-		/* Skip elements [7-8] i.e. Residency/Usage counters. */
-
-		/*
-		 * Avoid out-of-bounds access if the size of the package is less
-		 * than expected.
-		 */
-		if (lpi_pkg->package.count < 10)
-			continue;
-
-		obj = &lpi_pkg_elem[9];
-		if (obj->type == ACPI_TYPE_STRING)
-			strscpy(lpi_state->desc, obj->string.pointer,
-				ACPI_CX_DESC_LEN);
+		process_lpi_state_package(lpi_pkg++, lpi_state++, handle, state_idx);
 	}
 
 	acpi_handle_debug(handle, "Found %u power states\n", lpi_pkg_count);
