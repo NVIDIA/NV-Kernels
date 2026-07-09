@@ -434,6 +434,8 @@ int mtk_build_eint(struct mtk_pinctrl *hw, struct platform_device *pdev)
 	hw->eint->hw = hw->soc->eint_hw;
 	hw->eint->pctl = hw;
 	hw->eint->gpio_xlate = &mtk_eint_xt;
+	hw->eint->event_pins = hw->soc->eint_event;
+	hw->eint->num_event_pins = hw->soc->total_wake_eints;
 
 	ret = mtk_eint_do_init(hw->eint, hw->soc->eint_pin);
 	if (ret)

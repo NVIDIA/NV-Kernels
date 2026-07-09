@@ -973,6 +973,15 @@ static int mtk_build_gpiochip(struct mtk_pinctrl *hw)
 	return 0;
 }
 
+#ifdef CONFIG_GPIO_ACPI
+static void mtk_pinctrl_acpi_free_interrupts(void *data)
+{
+	struct gpio_chip *chip = data;
+
+	acpi_gpiochip_free_interrupts(chip);
+}
+#endif
+
 static int mtk_pctrl_build_state(struct platform_device *pdev)
 {
 	struct mtk_pinctrl *hw = platform_get_drvdata(pdev);
@@ -1094,6 +1103,21 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, err, "Failed to add gpio_chip\n");
 
 	pinctrl_add_gpio_range(hw->pctrl, &hw->range);
+#ifdef CONFIG_GPIO_ACPI
+	if (hw->eint) {
+		acpi_gpiochip_request_interrupts(&hw->chip);
+
+		err = devm_add_action_or_reset(dev,
+					       mtk_pinctrl_acpi_free_interrupts,
+					       &hw->chip);
+		if (err) {
+			pinctrl_remove_gpio_range(hw->pctrl, &hw->range);
+			gpiochip_remove(&hw->chip);
+			return dev_err_probe(dev, err,
+					     "Failed to add ACPI GPIO cleanup\n");
+		}
+	}
+#endif
 
 	platform_set_drvdata(pdev, hw);
 

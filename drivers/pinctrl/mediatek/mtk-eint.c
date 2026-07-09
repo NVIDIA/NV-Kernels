@@ -49,6 +49,9 @@ static const struct mtk_eint_regs mtk_generic_eint_regs = {
 	.dbnc_ctrl = 0x500,
 	.dbnc_set  = 0x600,
 	.dbnc_clr  = 0x700,
+	.event     = 0x800,
+	.event_set = 0x840,
+	.event_clr = 0x880,
 };
 
 const unsigned int debounce_time_mt2701[] = {
@@ -161,6 +164,47 @@ static void mtk_eint_unmask(struct irq_data *d)
 
 	if (eint->pins[d->hwirq].dual_edge)
 		mtk_eint_flip_edge(eint, d->hwirq);
+}
+
+/*
+ * Clear the event_clr bit for a single EINT so its wake-event is not
+ * suppressed. Mirrors mtk_eint_unmask() addressing: register is banked
+ * per instance and word-indexed by (idx / 32).
+ */
+static void mtk_eint_event_unmask_one(struct mtk_eint *eint,
+				      unsigned int eint_num)
+{
+	unsigned int idx, inst;
+	unsigned int mask;
+	void __iomem *reg;
+
+	if (eint_num >= eint->hw->ap_num)
+		return;
+
+	idx  = eint->pins[eint_num].index;
+	inst = eint->pins[eint_num].instance;
+
+	if (inst >= eint->nbase)
+		return;
+
+	mask = BIT(idx & 0x1f);
+	reg = mtk_eint_get_offset(eint, eint_num, eint->regs->event_clr);
+	writel(mask, reg);
+}
+
+/*
+ * Walk the SoC's wake-event pin list (e.g. eint_event_mt8901[]) and
+ * clear each pin's event mask so wake sources survive init/resume.
+ */
+static void mtk_eint_apply_event_unmask(struct mtk_eint *eint)
+{
+	unsigned int i;
+
+	if (!eint->event_pins || !eint->num_event_pins)
+		return;
+
+	for (i = 0; i < eint->num_event_pins; i++)
+		mtk_eint_event_unmask_one(eint, eint->event_pins[i]);
 }
 
 static unsigned int mtk_eint_get_mask(struct mtk_eint *eint,
@@ -438,6 +482,7 @@ EXPORT_SYMBOL_GPL(mtk_eint_do_suspend);
 int mtk_eint_do_resume(struct mtk_eint *eint)
 {
 	mtk_eint_chip_write_mask(eint, eint->base, eint->cur_mask);
+	mtk_eint_apply_event_unmask(eint);
 
 	return 0;
 }
@@ -604,6 +649,11 @@ int mtk_eint_do_init(struct mtk_eint *eint, struct mtk_eint_pin *eint_pin)
 
 	irq_set_chained_handler_and_data(eint->irq, mtk_eint_irq_handler,
 					 eint);
+
+	mtk_eint_apply_event_unmask(eint);
+
+	dev_info(eint->dev, "%s completed, %u EINTs registered\n",
+		 __func__, eint->hw->ap_num);
 
 	return 0;
 
