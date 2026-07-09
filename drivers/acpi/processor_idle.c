@@ -1045,44 +1045,53 @@ static void stash_composite_state(struct acpi_lpi_states_array *curr_level,
 }
 
 static unsigned int flatten_lpi_states(struct acpi_processor *pr,
-				       unsigned int flat_state_cnt,
-				       struct acpi_lpi_states_array *curr_level,
-				       struct acpi_lpi_states_array *prev_level)
+				       unsigned int state_count,
+				       struct acpi_lpi_states_array *curr,
+				       struct acpi_lpi_states_array *prev)
 {
-	int i, j, state_count = curr_level->size;
-	struct acpi_lpi_state *p, *t = curr_level->entries;
+	struct acpi_lpi_state *parent_lpi = curr->entries;
+	unsigned int j;
 
-	curr_level->composite_states_size = 0;
-	for (j = 0; j < state_count; j++, t++) {
+	/*
+	 * Combine each of the "raw" _LPI states from the current (processor
+	 * container) level with all of the composite _LPI states from the
+	 * previous (processor or processor container) level.
+	 */
+	for (j = 0; j < curr->size; j++, parent_lpi++) {
 		struct acpi_lpi_state *flpi;
+		int i;
 
-		if (!(t->flags & ACPI_LPI_STATE_FLAGS_ENABLED))
+		if (!(parent_lpi->flags & ACPI_LPI_STATE_FLAGS_ENABLED))
 			continue;
 
-		if (flat_state_cnt >= ACPI_PROCESSOR_MAX_POWER) {
-			pr_warn("Limiting number of LPI states to max (%d)\n",
-				ACPI_PROCESSOR_MAX_POWER);
-			pr_warn("Please increase ACPI_PROCESSOR_MAX_POWER if needed.\n");
+		if (state_count >= ACPI_PROCESSOR_MAX_POWER) {
+			acpi_handle_info(pr->handle,
+					 "No space for more _LPI states than %d\n",
+					 ACPI_PROCESSOR_MAX_POWER);
 			break;
 		}
 
-		flpi = &pr->power.lpi_states[flat_state_cnt];
+		flpi = &pr->power.lpi_states[state_count];
 
-		for (i = 0; i < prev_level->composite_states_size; i++) {
-			p = prev_level->composite_states[i];
-			if (t->index <= p->enable_parent_state &&
-			    combine_lpi_states(p, t, flpi)) {
-				stash_composite_state(curr_level, flpi);
-				flat_state_cnt++;
-				flpi++;
-				if (flat_state_cnt >= ACPI_PROCESSOR_MAX_POWER)
-					break;
-			}
+		for (i = 0; i < prev->composite_states_size; i++) {
+			struct acpi_lpi_state *local_lpi = prev->composite_states[i];
+
+			if (parent_lpi->index > local_lpi->enable_parent_state)
+				continue;
+
+			if (!combine_lpi_states(local_lpi, parent_lpi, flpi))
+				continue;
+
+			stash_composite_state(curr, flpi);
+			state_count++;
+			flpi++;
+
+			if (state_count >= ACPI_PROCESSOR_MAX_POWER)
+				break;
 		}
 	}
 
-	kfree(curr_level->entries);
-	return flat_state_cnt;
+	return state_count;
 }
 
 int __weak acpi_processor_ffh_lpi_probe(unsigned int cpu)
@@ -1164,12 +1173,16 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 		if (strcmp(acpi_device_hid(d), ACPI_PROCESSOR_CONTAINER_HID))
 			break;
 
+		curr->composite_states_size = 0;
+
 		ret = acpi_processor_evaluate_lpi(handle, curr);
 		if (ret)
 			break;
 
 		/* flatten all the LPI states in this level of hierarchy */
 		state_count = flatten_lpi_states(pr, state_count, curr, prev);
+
+		kfree(curr->entries);
 
 		tmp = prev, prev = curr, curr = tmp;
 	}
