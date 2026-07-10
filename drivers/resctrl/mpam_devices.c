@@ -2028,14 +2028,27 @@ static int mpam_restore_mbwu_state(void *_ris)
 	u64 val;
 	struct mon_read mwbu_arg;
 	struct mpam_msc_ris *ris = _ris;
+	struct msmon_mbwu_state *mbwu_state;
+	struct mpam_msc *msc = ris->vmsc->msc;
 	struct mpam_class *class = ris->vmsc->comp->class;
 
 	for (i = 0; i < ris->props.num_mbwu_mon; i++) {
+		mbwu_state = &ris->mbwu_state[i];
+
 		if (ris->mbwu_state[i].enabled) {
-			mwbu_arg.ris = ris;
-			mwbu_arg.ctx = &ris->mbwu_state[i].cfg;
-			mwbu_arg.type = mpam_msmon_choose_counter(class);
-			mwbu_arg.val = &val;
+			{
+				ACQUIRE(mon_sel_lock, guard)(msc);
+
+				if (ACQUIRE_ERR(mon_sel_lock, &guard))
+					return -EIO;
+
+				mwbu_arg.ris = ris;
+				mwbu_arg.ctx = &ris->mbwu_state[i].cfg;
+				mwbu_arg.type = mpam_msmon_choose_counter(class);
+				mwbu_arg.val = &val;
+
+				mbwu_state->reset_on_next_read = true;
+			}
 
 			__ris_msmon_read(&mwbu_arg);
 			if (mwbu_arg.err && mwbu_arg.err != -EBUSY)
@@ -2077,15 +2090,9 @@ static int mpam_save_mbwu_state(void *arg)
 		ret = mpam_read_monsel_reg(msc, CFG_MBWU_CTL, &cur_ctl);
 		if (ret)
 			return ret;
-		ret = mpam_write_monsel_reg(msc, CFG_MBWU_CTL, 0);
-		if (ret)
-			return ret;
 
 		if (mpam_ris_has_mbwu_long_counter(ris)) {
 			ret = mpam_msc_read_mbwu_l(msc, &val);
-			if (ret)
-				return ret;
-			ret = mpam_msc_zero_mbwu_l(msc);
 			if (ret)
 				return ret;
 		} else {
@@ -2095,10 +2102,6 @@ static int mpam_save_mbwu_state(void *arg)
 			if (ret)
 				return ret;
 			val = val32;
-
-			ret = mpam_write_monsel_reg(msc, MBWU, 0);
-			if (ret)
-				return ret;
 		}
 
 		cfg->mon = i;
