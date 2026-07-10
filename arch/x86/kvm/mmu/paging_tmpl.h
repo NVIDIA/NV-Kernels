@@ -700,6 +700,27 @@ static int FNAME(fetch)(struct kvm_vcpu *vcpu, gpa_t addr,
 		clear_sp_write_flooding_count(it.sptep);
 		drop_large_spte(vcpu, it.sptep);
 
+		/*
+		 * A present SPTE at an upper level must point at a shadow page
+		 * for a guest page table, i.e. a non-direct page.  If the guest
+		 * mapping previously used a huge page, the child here may be a
+		 * direct shadow page whose role does not match; reusing it would
+		 * make kvm_mmu_page_get_gfn() compute the wrong gfn for leaf
+		 * SPTEs and leave stale rmap entries, leading to a use-after-free
+		 * once the page is freed.  Drop the mismatched SPTE so that the
+		 * correct, non-direct page is fetched and linked below.
+		 */
+		if (is_shadow_present_pte(*it.sptep) && !is_large_pte(*it.sptep)) {
+			struct kvm_mmu_page *child =
+				to_shadow_page(*it.sptep & PT64_BASE_ADDR_MASK);
+
+			if (child->role.direct) {
+				drop_parent_pte(child, it.sptep);
+				kvm_flush_remote_tlbs_with_address(vcpu->kvm,
+					child->gfn, 1);
+			}
+		}
+
 		sp = NULL;
 		if (!is_shadow_present_pte(*it.sptep)) {
 			table_gfn = gw->table_gfn[it.level - 2];
