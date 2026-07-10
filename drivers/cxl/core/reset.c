@@ -1279,7 +1279,8 @@ not_ready:
 	} while (true);
 }
 
-static int cxl_reset_execute(struct pci_dev *pdev, int dvsec)
+static int cxl_reset_execute(struct cxl_reset_context *ctx, struct pci_dev *pdev,
+			     int dvsec)
 {
 	bool cache_disabled = false;
 	u16 cap;
@@ -1293,6 +1294,10 @@ static int cxl_reset_execute(struct pci_dev *pdev, int dvsec)
 	if (rc)
 		return rc;
 	cache_disabled = true;
+
+	rc = cxl_pci_target_reset_prepare(ctx);
+	if (rc)
+		goto out;
 
 	rc = cxl_reset_update_ctrl2(pdev, dvsec, PCI_DVSEC_CXL_INIT_CXL_RST,
 				    PCI_DVSEC_CXL_RST_MEM_CLR_EN);
@@ -1340,14 +1345,10 @@ int cxl_reset_function(struct pci_dev *pdev, bool probe)
 		goto out;
 	}
 
-	rc = cxl_pci_target_reset_prepare(&ctx);
-	if (rc)
-		goto out;
-
 	scoped_guard(rwsem_write, &cxl_rwsem.region) {
 		rc = cxl_hdm_ranges_prepare(&range_ctx, &ctx);
 		if (!rc)
-			rc = cxl_reset_execute(pdev, dvsec);
+			rc = cxl_reset_execute(&ctx, pdev, dvsec);
 		if (!rc)
 			rc = cxl_restore_hdm_decoders(&ctx);
 	}
