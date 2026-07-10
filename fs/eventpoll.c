@@ -714,6 +714,8 @@ static void ep_free(struct eventpoll *ep)
 	kfree_rcu(ep, rcu);
 }
 
+static struct file *epi_fget(const struct epitem *epi);
+
 /*
  * Removes a "struct epitem" from the eventpoll RB tree and deallocates
  * all the associated resources. Must be called with "mtx" held.
@@ -735,13 +737,26 @@ static bool __ep_remove(struct eventpoll *ep, struct epitem *epi, bool force)
 	 */
 	ep_unregister_pollwait(ep, epi);
 
-	/* Remove the current item from the list of epoll hooks */
-	spin_lock(&file->f_lock);
-	if (epi->dying && !force) {
-		spin_unlock(&file->f_lock);
-		return false;
+	if (!force) {
+		/* cheap sync with eventpoll_release_file() */
+		if (unlikely(READ_ONCE(epi->dying)))
+			return false;
+
+		/*
+		 * If we manage to grab a reference it means we're not in
+		 * eventpoll_release_file() and aren't going to be. With the
+		 * pin held @file cannot reach refcount zero, which holds
+		 * __fput() off and transitively keeps the watched struct
+		 * eventpoll alive across the hlist_del_rcu() and the f_lock
+		 * use.
+		 */
+		file = epi_fget(epi);
+		if (!file)
+			return false;
 	}
 
+	/* Remove the current item from the list of epoll hooks */
+	spin_lock(&file->f_lock);
 	to_free = NULL;
 	head = file->f_ep;
 	if (head->first == &epi->fllink && !epi->fllink.next) {
@@ -776,6 +791,11 @@ static bool __ep_remove(struct eventpoll *ep, struct epitem *epi, bool force)
 	call_rcu(&epi->rcu, epi_rcu_free);
 
 	percpu_counter_dec(&ep->user->epoll_watches);
+
+	/* Drop the pin taken above; on the force path we never took one. */
+	if (!force)
+		fput(file);
+
 	return true;
 }
 
