@@ -2017,8 +2017,7 @@ static int mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 static int mpam_restore_mbwu_state(void *_ris)
 {
 	int i;
-	u64 val;
-	struct mon_read mwbu_arg;
+	u64 val = 0;
 	struct mpam_msc_ris *ris = _ris;
 	struct msmon_mbwu_state *mbwu_state;
 	struct mpam_msc *msc = ris->vmsc->msc;
@@ -2028,23 +2027,25 @@ static int mpam_restore_mbwu_state(void *_ris)
 		mbwu_state = &ris->mbwu_state[i];
 
 		if (ris->mbwu_state[i].enabled) {
+			struct mon_read mbwu_arg = {
+				.ris = ris,
+				.ctx = &ris->mbwu_state[i].cfg,
+				.type = mpam_msmon_choose_counter(class),
+				.val = &val,
+			};
+
 			{
 				ACQUIRE(mon_sel_lock, guard)(msc);
 
 				if (ACQUIRE_ERR(mon_sel_lock, &guard))
 					return -EIO;
 
-				mwbu_arg.ris = ris;
-				mwbu_arg.ctx = &ris->mbwu_state[i].cfg;
-				mwbu_arg.type = mpam_msmon_choose_counter(class);
-				mwbu_arg.val = &val;
-
 				mbwu_state->reset_on_next_read = true;
 			}
 
-			__ris_msmon_read(&mwbu_arg);
-			if (mwbu_arg.err && mwbu_arg.err != -EBUSY)
-				return mwbu_arg.err;
+			__ris_msmon_read(&mbwu_arg);
+			if (mbwu_arg.err && mbwu_arg.err != -EBUSY)
+				return mbwu_arg.err;
 		}
 	}
 
