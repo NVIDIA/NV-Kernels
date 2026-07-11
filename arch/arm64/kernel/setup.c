@@ -351,6 +351,14 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	/* Parse the ACPI tables for possible boot-time configuration */
 	acpi_boot_table_init();
 
+	/*
+	 * DEN0113 defines the DRTM measurement/attestation chain over ACPI.
+	 * A launched system that fell back to device tree runs on unmeasured
+	 * topology with no valid attestation, so fail closed.
+	 */
+	if (sl_dlme_region_pa && acpi_disabled)
+		panic("slaunch: DRTM launch requires ACPI mode, but ACPI is disabled\n");
+
 	if (acpi_disabled)
 		unflatten_device_tree();
 
