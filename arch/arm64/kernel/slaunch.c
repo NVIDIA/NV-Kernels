@@ -150,9 +150,9 @@ static void __init slaunch_tpm_setup(void)
 	struct arm_smccc_res res;
 
 	arm_smccc_smc(DRTM_SMC_CLOSE_LOCALITY, 2, 0, 0, 0, 0, 0, 0, &res);
-	if (res.a0 == (unsigned long)DRTM_NOT_SUPPORTED)
+	if ((long)res.a0 == DRTM_NOT_SUPPORTED)
 		pr_warn("slaunch: CLOSE_LOCALITY not supported (no TPM backend)\n");
-	else if (res.a0 != DRTM_SUCCESS)
+	else if ((long)res.a0 != DRTM_SUCCESS)
 		pr_err("slaunch: CLOSE_LOCALITY failed: %ld\n", (long)res.a0);
 	else
 		pr_info("slaunch: TPM locality 2 closed\n");
@@ -169,16 +169,19 @@ static void __init slaunch_enable_secure_ints(void)
 	struct arm_smccc_res res;
 
 	arm_smccc_smc(DRTM_SMC_ENABLE_SECURE_INTERRUPTS, 0, 0, 0, 0, 0, 0, 0, &res);
-	if (res.a0 == (unsigned long)DRTM_NOT_SUPPORTED ||
-	    res.a0 == (unsigned long)DRTM_DENIED)
+	if ((long)res.a0 == DRTM_NOT_SUPPORTED ||
+	    (long)res.a0 == DRTM_DENIED)
 		pr_info("slaunch: Secure interrupts not disabled by platform (%ld)\n",
 			(long)res.a0);
-	else if (res.a0 != DRTM_SUCCESS)
+	else if ((long)res.a0 != DRTM_SUCCESS)
 		panic("slaunch: ENABLE_SECURE_INTERRUPTS failed: %ld\n",
 		      (long)res.a0);
 	else
 		pr_info("slaunch: Secure interrupts re-enabled\n");
 }
+
+/* Defined after the address-map parser below. */
+static const char *dcrtm_type_name(int type);
 
 /*
  * Parse the D-CRTM address map (at header_size + protected_regions_size
@@ -251,12 +254,7 @@ static bool __init slaunch_parse_address_map(phys_addr_t dlme_data_pa,
 
 		pr_info("slaunch:   [%u] 0x%012llx - 0x%012llx  %s (%llu pages)\n",
 			i, addr, addr + pages * DRTM_PAGE_SIZE,
-			type == DRTM_REGION_TYPE_NORMAL        ? "NORMAL" :
-			type == DRTM_REGION_TYPE_NORMAL_CACHED ? "NORMAL_CACHED" :
-			type == DRTM_REGION_TYPE_DEVICE        ? "DEVICE" :
-			type == DRTM_REGION_TYPE_NV            ? "NV" :
-			type == DRTM_REGION_TYPE_RSVD          ? "RSVD" :
-			"UNKNOWN", pages);
+			dcrtm_type_name(type), pages);
 	}
 
 	early_memunmap(map_hdr, (size_t)map_size);
@@ -281,8 +279,8 @@ static bool __init slaunch_parse_address_map(phys_addr_t dlme_data_pa,
  * spec-conformant "single entry, start=0, full-range" encoding; partial
  * lockdown breaks the measure-then-parse soundness model.
  */
-static void __init slaunch_assert_full_lockdown(phys_addr_t dlme_data_pa,
-						u64 hdr_size, u64 prot_size)
+static void __init slaunch_assert_dma_protection(phys_addr_t dlme_data_pa,
+						 u64 hdr_size, u64 prot_size)
 {
 	const struct drtm_mem_region_hdr *phdr;
 	const struct drtm_mem_region *regs;
@@ -1053,9 +1051,9 @@ void __init slaunch_setup(void)
 	 * Called from slaunch_setup (not slaunch_early_init) so panic
 	 * prints — earlycon is registered by this point.
 	 */
-	slaunch_assert_full_lockdown(dlme_data_pa,
-				     le16_to_cpu(hdr->this_hdr_size),
-				     le64_to_cpu(hdr->protected_regions_size));
+	slaunch_assert_dma_protection(dlme_data_pa,
+				      le16_to_cpu(hdr->this_hdr_size),
+				      le64_to_cpu(hdr->protected_regions_size));
 
 	/* Stash for slaunch_reserve_dlme_data() to reserve post-efi_init. */
 	sl_dlme_data_pa = dlme_data_pa;
@@ -1302,7 +1300,7 @@ static void __init slaunch_verify_hash_algo(void)
 	 */
 	arm_smccc_smc(DRTM_SMC_FEATURES, (1ULL << 63) | 0x1,
 		      0, 0, 0, 0, 0, 0, &res);
-	if ((s64)res.a0 == DRTM_NOT_SUPPORTED) {
+	if ((long)res.a0 == DRTM_NOT_SUPPORTED) {
 		pr_warn("slaunch: DRTM_FEATURES(TPM) not supported; assuming SHA-256\n");
 		fw_features_supported = false;
 		algo = SL_TPM_ALG_SHA256;
@@ -2330,7 +2328,7 @@ static int __init slaunch_unprotect_memory(void)
 
 	pr_info("slaunch: Calling DRTM_UNPROTECT_MEMORY\n");
 	arm_smccc_smc(DRTM_SMC_UNPROTECT_MEMORY, 0, 0, 0, 0, 0, 0, 0, &res);
-	if (res.a0 != DRTM_SUCCESS) {
+	if ((long)res.a0 != DRTM_SUCCESS) {
 		pr_err("slaunch: UNPROTECT_MEMORY failed: %ld\n",
 		       (long)res.a0);
 		return -EIO;

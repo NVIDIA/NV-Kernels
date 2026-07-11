@@ -17,7 +17,7 @@
 #define SL_DRTM_SMC_FEATURES		0xC4000111UL
 #define SL_DRTM_SMC_DYNAMIC_LAUNCH	0xC4000114UL
 #define SL_DRTM_PAGE_SIZE		0x1000
-#define SL_ROUND_UP_4K(x)		(((x) + SL_DRTM_PAGE_SIZE - 1) & \
+#define SL_ROUND_UP_PAGE(x)		(((x) + SL_DRTM_PAGE_SIZE - 1) & \
 					 ~(SL_DRTM_PAGE_SIZE - 1ULL))
 
 /*
@@ -259,7 +259,7 @@ void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 	 */
 	image_size = (unsigned long)(_edata - _text);
 	kernel_memsize = (unsigned long)(_end - _text);
-	dlme_data_offset = SL_ROUND_UP_4K(kernel_memsize);
+	dlme_data_offset = SL_ROUND_UP_PAGE(kernel_memsize);
 
 	/*
 	 * Write DTB PA into the Preamble->DLME slot at (kernel_addr +
@@ -309,6 +309,7 @@ void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 	sl_smc(SL_DRTM_SMC_DYNAMIC_LAUNCH, (u64)params);
 
 	/* If we reach here, the SMC failed. Halt. */
+	efi_err("DRTM: dynamic launch did not occur\n");
 	for (;;)
 		asm volatile("wfi");
 }
