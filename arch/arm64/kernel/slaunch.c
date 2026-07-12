@@ -2339,17 +2339,3 @@ static int __init slaunch_unprotect_memory(void)
 	return 0;
 }
 late_initcall(slaunch_unprotect_memory);
-
-/*
- * Clean up DRTM state before kexec or reboot. Do not call
- * DRTM_SET_ERROR(0): per DEN0113 v1.2 §3.8 its argument is the persisted
- * error code, zero is reserved, and no "clear errors" semantics exists.
- */
-void slaunch_exit(void)
-{
-	if (!sl_dlme_region_pa)
-		return;
-
-	pr_info("slaunch: Cleaning DRTM state before kexec/reboot\n");
-	sl_dlme_region_pa = 0;
-}
