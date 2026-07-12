@@ -34,19 +34,19 @@ extern char sl_entry[];
  * Struct must be packed — passed directly to TF-A via SMC.
  */
 struct sl_drtm_params {
-	u16	revision;
-	u16	reserved;
-	u32	launch_features;
-	u64	dlme_region_address;
-	u64	dlme_region_size;
-	u64	dlme_image_start;
-	u64	dlme_entry_point_offset;
-	u64	dlme_image_size;
-	u64	dlme_data_offset;
-	u64	nw_dce_region_address;
-	u64	nw_dce_region_size;
-	u64	mem_prot_table_address;
-	u64	mem_prot_table_size;
+	__le16	revision;
+	__le16	reserved;
+	__le32	launch_features;
+	__le64	dlme_region_address;
+	__le64	dlme_region_size;
+	__le64	dlme_image_start;
+	__le64	dlme_entry_point_offset;
+	__le64	dlme_image_size;
+	__le64	dlme_data_offset;
+	__le64	nw_dce_region_address;
+	__le64	nw_dce_region_size;
+	__le64	mem_prot_table_address;
+	__le64	mem_prot_table_size;
 } __packed;
 
 static u64 sl_smc_ret(u64 fn, u64 arg1)
@@ -270,23 +270,23 @@ void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 			  SL_DLME_DTB_SLOT_OFFSET) = fdt_addr;
 
 	/* Build DRTM_PARAMETERS */
-	params->revision = DRTM_PARAMS_REVISION;
-	params->reserved = 0;
+	params->revision = cpu_to_le16(DRTM_PARAMS_REVISION);
+	params->reserved = cpu_to_le16(0);
 	/* bits[5:3]=0: complete DMA protection. bit 7: request Secure-interrupt
 	 * disable for the launch window (DEN0113 Table 9); the DLME re-enables
 	 * post-launch via DRTM_ENABLE_SECURE_INTERRUPTS. */
-	params->launch_features = DRTM_LAUNCH_FEAT_MEM_PROT_ALL | DRTM_LAUNCH_FEAT_SEC_INT_DISABLE;
-	params->dlme_region_address = kernel_addr;
-	params->dlme_region_size = dlme_data_offset + sl_dlme_data_reserve;
-	params->dlme_image_start = 0;
-	params->dlme_entry_point_offset = sl_entry_offset;
-	params->dlme_image_size = image_size;
-	params->dlme_data_offset = dlme_data_offset;
-	params->nw_dce_region_address = 0;
-	params->nw_dce_region_size = 0;
+	params->launch_features = cpu_to_le32(DRTM_LAUNCH_FEAT_MEM_PROT_ALL | DRTM_LAUNCH_FEAT_SEC_INT_DISABLE);
+	params->dlme_region_address = cpu_to_le64(kernel_addr);
+	params->dlme_region_size = cpu_to_le64(dlme_data_offset + sl_dlme_data_reserve);
+	params->dlme_image_start = cpu_to_le64(0);
+	params->dlme_entry_point_offset = cpu_to_le64(sl_entry_offset);
+	params->dlme_image_size = cpu_to_le64(image_size);
+	params->dlme_data_offset = cpu_to_le64(dlme_data_offset);
+	params->nw_dce_region_address = cpu_to_le64(0);
+	params->nw_dce_region_size = cpu_to_le64(0);
 	/* Complete DMA protection: table must be zero (DEN0113 v1.2 Table 9). */
-	params->mem_prot_table_address = 0;
-	params->mem_prot_table_size = 0;
+	params->mem_prot_table_address = cpu_to_le64(0);
+	params->mem_prot_table_size = cpu_to_le64(0);
 
 	/*
 	 * Clean to DRAM what the D-CRTM reads after the SMC: the params
