@@ -314,7 +314,7 @@ static void __init slaunch_assert_dma_protection(phys_addr_t dlme_data_pa,
 		panic("slaunch: SMMU lockdown not full-range (num=%u start=0x%llx st=0x%llx; want 1/0/0x%llx); DRTM secure launch requires full DRAM coverage\n",
 		      num, start, st, (u64)DRTM_MEM_PROT_FULL_RANGE);
 
-	early_memunmap(phdr, (size_t)prot_size);
+	early_memunmap((void *)phdr, (size_t)prot_size);
 	pr_info("slaunch: SMMU lockdown verified: full NS-DRAM coverage\n");
 }
 
@@ -484,7 +484,7 @@ void __init slaunch_early_init(void)
 	struct dlme_data_header *hdr;
 	phys_addr_t dlme_data_pa;
 	phys_addr_t dtb_pa;
-	u32 *dtb_hdr;
+	__be32 *dtb_hdr;
 	u32 fdt_magic, fdt_size;
 
 	if (!sl_dlme_region_pa)
@@ -705,7 +705,7 @@ static void __init slaunch_validate_srtm_log(u64 log_pa,
 
 	if (dtb_pa) {
 		/* Read fdt_totalsize from the (already-validated) DTB. */
-		u32 *p = early_memremap(dtb_pa, sizeof(u32) * 2);
+		__be32 *p = early_memremap(dtb_pa, sizeof(u32) * 2);
 
 		if (p) {
 			fdt_size = be32_to_cpu(p[1]);
