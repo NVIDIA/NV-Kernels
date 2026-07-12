@@ -215,18 +215,12 @@ bool efi_slaunch_enabled(const char *cmdline)
 {
 	if (!cmdline)
 		return false;
-	if (!sl_cmdline_token(cmdline, "drtm=on"))
-		return false;
-
 	/*
-	 * drtm=on requires efi=noruntime, else the post-DRTM kernel could
-	 * call unmeasured UEFI runtime services. If missing, skip DRTM.
+	 * A detected DRTM launch forces EFI runtime services off in
+	 * slaunch_setup() (via disable_runtime), so no efi=noruntime token is
+	 * needed here; drtm=on alone requests the launch.
 	 */
-	if (!sl_cmdline_token(cmdline, "efi=noruntime")) {
-		efi_warn("DRTM: drtm=on needs efi=noruntime; skipping DRTM\n");
-		return false;
-	}
-	return true;
+	return sl_cmdline_token(cmdline, "drtm=on");
 }
 
 /*
