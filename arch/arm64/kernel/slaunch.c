@@ -1064,14 +1064,15 @@ void __init slaunch_setup(void)
 	slaunch_tpm_setup();
 
 	/*
-	 * Unconditionally disable EFI runtime services: their pointers come
-	 * from untrusted pre-DRTM firmware. Defense-in-depth backstop to the
-	 * stub's efi=noruntime gate. Clearing EFI_RUNTIME_SERVICES and
-	 * runtime_supported_mask makes all runtime dispatch see "unsupported".
+	 * A detected DRTM launch forces EFI runtime services off: their
+	 * pointers come from untrusted pre-DRTM firmware. efi_disable_runtime()
+	 * sets disable_runtime so arm_enable_runtime_services() never re-enables
+	 * them; the bit/mask clear is defense in depth.
 	 */
+	efi_disable_runtime();
 	clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
 	efi.runtime_supported_mask = 0;
-	pr_info("slaunch: EFI runtime services unconditionally disabled\n");
+	pr_info("slaunch: EFI runtime services disabled (DRTM launch)\n");
 
 	/*
 	 * Validate all untrusted EFI inputs before efi_init() consumes them:
