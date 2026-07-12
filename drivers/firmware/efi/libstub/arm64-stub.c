@@ -43,7 +43,7 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 	 * BSS for D-CRTM to populate (address map, event log, etc.).
 	 */
 	efi_slaunch_get_dlme_data_size();
-	*reserve_size += sl_dlme_data_reserve;
+	*reserve_size += SL_DLME_DTB_SLOT_GAP + sl_dlme_data_reserve;
 #endif
 	*image_addr = (unsigned long)_text;
 
