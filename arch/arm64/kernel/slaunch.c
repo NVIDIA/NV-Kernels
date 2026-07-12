@@ -276,8 +276,8 @@ static bool __init slaunch_parse_address_map(phys_addr_t dlme_data_pa,
 /*
  * Verify D-CRTM published full-range DMA protection (DEN0113 v1.2
  * §4.6.2). Walks the protected_regions sub-region and requires the
- * spec-conformant "single entry, start=0, full-range" encoding; partial
- * lockdown breaks the measure-then-parse soundness model.
+ * spec-conformant "single entry, start=0, full-range" encoding; a partial
+ * map breaks the measure-then-parse soundness model.
  */
 static void __init slaunch_assert_dma_protection(phys_addr_t dlme_data_pa,
 						 u64 hdr_size, u64 prot_size)
@@ -289,7 +289,7 @@ static void __init slaunch_assert_dma_protection(phys_addr_t dlme_data_pa,
 	u64 start, st;
 
 	if (prot_size == 0)
-		panic("slaunch: DCE published empty protected_regions; cannot verify SMMU lockdown\n");
+		panic("slaunch: DCE published empty protected_regions; cannot verify SMMU DMA protection\n");
 	if (prot_size < sizeof(*phdr) + sizeof(*regs))
 		panic("slaunch: protected_regions size %llu too small for 1 entry\n",
 		      prot_size);
@@ -308,14 +308,14 @@ static void __init slaunch_assert_dma_protection(phys_addr_t dlme_data_pa,
 	/*
 	 * Strict spec match (DEN0113 v1.2 §3.15 R314110 + §4.6.2): single
 	 * entry, start=0, size_and_type = DRTM_MEM_PROT_FULL_RANGE. Anything
-	 * else is partial lockdown or non-conformant — fatal.
+	 * else is partial DMA protection or non-conformant — fatal.
 	 */
 	if (num != 1 || start != 0 || st != DRTM_MEM_PROT_FULL_RANGE)
-		panic("slaunch: SMMU lockdown not full-range (num=%u start=0x%llx st=0x%llx; want 1/0/0x%llx); DRTM secure launch requires full DRAM coverage\n",
+		panic("slaunch: SMMU DMA protection not full-range (num=%u start=0x%llx st=0x%llx; want 1/0/0x%llx); DRTM secure launch requires full DRAM coverage\n",
 		      num, start, st, (u64)DRTM_MEM_PROT_FULL_RANGE);
 
 	early_memunmap((void *)phdr, (size_t)prot_size);
-	pr_info("slaunch: SMMU lockdown verified: full NS-DRAM coverage\n");
+	pr_info("slaunch: SMMU DMA protection verified: full NS-DRAM coverage\n");
 }
 
 /*
@@ -1034,7 +1034,7 @@ void __init slaunch_setup(void)
 	dlme_data_pa = sl_dlme_region_pa + sl_dlme_data_offset;
 	hdr = early_memremap(dlme_data_pa, sizeof(*hdr));
 	/* The header locates the protected-regions table and event log that
-	 * the full-lockdown assertion and locality close below need; fail
+	 * the DMA-protection assertion and locality close below need; fail
 	 * closed if it cannot be mapped rather than boot on with them skipped. */
 	if (!hdr)
 		panic("slaunch: failed to map DLME data header at 0x%llx\n",
@@ -1047,7 +1047,7 @@ void __init slaunch_setup(void)
 	pr_info("slaunch: Event log size: %llu\n",
 		le64_to_cpu(hdr->drtm_event_log_size));
 
-	/* Enforce full-lockdown assumption per DEN0113 v1.2 §4.6.2.
+	/* Enforce full-range DMA-protection assumption per DEN0113 v1.2 §4.6.2.
 	 * Called from slaunch_setup (not slaunch_early_init) so panic
 	 * prints — earlycon is registered by this point.
 	 */
