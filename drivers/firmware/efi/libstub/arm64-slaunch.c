@@ -302,8 +302,12 @@ void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 	 */
 	sl_smc(SL_DRTM_SMC_DYNAMIC_LAUNCH, (u64)params);
 
-	/* If we reach here, the SMC failed. Halt. */
-	efi_err("DRTM: dynamic launch did not occur\n");
+	/*
+	 * The launch SMC returns only on failure (success ERETs to sl_entry).
+	 * Boot services are gone here, so we cannot print; the pre-EBS notice
+	 * in efi_boot_kernel() flagged that reaching this halt means the
+	 * dynamic launch failed.
+	 */
 	for (;;)
 		asm volatile("wfi");
 }
