@@ -56,39 +56,19 @@
 
 #ifndef __ASSEMBLY__
 /*
- * DRTM_PARAMETERS (DEN0113 v1.2 §3.13, Table 9)
- * Passed to DRTM_DYNAMIC_LAUNCH SMC in X1.
- */
-struct drtm_parameters {
-	u16	revision;
-	u16	reserved;
-	u32	launch_features;
-	u64	dlme_region_address;
-	u64	dlme_region_size;
-	u64	dlme_image_start;
-	u64	dlme_entry_point_offset;
-	u64	dlme_image_size;
-	u64	dlme_data_offset;
-	u64	nw_dce_region_address;
-	u64	nw_dce_region_size;
-	u64	mem_prot_table_address;
-	u64	mem_prot_table_size;
-} __packed;
-
-/*
  * Memory Region Descriptor Table (DEN0113 v1.2 §3.14, Table 11): header
  * followed by num_regions descriptors, consumed in place from the DLME
  * data region (no fixed-size copy, no region-count cap).
  */
 struct drtm_mem_region_hdr {
-	u16	revision;
-	u16	reserved;
-	u32	num_regions;
+	__le16	revision;
+	__le16	reserved;
+	__le32	num_regions;
 } __packed;
 
 struct drtm_mem_region {
-	u64	start_address;
-	u64	size_and_type;
+	__le64	start_address;
+	__le64	size_and_type;
 } __packed;
 
 /*
