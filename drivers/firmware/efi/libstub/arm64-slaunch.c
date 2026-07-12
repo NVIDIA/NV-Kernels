@@ -259,7 +259,7 @@ void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 	 */
 	image_size = (unsigned long)(_edata - _text);
 	kernel_memsize = (unsigned long)(_end - _text);
-	dlme_data_offset = SL_ROUND_UP_PAGE(kernel_memsize);
+	dlme_data_offset = SL_ROUND_UP_PAGE(kernel_memsize) + SL_DLME_DTB_SLOT_GAP;
 
 	/*
 	 * Write DTB PA into the Preamble->DLME slot at (kernel_addr +
