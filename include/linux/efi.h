@@ -1146,8 +1146,10 @@ static inline bool efi_capsule_pending(int *reset_type) { return false; }
 
 #ifdef CONFIG_EFI
 extern bool efi_runtime_disabled(void);
+void efi_disable_runtime(void);
 #else
 static inline bool efi_runtime_disabled(void) { return true; }
+static inline void efi_disable_runtime(void) { }
 #endif
 
 extern void efi_call_virt_check_flags(unsigned long flags, const void *caller);
