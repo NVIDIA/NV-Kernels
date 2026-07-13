@@ -128,10 +128,15 @@ efi_status_t efi_kaslr_relocate_kernel(unsigned long *image_addr,
 		if (!check_image_region(*image_addr, kernel_memsize)) {
 			efi_err("FIRMWARE BUG: Image BSS overlaps adjacent EFI memory region\n");
 		} else if (IS_ALIGNED(*image_addr, min_kimg_align) &&
-			   (unsigned long)_end < EFI_ALLOC_LIMIT) {
+			   (unsigned long)_end < EFI_ALLOC_LIMIT &&
+			   *reserve_size == kernel_memsize) {
 			/*
 			 * Just execute from wherever we were loaded by the
-			 * UEFI PE/COFF loader if the placement is suitable.
+			 * UEFI PE/COFF loader if the placement is suitable
+			 * and nothing beyond the image is reserved: a tail
+			 * (e.g. DRTM DLME data) lies beyond PE SizeOfImage,
+			 * and LoadedImage does not expose the backing
+			 * allocation extent, so relocate to allocate it.
 			 */
 			*reserve_size = 0;
 			return EFI_SUCCESS;
