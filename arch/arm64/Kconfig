@@ -2438,7 +2438,9 @@ config ARM64_SECURE_LAUNCH
 	  The EFI stub triggers DRTM_DYNAMIC_LAUNCH after ExitBootServices
 	  when "drtm=on" is on the kernel command line. D-CRTM measures the
 	  kernel and returns control. The kernel then parses DLME data and
-	  manages DRTM SMC calls during boot.
+	  manages DRTM SMC calls during boot. Booting with drtm=on requires
+	  firmware with an EL3 DRTM monitor; without drtm=on the kernel
+	  boots normally and issues no DRTM calls.
 
 	  If unsure, say N.
 
