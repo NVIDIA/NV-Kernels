@@ -349,21 +349,20 @@ SECTIONS
 	 * so the DRTM measurement bounds [_text, _edata) never cover
 	 * stub-mutable data; __pecoff_data_rawsize is computed past
 	 * __efistub_end. Stub text/rodata stay in PE .text (buckets above).
+	 * The section is padded to a page so [__efistub_start, __efistub_end)
+	 * owns its tail page exclusively and free_initmem() can free and
+	 * unmap it on any page size; PAGE_SIZE is a multiple of the PE
+	 * FileAlignment (0x200), so no separate PE padding is needed, and
+	 * the zero fill is PROGBITS so `objcopy -O binary` writes the bytes.
 	 */
 	. = ALIGN(PAGE_SIZE);
 	__efistub_start = .;
 	.efistub : ALIGN(PAGE_SIZE) {
 		*(.efistub.data  .efistub.data.*)
 		*(.efistub.bss   .efistub.bss.*)
+		. = ALIGN(PAGE_SIZE);
 	}
 	__efistub_end = .;
-
-	/*
-	 * Materialize the trailing PE/COFF FileAlignment padding as a real
-	 * PROGBITS section so `objcopy -O binary` writes the bytes; else the
-	 * PE rawsize claims more than the file holds and the loader rejects it.
-	 */
-	.efistub_pad : { BYTE(0); . = ALIGN(PECOFF_FILE_ALIGNMENT); }
 	__pecoff_data_rawsize = ABSOLUTE(. - __initdata_begin);
 
 	/* start of zero-init region */
@@ -446,3 +445,12 @@ ASSERT(KEXEC_CONTROL_PAGE_SIZE >= SZ_4K, "KEXEC_CONTROL_PAGE_SIZE is broken")
 ASSERT(__relocate_new_kernel_start == arm64_relocate_new_kernel,
        "kexec control page does not start with arm64_relocate_new_kernel")
 #endif
+
+/*
+ * The EFI stub's writable statics are freed and unmapped after init; both
+ * boundaries must be page-aligned so the reclaim covers whole pages only.
+ */
+ASSERT((__efistub_start & (PAGE_SIZE - 1)) == 0,
+       "__efistub_start is not page aligned")
+ASSERT((__efistub_end & (PAGE_SIZE - 1)) == 0,
+       "__efistub_end is not page aligned")
