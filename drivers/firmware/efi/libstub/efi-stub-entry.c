@@ -67,6 +67,11 @@ efi_status_t __efiapi efi_pe_entry(efi_handle_t handle,
 	if (status != EFI_SUCCESS)
 		return status;
 
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+	/* Record the canonical command line for the DRTM launch gates. */
+	efi_slaunch_set_cmdline(cmdline_ptr);
+#endif
+
 	efi_info("Booting Linux Kernel...\n");
 
 	status = handle_kernel_image(&image_addr, &image_size,

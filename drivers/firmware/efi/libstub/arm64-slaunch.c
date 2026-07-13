@@ -223,6 +223,29 @@ bool efi_slaunch_enabled(const char *cmdline)
 	return sl_cmdline_token(cmdline, "drtm=on");
 }
 
+/* Canonical converted command line, recorded once by the stub entry. */
+static const char *sl_cmdline;
+
+/*
+ * Record the stub's canonical converted command line for the DRTM gates.
+ * Reusing it avoids a second efi_convert_cmdline(), which would measure
+ * the EFI LoadOptions a second time (duplicate PCR 9 event).
+ */
+void efi_slaunch_set_cmdline(const char *cmdline)
+{
+	sl_cmdline = cmdline;
+}
+
+/*
+ * True iff the recorded command line requests a DRTM launch. Gates the
+ * DRTM_FEATURES probe: an SMC faults on a platform with no EL3 monitor,
+ * so it must not be issued on boots that never asked for a launch.
+ */
+bool efi_slaunch_requested(void)
+{
+	return efi_slaunch_enabled(sl_cmdline);
+}
+
 /*
  * TF-A requires DRTM_PARAMETERS to be 4KB-aligned; we are past
  * ExitBootServices so cannot allocate — use a static buffer.

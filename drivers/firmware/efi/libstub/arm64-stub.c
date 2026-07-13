@@ -40,10 +40,16 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 #ifdef CONFIG_ARM64_SECURE_LAUNCH
 	/*
 	 * Reserve DLME data space (size from DRTM_FEATURES) after kernel
-	 * BSS for D-CRTM to populate (address map, event log, etc.).
+	 * BSS for D-CRTM to populate (address map, event log, etc.). Probe
+	 * and reserve only when the command line requests a launch: the
+	 * DRTM_FEATURES SMC would fault on a platform with no EL3 monitor.
 	 */
-	efi_slaunch_get_dlme_data_size();
-	*reserve_size += SL_DLME_DTB_SLOT_GAP + sl_dlme_data_reserve;
+	if (efi_slaunch_requested()) {
+		efi_slaunch_get_dlme_data_size();
+		if (sl_drtm_available)
+			*reserve_size += SL_DLME_DTB_SLOT_GAP +
+					 sl_dlme_data_reserve;
+	}
 #endif
 	*image_addr = (unsigned long)_text;
 
