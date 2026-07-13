@@ -396,6 +396,21 @@ void free_initmem(void)
 	 * is not supported by kallsyms.
 	 */
 	vunmap_range((u64)__init_begin, (u64)__init_end);
+
+	if (__efistub_start != __efistub_end) {
+		void *lm_begin = lm_alias(__efistub_start);
+		void *lm_end = lm_alias(__efistub_end);
+
+		/*
+		 * EFI-stub writable statics: dead after boot; freed and
+		 * unmapped like initmem (the .efistub layout exists for all
+		 * arm64 EFI builds).
+		 */
+		memblock_free(lm_begin, lm_end - lm_begin);
+		free_reserved_area(lm_begin, lm_end,
+				   POISON_FREE_INITMEM, "unused efistub");
+		vunmap_range((u64)__efistub_start, (u64)__efistub_end);
+	}
 }
 
 void dump_mem_limit(void)
