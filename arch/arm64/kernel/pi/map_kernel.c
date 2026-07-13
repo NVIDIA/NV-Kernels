@@ -43,6 +43,10 @@ static void __init map_kernel(u64 kaslr_offset, u64 va_offset, int root_level)
 	phys_addr_t pgdp = (phys_addr_t)init_pg_dir + PAGE_SIZE;
 	pgprot_t text_prot = PAGE_KERNEL_ROX;
 	pgprot_t data_prot = PAGE_KERNEL;
+	void *efistub_start = IS_ENABLED(CONFIG_EFI) ? (void *)__efistub_start
+						     : (void *)_end;
+	void *efistub_end = IS_ENABLED(CONFIG_EFI) ? (void *)__efistub_end
+						   : (void *)_end;
 	pgprot_t prot;
 
 	/*
@@ -92,8 +96,19 @@ static void __init map_kernel(u64 kaslr_offset, u64 va_offset, int root_level)
 		    __inittext_end, prot, false, root_level);
 	map_segment(init_pg_dir, &pgdp, va_offset, __initdata_begin,
 		    __initdata_end, data_prot, false, root_level);
-	map_segment(init_pg_dir, &pgdp, va_offset, _data, _end, data_prot,
-		    true, root_level);
+	/*
+	 * Map the EFI stub's writable statics (the page-aligned .efistub
+	 * section) as their own segment, without contiguous PTEs, so that no
+	 * block or contiguous mapping straddles a reclaim boundary and
+	 * free_initmem() can unmap [__efistub_start, __efistub_end) at page
+	 * granularity.
+	 */
+	map_segment(init_pg_dir, &pgdp, va_offset, _data, efistub_start,
+		    data_prot, true, root_level);
+	map_segment(init_pg_dir, &pgdp, va_offset, efistub_start, efistub_end,
+		    data_prot, false, root_level);
+	map_segment(init_pg_dir, &pgdp, va_offset, efistub_end, _end,
+		    data_prot, true, root_level);
 	dsb(ishst);
 
 	idmap_cpu_replace_ttbr1((phys_addr_t)init_pg_dir);
