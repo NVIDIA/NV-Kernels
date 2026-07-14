@@ -343,6 +343,7 @@ static int bcmasp_get_eee(struct net_device *dev, struct ethtool_eee *e)
 		return -ENODEV;
 
 	e->tx_lpi_enabled = p->tx_lpi_enabled;
+	e->tx_lpi_timer = umac_rl(intf, UMC_EEE_LPI_TIMER);
 
 	return phy_ethtool_get_eee(dev->phydev, e);
 }
@@ -366,6 +367,7 @@ static int bcmasp_set_eee(struct net_device *dev, struct ethtool_eee *e)
 			return ret;
 		}
 
+		umac_wl(intf, e->tx_lpi_timer, UMC_EEE_LPI_TIMER);
 		intf->eee.tx_lpi_enabled = e->tx_lpi_enabled;
 		bcmasp_eee_enable_set(intf, true);
 	}
