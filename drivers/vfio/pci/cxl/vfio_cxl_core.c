@@ -523,10 +523,6 @@ void vfio_pci_cxl_detect_and_init(struct vfio_pci_core_device *vdev)
 	u16 dvsec;
 	int ret;
 
-	/* Honor the user opt-out decision */
-	if (vdev->disable_cxl)
-		return;
-
 	if (!pcie_is_cxl(pdev))
 		return;
 
