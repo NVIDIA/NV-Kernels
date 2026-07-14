@@ -13,7 +13,6 @@
 #include <linux/io.h>
 #include <linux/range.h>
 #include <cxl/cxl.h>
-#include <cxl/pci.h>
 
 extern const struct nvdimm_security_ops *cxl_security_ops;
 
