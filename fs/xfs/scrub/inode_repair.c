@@ -570,7 +570,7 @@ xrep_dinode_bad_bmbt_fork(
 
 	if (nrecs == 0 || XFS_BMDR_SPACE_CALC(nrecs) > dfork_size)
 		return true;
-	if (level == 0 || level >= XFS_BM_MAXLEVELS(sc->mp, whichfork))
+	if (level == 0 || level > XFS_BM_MAXLEVELS(sc->mp, whichfork))
 		return true;
 
 	dmxr = xfs_bmdr_maxrecs(dfork_size, 0);
