@@ -925,6 +925,8 @@ static void show_rdt_iommu(struct rdtgroup *r, struct seq_file *s)
 
 		if (iommu_matches_rdtgroup(group, r))
 			seq_printf(s, "iommu_group:%s\n", group_kobj->name);
+
+		iommu_group_put(group);
 	}
 
 	kset_put(iommu_groups);
@@ -3376,12 +3378,14 @@ static int rdt_move_group_iommus(struct rdtgroup *from, struct rdtgroup *to)
 
 		if (!from || iommu_matches_rdtgroup(group, from)) {
 			err = kstrtoint(group_kobj->name, 0, &iommu_group_id);
-			if (err)
-				break;
+			if (!err)
+				err = rdtgroup_move_iommu(iommu_group_id, to);
+		}
 
-			err = rdtgroup_move_iommu(iommu_group_id, to);
-			if (err)
-				break;
+		iommu_group_put(group);
+		if (err) {
+			kobject_put(group_kobj);
+			break;
 		}
 	}
 
