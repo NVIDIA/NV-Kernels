@@ -2482,6 +2482,24 @@ config ARM64_SECURE_LAUNCH_FAULT_INJECT
 
 	  If unsure, say N.
 
+config ARM64_SECURE_LAUNCH_KASLR
+	bool "ARM64 DRTM trusted linear-map KASLR"
+	depends on ARM64_SECURE_LAUNCH && RANDOMIZE_BASE
+	depends on !MEMORY_HOTPLUG
+	default n
+	help
+	  After a DRTM Secure Launch, re-randomize the kernel linear
+	  (direct) map from the CPU's FEAT_RNG instead of leaving it at a
+	  fixed offset. The randomization slack is measured against present
+	  DRAM only, with no reservation for memory hotplug, so it works
+	  even when the CPU PArange equals the virtual address size.
+
+	  Fail-closed: if the CPU lacks FEAT_RNG (RNDR) the kernel panics
+	  rather than booting with a predictable linear map. Requires memory
+	  hotplug to be disabled.
+
+	  If unsure, say N.
+
 config COMPRESSED_INSTALL
 	bool "Install compressed image by default"
 	help
