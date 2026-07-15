@@ -781,7 +781,17 @@ static void rxrpc_input_soft_acks(struct rxrpc_call *call,
 	struct rxrpc_skb_priv *sp = rxrpc_skb(skb);
 	unsigned int i, old_nacks = 0;
 	rxrpc_seq_t lowest_nak = seq + sp->nr_acks;
-	u8 *acks = skb->data + sizeof(struct rxrpc_wire_header) + sizeof(struct rxrpc_ackpacket);
+	u8 sack[256] __aligned(sizeof(unsigned long));
+	u8 *acks = sack;
+
+	/* Extract the SACK table into a flat, aligned buffer so that we don't
+	 * access the possibly-nonlinear skbuff directly.
+	 */
+	memset(sack, 0, sizeof(sack));
+	if (skb_copy_bits(skb,
+			  sizeof(struct rxrpc_wire_header) + sizeof(struct rxrpc_ackpacket),
+			  sack, sp->nr_acks) < 0)
+		return;
 
 	for (i = 0; i < sp->nr_acks; i++) {
 		if (acks[i] == RXRPC_ACK_TYPE_ACK) {
@@ -943,9 +953,6 @@ static void rxrpc_input_ack(struct rxrpc_call *call, struct sk_buff *skb)
 	if (skb->len >= ioffset + sizeof(trailer) &&
 	    skb_copy_bits(skb, ioffset, &trailer, sizeof(trailer)) < 0)
 		return rxrpc_proto_abort(call, 0, rxrpc_badmsg_short_ack_trailer);
-
-	if (nr_acks > 0)
-		skb_condense(skb);
 
 	if (call->cong_last_nack) {
 		since = rxrpc_input_check_prev_ack(call, &summary, first_soft_ack);
