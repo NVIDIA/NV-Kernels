@@ -2016,8 +2016,8 @@ static int mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 static int mpam_restore_mbwu_state(void *_ris)
 {
 	int i;
-	u64 val;
-	struct mon_read mwbu_arg;
+	u64 val = 0;
+	struct mon_read mwbu_arg = {};
 	struct mpam_msc_ris *ris = _ris;
 	struct mpam_class *class = ris->vmsc->comp->class;
 
