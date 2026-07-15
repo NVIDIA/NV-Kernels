@@ -4135,6 +4135,7 @@ enum {
 	ALC245_FIXUP_CS35L41_I2C_2_MUTE_LED,
 	ALC236_FIXUP_HP_DMIC,
 	ALC245_FIXUP_HP_ENVY_X360_15_FH0XXX,
+	ALC236_FIXUP_DELL_HP_POP_NOISE,
 };
 
 /* A special fixup for Lenovo C940 and Yoga Duet 7;
@@ -6700,7 +6701,11 @@ static const struct hda_fixup alc269_fixups[] = {
 		.v.func = cs35l41_fixup_i2c_two,
 		.chained = true,
 		.chain_id = ALC245_FIXUP_HP_X360_MUTE_LEDS
-	}
+	},
+	[ALC236_FIXUP_DELL_HP_POP_NOISE] = {
+		.type = HDA_FIXUP_FUNC,
+		.v.func = alc285_fixup_invalidate_dacs,
+	},
 };
 
 static const struct hda_quirk alc269_fixup_tbl[] = {
@@ -6847,6 +6852,8 @@ static const struct hda_quirk alc269_fixup_tbl[] = {
 	SND_PCI_QUIRK(0x1028, 0x0cc3, "Dell Oasis 14 Low Weight MTL-U", ALC289_FIXUP_DELL_CS35L41_SPI_2),
 	SND_PCI_QUIRK(0x1028, 0x0cc4, "Dell Oasis 16 MTL-H/U", ALC289_FIXUP_DELL_CS35L41_SPI_2),
 	SND_PCI_QUIRK(0x1028, 0x0cc5, "Dell Oasis 14", ALC289_FIXUP_RTK_AMP_DUAL_SPK),
+	SND_PCI_QUIRK(0x1028, 0x0e6b, "Dell Pro QCM1255", ALC236_FIXUP_DELL_HP_POP_NOISE),
+	SND_PCI_QUIRK(0x1028, 0x0e6d, "Dell Pro Micro QCM1255", ALC236_FIXUP_DELL_HP_POP_NOISE),
 	SND_PCI_QUIRK(0x1028, 0x164a, "Dell", ALC293_FIXUP_DELL1_MIC_NO_PRESENCE),
 	SND_PCI_QUIRK(0x1028, 0x164b, "Dell", ALC293_FIXUP_DELL1_MIC_NO_PRESENCE),
 	SND_PCI_QUIRK(0x103c, 0x1586, "HP", ALC269_FIXUP_HP_MUTE_LED_MIC2),
