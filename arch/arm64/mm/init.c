@@ -40,6 +40,8 @@
 #include <asm/kernel-pgtable.h>
 #include <asm/kvm_host.h>
 #include <asm/memory.h>
+#include <linux/arm-smccc.h>
+#include <asm/drtm.h>
 #include <asm/numa.h>
 #include <asm/rsi.h>
 #include <asm/sections.h>
@@ -232,6 +234,43 @@ void __init arm64_memblock_init(void)
 		memstart_addr = round_up(memblock_end_of_DRAM() - linear_region_size,
 					 ARM64_MEMSTART_ALIGN);
 		memblock_remove(0, memstart_addr);
+	}
+
+	/*
+	 * DRTM: re-randomize the linear map from a trusted RNG.
+	 * Coverage is bounded to present DRAM (memblock span) -- no hotplug
+	 * reservation -- so the slack is (linear_region - span). The seed
+	 * comes from the PSC-backed firmware TRNG, never the attacker-visible
+	 * FDT seed; fail closed if no trusted entropy is available.
+	 */
+	if (IS_ENABLED(CONFIG_ARM64_SECURE_LAUNCH_KASLR) && slaunch_active()) {
+		s64 range = linear_region_size -
+			    (memblock_end_of_DRAM() - memblock_start_of_DRAM());
+		struct arm_smccc_res res;
+		unsigned long seed;
+		u64 nslots;
+		int tries;
+
+		if (range < (s64)ARM64_MEMSTART_ALIGN)
+			panic("DRTM KASLR: linear region too small to randomize\n");
+		/*
+		 * Seed from the PSC-backed firmware TRNG (SMCCC TRNG_RND64),
+		 * not CPU RNDR: RNDR is not exposed to NS on all DRTM
+		 * platforms, but EL3 is (a Secure Launch arrives via SMC).
+		 * Call the SMC directly -- the conduit predates the generic
+		 * SMCCC probe. Retry a transiently empty pool; fail closed.
+		 */
+		for (tries = 0; tries < 10; tries++) {
+			arm_smccc_smc(ARM_SMCCC_TRNG_RND64, 64, 0, 0, 0, 0, 0, 0, &res);
+			if ((int)res.a0 == SMCCC_RET_SUCCESS)
+				break;
+		}
+		if ((int)res.a0 != SMCCC_RET_SUCCESS)
+			panic("DRTM KASLR: firmware TRNG unavailable, refusing weak KASLR\n");
+		seed = res.a3;	/* 64 bits requested -> entropy in X3 */
+
+		nslots = (u64)range / ARM64_MEMSTART_ALIGN;
+		memstart_addr -= ARM64_MEMSTART_ALIGN * (seed % nslots);
 	}
 
 	/*
