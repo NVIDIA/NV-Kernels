@@ -794,6 +794,43 @@ void vfio_cxl_prepare_reset(struct vfio_pci_core_device *vdev)
 }
 
 /*
+ * vfio_cxl_borrow_memory_space - turn Memory Space on for the component
+ * register reads, reporting whether it has to be put back.
+ *
+ * The reset path saves and restores PCI config around the reset, so a guest
+ * that cleared PCI_COMMAND Memory Space beforehand gets it back disabled.
+ * Reading a BAR in that state produces an Unsupported Request completion;
+ * on platforms that promote UR to a fatal error this fires DPC.
+ *
+ * Borrow it rather than keep it: vfio tracks Memory Space in vconfig while
+ * the guest reads it from hardware, so leaving it enabled would make
+ * __vfio_pci_memory_enabled() disagree with what the guest sees.  Mirrors
+ * cxl_hdm_enable_mem().
+ */
+static int vfio_cxl_borrow_memory_space(struct vfio_pci_core_device *vdev,
+					u16 *cmd, bool *restore)
+{
+	int rc;
+
+	*restore = false;
+
+	rc = pci_read_config_word(vdev->pdev, PCI_COMMAND, cmd);
+	if (rc)
+		return pcibios_err_to_errno(rc);
+
+	if (*cmd & PCI_COMMAND_MEMORY)
+		return 0;
+
+	rc = pci_write_config_word(vdev->pdev, PCI_COMMAND,
+				   *cmd | PCI_COMMAND_MEMORY);
+	if (rc)
+		return pcibios_err_to_errno(rc);
+
+	*restore = true;
+	return 0;
+}
+
+/*
  * vfio_cxl_finish_reset - Re-enable DPA region after reset.
  *
  * Must be called with vdev->memory_lock held for writing.  Re-reads the
@@ -803,17 +840,27 @@ void vfio_cxl_prepare_reset(struct vfio_pci_core_device *vdev)
 void vfio_cxl_finish_reset(struct vfio_pci_core_device *vdev)
 {
 	struct vfio_pci_cxl_state *cxl = vdev->cxl;
+	bool restore_command;
+	u16 command;
 
 	lockdep_assert_held_write(&vdev->memory_lock);
 
 	if (!cxl)
 		return;
+
+	/* Without Memory Space the snapshot below reads all ones. */
+	if (vfio_cxl_borrow_memory_space(vdev, &command, &restore_command))
+		return;
+
 	/*
 	 * Re-initialise the emulated HDM comp_reg_virt[] from hardware.
 	 * A reset clears decoder registers; mirror that in the emulated
 	 * state so the guest device manager sees the post-reset hardware.
 	 */
 	vfio_cxl_reinit_comp_regs(cxl);
+
+	if (restore_command)
+		pci_write_config_word(vdev->pdev, PCI_COMMAND, command);
 
 	/*
 	 * Only re-enable the DPA mmap if the hardware has actually
