@@ -107,6 +107,102 @@ static void cxl_dvsec_status_write(struct vfio_pci_core_device *vdev,
 	dvsec_virt_write16(vdev, CXL_DVSEC_STATUS_OFFSET, new_val);
 }
 
+/**
+ * vfio_cxl_reset - Service a guest CXL protocol reset.
+ * @vdev: VFIO PCI core device
+ *
+ * No host memory offlining is performed: the DPA region is guest memory,
+ * not host RAM.
+ *
+ * memory_lock is held for the entire sequence so neither BAR nor DPA
+ * mappings can fault back in. INIT_CXL_RST is not forwarded to hardware;
+ * cxl_reset_dvsec_sequence() drives the state machine directly.
+ *
+ * STATUS2 outcome bits are written back to vconfig on return so that the
+ * guest can poll for completion without going to hardware.
+ *
+ * Return: 0 on success, negative error code on failure.
+ */
+static int vfio_cxl_reset(struct vfio_pci_core_device *vdev)
+{
+	struct vfio_pci_cxl_state *cxl = vdev->cxl;
+	struct pci_dev *pdev = vdev->pdev;
+	u16 dvsec = _cxlds_get_dvsec(cxl);
+	u16 hw_status2 = 0;
+	int ret;
+
+	vfio_pci_zap_and_down_write_memory_lock(vdev);
+	vfio_pci_dma_buf_move(vdev, true);
+
+	/*
+	 * CXL r4.0 Table 8-9: device must clear CXL_Reset_Complete before
+	 * starting the reset flow, on the 0->1 transition of Initiate_CXL_Reset.
+	 * Clear both reset outcome bits so a polling guest sees an unambiguous
+	 * in-progress state rather than a stale result from a prior attempt.
+	 */
+	{
+		u16 s = dvsec_virt_read16(vdev, CXL_DVSEC_STATUS2_OFFSET);
+
+		s &= ~(CXL_DVSEC_STATUS2_CXL_RESET_COMPLETE |
+		       CXL_DVSEC_STATUS2_CXL_RESET_ERROR);
+		dvsec_virt_write16(vdev, CXL_DVSEC_STATUS2_OFFSET, s);
+	}
+
+	vfio_cxl_prepare_reset(vdev);
+
+	/*
+	 * cxl_reset_dvsec_sequence() runs the DVSEC reset and HDM decoder
+	 * restore under the CXL core locks.  A CXL reset can clear config like
+	 * an FLR, so wake the device, save config and drop Bus Master for the
+	 * reset window, mirroring pci_dev_save_and_disable().  The decoder
+	 * restore does MMIO, which reads all ones in D3hot and would then look
+	 * like a locked committed decoder.  pci_restore_state() puts config
+	 * back after a successful reset and restore, so the function masters the
+	 * bus again only once the decoders are restored.
+	 */
+	vfio_pci_set_power_state(vdev, PCI_D0);
+	pci_save_state(pdev);
+	pci_clear_master(pdev);
+	ret = cxl_reset_dvsec_sequence(pdev,
+				       !!(dvsec_virt_read16(vdev,
+					    CXL_DVSEC_CONTROL2_OFFSET) &
+					  CXL_DVSEC_CTRL2_CXL_RESET_MEM_CLR_ENABLE));
+	pci_restore_state(pdev);
+	if (ret && ret != -EAGAIN) {
+		/*
+		 * The reset ran but a step failed, typically HDM restore. Keep
+		 * the function off the bus so it cannot DMA over decoders that
+		 * were not restored; the DPA region stays inactive because the
+		 * decoder is not committed. -EAGAIN means the reset never ran
+		 * (device lock contended), so the device is left intact to retry.
+		 */
+		pci_clear_master(pdev);
+	}
+
+	vfio_cxl_finish_reset(vdev);
+
+	/*
+	 * Re-read STATUS2 from hardware after the reset.  STATUS2 is not part
+	 * of any config save or restore, so the value here is fresh post-reset
+	 * (both outcome bits clear) and reflects genuine hardware changes such
+	 * as VOLATILE_HDM_PRES_ERROR clearing.  Stamp the new outcome on top.
+	 */
+	pci_read_config_word(pdev, dvsec + CXL_DVSEC_STATUS2_OFFSET,
+			     &hw_status2);
+	hw_status2 &= ~(CXL_DVSEC_STATUS2_CXL_RESET_COMPLETE |
+			CXL_DVSEC_STATUS2_CXL_RESET_ERROR);
+	if (ret)
+		hw_status2 |= CXL_DVSEC_STATUS2_CXL_RESET_ERROR;
+	else
+		hw_status2 |= CXL_DVSEC_STATUS2_CXL_RESET_COMPLETE;
+	dvsec_virt_write16(vdev, CXL_DVSEC_STATUS2_OFFSET, hw_status2);
+
+	if (__vfio_pci_memory_enabled(vdev))
+		vfio_pci_dma_buf_move(vdev, false);
+	up_write(&vdev->memory_lock);
+	return ret;
+}
+
 static void cxl_dvsec_control2_write(struct vfio_pci_core_device *vdev,
 				     u16 new_val)
 {
@@ -115,6 +211,7 @@ static void cxl_dvsec_control2_write(struct vfio_pci_core_device *vdev,
 	u16 abs_off = dvsec + CXL_DVSEC_CONTROL2_OFFSET;
 	u16 cap2 = dvsec_virt_read16(vdev, CXL_DVSEC_CAPABILITY2_OFFSET);
 	u16 cap3 = dvsec_virt_read16(vdev, CXL_DVSEC_CAPABILITY3_OFFSET);
+	u16 cur_val = dvsec_virt_read16(vdev, CXL_DVSEC_CONTROL2_OFFSET);
 	u16 rev_mask = CXL_CTRL2_RESERVED_MASK;
 
 	if (!(cap3 & CXL_DVSEC_CAP3_VOLATILE_HDM_CONFIGURABILITY))
@@ -125,13 +222,15 @@ static void cxl_dvsec_control2_write(struct vfio_pci_core_device *vdev,
 	new_val &= ~rev_mask;
 
 	/*
-	 * Cache WBI: forward to hardware.  cxl_dev_reset() programs
-	 * Disable_Caching first and then initiates Cache WBI with that bit
-	 * still set; replicate that ordering for VMM-delegated WBI by carrying
-	 * the just-written Disable_Caching value into the same hardware write.
-	 * new_val is the post-merge 16-bit shadow value, so it already reflects
-	 * a prior shadow-only Disable_Caching=1 followed by a WBI-only write.
+	 * Disable_Caching needs its own write: a device that sees it assert in
+	 * the same write as Cache WBI does not act on the WBI.  Forward the
+	 * 1->0 transition too, or caching stays disabled in hardware.
 	 */
+	if ((new_val ^ cur_val) & CXL_DVSEC_CTRL2_DISABLE_CACHING)
+		pci_write_config_word(pdev, abs_off,
+				      new_val & CXL_DVSEC_CTRL2_DISABLE_CACHING);
+
+	/* Cache WBI: separate write, with Disable_Caching held asserted */
 	if (new_val & CXL_DVSEC_CTRL2_INITIATE_CACHE_WBI) {
 		u16 hw_val = CXL_DVSEC_CTRL2_INITIATE_CACHE_WBI;
 
@@ -141,14 +240,31 @@ static void cxl_dvsec_control2_write(struct vfio_pci_core_device *vdev,
 	}
 
 	/*
-	 * CXL Reset: not yet supported - do not forward to HW.
-	 * TODO: invoke CXL protocol reset via cxl subsystem
+	 * Commit the new CONTROL2 value to the shadow before triggering a
+	 * reset.  vfio_cxl_reset() reads Mem_Clr_Enable (bit 3) from the
+	 * shadow; if the shadow is written after the reset call, a guest write
+	 * that changes bit 3 in the same access as INITIATE_CXL_RESET would
+	 * reset with the stale bit 3 value instead of the one just written.
 	 */
-	if (new_val & CXL_DVSEC_CTRL2_INITIATE_CXL_RESET)
-		pci_warn(pdev, "vfio-cxl: CXL reset requested but not yet supported\n");
-
 	dvsec_virt_write16(vdev, CXL_DVSEC_CONTROL2_OFFSET,
 			   new_val & ~CXL_CTRL2_HW_BITS_MASK);
+
+	/*
+	 * INIT_CXL_RST: not forwarded to hardware. cxl_reset_dvsec_sequence()
+	 * drives the state machine; forwarding it after the reset would fire a
+	 * second one. Drop writes on non-RST_CAPABLE devices silently; the
+	 * spec reserves the bit there and logging every write is just noise.
+	 */
+	if (new_val & CXL_DVSEC_CTRL2_INITIATE_CXL_RESET) {
+		if (vfio_cxl_reset_capable(vdev)) {
+			int rc = vfio_cxl_reset(vdev);
+
+			if (rc)
+				pci_warn(pdev,
+					 "vfio-cxl: CXL reset failed (%d)\n",
+					 rc);
+		}
+	}
 }
 
 static void cxl_dvsec_status2_write(struct vfio_pci_core_device *vdev,
