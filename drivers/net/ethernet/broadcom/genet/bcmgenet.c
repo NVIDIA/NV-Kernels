@@ -3520,32 +3520,25 @@ static void bcmgenet_dump_tx_queue(struct bcmgenet_tx_ring *ring)
 static void bcmgenet_timeout(struct net_device *dev, unsigned int txqueue)
 {
 	struct bcmgenet_priv *priv = netdev_priv(dev);
-	u32 int0_enable = 0;
-	u32 int1_enable = 0;
-	unsigned int q;
+	unsigned int index = txqueue ? txqueue - 1 : DESC_INDEX;
+	struct bcmgenet_tx_ring *ring = &priv->tx_rings[index];
+	struct netdev_queue *txq = netdev_get_tx_queue(dev, txqueue);
 
 	netif_dbg(priv, tx_err, dev, "bcmgenet_timeout\n");
 
-	for (q = 0; q < priv->hw_params->tx_queues; q++)
-		bcmgenet_dump_tx_queue(&priv->tx_rings[q]);
-	bcmgenet_dump_tx_queue(&priv->tx_rings[DESC_INDEX]);
+	bcmgenet_dump_tx_queue(ring);
 
-	bcmgenet_tx_reclaim_all(dev);
+	bcmgenet_tx_reclaim(dev, ring);
 
-	for (q = 0; q < priv->hw_params->tx_queues; q++)
-		int1_enable |= (1 << q);
+	/* Re-enable the TX interrupt for this ring */
+	ring->int_enable(ring);
 
-	int0_enable = UMAC_IRQ_TXDMA_DONE;
-
-	/* Re-enable TX interrupts if disabled */
-	bcmgenet_intrl2_0_writel(priv, int0_enable, INTRL2_CPU_MASK_CLEAR);
-	bcmgenet_intrl2_1_writel(priv, int1_enable, INTRL2_CPU_MASK_CLEAR);
-
-	netif_trans_update(dev);
+	if (txq->trans_start != jiffies)
+		txq->trans_start = jiffies;
 
 	dev->stats.tx_errors++;
 
-	netif_tx_wake_all_queues(dev);
+	netif_tx_wake_queue(txq);
 }
 
 #define MAX_MDF_FILTER	17
