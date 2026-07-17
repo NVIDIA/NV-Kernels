@@ -695,9 +695,9 @@ static void unix_release_sock(struct sock *sk, int embrion)
 	while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 		if (state == TCP_LISTEN)
 			unix_release_sock(skb->sk, 1);
-		/* passed fds are erased in the kfree_skb hook	      */
+		/* passed fds are erased in the kfree_skb hook */
 		UNIXCB(skb).consumed = skb->len;
-		kfree_skb(skb);
+		kfree_skb_reason(skb, SKB_DROP_REASON_SOCKET_CLOSE);
 	}
 
 	if (path.dentry)
