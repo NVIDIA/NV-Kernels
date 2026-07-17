@@ -170,7 +170,7 @@ rel()
 {
 	# Load up the current contents of the $SECTION segment
 	# as the offsets (see below) are recorded there and we will need
-	# those to calculate the actuall address.
+	# those to calculate the actual address.
 	contentmap_init "$1" "$SECTION"
 
 	#file="$(basename "$1")"
@@ -237,7 +237,7 @@ disassemble()
 	'
 }
 
-# Accumulate potentially vunerable indirect call/jmp sequences.  We do this
+# Accumulate potentially vulnerable indirect call/jmp sequences.  We do this
 # by examining the raw disassembly for affected forms, recording the location
 # of each.
 case "$bit16" in
