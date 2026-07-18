@@ -2104,6 +2104,9 @@ bpf_prog_run_array_uprobe(const struct bpf_prog_array *array,
 #define bpf_rcu_lock_held() \
 	(rcu_read_lock_held() || rcu_read_lock_trace_held() || rcu_read_lock_bh_held())
 
+bool bpf_jit_bypass_spec_v1(void);
+bool bpf_jit_bypass_spec_v4(void);
+
 #ifdef CONFIG_BPF_SYSCALL
 DECLARE_PER_CPU(int, bpf_prog_active);
 extern struct mutex bpf_stats_enabled_mutex;
@@ -2272,12 +2275,16 @@ static inline bool bpf_allow_uninit_stack(void)
 
 static inline bool bpf_bypass_spec_v1(void)
 {
-	return cpu_mitigations_off() || perfmon_capable();
+	return bpf_jit_bypass_spec_v1() ||
+		cpu_mitigations_off() ||
+		perfmon_capable();
 }
 
 static inline bool bpf_bypass_spec_v4(void)
 {
-	return cpu_mitigations_off() || perfmon_capable();
+	return bpf_jit_bypass_spec_v4() ||
+		cpu_mitigations_off() ||
+		perfmon_capable();
 }
 
 int bpf_map_new_fd(struct bpf_map *map, int flags);
