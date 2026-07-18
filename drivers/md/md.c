@@ -217,23 +217,21 @@ static int rdev_need_serial(struct md_rdev *rdev)
 void mddev_create_serial_pool(struct mddev *mddev, struct md_rdev *rdev)
 {
 	int ret = 0;
+	unsigned int noio_flags;
 
 	if (rdev && !rdev_need_serial(rdev) &&
 	    !test_bit(CollisionCheck, &rdev->flags))
 		return;
 
+	noio_flags = memalloc_noio_save();
 	if (!rdev)
 		ret = rdevs_init_serial(mddev);
 	else
 		ret = rdev_init_serial(rdev);
 	if (ret)
-		return;
+		goto out;
 
 	if (mddev->serial_info_pool == NULL) {
-		/*
-		 * already in memalloc noio context by
-		 * mddev_suspend()
-		 */
 		mddev->serial_info_pool =
 			mempool_create_kmalloc_pool(NR_SERIAL_INFOS,
 						sizeof(struct serial_info));
@@ -242,6 +240,8 @@ void mddev_create_serial_pool(struct mddev *mddev, struct md_rdev *rdev)
 			pr_err("can't alloc memory pool for serialization\n");
 		}
 	}
+out:
+	memalloc_noio_restore(noio_flags);
 }
 
 /*
@@ -491,9 +491,6 @@ int mddev_suspend(struct mddev *mddev, bool interruptible)
 	 */
 	WRITE_ONCE(mddev->suspended, mddev->suspended + 1);
 
-	/* restrict memory reclaim I/O during raid array is suspend */
-	mddev->noio_flag = memalloc_noio_save();
-
 	mutex_unlock(&mddev->suspend_mutex);
 	return 0;
 }
@@ -509,9 +506,6 @@ static void __mddev_resume(struct mddev *mddev, bool recovery_needed)
 		mutex_unlock(&mddev->suspend_mutex);
 		return;
 	}
-
-	/* entred the memalloc scope from mddev_suspend() */
-	memalloc_noio_restore(mddev->noio_flag);
 
 	percpu_ref_resurrect(&mddev->active_io);
 	wake_up(&mddev->sb_wait);
@@ -4001,6 +3995,7 @@ level_store(struct mddev *mddev, const char *buf, size_t len)
 	char clevel[16];
 	ssize_t rv;
 	size_t slen = len;
+	unsigned int noio_flags;
 	struct md_personality *pers, *oldpers;
 	long level;
 	void *priv, *oldpriv;
@@ -4012,6 +4007,7 @@ level_store(struct mddev *mddev, const char *buf, size_t len)
 	rv = mddev_suspend_and_lock(mddev);
 	if (rv)
 		return rv;
+	noio_flags = memalloc_noio_save();
 
 	if (mddev->pers == NULL) {
 		memcpy(mddev->clevel, buf, slen);
@@ -4193,6 +4189,7 @@ level_store(struct mddev *mddev, const char *buf, size_t len)
 	md_new_event();
 	rv = len;
 out_unlock:
+	memalloc_noio_restore(noio_flags);
 	mddev_unlock_and_resume(mddev);
 	return rv;
 }
@@ -4264,6 +4261,7 @@ static ssize_t
 raid_disks_store(struct mddev *mddev, const char *buf, size_t len)
 {
 	unsigned int n;
+	unsigned int noio_flags;
 	int err;
 
 	err = kstrtouint(buf, 10, &n);
@@ -4273,6 +4271,7 @@ raid_disks_store(struct mddev *mddev, const char *buf, size_t len)
 	err = mddev_suspend_and_lock(mddev);
 	if (err)
 		return err;
+	noio_flags = memalloc_noio_save();
 	if (mddev->pers) {
 		if (n != mddev->raid_disks)
 			err = update_raid_disks(mddev, n);
@@ -4296,6 +4295,7 @@ raid_disks_store(struct mddev *mddev, const char *buf, size_t len)
 	} else
 		mddev->raid_disks = n;
 out_unlock:
+	memalloc_noio_restore(noio_flags);
 	mddev_unlock_and_resume(mddev);
 	return err ? err : len;
 }
@@ -4660,6 +4660,7 @@ new_dev_store(struct mddev *mddev, const char *buf, size_t len)
 	int minor;
 	dev_t dev;
 	struct md_rdev *rdev;
+	unsigned int noio_flags;
 	int err;
 
 	if (!*buf || *e != ':' || !e[1] || e[1] == '\n')
@@ -4675,6 +4676,7 @@ new_dev_store(struct mddev *mddev, const char *buf, size_t len)
 	err = mddev_suspend_and_lock(mddev);
 	if (err)
 		return err;
+	noio_flags = memalloc_noio_save();
 	if (mddev->persistent) {
 		rdev = md_import_device(dev, mddev->major_version,
 					mddev->minor_version);
@@ -4693,6 +4695,7 @@ new_dev_store(struct mddev *mddev, const char *buf, size_t len)
 		rdev = md_import_device(dev, -1, -1);
 
 	if (IS_ERR(rdev)) {
+		memalloc_noio_restore(noio_flags);
 		mddev_unlock_and_resume(mddev);
 		return PTR_ERR(rdev);
 	}
@@ -4700,6 +4703,7 @@ new_dev_store(struct mddev *mddev, const char *buf, size_t len)
  out:
 	if (err)
 		export_rdev(rdev);
+	memalloc_noio_restore(noio_flags);
 	mddev_unlock_and_resume(mddev);
 	if (!err)
 		md_new_event();
@@ -7680,8 +7684,10 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 			unsigned int cmd, unsigned long arg)
 {
 	int err = 0;
+	unsigned int noio_flags = 0;
 	void __user *argp = (void __user *)arg;
 	struct mddev *mddev = NULL;
+	bool suspend;
 
 	if (!md_ioctl_valid(cmd))
 		return -ENOTTY;
@@ -7761,13 +7767,15 @@ static int md_ioctl(struct block_device *bdev, blk_mode_t mode,
 	if (!md_is_rdwr(mddev))
 		flush_work(&mddev->sync_work);
 
-	err = md_ioctl_need_suspend(cmd) ? mddev_suspend_and_lock(mddev) :
-					   mddev_lock(mddev);
+	suspend = md_ioctl_need_suspend(cmd);
+	err = suspend ? mddev_suspend_and_lock(mddev) : mddev_lock(mddev);
 	if (err) {
 		pr_debug("md: ioctl lock interrupted, reason %d, cmd %d\n",
 			 err, cmd);
 		goto out;
 	}
+	if (suspend)
+		noio_flags = memalloc_noio_save();
 
 	if (cmd == SET_ARRAY_INFO) {
 		err = __md_set_array_info(mddev, argp);
@@ -7891,8 +7899,12 @@ unlock:
 	    err != -EINVAL)
 		mddev->hold_active = 0;
 
-	md_ioctl_need_suspend(cmd) ? mddev_unlock_and_resume(mddev) :
-				     mddev_unlock(mddev);
+	if (suspend) {
+		memalloc_noio_restore(noio_flags);
+		mddev_unlock_and_resume(mddev);
+	} else {
+		mddev_unlock(mddev);
+	}
 
 out:
 	if (cmd == STOP_ARRAY_RO || (err && cmd == STOP_ARRAY))
@@ -9549,6 +9561,7 @@ static void md_start_sync(struct work_struct *ws)
 	struct mddev *mddev = container_of(ws, struct mddev, sync_work);
 	int spares = 0;
 	bool suspend = false;
+	unsigned int noio_flags = 0;
 	char *name;
 
 	/*
@@ -9559,6 +9572,7 @@ static void md_start_sync(struct work_struct *ws)
 	    md_spares_need_change(mddev)) {
 		suspend = true;
 		mddev_suspend(mddev, false);
+		noio_flags = memalloc_noio_save();
 	}
 
 	mddev_lock_nointr(mddev);
@@ -9572,6 +9586,7 @@ static void md_start_sync(struct work_struct *ws)
 		mddev_unlock(mddev);
 		mddev_suspend_and_lock_nointr(mddev);
 		suspend = true;
+		noio_flags = memalloc_noio_save();
 	}
 
 	if (!md_is_rdwr(mddev)) {
@@ -9617,8 +9632,10 @@ static void md_start_sync(struct work_struct *ws)
 	 *     https://bugzilla.kernel.org/show_bug.cgi?id=218200
 	 * Therefore, use __mddev_resume(mddev, false).
 	 */
-	if (suspend)
+	if (suspend) {
+		memalloc_noio_restore(noio_flags);
 		__mddev_resume(mddev, false);
+	}
 	md_wakeup_thread(mddev->sync_thread);
 	sysfs_notify_dirent_safe(mddev->sysfs_action);
 	md_new_event();
@@ -9637,8 +9654,10 @@ not_running:
 	 *     https://bugzilla.kernel.org/show_bug.cgi?id=218200
 	 * Therefore, use __mddev_resume(mddev, false).
 	 */
-	if (suspend)
+	if (suspend) {
+		memalloc_noio_restore(noio_flags);
 		__mddev_resume(mddev, false);
+	}
 
 	wake_up(&resync_wait);
 	if (test_and_clear_bit(MD_RECOVERY_RECOVER, &mddev->recovery) &&
