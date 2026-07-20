@@ -828,7 +828,7 @@ static resource_size_t calculate_memsize(resource_size_t size,
 	if (old_size == 1)
 		old_size = 0;
 
-	size = max(size, add_size) + children_add_size;
+	size = max(size + children_add_size, add_size);
 	return ALIGN(max(size, old_size), align);
 }
 
