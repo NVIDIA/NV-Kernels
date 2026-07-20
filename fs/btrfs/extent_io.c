@@ -492,6 +492,7 @@ static void end_bbio_data_write(struct btrfs_bio *bbio)
 	struct bio *bio = &bbio->bio;
 	int error = blk_status_to_errno(bio->bi_status);
 	struct folio_iter fi;
+	u32 bio_size = 0;
 
 	ASSERT(!bio_flagged(bio, BIO_CLONED));
 	bio_for_each_folio_all(fi, bio) {
@@ -505,6 +506,7 @@ static void end_bbio_data_write(struct btrfs_bio *bbio)
 		/* Only order 0 (single page) folios are allowed for data. */
 		ASSERT(folio_order(folio) == 0);
 
+		bio_size += len;
 		/* Our read/write should always be sector aligned. */
 		if (!IS_ALIGNED(fi.offset, sectorsize))
 			btrfs_err(fs_info,
@@ -515,13 +517,15 @@ static void end_bbio_data_write(struct btrfs_bio *bbio)
 		"incomplete page write with offset %zu and length %zu",
 				   fi.offset, fi.length);
 
-		btrfs_finish_ordered_extent(bbio->ordered,
-				folio_page(folio, 0), start, len, !error);
 		if (error)
 			mapping_set_error(folio->mapping, error);
+		ASSERT(btrfs_folio_test_ordered(fs_info, folio, start, len));
+		btrfs_folio_clear_ordered(fs_info, folio, start, len);
 		btrfs_folio_clear_writeback(fs_info, folio, start, len);
 	}
 
+	btrfs_finish_ordered_extent(bbio->ordered, bbio->file_offset, bio_size,
+				    !error);
 	bio_put(bio);
 }
 
@@ -1402,8 +1406,8 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 		u32 iosize;
 
 		if (cur >= i_size) {
-			btrfs_mark_ordered_io_finished(inode, page, cur, len,
-						       true);
+			btrfs_folio_clear_ordered(fs_info, page_folio(page), cur, len);
+			btrfs_mark_ordered_io_finished(inode, cur, len, true);
 			/*
 			 * This range is beyond i_size, thus we don't need to
 			 * bother writing back.
@@ -1444,7 +1448,9 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 						 cur + fs_info->sectorsize - 1);
 			btrfs_folio_clear_writeback(fs_info, page_folio(page), cur,
 						    fs_info->sectorsize);
-			btrfs_mark_ordered_io_finished(inode, page, cur,
+			btrfs_folio_clear_ordered(fs_info, page_folio(page), cur,
+						  fs_info->sectorsize);
+			btrfs_mark_ordered_io_finished(inode, cur,
 						       fs_info->sectorsize, false);
 			if (!found_error)
 				found_error = ret;
@@ -1560,9 +1566,12 @@ done:
 		end_page_writeback(page);
 	}
 	if (ret) {
-		if (!extent_io_called)
-			btrfs_mark_ordered_io_finished(BTRFS_I(inode), page,
-						       page_start, PAGE_SIZE, false);
+		if (!extent_io_called) {
+			btrfs_folio_clear_ordered(BTRFS_I(inode)->root->fs_info, folio,
+						  page_start, PAGE_SIZE);
+			btrfs_mark_ordered_io_finished(BTRFS_I(inode), page_start,
+						       PAGE_SIZE, false);
+		}
 		mapping_set_error(page->mapping, ret);
 	}
 	unlock_page(page);
@@ -2316,8 +2325,9 @@ void extent_write_locked_range(struct inode *inode, struct page *locked_page,
 			end_page_writeback(page);
 		}
 		if (ret) {
-			btrfs_mark_ordered_io_finished(BTRFS_I(inode), page,
-						       cur, cur_len, !ret);
+			btrfs_folio_clear_ordered(fs_info, page_folio(page), cur, cur_len);
+			btrfs_mark_ordered_io_finished(BTRFS_I(inode), cur, cur_len,
+						       !ret);
 			mapping_set_error(page->mapping, ret);
 		}
 		btrfs_folio_unlock_writer(fs_info, page_folio(page), cur, cur_len);

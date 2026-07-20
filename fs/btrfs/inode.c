@@ -482,7 +482,7 @@ static inline void btrfs_cleanup_ordered_extents(struct btrfs_inode *inode,
 		}
 	}
 
-	return btrfs_mark_ordered_io_finished(inode, NULL, offset, bytes, false);
+	return btrfs_mark_ordered_io_finished(inode, offset, bytes, false);
 }
 
 static int btrfs_dirty_inode(struct btrfs_inode *inode);
@@ -1114,8 +1114,10 @@ static void submit_uncompressed_range(struct btrfs_inode *inode,
 
 			set_page_writeback(locked_page);
 			end_page_writeback(locked_page);
-			btrfs_mark_ordered_io_finished(inode, locked_page,
-						       page_start, PAGE_SIZE,
+			btrfs_folio_clear_ordered(inode->root->fs_info,
+						  page_folio(locked_page), page_start,
+						  PAGE_SIZE);
+			btrfs_mark_ordered_io_finished(inode, page_start, PAGE_SIZE,
 						       !ret);
 			mapping_set_error(locked_page->mapping, ret);
 			unlock_page(locked_page);
@@ -2918,8 +2920,9 @@ out_page:
 		 * to reflect the errors and clean the page.
 		 */
 		mapping_set_error(page->mapping, ret);
-		btrfs_mark_ordered_io_finished(inode, page, page_start,
-					       PAGE_SIZE, !ret);
+		btrfs_folio_clear_ordered(fs_info, page_folio(page), page_start,
+						  PAGE_SIZE);
+		btrfs_mark_ordered_io_finished(inode, page_start, PAGE_SIZE, !ret);
 		clear_page_dirty_for_io(page);
 	}
 	btrfs_folio_clear_checked(fs_info, page_folio(page), page_start, PAGE_SIZE);
@@ -7974,8 +7977,8 @@ static int btrfs_dio_iomap_end(struct inode *inode, loff_t pos, loff_t length,
 			 * as fully truncated.
 			 */
 			btrfs_mark_ordered_extent_truncated(dio_data->ordered, 0);
-			btrfs_finish_ordered_extent(dio_data->ordered, NULL,
-						    pos, length, true);
+			btrfs_finish_ordered_extent(dio_data->ordered, pos, length,
+						    true);
 		} else {
 			unlock_extent(&BTRFS_I(inode)->io_tree, pos,
 				      pos + length - 1, NULL);
@@ -8007,8 +8010,7 @@ static void btrfs_dio_end_io(struct btrfs_bio *bbio)
 	}
 
 	if (btrfs_op(bio) == BTRFS_MAP_WRITE) {
-		btrfs_finish_ordered_extent(bbio->ordered, NULL,
-					    dip->file_offset, dip->bytes,
+		btrfs_finish_ordered_extent(bbio->ordered, dip->file_offset, dip->bytes,
 					    !bio->bi_status);
 	} else {
 		unlock_extent(&inode->io_tree, dip->file_offset,
@@ -8049,8 +8051,7 @@ static void btrfs_dio_submit_io(const struct iomap_iter *iter, struct bio *bio,
 
 		ret = btrfs_extract_ordered_extent(bbio, dio_data->ordered);
 		if (ret) {
-			btrfs_finish_ordered_extent(dio_data->ordered, NULL,
-						    file_offset, dip->bytes,
+			btrfs_finish_ordered_extent(dio_data->ordered, file_offset, dip->bytes,
 						    !ret);
 			bio->bi_status = errno_to_blk_status(ret);
 			iomap_dio_bio_end_io(bio);
