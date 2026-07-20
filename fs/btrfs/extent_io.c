@@ -1388,12 +1388,17 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 	int found_error = 0;
 	int nr = 0;
 
-	ret = btrfs_writepage_cow_fixup(page);
-	if (ret) {
-		/* Fixup worker will requeue */
-		redirty_page_for_writepage(bio_ctrl->wbc, page);
-		unlock_page(page);
-		return 1;
+	if (unlikely(!PageOrdered(page))) {
+		WARN_ON(IS_ENABLED(CONFIG_BTRFS_DEBUG));
+		btrfs_err_rl(fs_info,
+	"root %lld ino %llu page %llu is marked dirty without notifying the fs",
+			     btrfs_root_id(inode->root),
+			     btrfs_ino(inode),
+			     page_offset(page));
+		btrfs_folio_clear_dirty(fs_info, page_folio(page), cur, PAGE_SIZE);
+		btrfs_folio_set_writeback(fs_info, page_folio(page), cur, PAGE_SIZE);
+		btrfs_folio_clear_writeback(fs_info, page_folio(page), cur, PAGE_SIZE);
+		return -EUCLEAN;
 	}
 
 	bio_ctrl->end_io_func = end_bbio_data_write;
