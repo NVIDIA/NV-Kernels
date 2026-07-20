@@ -239,3 +239,34 @@ CONFIG_HAVE_KERNEL_GZIP                         policy<{'arm64': '-'}>
 CONFIG_HAVE_KERNEL_ZSTD                         policy<{'arm64': '-'}>
 CONFIG_KERNEL_GZIP                              policy<{'arm64': '-'}>
 CONFIG_KERNEL_ZSTD                              policy<{'arm64': '-'}>
+
+# DRTM: symbols force-disabled on arm64 by MEMORY_HOTPLUG=n (needed for ARM64_SECURE_LAUNCH_KASLR)
+CONFIG_ACPI_HOTPLUG_MEMORY                      policy<{'arm64': '-'}>
+CONFIG_DEVICE_MIGRATION                         policy<{'arm64': '-'}>
+CONFIG_DEVICE_PRIVATE                           policy<{'arm64': '-'}>
+CONFIG_DEV_DAX_KMEM                             policy<{'arm64': '-'}>
+CONFIG_DEV_DAX_PMEM                             policy<{'arm64': '-'}>
+CONFIG_DRM_XE_GPUSVM                            policy<{'arm64': '-'}>
+CONFIG_DRM_XE_PAGEMAP                           policy<{'arm64': '-'}>
+CONFIG_FS_DAX                                   policy<{'arm64': '-'}>
+CONFIG_FS_DAX_PMD                               policy<{'arm64': '-'}>
+CONFIG_FUSE_DAX                                 policy<{'arm64': '-'}>
+CONFIG_HSA_AMD_P2P                              policy<{'arm64': '-'}>
+CONFIG_HSA_AMD_SVM                              policy<{'arm64': '-'}>
+CONFIG_MEMORY_HOTREMOVE                         policy<{'arm64': '-'}>
+CONFIG_MEMORY_NOTIFIER_ERROR_INJECT             policy<{'arm64': '-'}>
+CONFIG_MHP_DEFAULT_ONLINE_TYPE_OFFLINE          policy<{'arm64': '-'}>
+CONFIG_MHP_DEFAULT_ONLINE_TYPE_ONLINE_AUTO      policy<{'arm64': '-'}>
+CONFIG_MHP_DEFAULT_ONLINE_TYPE_ONLINE_KERNEL    policy<{'arm64': '-'}>
+CONFIG_MHP_DEFAULT_ONLINE_TYPE_ONLINE_MOVABLE   policy<{'arm64': '-'}>
+CONFIG_MHP_MEMMAP_ON_MEMORY                     policy<{'arm64': '-'}>
+CONFIG_ND_PFN                                   policy<{'arm64': '-'}>
+CONFIG_NVDIMM_DAX                               policy<{'arm64': '-'}>
+CONFIG_NVDIMM_PFN                               policy<{'arm64': '-'}>
+CONFIG_PCI_P2PDMA                               policy<{'arm64': '-'}>
+CONFIG_TEST_HMM                                 policy<{'arm64': '-'}>
+CONFIG_VFIO_PCI_DMABUF                          policy<{'arm64': '-'}>
+CONFIG_VIRTIO_MEM                               policy<{'arm64': '-'}>
+CONFIG_XEN_BALLOON_MEMORY_HOTPLUG               policy<{'arm64': '-'}>
+CONFIG_XEN_UNPOPULATED_ALLOC                    policy<{'arm64': '-'}>
+CONFIG_ZONE_DEVICE                              policy<{'arm64': '-'}>
