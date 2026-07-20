@@ -1381,6 +1381,7 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 	u64 block_start;
 	struct extent_map *em;
 	int ret = 0;
+	int found_error = 0;
 	int nr = 0;
 
 	ret = btrfs_writepage_cow_fixup(page);
@@ -1424,8 +1425,31 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 
 		em = btrfs_get_extent(inode, NULL, 0, cur, len);
 		if (IS_ERR(em)) {
-			ret = PTR_ERR_OR_ZERO(em);
-			goto out_error;
+			ret = PTR_ERR(em);
+
+			/*
+			 * bio_ctrl may contain a bio crossing several pages. Submit it
+			 * immediately so that the bio has a chance to finish normally,
+			 * rather than being marked as error with this sector.
+			 */
+			submit_one_bio(bio_ctrl);
+
+			/*
+			 * No bio will clear dirty/writeback state and finish the ordered
+			 * extent for this sector, so do that manually.
+			 */
+			btrfs_folio_clear_dirty(fs_info, page_folio(page), cur,
+						fs_info->sectorsize);
+			btrfs_set_range_writeback(inode, cur,
+						 cur + fs_info->sectorsize - 1);
+			btrfs_folio_clear_writeback(fs_info, page_folio(page), cur,
+						    fs_info->sectorsize);
+			btrfs_mark_ordered_io_finished(inode, page, cur,
+						       fs_info->sectorsize, false);
+			if (!found_error)
+				found_error = ret;
+			cur += fs_info->sectorsize;
+			continue;
 		}
 
 		extent_offset = cur - em->start;
@@ -1444,7 +1468,7 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 
 		/*
 		 * Note that em_end from extent_map_end() and dirty_range_end from
-		 * find_next_dirty_byte() are all exclusive
+		 * find_next_dirty_byte() are all exclusive.
 		 */
 		iosize = min(min(em_end, end + 1), dirty_range_end) - cur;
 		free_extent_map(em);
@@ -1473,15 +1497,7 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 
 	btrfs_folio_assert_not_dirty(fs_info, page_folio(page));
 	*nr_ret = nr;
-	return 0;
-
-out_error:
-	/*
-	 * If we finish without problem, we should not only clear page dirty,
-	 * but also empty subpage dirty bits
-	 */
-	*nr_ret = nr;
-	return ret;
+	return found_error;
 }
 
 /*
@@ -1498,6 +1514,7 @@ static int __extent_writepage(struct page *page, struct btrfs_bio_ctrl *bio_ctrl
 	struct folio *folio = page_folio(page);
 	struct inode *inode = page->mapping->host;
 	const u64 page_start = page_offset(page);
+	bool extent_io_called = false;
 	int ret;
 	int nr = 0;
 	size_t pg_offset;
@@ -1529,6 +1546,7 @@ static int __extent_writepage(struct page *page, struct btrfs_bio_ctrl *bio_ctrl
 	if (ret)
 		goto done;
 
+	extent_io_called = true;
 	ret = __extent_writepage_io(BTRFS_I(inode), page, bio_ctrl, i_size, &nr);
 	if (ret == 1)
 		return 0;
@@ -1536,14 +1554,15 @@ static int __extent_writepage(struct page *page, struct btrfs_bio_ctrl *bio_ctrl
 	bio_ctrl->wbc->nr_to_write--;
 
 done:
-	if (nr == 0) {
+	if (nr == 0 && (!ret || !extent_io_called)) {
 		/* make sure the mapping tag for page dirty gets cleared */
 		set_page_writeback(page);
 		end_page_writeback(page);
 	}
 	if (ret) {
-		btrfs_mark_ordered_io_finished(BTRFS_I(inode), page, page_start,
-					       PAGE_SIZE, !ret);
+		if (!extent_io_called)
+			btrfs_mark_ordered_io_finished(BTRFS_I(inode), page,
+						       page_start, PAGE_SIZE, false);
 		mapping_set_error(page->mapping, ret);
 	}
 	unlock_page(page);
