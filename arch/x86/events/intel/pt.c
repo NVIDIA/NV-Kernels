@@ -496,6 +496,11 @@ static u64 pt_config_filters(struct perf_event *event)
 	return rtit_ctl;
 }
 
+static void pt_config_enable(struct perf_event *event)
+{
+	pt_config_start(event);
+}
+
 static void pt_config(struct perf_event *event)
 {
 	struct pt *pt = this_cpu_ptr(&pt_ctx);
@@ -534,7 +539,7 @@ static void pt_config(struct perf_event *event)
 	reg |= (event->attr.config & PT_CONFIG_MASK);
 
 	event->hw.config = reg;
-	pt_config_start(event);
+	pt_config_enable(event);
 }
 
 static void pt_config_stop(struct perf_event *event)
