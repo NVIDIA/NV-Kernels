@@ -41,7 +41,13 @@ chmod +x 'drivers/net/ethernet/realtek/r8127/rtl_eeprom.c'
 chmod +x 'drivers/net/ethernet/realtek/r8127/rtl_eeprom.h'
 chmod +x 'drivers/net/ethernet/realtek/r8127/rtltool.c'
 chmod +x 'drivers/net/ethernet/realtek/r8127/rtltool.h'
+chmod +x 'tools/testing/selftests/rseq/run_legacy_check.sh'
+chmod +x 'tools/testing/selftests/rseq/run_timeslice_test.sh'
 # Remove any files deleted from the orig.
+rm -f 'Documentation/ABI/obsolete/sysfs-selinux-user'
 rm -f 'arch/parisc/lib/checksum.c'
+rm -f 'drivers/platform/x86/lenovo/wmi-gamezone.h'
+rm -f 'tools/testing/selftests/bpf/prog_tests/access_variable_array.c'
+rm -f 'tools/testing/selftests/bpf/progs/test_access_variable_array.c'
 rm -f 'tools/testing/selftests/mqueue/setting'
 exit 0
