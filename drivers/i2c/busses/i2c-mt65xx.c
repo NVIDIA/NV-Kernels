@@ -26,6 +26,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/units.h>
+#include <linux/soc/mediatek/mtk-pwrap.h>
 
 #define I2C_RS_TRANSFER			(1 << 4)
 #define I2C_ARB_LOST			(1 << 3)
@@ -303,6 +304,11 @@ struct mtk_i2c {
 	void __iomem *base;		/* i2c base addr */
 	void __iomem *pdmabase;		/* dma base address*/
 	struct clk_bulk_data clocks[I2C_MT65XX_CLK_MAX]; /* clocks for i2c */
+#ifdef CONFIG_ACPI
+	void *pwrap_ctrl;
+	bool power_state;
+#endif
+	bool system_suspended;
 	bool have_pmic;			/* can use i2c pins from PMIC */
 	bool use_push_pull;		/* IO config push-pull mode */
 
@@ -1415,6 +1421,93 @@ static int mtk_i2c_parse_fw(struct mtk_i2c *i2c)
 	return 0;
 }
 
+#ifdef CONFIG_ACPI
+static int mtk_i2c_pwrap_probe(struct platform_device *pdev,
+			       struct mtk_i2c *i2c)
+{
+	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
+	struct acpi_buffer acpi_path = { ACPI_ALLOCATE_BUFFER, NULL };
+	acpi_status status;
+	int ret;
+
+	if (!adev)
+		return 0;
+
+	status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &acpi_path);
+	if (ACPI_FAILURE(status))
+		return dev_err_probe(&pdev->dev, -EINVAL,
+				"failed to get ACPI device path\n");
+
+	i2c->pwrap_ctrl = mtk_pwrap_dev_probe(acpi_path.pointer);
+	if (!i2c->pwrap_ctrl) {
+		ret = dev_err_probe(&pdev->dev, -ENODEV,
+				    "pwrap probe failed for %s\n",
+				    (char *)acpi_path.pointer);
+		goto out_free;
+	}
+
+	i2c->power_state = true;
+	dev_dbg(&pdev->dev, "pwrap probe succeeded for %s\n",
+		(char *)acpi_path.pointer);
+
+	ret = 0;
+
+out_free:
+	ACPI_FREE(acpi_path.pointer);
+	return ret;
+}
+
+static void mtk_i2c_pwrap_remove(struct mtk_i2c *i2c)
+{
+	if (!i2c->pwrap_ctrl)
+		return;
+
+	mtk_pwrap_dev_remove(i2c->pwrap_ctrl);
+	i2c->pwrap_ctrl = NULL;
+	i2c->power_state = false;
+}
+
+static int mtk_i2c_pwrap_suspend(struct mtk_i2c *i2c)
+{
+	int ret;
+
+	if (!i2c->pwrap_ctrl)
+		return 0;
+	if (!i2c->power_state)
+		return -EIO;
+
+	ret = mtk_pwrap_dev_suspend(i2c->pwrap_ctrl, 0);
+	/* A failed request leaves the hardware state ambiguous. */
+	i2c->power_state = false;
+	return ret;
+}
+
+static int mtk_i2c_pwrap_resume(struct mtk_i2c *i2c)
+{
+	int ret;
+
+	if (!i2c->pwrap_ctrl || i2c->power_state)
+		return 0;
+
+	ret = mtk_pwrap_dev_resume(i2c->pwrap_ctrl, 0);
+	if (ret)
+		return ret;
+
+	i2c->power_state = true;
+	return 0;
+}
+#else
+static int mtk_i2c_pwrap_probe(struct platform_device *pdev,
+			       struct mtk_i2c *i2c)
+{
+	return 0;
+}
+
+static void mtk_i2c_pwrap_remove(struct mtk_i2c *i2c) {}
+static int mtk_i2c_pwrap_suspend(struct mtk_i2c *i2c) { return 0; }
+static int mtk_i2c_pwrap_resume(struct mtk_i2c *i2c) { return 0; }
+#endif
+
 static int mtk_i2c_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -1538,10 +1631,15 @@ static int mtk_i2c_probe(struct platform_device *pdev)
 		}
 	}
 
+	/* Establish ACPI Power Wrap control before the first controller MMIO. */
+	ret = mtk_i2c_pwrap_probe(pdev, i2c);
+	if (ret)
+		return ret;
+
 	ret = clk_bulk_prepare_enable(I2C_MT65XX_CLK_MAX, i2c->clocks);
 	if (ret) {
 		dev_err(&pdev->dev, "clock enable failed!\n");
-		return ret;
+		goto err_pwrap_remove;
 	}
 	mtk_i2c_init_hw(i2c);
 	clk_bulk_disable(I2C_MT65XX_CLK_MAX, i2c->clocks);
@@ -1567,6 +1665,9 @@ static int mtk_i2c_probe(struct platform_device *pdev)
 err_bulk_unprepare:
 	clk_bulk_unprepare(I2C_MT65XX_CLK_MAX, i2c->clocks);
 
+err_pwrap_remove:
+	mtk_i2c_pwrap_remove(i2c);
+
 	return ret;
 }
 
@@ -1575,16 +1676,40 @@ static void mtk_i2c_remove(struct platform_device *pdev)
 	struct mtk_i2c *i2c = platform_get_drvdata(pdev);
 
 	i2c_del_adapter(&i2c->adap);
-
 	clk_bulk_unprepare(I2C_MT65XX_CLK_MAX, i2c->clocks);
+	mtk_i2c_pwrap_remove(i2c);
 }
+
+static int mtk_i2c_resume_noirq(struct device *dev);
 
 static int mtk_i2c_suspend_noirq(struct device *dev)
 {
+	int ret, rollback_ret;
 	struct mtk_i2c *i2c = dev_get_drvdata(dev);
 
+	/* Recover an unresolved prior resume before starting another cycle. */
+	if (i2c->system_suspended) {
+		ret = mtk_i2c_resume_noirq(dev);
+		if (ret) {
+			dev_err(dev, "pre-suspend recovery failed (%d)\n", ret);
+			return ret;
+		}
+	}
+
+	i2c->system_suspended = true;
 	i2c_mark_adapter_suspended(&i2c->adap);
+
+	ret = mtk_i2c_pwrap_suspend(i2c);
 	clk_bulk_unprepare(I2C_MT65XX_CLK_MAX, i2c->clocks);
+	if (ret) {
+		dev_err(dev, "pwrap suspend failed (%d)\n", ret);
+
+		rollback_ret = mtk_i2c_resume_noirq(dev);
+		if (rollback_ret)
+			dev_err(dev, "pwrap D0 rollback failed (%d)\n",
+				rollback_ret);
+		return ret;
+	}
 
 	return 0;
 }
@@ -1593,6 +1718,10 @@ static int mtk_i2c_resume_noirq(struct device *dev)
 {
 	int ret;
 	struct mtk_i2c *i2c = dev_get_drvdata(dev);
+
+	ret = mtk_i2c_pwrap_resume(i2c);
+	if (ret)
+		return ret;
 
 	ret = clk_bulk_prepare_enable(I2C_MT65XX_CLK_MAX, i2c->clocks);
 	if (ret) {
@@ -1605,11 +1734,32 @@ static int mtk_i2c_resume_noirq(struct device *dev)
 	clk_bulk_disable(I2C_MT65XX_CLK_MAX, i2c->clocks);
 
 	i2c_mark_adapter_resumed(&i2c->adap);
+	i2c->system_suspended = false;
 
 	return 0;
 }
 
+static int mtk_i2c_resume(struct device *dev)
+{
+	struct mtk_i2c *i2c = dev_get_drvdata(dev);
+	int ret;
+
+	if (!i2c->system_suspended)
+		return 0;
+
+	/*
+	 * The PM core skips ->resume_noirq() when this device's
+	 * ->suspend_noirq() failed.  Retry D0 before allowing transfers.
+	 */
+	ret = mtk_i2c_resume_noirq(dev);
+	if (ret)
+		dev_err(dev, "pwrap resume recovery failed (%d)\n", ret);
+
+	return ret;
+}
+
 static const struct dev_pm_ops mtk_i2c_pm = {
+	SYSTEM_SLEEP_PM_OPS(NULL, mtk_i2c_resume)
 	NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_i2c_suspend_noirq,
 				  mtk_i2c_resume_noirq)
 };
