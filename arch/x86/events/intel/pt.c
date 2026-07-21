@@ -1515,12 +1515,12 @@ void intel_pt_interrupt(void)
 
 	perf_aux_output_end(&pt->handle, local_xchg(&buf->data_size, 0));
 
-	if (!event->hw.state) {
+	if (!(event->hw.state & PERF_HES_STOPPED)) {
 		int ret;
 
 		buf = perf_aux_output_begin(&pt->handle, event);
 		if (!buf) {
-			event->hw.state = PERF_HES_STOPPED;
+			event->hw.state |= PERF_HES_STOPPED;
 			return;
 		}
 
@@ -1594,7 +1594,7 @@ static void pt_event_start(struct perf_event *event, int mode)
 	}
 
 	WRITE_ONCE(pt->handle_nmi, 1);
-	hwc->state = 0;
+	hwc->state &= ~PERF_HES_STOPPED;
 
 	pt_config_buffer(buf);
 	pt_config(event);
@@ -1604,7 +1604,7 @@ static void pt_event_start(struct perf_event *event, int mode)
 fail_end_stop:
 	perf_aux_output_end(&pt->handle, 0);
 fail_stop:
-	hwc->state = PERF_HES_STOPPED;
+	hwc->state |= PERF_HES_STOPPED;
 }
 
 static void pt_event_stop(struct perf_event *event, int mode)
@@ -1620,10 +1620,10 @@ static void pt_event_stop(struct perf_event *event, int mode)
 
 	pt_config_stop(event);
 
-	if (event->hw.state == PERF_HES_STOPPED)
+	if (event->hw.state & PERF_HES_STOPPED)
 		return;
 
-	event->hw.state = PERF_HES_STOPPED;
+	event->hw.state |= PERF_HES_STOPPED;
 
 	if (mode & PERF_EF_UPDATE) {
 		struct pt_buffer *buf = perf_get_aux(&pt->handle);
@@ -1709,10 +1709,10 @@ static int pt_event_add(struct perf_event *event, int mode)
 	if (mode & PERF_EF_START) {
 		pt_event_start(event, 0);
 		ret = -EINVAL;
-		if (hwc->state == PERF_HES_STOPPED)
+		if (hwc->state & PERF_HES_STOPPED)
 			goto fail;
 	} else {
-		hwc->state = PERF_HES_STOPPED;
+		hwc->state |= PERF_HES_STOPPED;
 	}
 
 	ret = 0;
