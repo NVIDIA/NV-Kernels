@@ -16,6 +16,10 @@
 extern void efi_init(void);
 
 bool efi_runtime_fixup_exception(struct pt_regs *regs, const char *msg);
+
+enum efi_secureboot_mode __arm64_ima_efi_boot_mode(void);
+
+#define arch_ima_efi_boot_mode	__arm64_ima_efi_boot_mode()
 #else
 #define efi_init()
 
