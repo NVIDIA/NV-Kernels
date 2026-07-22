@@ -822,6 +822,9 @@ static void ep_free(struct eventpoll *ep)
 	kfree(ep);
 }
 
+/* epi_fget() is defined further down; forward-declared for __ep_remove(). */
+static struct file *epi_fget(const struct epitem *epi);
+
 /*
  * Removes a "struct epitem" from the eventpoll RB tree and deallocates
  * all the associated resources. Must be called with "mtx" held.
@@ -832,6 +835,8 @@ static void ep_free(struct eventpoll *ep)
  */
 static bool __ep_remove(struct eventpoll *ep, struct epitem *epi, bool force)
 {
+	/* Raw pointer used by the force path; the !force path overwrites it
+	 * below with a pinned reference from epi_fget(). */
 	struct file *file = epi->ffd.file;
 	struct epitems_head *to_free;
 	struct hlist_head *head;
@@ -843,12 +848,26 @@ static bool __ep_remove(struct eventpoll *ep, struct epitem *epi, bool force)
 	 */
 	ep_unregister_pollwait(ep, epi);
 
+	if (!force) {
+		/* cheap sync with eventpoll_release_file() */
+		if (unlikely(READ_ONCE(epi->dying)))
+			return false;
+		/*
+		 * If we manage to grab a reference it means we're not in
+		 * eventpoll_release_file() and aren't going to be.  Pinning
+		 * @file keeps it, and transitively the watched struct
+		 * eventpoll, alive across the f_lock critical section below,
+		 * closing the UAF.  A successful pin also proves we are not
+		 * racing eventpoll_release_file() on this epi, so the old
+		 * under-lock epi->dying recheck is dropped.
+		 */
+		file = epi_fget(epi);
+		if (!file)
+			return false;
+	}
+
 	/* Remove the current item from the list of epoll hooks */
 	spin_lock(&file->f_lock);
-	if (epi->dying && !force) {
-		spin_unlock(&file->f_lock);
-		return false;
-	}
 
 	to_free = NULL;
 	head = file->f_ep;
@@ -864,6 +883,8 @@ static bool __ep_remove(struct eventpoll *ep, struct epitem *epi, bool force)
 	}
 	hlist_del_rcu(&epi->fllink);
 	spin_unlock(&file->f_lock);
+	if (!force)
+		fput(file);
 	free_ephead(to_free);
 
 	rb_erase_cached(&epi->rbn, &ep->rbr);
