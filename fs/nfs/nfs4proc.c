@@ -7673,6 +7673,7 @@ static int nfs4_add_lease(struct file *file, int arg, struct file_lock **lease,
 {
 	struct inode *inode = file_inode(file);
 	fmode_t type = arg == F_RDLCK ? FMODE_READ : FMODE_WRITE;
+	fl_owner_t owner = (*lease)->fl_owner; /* [noble: adjust context for older file_lock API] */
 	int ret;
 
 	/* No delegation, no lease */
@@ -7682,7 +7683,8 @@ static int nfs4_add_lease(struct file *file, int arg, struct file_lock **lease,
 	if (ret || nfs4_have_delegation(inode, type))
 		return ret;
 	/* We raced with a delegation return */
-	nfs4_delete_lease(file, priv);
+	dprintk("%s: raced with a delegation return\n", __func__);
+	nfs4_delete_lease(file, &owner);
 	return -EAGAIN;
 }
 
