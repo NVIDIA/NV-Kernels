@@ -160,6 +160,12 @@ bool efi_poweroff_required(void)
 	return efi_enabled(EFI_RUNTIME_SERVICES);
 }
 
+enum efi_secureboot_mode __arm64_ima_efi_boot_mode(void)
+{
+	return efi_enabled(EFI_SECURE_BOOT) ?
+		efi_secureboot_mode_enabled : efi_secureboot_mode_disabled;
+}
+
 asmlinkage efi_status_t efi_handle_corrupted_x18(efi_status_t s, const char *f)
 {
 	pr_err_ratelimited(FW_BUG "register x18 corrupted by EFI %s\n", f);
