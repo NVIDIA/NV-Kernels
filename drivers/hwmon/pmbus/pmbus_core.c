@@ -34,7 +34,7 @@
 struct pmbus_sensor {
 	struct pmbus_sensor *next;
 	char name[PMBUS_NAME_SIZE];	/* sysfs sensor name */
-	struct device_attribute attribute;
+	struct sensor_device_attribute attribute;
 	u8 page;		/* page number */
 	u8 phase;		/* phase number, 0xff for all phases */
 	u16 reg;		/* register */
@@ -57,7 +57,7 @@ struct pmbus_boolean {
 
 struct pmbus_label {
 	char name[PMBUS_NAME_SIZE];	/* sysfs label name */
-	struct device_attribute attribute;
+	struct sensor_device_attribute attribute;
 	char label[PMBUS_NAME_SIZE];	/* label */
 };
 #define to_pmbus_label(_attr) \
@@ -1173,7 +1173,8 @@ static ssize_t pmbus_show_sensor(struct device *dev,
 				 struct device_attribute *devattr, char *buf)
 {
 	struct i2c_client *client = to_i2c_client(dev->parent);
-	struct pmbus_sensor *sensor = to_pmbus_sensor(devattr);
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct pmbus_sensor *sensor = to_pmbus_sensor(attr);
 	struct pmbus_data *data = i2c_get_clientdata(client);
 	ssize_t ret;
 
@@ -1193,7 +1194,8 @@ static ssize_t pmbus_set_sensor(struct device *dev,
 {
 	struct i2c_client *client = to_i2c_client(dev->parent);
 	struct pmbus_data *data = i2c_get_clientdata(client);
-	struct pmbus_sensor *sensor = to_pmbus_sensor(devattr);
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct pmbus_sensor *sensor = to_pmbus_sensor(attr);
 	ssize_t rv = count;
 	s64 val;
 	int ret;
@@ -1216,7 +1218,8 @@ static ssize_t pmbus_set_sensor(struct device *dev,
 static ssize_t pmbus_show_label(struct device *dev,
 				struct device_attribute *da, char *buf)
 {
-	struct pmbus_label *label = to_pmbus_label(da);
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	struct pmbus_label *label = to_pmbus_label(attr);
 
 	return sysfs_emit(buf, "%s\n", label->label);
 }
@@ -1369,8 +1372,8 @@ static struct pmbus_sensor *pmbus_add_sensor(struct pmbus_data *data,
 					     bool update, bool readonly,
 					     bool writeonly, bool convert)
 {
+	struct sensor_device_attribute *a;
 	struct pmbus_sensor *sensor;
-	struct device_attribute *a;
 
 	sensor = devm_kzalloc(data->dev, sizeof(*sensor), GFP_KERNEL);
 	if (!sensor)
@@ -1394,12 +1397,11 @@ static struct pmbus_sensor *pmbus_add_sensor(struct pmbus_data *data,
 	sensor->update = update;
 	sensor->convert = convert;
 	sensor->data = -ENODATA;
-	pmbus_dev_attr_init(a, sensor->name,
-			    readonly ? 0444 : 0644,
-			    writeonly ? pmbus_show_zero : pmbus_show_sensor,
-			    pmbus_set_sensor);
+	pmbus_attr_init(a, sensor->name, readonly ? 0444 : 0644,
+			writeonly ? pmbus_show_zero : pmbus_show_sensor,
+			pmbus_set_sensor, -1);
 
-	if (pmbus_add_attribute(data, &a->attr))
+	if (pmbus_add_attribute(data, &a->dev_attr.attr))
 		return NULL;
 
 	sensor->next = data->sensors;
@@ -1416,8 +1418,8 @@ static int pmbus_add_label(struct pmbus_data *data,
 			   const char *name, int seq,
 			   const char *lstring, int index, int phase)
 {
+	struct sensor_device_attribute *a;
 	struct pmbus_label *label;
-	struct device_attribute *a;
 
 	label = devm_kzalloc(data->dev, sizeof(*label), GFP_KERNEL);
 	if (!label)
@@ -1442,8 +1444,8 @@ static int pmbus_add_label(struct pmbus_data *data,
 				 lstring, index, phase);
 	}
 
-	pmbus_dev_attr_init(a, label->name, 0444, pmbus_show_label, NULL);
-	return pmbus_add_attribute(data, &a->attr);
+	pmbus_attr_init(a, label->name, 0444, pmbus_show_label, NULL, -1);
+	return pmbus_add_attribute(data, &a->dev_attr.attr);
 }
 
 /*
@@ -2331,7 +2333,7 @@ struct pmbus_samples_attr {
 struct pmbus_samples_reg {
 	int page;
 	struct pmbus_samples_attr *attr;
-	struct device_attribute dev_attr;
+	struct sensor_device_attribute attribute;
 };
 
 static struct pmbus_samples_attr pmbus_samples_registers[] = {
@@ -2353,14 +2355,15 @@ static struct pmbus_samples_attr pmbus_samples_registers[] = {
 	}
 };
 
-#define to_samples_reg(x) container_of(x, struct pmbus_samples_reg, dev_attr)
+#define to_samples_reg(x) container_of(x, struct pmbus_samples_reg, attribute)
 
 static ssize_t pmbus_show_samples(struct device *dev,
 				  struct device_attribute *devattr, char *buf)
 {
 	int val;
 	struct i2c_client *client = to_i2c_client(dev->parent);
-	struct pmbus_samples_reg *reg = to_samples_reg(devattr);
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct pmbus_samples_reg *reg = to_samples_reg(attr);
 	struct pmbus_data *data = i2c_get_clientdata(client);
 
 	mutex_lock(&data->update_lock);
@@ -2379,7 +2382,8 @@ static ssize_t pmbus_set_samples(struct device *dev,
 	int ret;
 	long val;
 	struct i2c_client *client = to_i2c_client(dev->parent);
-	struct pmbus_samples_reg *reg = to_samples_reg(devattr);
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct pmbus_samples_reg *reg = to_samples_reg(attr);
 	struct pmbus_data *data = i2c_get_clientdata(client);
 
 	if (kstrtol(buf, 0, &val) < 0)
@@ -2395,6 +2399,7 @@ static ssize_t pmbus_set_samples(struct device *dev,
 static int pmbus_add_samples_attr(struct pmbus_data *data, int page,
 				  struct pmbus_samples_attr *attr)
 {
+	struct sensor_device_attribute *a;
 	struct pmbus_samples_reg *reg;
 
 	reg = devm_kzalloc(data->dev, sizeof(*reg), GFP_KERNEL);
@@ -2404,10 +2409,12 @@ static int pmbus_add_samples_attr(struct pmbus_data *data, int page,
 	reg->attr = attr;
 	reg->page = page;
 
-	pmbus_dev_attr_init(&reg->dev_attr, attr->name, 0644,
-			    pmbus_show_samples, pmbus_set_samples);
+	a = &reg->attribute;
 
-	return pmbus_add_attribute(data, &reg->dev_attr.attr);
+	pmbus_attr_init(a, attr->name, 0644,
+			pmbus_show_samples, pmbus_set_samples, -1);
+
+	return pmbus_add_attribute(data, &a->dev_attr.attr);
 }
 
 static int pmbus_add_samples_attributes(struct i2c_client *client,
@@ -2862,9 +2869,15 @@ static void pmbus_notify(struct pmbus_data *data, int page, int reg, int flags)
 		struct device_attribute *da = to_dev_attr(data->group.attrs[i]);
 		struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
 		int index = attr->index;
-		u16 smask = pb_index_to_mask(index);
-		u8 spage = pb_index_to_page(index);
-		u16 sreg = pb_index_to_reg(index);
+		u16 smask, sreg;
+		u8 spage;
+
+		if (index == -1)
+			continue;
+
+		smask = pb_index_to_mask(index);
+		spage = pb_index_to_page(index);
+		sreg = pb_index_to_reg(index);
 
 		if (reg == sreg && page == spage && (smask & flags)) {
 			dev_dbg(data->dev, "sysfs notify: %s", da->attr.name);
