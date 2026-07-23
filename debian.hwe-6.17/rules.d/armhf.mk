@@ -16,3 +16,8 @@ do_tools_bpftool_stub = true
 do_tools_rtla = true
 
 do_dtbs		= true
+do_tools_noble_hwe = true
+gcc		= gcc-13
+rustc		= rustc-1.82
+rustfmt		= /usr/lib/rust-1.82/bin/rustfmt
+bindgen		= bindgen-0.65
