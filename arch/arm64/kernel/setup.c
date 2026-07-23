@@ -51,6 +51,7 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 #include <asm/traps.h>
+#include <asm/drtm.h>
 #include <asm/efi.h>
 #include <asm/xen/hypervisor.h>
 #include <asm/mmu_context.h>
@@ -289,6 +290,8 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	early_fixmap_init();
 	early_ioremap_init();
 
+	slaunch_early_init();
+
 	setup_machine_fdt(__fdt_pointer);
 
 	/*
@@ -319,8 +322,12 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	 */
 	cpu_uninstall_idmap();
 
+	slaunch_setup();
+	slaunch_validate_initrd();
+
 	xen_early_init();
 	efi_init();
+	slaunch_reserve_dlme_data();
 
 	if (!efi_enabled(EFI_BOOT)) {
 		if ((u64)_text % MIN_KIMG_ALIGN)
@@ -333,10 +340,24 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	paging_init();
 
+	/*
+	 * Measure ACPI tables before acpi_boot_table_init() consumes them;
+	 * after paging_init() so memblock_alloc() returns linear-mapped ptrs.
+	 */
+	slaunch_measure_post_efi();
+
 	acpi_table_upgrade();
 
 	/* Parse the ACPI tables for possible boot-time configuration */
 	acpi_boot_table_init();
+
+	/*
+	 * DEN0113 defines the DRTM measurement/attestation chain over ACPI.
+	 * A launched system that fell back to device tree runs on unmeasured
+	 * topology with no valid attestation, so fail closed.
+	 */
+	if (sl_dlme_region_pa && acpi_disabled)
+		panic("slaunch: DRTM launch requires ACPI mode, but ACPI is disabled\n");
 
 	if (acpi_disabled)
 		unflatten_device_tree();

@@ -1,0 +1,16 @@
+config NVIDIA_FIRME_GUEST
+	tristate "NVIDIA FIRME attestation driver"
+	depends on ARM64
+	default m
+	select TSM_REPORTS
+	select TSM_MEASUREMENTS
+	help
+	  TSM report and measurement register backend for ARM FIRME (DEN0149)
+	  on NVIDIA Grace (TH500) platforms. After a DRTM Secure Launch:
+
+	  - FIRME_ATTEST_PAT_GET retrieves attestation tokens from PSC,
+	    exposed via configfs at /sys/kernel/config/tsm/report/.
+	  - FIRME_ATTEST_EXTEND extends measurement registers in PSC,
+	    exposed via sysfs for GPU/device evidence binding.
+
+	  If you choose 'M' here, this module will be called nvidia-firme.

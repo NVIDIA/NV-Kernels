@@ -61,3 +61,13 @@ PROVIDE(__efistub__gzdata_size =
 PROVIDE(__data_rawsize = ABSOLUTE(_edata - _data));
 PROVIDE(__data_size = ABSOLUTE(_end - _data));
 PROVIDE(__sbat_size = ABSOLUTE(_esbat - _sbat));
+
+/*
+ * ARM64_SECURE_LAUNCH references these __efistub_ aliases, but sl_entry
+ * is not reachable in the compressed zboot path, so a drtm=on zboot build
+ * silently no-ops the DRTM launch. These stubs only let such a build link.
+ */
+PROVIDE_HIDDEN(__efistub__text    = ADDR(.head));
+PROVIDE_HIDDEN(__efistub__end     = _end);
+PROVIDE_HIDDEN(__efistub__edata   = _edata);
+PROVIDE_HIDDEN(__efistub_sl_entry = ADDR(.head));

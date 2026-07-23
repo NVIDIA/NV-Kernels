@@ -1267,4 +1267,20 @@ void arch_accept_memory(phys_addr_t start, phys_addr_t end);
 efi_status_t efi_zboot_decompress_init(unsigned long *alloc_size);
 efi_status_t efi_zboot_decompress(u8 *out, unsigned long outlen);
 
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+bool efi_slaunch_enabled(const char *cmdline);
+void efi_slaunch_set_cmdline(const char *cmdline);
+bool efi_slaunch_requested(void);
+void efi_slaunch_get_dlme_data_size(void);
+void efi_slaunch_scrub_imagebase(unsigned long kernel_addr);
+extern unsigned long sl_dlme_data_reserve;
+/* Page gap below the DLME data region so the Preamble->DLME DTB-PA
+ * handoff slot (SL_DLME_DTB_SLOT_OFFSET) is dedicated scratch, not the
+ * kernel image tail. */
+#define SL_DLME_DTB_SLOT_GAP		0x1000
+extern bool sl_drtm_available;
+void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
+				 unsigned long fdt_addr);
+#endif
+
 #endif

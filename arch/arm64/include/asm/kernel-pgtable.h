@@ -68,7 +68,13 @@
 #define KERNEL_SEGMENT_COUNT	5
 
 #if SWAPPER_BLOCK_SIZE > SEGMENT_ALIGN
-#define EARLY_SEGMENT_EXTRA_PAGES (KERNEL_SEGMENT_COUNT + 1)
+/*
+ * The EFI stub's writable statics (.efistub) are mapped as a separate
+ * segment so they can be unmapped after init; each of its two page-aligned
+ * boundaries may force one extra page-table page where a swapper-block
+ * mapping would otherwise be used.
+ */
+#define EARLY_SEGMENT_EXTRA_PAGES (KERNEL_SEGMENT_COUNT + 1 + 2 * __is_defined(CONFIG_EFI))
 /*
  * The initial ID map consists of the kernel image, mapped as two separate
  * segments, and may appear misaligned wrt the swapper block size. This means

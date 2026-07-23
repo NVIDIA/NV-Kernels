@@ -96,6 +96,11 @@ bool efi_runtime_disabled(void)
 	return disable_runtime;
 }
 
+void __init efi_disable_runtime(void)
+{
+	disable_runtime = true;
+}
+
 bool __pure __efi_soft_reserve_enabled(void)
 {
 	return !efi_enabled(EFI_MEM_NO_SOFT_RESERVE);

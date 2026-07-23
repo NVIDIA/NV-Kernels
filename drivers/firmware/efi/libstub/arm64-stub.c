@@ -36,11 +36,36 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 	kernel_codesize = __inittext_end - _text;
 	kernel_memsize = kernel_size + (_end - _edata);
 	*reserve_size = kernel_memsize;
+
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+	/*
+	 * Reserve DLME data space (size from DRTM_FEATURES) after kernel
+	 * BSS for D-CRTM to populate (address map, event log, etc.). Probe
+	 * and reserve only when the command line requests a launch: the
+	 * DRTM_FEATURES SMC would fault on a platform with no EL3 monitor.
+	 */
+	if (efi_slaunch_requested()) {
+		efi_slaunch_get_dlme_data_size();
+		if (sl_drtm_available)
+			*reserve_size += SL_DLME_DTB_SLOT_GAP +
+					 sl_dlme_data_reserve;
+	}
+#endif
 	*image_addr = (unsigned long)_text;
 
-	return efi_kaslr_relocate_kernel(image_addr, reserve_addr, reserve_size,
-					 kernel_size, kernel_codesize, kernel_memsize,
-					 efi_kaslr_get_phys_seed(image_handle));
+	{
+		efi_status_t st;
+
+		st = efi_kaslr_relocate_kernel(image_addr, reserve_addr,
+					       reserve_size, kernel_size,
+					       kernel_codesize, kernel_memsize,
+					       efi_kaslr_get_phys_seed(image_handle));
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+		if (st == EFI_SUCCESS)
+			efi_slaunch_scrub_imagebase(*image_addr);
+#endif
+		return st;
+	}
 }
 
 asmlinkage void primary_entry(void);
