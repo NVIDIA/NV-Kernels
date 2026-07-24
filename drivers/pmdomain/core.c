@@ -1990,6 +1990,28 @@ static int genpd_get_cpu(struct generic_pm_domain *genpd, struct device *dev)
 	return -1;
 }
 
+static bool genpd_hierarchy_has_cpu(struct generic_pm_domain *genpd, int cpu,
+				    unsigned int depth)
+{
+	struct gpd_link *link;
+	bool found = false;
+
+	genpd_lock_nested(genpd, depth);
+	if (!genpd_is_cpu_domain(genpd))
+		goto out;
+
+	found = cpumask_test_cpu(cpu, genpd->cpus);
+	list_for_each_entry(link, &genpd->child_links, child_node) {
+		if (found)
+			break;
+		found = genpd_hierarchy_has_cpu(link->parent, cpu, depth + 1);
+	}
+out:
+	genpd_unlock(genpd);
+
+	return found;
+}
+
 static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
 			    struct device *base_dev)
 {
@@ -2032,6 +2054,54 @@ static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
 
 	return ret;
 }
+
+/**
+ * pm_genpd_add_virtual_cpu_device - Add a virtual CPU device to a PM domain.
+ * @genpd: CPU PM domain to add the device to.
+ * @dev: Virtual CPU device to be added.
+ * @cpu_dev: Physical CPU device represented by @dev.
+ *
+ * Add @dev to the CPU domain @genpd while using @cpu_dev to derive its CPU
+ * identity. This is useful for a virtual consumer that represents a physical
+ * CPU in a domain hierarchy. Reject the attachment if the CPU is already
+ * represented by the target domain or any of its ancestors, because genpd's
+ * CPU masks do not reference-count duplicate ownership paths.
+ *
+ * @cpu_dev only needs to remain valid for this synchronous call. Genpd stores
+ * the resolved CPU number, not a pointer to @cpu_dev.
+ *
+ * The CPU-domain topology above @genpd must be complete before this function
+ * is called. Adding parent links after attaching CPU consumers is unsupported,
+ * because those links cannot be checked for duplicate CPU ownership.
+ *
+ * Context: Sleepable. Takes the internal genpd list lock and the domain lock;
+ * callers must not hold either lock.
+ *
+ * Return: 0 on success, or a negative error code.
+ */
+int pm_genpd_add_virtual_cpu_device(struct generic_pm_domain *genpd,
+				    struct device *dev,
+				    struct device *cpu_dev)
+{
+	int cpu;
+	int ret;
+
+	if (!genpd || !dev || !cpu_dev || !genpd_is_cpu_domain(genpd))
+		return -EINVAL;
+	cpu = genpd_get_cpu(genpd, cpu_dev);
+	if (cpu < 0)
+		return -EINVAL;
+
+	mutex_lock(&gpd_list_lock);
+	if (genpd_hierarchy_has_cpu(genpd, cpu, 0))
+		ret = -EBUSY;
+	else
+		ret = genpd_add_device(genpd, dev, cpu_dev);
+	mutex_unlock(&gpd_list_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(pm_genpd_add_virtual_cpu_device);
 
 /**
  * pm_genpd_add_device - Add a device to an I/O PM domain.
