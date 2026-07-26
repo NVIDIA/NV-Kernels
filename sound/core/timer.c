@@ -441,6 +441,8 @@ static void snd_timer_close_locked(struct snd_timer_instance *timeri,
 			list_del_init(&slave->ack_list);
 			list_del_init(&slave->active_list);
 		}
+		/* the close is done; a reopen must not see the mark */
+		timeri->flags &= ~SNDRV_TIMER_IFLG_DEAD;
 		spin_unlock(&timer->lock);
 		spin_unlock_irq(&slave_active_lock);
 
