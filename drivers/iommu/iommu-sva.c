@@ -121,10 +121,10 @@ struct iommu_sva *iommu_sva_bind_device(struct device *dev, struct mm_struct *mm
 
 out:
 	refcount_set(&handle->users, 1);
-	list_add(&handle->handle_item, &mm->iommu_mm->sva_handles);
-	mutex_unlock(&iommu_sva_lock);
 	handle->dev = dev;
 	handle->domain = domain;
+	list_add(&handle->handle_item, &mm->iommu_mm->sva_handles);
+	mutex_unlock(&iommu_sva_lock);
 	return handle;
 
 out_free_domain:
