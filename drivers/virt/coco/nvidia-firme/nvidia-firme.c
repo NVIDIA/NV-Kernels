@@ -89,7 +89,6 @@ static int nvidia_firme_report_new(struct tsm_report *report, void *data)
 	void *buf;
 	phys_addr_t buf_phys;
 	u8 *token __free(kvfree) = NULL;
-	u64 offset = 0;
 	u64 challenge_sz = 0;
 	size_t token_size = 0;
 	int retries;
@@ -121,13 +120,13 @@ static int nvidia_firme_report_new(struct tsm_report *report, void *data)
 	do {
 		retries = 0;
 retry:
-		pr_info("nvidia-firme: FIRME_ATTEST_PAT_GET SMC: buf=0x%llx offset=%llu page_count=%d challenge_sz=%llu\n",
-			(u64)buf_phys, offset, FIRME_BUF_PAGE_COUNT,
+		pr_info("nvidia-firme: FIRME_ATTEST_PAT_GET SMC: buf=0x%llx offset=%zu page_count=%d challenge_sz=%llu\n",
+			(u64)buf_phys, token_size, FIRME_BUF_PAGE_COUNT,
 			challenge_sz);
 
 		arm_smccc_1_1_invoke(FIRME_ATTEST_PAT_GET,
 				     buf_phys,
-				     offset,
+				     0,
 				     FIRME_BUF_PAGE_COUNT,
 				     challenge_sz,
 				     &res);
@@ -163,16 +162,15 @@ retry:
 			return -EIO;
 		}
 
-		/* res.a1 = bytes written this call, starting at offset in buf */
+		/* res.a1 = bytes written this call */
 		if (token_size + res.a1 > FIRME_MAX_TOKEN_SIZE) {
 			pr_err("nvidia-firme: token exceeds max size\n");
 			free_pages((unsigned long)buf, get_order(FIRME_BUF_SIZE));
 			return -ENOSPC;
 		}
 
-		memcpy(&token[token_size], buf + offset, res.a1);
+		memcpy(&token[token_size], buf, res.a1);
 		token_size += res.a1;
-		offset += res.a1;
 
 		/* Clear challenge after first call */
 		challenge_sz = 0;
