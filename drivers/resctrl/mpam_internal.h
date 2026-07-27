@@ -11,7 +11,6 @@
 #include <linux/io.h>
 #include <linux/jump_label.h>
 #include <linux/llist.h>
-#include <linux/mailbox_client.h>
 #include <linux/mutex.h>
 #include <linux/resctrl.h>
 #include <linux/spinlock.h>
@@ -58,15 +57,6 @@ struct mpam_garbage {
 	struct platform_device	*pdev;
 };
 
-struct mpam_pcc_chan {
-	struct list_head	pcc_chans;
-	struct mbox_client	pcc_cl;
-	struct pcc_mbox_chan	*pcc_chan;
-	struct mutex		pcc_chan_lock; /* only one message at a time */
-	int			subspace_id;
-	int			refcount;
-};
-
 struct mpam_msc {
 	/* member of mpam_all_msc */
 	struct list_head	all_msc_list;
@@ -76,8 +66,6 @@ struct mpam_msc {
 
 	/* Not modified after mpam_is_enabled() becomes true */
 	enum mpam_msc_iface	iface;
-	struct mpam_pcc_chan	*pcc_chan;
-	int			mpam_fb_msc_id;	/* in its own name space */
 	u32			nrdy_usec;
 	cpumask_t		accessibility;
 	bool			has_extd_esr;
@@ -138,7 +126,6 @@ struct mpam_msc {
 	 */
 	raw_spinlock_t		_mon_sel_lock;
 	unsigned long		_mon_sel_flags;
-	struct mutex		mon_sel_mutex;
 
 	void __iomem		*mapped_hwpage;
 	size_t			mapped_hwpage_sz;
@@ -152,44 +139,27 @@ struct mpam_msc {
 /* Returning false here means accesses to mon_sel must fail and report an error. */
 static inline bool __must_check mpam_mon_sel_lock(struct mpam_msc *msc)
 {
-	if (msc->iface == MPAM_IFACE_MMIO) {
-		raw_spin_lock_irqsave(&msc->_mon_sel_lock, msc->_mon_sel_flags);
-
-		return true;
-	}
-
-	if (!preemptible())
+	/* Locking will require updating to support a firmware backed interface */
+	if (WARN_ON_ONCE(msc->iface != MPAM_IFACE_MMIO))
 		return false;
 
-	mutex_lock(&msc->mon_sel_mutex);
-
+	raw_spin_lock_irqsave(&msc->_mon_sel_lock, msc->_mon_sel_flags);
 	return true;
 }
 
 static inline void mpam_mon_sel_unlock(struct mpam_msc *msc)
 {
-	if (msc->iface == MPAM_IFACE_MMIO) {
-		raw_spin_unlock_irqrestore(&msc->_mon_sel_lock,
-					   msc->_mon_sel_flags);
-
-		return;
-	}
-
-	mutex_unlock(&msc->mon_sel_mutex);
+	raw_spin_unlock_irqrestore(&msc->_mon_sel_lock, msc->_mon_sel_flags);
 }
 
 static inline void mpam_mon_sel_lock_held(struct mpam_msc *msc)
 {
-	if (msc->iface == MPAM_IFACE_MMIO)
-		lockdep_assert_held_once(&msc->_mon_sel_lock);
-	else
-		lockdep_assert_held_once(&msc->mon_sel_mutex);
+	lockdep_assert_held_once(&msc->_mon_sel_lock);
 }
 
 static inline void mpam_mon_sel_lock_init(struct mpam_msc *msc)
 {
 	raw_spin_lock_init(&msc->_mon_sel_lock);
-	mutex_init(&msc->mon_sel_mutex);
 }
 
 /* Bits for mpam features bitmaps */
@@ -529,14 +499,6 @@ static inline int mpam_resctrl_online_cpu(unsigned int cpu) { return 0; }
 static inline void mpam_resctrl_offline_cpu(unsigned int cpu) { }
 static inline void mpam_resctrl_teardown_class(struct mpam_class *class) { }
 #endif /* CONFIG_RESCTRL_FS */
-
-/* MPAM-Fb Firmware-backed protocol wrappers */
-int mpam_fb_send_read_request(struct mpam_msc *msc, u16 reg, u32 *result);
-int mpam_fb_send_write_request(struct mpam_msc *msc, u16 reg, u32 value);
-int mpam_fb_get_protocol_version(struct mpam_msc *msc);
-
-#define PCC_TYPE3_MSG_PAYLOAD_OFS	0x10
-#define MPAM_FB_MAX_MSG_SIZE	(PCC_TYPE3_MSG_PAYLOAD_OFS + 4 * sizeof(u32))
 
 /*
  * MPAM MSCs have the following register layout. See:
