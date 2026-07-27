@@ -638,6 +638,10 @@ void pdsc_health_thread(struct work_struct *work)
 
 	mutex_lock(&pdsc->config_lock);
 
+	/* Ignore health checks queued while the health thread is stopped. */
+	if (READ_ONCE(pdsc->health_stopped))
+		goto out_unlock;
+
 	/* Don't do a check when in a transition state */
 	mask = BIT_ULL(PDSC_S_INITING_DRIVER) |
 	       BIT_ULL(PDSC_S_STOPPING_DRIVER);
