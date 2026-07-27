@@ -120,8 +120,7 @@ static int mpam_fb_build_write_message(int msc_id, int reg, u32 val,
 static int mpam_fb_send_request(struct mpam_pcc_chan *pcc_chan, u32 msc_id,
 				u16 reg, u32 *result, int mpam_fb_command)
 {
-	unsigned int token = atomic_inc_return(&mpam_fb_token) &
-			     FIELD_MAX(MPAM_MSC_TOKEN_MASK);
+	unsigned int token = atomic_inc_return(&mpam_fb_token);
 	struct acpi_pcct_ext_pcc_shared_memory *pcc_shmem;
 	struct pcc_mbox_chan *chan;
 	void __iomem *payload_ofs;
