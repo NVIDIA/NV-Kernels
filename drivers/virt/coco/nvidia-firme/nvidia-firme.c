@@ -120,7 +120,7 @@ static int nvidia_firme_report_new(struct tsm_report *report, void *data)
 	do {
 		retries = 0;
 retry:
-		pr_info("nvidia-firme: FIRME_ATTEST_PAT_GET SMC: buf=0x%llx offset=%zu page_count=%d challenge_sz=%llu\n",
+		pr_debug("nvidia-firme: FIRME_ATTEST_PAT_GET SMC: buf=0x%llx offset=%zu page_count=%d challenge_sz=%llu\n",
 			(u64)buf_phys, token_size, FIRME_BUF_PAGE_COUNT,
 			challenge_sz);
 
@@ -131,7 +131,7 @@ retry:
 				     challenge_sz,
 				     &res);
 
-		pr_info("nvidia-firme: SMC returned: status=%ld written=%lu remaining=%lu\n",
+		pr_debug("nvidia-firme: SMC returned: status=%ld written=%lu remaining=%lu\n",
 			(long)res.a0, res.a1, res.a2);
 
 		if ((long)res.a0 == FIRME_RETRY) {
@@ -181,7 +181,7 @@ retry:
 	report->outblob = no_free_ptr(token);
 	report->outblob_len = token_size;
 
-	pr_info("nvidia-firme: attestation token retrieved, %zu bytes\n",
+	pr_debug("nvidia-firme: attestation token retrieved, %zu bytes\n",
 		token_size);
 	return 0;
 }
@@ -233,7 +233,7 @@ static int firme_mr_extend(const struct tsm_measurements *tm,
 	memcpy(buf, data, mr->mr_size);
 	buf_phys = virt_to_phys(buf);
 
-	pr_info("nvidia-firme: EXT_CLAIMS SMC: slot=%u buf=0x%llx size=%u\n",
+	pr_debug("nvidia-firme: EXT_CLAIMS SMC: slot=%u buf=0x%llx size=%u\n",
 		slot_index, (u64)buf_phys, mr->mr_size);
 
 	arm_smccc_1_1_invoke(FIRME_ATTEST_EXTEND,
@@ -245,7 +245,7 @@ static int firme_mr_extend(const struct tsm_measurements *tm,
 
 	free_page((unsigned long)buf);
 
-	pr_info("nvidia-firme: EXT_CLAIMS returned status=%ld\n", (long)res.a0);
+	pr_debug("nvidia-firme: EXT_CLAIMS returned status=%ld\n", (long)res.a0);
 
 	if ((long)res.a0 == FIRME_SUCCESS) {
 		memcpy(mr->mr_value, data, mr->mr_size);
