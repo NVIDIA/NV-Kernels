@@ -795,7 +795,7 @@ static inline void nfs_folio_mark_unstable(struct nfs_page *req,
 	struct folio *folio = nfs_page_to_folio(req);
 
 	if (folio && !cinfo->dreq) {
-		struct inode *inode = folio_file_mapping(folio)->host;
+		struct inode *inode = folio->mapping->host;
 		long nr = DIV_ROUND_UP(req->wb_bytes, PAGE_SIZE);
 
 		/* This range is really still in write-back - just that the
