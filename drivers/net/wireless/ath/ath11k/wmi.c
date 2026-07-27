@@ -4973,6 +4973,7 @@ static int ath11k_service_ready_ext_event(struct ath11k_base *ab,
 	return 0;
 
 err:
+	kfree(svc_rdy_ext.mac_phy_caps); /* [noble: move cleanup to ath11k_service_ready_ext_event() error path] */
 	ath11k_wmi_free_dbring_caps(ab);
 	return ret;
 }
