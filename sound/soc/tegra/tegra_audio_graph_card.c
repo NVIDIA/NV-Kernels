@@ -6,6 +6,7 @@
 #include <linux/math64.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <sound/graph_card.h>
 #include <sound/pcm_params.h>
@@ -198,6 +199,7 @@ static int tegra_audio_graph_probe(struct platform_device *pdev)
 	struct tegra_audio_priv *priv;
 	struct device *dev = &pdev->dev;
 	struct snd_soc_card *card;
+	int ret;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -213,7 +215,13 @@ static int tegra_audio_graph_probe(struct platform_device *pdev)
 	priv->simple.ops = &tegra_audio_graph_ops;
 	priv->simple.force_dpcm = 1;
 
-	return audio_graph_parse_of(&priv->simple, dev);
+	ret = audio_graph_parse_of(&priv->simple, dev);
+	if (ret < 0)
+		return ret;
+
+	of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+
+	return 0;
 }
 
 static const struct tegra_audio_cdata tegra210_data = {
