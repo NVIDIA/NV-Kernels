@@ -1514,6 +1514,7 @@ struct xhci_hcd {
 	u32		imod_interval;
 	int		event_ring_max;
 	u32		page_size;
+	unsigned int	dma_mask_bits;
 	/* MSI-X/MSI vectors */
 	int		nvecs;
 	/* optional clocks */
