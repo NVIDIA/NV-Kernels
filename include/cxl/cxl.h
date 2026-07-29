@@ -157,6 +157,8 @@ void pci_cxl_hdm_init(struct pci_dev *pdev);
 void pci_cxl_hdm_release(struct pci_dev *pdev);
 int cxl_restore_hdm_after_pci_reset(struct pci_dev *pdev);
 int cxl_reset_function(struct pci_dev *pdev, bool probe);
+bool cxl_reset_capable(struct pci_dev *pdev);
+int cxl_reset_dvsec_sequence(struct pci_dev *pdev, bool mem_clr_en);
 #else
 static inline void pci_cxl_hdm_init(struct pci_dev *pdev)
 {
@@ -175,6 +177,17 @@ static inline int cxl_reset_function(struct pci_dev *pdev, bool probe)
 {
 	return -ENOTTY;
 }
+
+static inline bool cxl_reset_capable(struct pci_dev *pdev)
+{
+	return false;
+}
+
+static inline int cxl_reset_dvsec_sequence(struct pci_dev *pdev, bool mem_clr_en)
+{
+	return -ENOTTY;
+}
+
 #endif
 
 struct cxl_reg_map {
@@ -384,7 +397,7 @@ struct cxl_region *cxl_create_region(struct cxl_root_decoder *cxlrd,
 
 enum cxl_regloc_type;
 
-#ifdef CONFIG_CXL_BUS
+#if IS_ENABLED(CONFIG_CXL_BUS)
 
 int cxl_get_hdm_info(struct cxl_dev_state *cxlds, u8 *count,
 		     resource_size_t *offset, resource_size_t *size);
