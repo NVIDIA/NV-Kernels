@@ -989,6 +989,8 @@ static void gve_free_rings(struct gve_priv *priv)
 	if (priv->rx) {
 		for (i = 0; i < priv->rx_cfg.num_queues; i++) {
 			ntfy_idx = gve_rx_idx_to_ntfy(priv, i);
+			if (!gve_is_gqi(priv))
+				timer_shutdown_sync(&priv->rx[i].starvation_timer);
 			gve_remove_napi(priv, ntfy_idx);
 		}
 		gve_rx_free_rings(priv);
