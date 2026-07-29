@@ -192,6 +192,17 @@ void bpf_struct_ops_init(struct btf *btf, struct bpf_verifier_log *log)
 					mname, st_ops->name);
 				break;
 			}
+
+			/*
+			 * A >8 byte return value is passed back in a register pair,
+			 * which the struct_ops trampoline does not preserve (only
+			 * 8 bytes of the return value are saved and restored).
+			 */
+			if (func_proto && st_ops->func_models[j].ret_size > 8) {
+				pr_warn("func ptr %s in struct %s has a >8 byte return value, which is not supported\n",
+					mname, st_ops->name);
+				break;
+			}
 		}
 
 		if (j == btf_type_vlen(t)) {
