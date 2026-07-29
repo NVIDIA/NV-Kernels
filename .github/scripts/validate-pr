@@ -2,6 +2,7 @@
 from argparse import ArgumentParser
 from collections import Counter
 from colorama import Fore
+import difflib
 import git
 import hashlib
 import mailbox
@@ -130,24 +131,315 @@ def describe_added_sob_order(message, added):
     return None
 
 
-def get_patch_id(commit):
+def get_patch_id(commit, zero_context=False):
     """Return the stable patch-ID string for a commit, or None on failure."""
+    show_args = ['git', 'show']
+    if zero_context:
+        show_args.extend([
+            '--format=', '--no-color', '--no-ext-diff', '--no-textconv',
+            '--full-index', '--binary', '--unified=0',
+        ])
+    show_args.append(commit.hexsha)
+    try:
+        show = subprocess.run(
+            show_args,
+            capture_output=True,
+            cwd=commit.repo.working_dir,
+        )
+        if show.returncode != 0:
+            return None
+        pid = subprocess.run(
+            ['git', 'patch-id', '--stable'],
+            input=show.stdout,
+            capture_output=True,
+            cwd=commit.repo.working_dir,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+    if pid.returncode != 0:
+        return None
+    match = re.fullmatch(
+        br'(?:(?P<sha1>[0-9a-f]{40}) [0-9a-f]{40}|'
+        br'(?P<sha256>[0-9a-f]{64}) [0-9a-f]{64})\n?',
+        pid.stdout,
+    )
+    if match is None:
+        return None
+    return (match.group('sha1') or match.group('sha256')).decode('ascii')
+
+
+_OID_RE = re.compile(r'(?:[0-9a-f]{40}|[0-9a-f]{64})')
+_MERGE_TREE_CONFLICT_RE = re.compile(
+    r'^[0-7]{6} ' + _OID_RE.pattern + r' [1-3]\t.+$')
+_MAX_EQUIVALENCE_FILE_LINES = 20000
+_MAX_EQUIVALENCE_EDITS = 128
+_MAX_EQUIVALENCE_ANCHOR_LINES = 64
+
+
+def _parse_merge_tree_result(returncode, stdout):
+    """Classify merge-tree --write-tree output as clean, conflict, or error."""
+    lines = stdout.splitlines()
+    if not lines or not _OID_RE.fullmatch(lines[0]):
+        return 'error', None
+    tree_oid = lines[0]
+    if returncode == 0 and len(lines) == 1:
+        return 'clean', tree_oid
+    if returncode == 0:
+        return 'error', None
+    if returncode != 1:
+        return 'error', None
+    conflict_lines = 0
+    for line in lines[1:]:
+        if _MERGE_TREE_CONFLICT_RE.fullmatch(line):
+            conflict_lines += 1
+            continue
+        # merge-tree may append a blank line and informational messages
+        # after the NUL-less conflict stage records.
+        if conflict_lines and (line == '' or line.startswith('Auto-merging') or
+                               line.startswith('CONFLICT ') or
+                               line.startswith('CONFLICT(')):
+            continue
+        return 'error', None
+    if conflict_lines:
+        return 'conflict', tree_oid
+    return 'error', None
+
+
+def _commit_path_set(commit):
+    """Return the set of paths touched by a single-parent commit, or None."""
+    if len(commit.parents) != 1:
+        return None
+    result = subprocess.run(
+        [
+            'git', 'diff-tree', '--no-commit-id', '--name-only', '-r', '-z',
+            commit.hexsha,
+        ],
+        capture_output=True,
+        cwd=commit.repo.working_dir,
+    )
+    if result.returncode != 0:
+        return None
+    if not result.stdout:
+        return set()
+    if not result.stdout.endswith(b'\0'):
+        return None
+    parts = result.stdout.split(b'\0')
+    if parts[-1] != b'':
+        return None
+    try:
+        return {part.decode('utf-8') for part in parts[:-1]}
+    except UnicodeDecodeError:
+        return None
+
+
+def _blob_lines(commit, path):
+    """Return text lines with endings for path at commit, or None."""
+    result = subprocess.run(
+        ['git', 'cat-file', '-e', '{}:{}'.format(commit.hexsha, path)],
+        capture_output=True,
+        cwd=commit.repo.working_dir,
+    )
+    if result.returncode != 0:
+        return None
     show = subprocess.run(
-        ['git', 'show', commit.hexsha],
+        ['git', 'show', '{}:{}'.format(commit.hexsha, path)],
         capture_output=True,
         cwd=commit.repo.working_dir,
     )
-    pid = subprocess.run(
-        ['git', 'patch-id', '--stable'],
-        input=show.stdout,
-        capture_output=True,
-        cwd=commit.repo.working_dir,
-    )
-    if pid.returncode == 0 and pid.stdout:
-        parts = pid.stdout.decode().strip().split()
-        if parts:
-            return parts[0]
-    return None
+    if show.returncode != 0:
+        return None
+    if b'\0' in show.stdout:
+        return None
+    try:
+        return show.stdout.decode('utf-8').splitlines(keepends=True)
+    except UnicodeDecodeError:
+        return None
+
+
+def _parent_to_result_edits(parent_lines, result_lines):
+    """Return ordered (removed, inserted, i1, i2) edits with autojunk disabled."""
+    if (len(parent_lines) > _MAX_EQUIVALENCE_FILE_LINES or
+            len(result_lines) > _MAX_EQUIVALENCE_FILE_LINES):
+        return None
+    edits = []
+    matcher = difflib.SequenceMatcher(
+        None, parent_lines, result_lines, autojunk=False)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'equal':
+            continue
+        edits.append((parent_lines[i1:i2], result_lines[j1:j2], i1, i2))
+    return edits
+
+
+def _sequence_occurrences(lines, sequence):
+    """Return how many times sequence occurs contiguously in lines."""
+    length = len(sequence)
+    if length == 0 or length > len(lines):
+        return 0
+    return sum(
+        1 for index in range(len(lines) - length + 1)
+        if lines[index:index + length] == sequence)
+
+
+def _unique_adjacent_anchor(upstream_parent, local_parent,
+                            up_i1, up_i2, loc_i1, loc_i2):
+    """Return True when one immediately adjacent unique context proves placement.
+
+    Grow the shortest same-side neighbor sequence until it appears exactly once
+    in both parents. Reject the side as soon as neighbor content diverges.
+    """
+    for side in ('left', 'right'):
+        if side == 'left':
+            max_len = min(up_i1, loc_i1)
+        else:
+            max_len = min(len(upstream_parent) - up_i2,
+                          len(local_parent) - loc_i2)
+        max_len = min(max_len, _MAX_EQUIVALENCE_ANCHOR_LINES)
+        for length in range(1, max_len + 1):
+            if side == 'left':
+                up_seq = upstream_parent[up_i1 - length:up_i1]
+                loc_seq = local_parent[loc_i1 - length:loc_i1]
+            else:
+                up_seq = upstream_parent[up_i2:up_i2 + length]
+                loc_seq = local_parent[loc_i2:loc_i2 + length]
+            if up_seq != loc_seq:
+                break
+            if (_sequence_occurrences(upstream_parent, up_seq) == 1 and
+                    _sequence_occurrences(local_parent, loc_seq) == 1):
+                return True
+    return False
+
+
+def _edits_have_unique_placement(upstream_parent, upstream_result,
+                                 local_parent, local_result):
+    """Prove same ordered edit payload with unambiguous adjacent anchors."""
+    upstream_edits = _parent_to_result_edits(upstream_parent, upstream_result)
+    local_edits = _parent_to_result_edits(local_parent, local_result)
+    if (upstream_edits is None or local_edits is None or
+            len(upstream_edits) > _MAX_EQUIVALENCE_EDITS or
+            len(local_edits) > _MAX_EQUIVALENCE_EDITS):
+        return False
+    if not upstream_edits:
+        return False
+    if ([(removed, inserted) for removed, inserted, _, _ in upstream_edits] !=
+            [(removed, inserted) for removed, inserted, _, _ in local_edits]):
+        return False
+    for (_, _, up_i1, up_i2), (_, _, loc_i1, loc_i2) in zip(
+            upstream_edits, local_edits):
+        if not _unique_adjacent_anchor(
+                upstream_parent, local_parent, up_i1, up_i2, loc_i1, loc_i2):
+            return False
+    return True
+
+
+def is_equivalent_by_anchored_edits(local_commit, upstream_commit):
+    """Prove context-only equivalence when three-way replay conflicts.
+
+    Zero-context patch-ID equality is assumed by the caller. For every touched
+    path, require identical ordered removed/inserted edit payloads and at least
+    one immediately adjacent context sequence that is unique in both parents and
+    present on the same side of the matching local edit. Fail closed when
+    placement is ambiguous or blobs cannot be compared as text.
+    """
+    if len(local_commit.parents) != 1 or len(upstream_commit.parents) != 1:
+        return False
+    local_paths = _commit_path_set(local_commit)
+    upstream_paths = _commit_path_set(upstream_commit)
+    if local_paths is None or upstream_paths is None:
+        return False
+    if local_paths != upstream_paths or not local_paths:
+        return False
+
+    local_parent = local_commit.parents[0]
+    upstream_parent = upstream_commit.parents[0]
+    for path in sorted(local_paths):
+        up_before = _blob_lines(upstream_parent, path)
+        up_after = _blob_lines(upstream_commit, path)
+        loc_before = _blob_lines(local_parent, path)
+        loc_after = _blob_lines(local_commit, path)
+        # Fail closed on adds/deletes/renames/binary/undecodable blobs.
+        if None in (up_before, up_after, loc_before, loc_after):
+            return False
+        if not _edits_have_unique_placement(
+                up_before, up_after, loc_before, loc_after):
+            return False
+    return True
+
+
+def is_equivalent_replay(local_commit, upstream_commit,
+                         local_patch_id, upstream_patch_id):
+    """Return whether the upstream change replays to the exact local tree."""
+    if not local_patch_id or not upstream_patch_id:
+        return False
+
+    try:
+        context_only = local_patch_id != upstream_patch_id
+        if context_only:
+            local_zero = get_patch_id(local_commit, zero_context=True)
+            upstream_zero = get_patch_id(upstream_commit, zero_context=True)
+            if not local_zero or local_zero != upstream_zero:
+                return False
+
+        if len(local_commit.parents) != 1 or len(upstream_commit.parents) != 1:
+            return False
+
+        object_path = subprocess.run(
+            ['git', 'rev-parse', '--git-path', 'objects'],
+            capture_output=True,
+            cwd=local_commit.repo.working_dir,
+            text=True,
+        )
+        if object_path.returncode != 0 or not object_path.stdout.strip():
+            return False
+        object_dir = object_path.stdout.strip()
+        if not os.path.isabs(object_dir):
+            object_dir = os.path.abspath(os.path.join(
+                local_commit.repo.working_dir, object_dir))
+
+        with tempfile.TemporaryDirectory() as replay_object_dir:
+            env = os.environ.copy()
+            # Git treats a double-quoted entry as a C-style quoted path, so
+            # separators in the object directory do not create extra entries.
+            quoted_object_dir = object_dir.replace('\\', '\\\\').replace(
+                '"', '\\"')
+            alternates = ['"{}"'.format(quoted_object_dir)]
+            if env.get('GIT_ALTERNATE_OBJECT_DIRECTORIES'):
+                alternates.append(env['GIT_ALTERNATE_OBJECT_DIRECTORIES'])
+            env['GIT_OBJECT_DIRECTORY'] = replay_object_dir
+            env['GIT_ALTERNATE_OBJECT_DIRECTORIES'] = os.pathsep.join(
+                alternates)
+            replay = subprocess.run(
+                [
+                    'git', 'merge-tree', '--write-tree',
+                    '--merge-base={}'.format(upstream_commit.parents[0].hexsha),
+                    local_commit.parents[0].hexsha,
+                    upstream_commit.hexsha,
+                ],
+                capture_output=True,
+                cwd=local_commit.repo.working_dir,
+                env=env,
+                text=True,
+            )
+        status, tree_oid = _parse_merge_tree_result(
+            replay.returncode, replay.stdout)
+        if status == 'clean':
+            return tree_oid == local_commit.tree.hexsha
+        if status == 'conflict' and context_only:
+            return is_equivalent_by_anchored_edits(
+                local_commit, upstream_commit)
+        if status != 'clean':
+            detail = replay.stderr.strip() or "git merge-tree exited {}".format(
+                replay.returncode)
+            if status == 'error' and not detail and replay.stdout.strip():
+                detail = "malformed git merge-tree output"
+            print("W: unable to verify patch replay: {}".format(detail),
+                  file=sys.stderr)
+        return False
+    except (OSError, subprocess.SubprocessError, UnicodeError) as error:
+        print("W: unable to verify patch replay: {}".format(error),
+              file=sys.stderr)
+        return False
 
 
 def describe_sob_chain(local_commit, upstream_commit):
@@ -497,8 +789,11 @@ def build_digest(commits, repo, upstream_remote=None):
         # Patch-ID
         local_pid    = get_patch_id(commit)
         upstream_pid = get_patch_id(upstream)
-        if local_pid and upstream_pid and local_pid == upstream_pid:
-            pid_status = 'match'
+        patch_ids_match = bool(
+            local_pid and upstream_pid and local_pid == upstream_pid)
+        if is_equivalent_replay(
+                commit, upstream, local_pid, upstream_pid):
+            pid_status = 'match' if patch_ids_match else 'context'
             pid_error  = False
         else:
             pid_status = 'MISMATCH'
