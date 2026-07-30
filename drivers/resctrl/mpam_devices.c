@@ -2040,6 +2040,7 @@ static int mpam_restore_mbwu_state(void *_ris)
 /* Call with MSC cfg_lock held */
 static int mpam_save_mbwu_state(void *arg)
 {
+	bool long_counter;
 	int i;
 	u64 val;
 	int ret;
@@ -2048,6 +2049,8 @@ static int mpam_save_mbwu_state(void *arg)
 	struct mpam_msc_ris *ris = arg;
 	struct msmon_mbwu_state *mbwu_state;
 	struct mpam_msc *msc = ris->vmsc->msc;
+
+	long_counter = mpam_ris_has_mbwu_long_counter(ris);
 
 	for (i = 0; i < ris->props.num_mbwu_mon; i++) {
 		mbwu_state = &ris->mbwu_state[i];
@@ -2072,7 +2075,7 @@ static int mpam_save_mbwu_state(void *arg)
 		if (ret)
 			return ret;
 
-		if (mpam_ris_has_mbwu_long_counter(ris)) {
+		if (long_counter) {
 			ret = mpam_msc_read_mbwu_l(msc, &val);
 			if (ret)
 				return ret;
@@ -2091,6 +2094,9 @@ static int mpam_save_mbwu_state(void *arg)
 			if (ret)
 				return ret;
 		}
+
+		if (val & (long_counter ? MSMON___L_NRDY : MSMON___NRDY))
+			continue;
 
 		cfg->mon = i;
 		cfg->pmg = FIELD_GET(MSMON_CFG_x_FLT_PMG, cur_flt);
