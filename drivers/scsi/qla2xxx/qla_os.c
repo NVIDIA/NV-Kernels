@@ -3928,8 +3928,6 @@ qla2x00_remove_one(struct pci_dev *pdev)
 
 	qla2x00_dfs_remove(base_vha);
 
-	qla84xx_put_chip(base_vha);
-
 	/* Disable timer */
 	if (base_vha->timer_active)
 		qla2x00_stop_timer(base_vha);
@@ -3953,6 +3951,8 @@ qla2x00_remove_one(struct pci_dev *pdev)
 	fc_remove_host(base_vha->host);
 
 	scsi_remove_host(base_vha->host);
+
+	qla84xx_put_chip(base_vha);
 
 	qla2x00_free_device(base_vha);
 
@@ -6825,8 +6825,6 @@ qla2x00_disable_board_on_pci_error(struct work_struct *work)
 
 	qla2x00_dfs_remove(base_vha);
 
-	qla84xx_put_chip(base_vha);
-
 	if (base_vha->timer_active)
 		qla2x00_stop_timer(base_vha);
 
@@ -6843,6 +6841,8 @@ qla2x00_disable_board_on_pci_error(struct work_struct *work)
 	fc_remove_host(base_vha->host);
 
 	scsi_remove_host(base_vha->host);
+
+	qla84xx_put_chip(base_vha);
 
 	base_vha->flags.init_done = 0;
 	qla25xx_delete_queues(base_vha);
