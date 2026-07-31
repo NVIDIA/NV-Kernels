@@ -5339,6 +5339,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
 	if (of_device_is_compatible(dev->of_node, "nvidia,tegra264-smmu")) {
 		tegra_cmdqv_dt_probe(dev->of_node, smmu);
 		static_branch_enable(&arm_smmu_erratum_repeat_tlbi_cfgi_key);
+	} else if (of_property_read_bool(dev->of_node,
+					 "nvidia,tegra264-tlbi-race-fix")) {
+		static_branch_enable(&arm_smmu_erratum_repeat_tlbi_cfgi_key);
 	}
 
 	return ret;
