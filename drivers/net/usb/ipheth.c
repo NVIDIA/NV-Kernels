@@ -113,12 +113,25 @@ struct ipheth_device {
 	u8 bulk_in;
 	u8 bulk_out;
 	struct delayed_work carrier_work;
+	spinlock_t carrier_work_lock;
+	bool carrier_work_enabled;
 	bool confirmed_pairing;
 	int (*rcvbulk_callback)(struct urb *urb);
 	size_t rx_buf_len;
 };
 
 static int ipheth_rx_submit(struct ipheth_device *dev, gfp_t mem_flags);
+
+static void ipheth_schedule_carrier_work(struct ipheth_device *dev,
+					 unsigned long delay)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dev->carrier_work_lock, flags);
+	if (dev->carrier_work_enabled)
+		schedule_delayed_work(&dev->carrier_work, delay);
+	spin_unlock_irqrestore(&dev->carrier_work_lock, flags);
+}
 
 static int ipheth_alloc_urbs(struct ipheth_device *iphone)
 {
@@ -356,7 +369,7 @@ static void ipheth_sndbulk_callback(struct urb *urb)
 		netif_wake_queue(dev->net);
 	else
 		// on URB error, trigger immediate poll
-		schedule_delayed_work(&dev->carrier_work, 0);
+		ipheth_schedule_carrier_work(dev, 0);
 }
 
 static int ipheth_carrier_set(struct ipheth_device *dev)
@@ -400,7 +413,7 @@ static void ipheth_carrier_check_work(struct work_struct *work)
 						 carrier_work.work);
 
 	ipheth_carrier_set(dev);
-	schedule_delayed_work(&dev->carrier_work, IPHETH_CARRIER_CHECK_TIMEOUT);
+	ipheth_schedule_carrier_work(dev, IPHETH_CARRIER_CHECK_TIMEOUT);
 }
 
 static int ipheth_get_macaddr(struct ipheth_device *dev)
@@ -478,6 +491,7 @@ static int ipheth_open(struct net_device *net)
 {
 	struct ipheth_device *dev = netdev_priv(net);
 	struct usb_device *udev = dev->udev;
+	unsigned long flags;
 	int retval = 0;
 
 	usb_set_interface(udev, IPHETH_INTFNUM, IPHETH_ALT_INTFNUM);
@@ -490,15 +504,26 @@ static int ipheth_open(struct net_device *net)
 	if (retval)
 		return retval;
 
+	spin_lock_irqsave(&dev->carrier_work_lock, flags);
+	dev->carrier_work_enabled = true;
 	schedule_delayed_work(&dev->carrier_work, IPHETH_CARRIER_CHECK_TIMEOUT);
+	spin_unlock_irqrestore(&dev->carrier_work_lock, flags);
 	return retval;
 }
 
 static int ipheth_close(struct net_device *net)
 {
 	struct ipheth_device *dev = netdev_priv(net);
+	unsigned long flags;
 
 	netif_stop_queue(net);
+	/* A TX URB can still complete with an error after this point and
+	 * try to re-arm the carrier work. Prevent new schedules before
+	 * cancelling it so the work cannot outlive the netdev.
+	 */
+	spin_lock_irqsave(&dev->carrier_work_lock, flags);
+	dev->carrier_work_enabled = false;
+	spin_unlock_irqrestore(&dev->carrier_work_lock, flags);
 	cancel_delayed_work_sync(&dev->carrier_work);
 	return 0;
 }
@@ -633,6 +658,8 @@ static int ipheth_probe(struct usb_interface *intf,
 	}
 
 	INIT_DELAYED_WORK(&dev->carrier_work, ipheth_carrier_check_work);
+	spin_lock_init(&dev->carrier_work_lock);
+	dev->carrier_work_enabled = false;
 
 	retval = ipheth_alloc_urbs(dev);
 	if (retval) {
