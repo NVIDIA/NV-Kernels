@@ -33,9 +33,15 @@ CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-
 CONFIG_CPUFREQ_DT_RUST                          policy<{'arm64': '-'}>
 CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_DRM_TYR                                  policy<{'arm64': '-'}>
+CONFIG_DW_I3C_MASTER                            policy<{'amd64': 'n', 'arm64': 'm'}>
+CONFIG_DW_I3C_MASTER                            note<'Enable DesignWare I3C master controller for Tegra410'>
+
 CONFIG_FIND_BIT_BENCHMARK_RUST                  policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_GCC_VERSION                              policy<{'amd64': '130300', 'arm64': '130300'}>
 CONFIG_HAVE_RUST                                policy<{'amd64': 'y', 'arm64': '-'}>
+CONFIG_I3C                                      policy<{'amd64': 'n', 'arm64': 'm'}>
+CONFIG_I3C                                      note<'Enable I3C bus support for Tegra410 and SPD5118 temperature sensors'>
+
 CONFIG_LD_VERSION                               policy<{'amd64': '24200', 'arm64': '24200'}>
 CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_44             policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_65             policy<{'amd64': '-', 'arm64': '-'}>
@@ -59,4 +65,6 @@ CONFIG_RUST_FW_LOADER_ABSTRACTIONS              policy<{'amd64': '-', 'arm64': '
 CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_RUST_PHYLIB_ABSTRACTIONS                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_SAMPLES_RUST                             policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_SENSORS_SPD5118                          policy<{'amd64': 'n', 'arm64': 'm'}>
+CONFIG_SENSORS_SPD5118                          note<'Enable SPD5118 temperature sensor support for DDR5 memory modules'>
 CONFIG_TOOLS_SUPPORT_RELR                       policy<{'amd64': 'y', 'arm64': '-'}>
