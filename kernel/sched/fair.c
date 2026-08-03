@@ -7774,16 +7774,6 @@ enum asym_fits_state {
 };
 
 /*
- * Return a stable CPU representative of @cpu's SMT core within @cpus.
- */
-static int select_idle_core_cpu(int cpu, const struct cpumask *cpus)
-{
-	int sibling = cpumask_first_and(cpu_smt_mask(cpu), cpus);
-
-	return sibling < nr_cpu_ids ? sibling : cpu;
-}
-
-/*
  * Scan the asym_capacity domain for idle CPUs; pick the first idle one on which
  * the task fits. If no CPU is big enough, but there are idle ones, try to
  * maximize capacity.
@@ -7792,7 +7782,6 @@ static int
 select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 {
 	bool prefers_idle_core = sched_smt_active() && test_idle_cores(target);
-	bool best_idle_core = false;
 	unsigned long task_util, util_min, util_max, best_cap = 0;
 	int fits, best_fits = ASYM_IDLE_COMPLETE_MISFIT;
 	int cpu, best_cpu = -1;
@@ -7818,8 +7807,7 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 	}
 
 	for_each_cpu_wrap(cpu, cpus, target) {
-		bool idle_core = !sched_smt_active() || is_core_idle(cpu);
-		bool preferred_core = !prefers_idle_core || idle_core;
+		bool preferred_core = !prefers_idle_core || is_core_idle(cpu);
 		unsigned long cpu_cap = capacity_of(cpu);
 
 		/*
@@ -7836,7 +7824,7 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 
 		/* This CPU fits with all requirements */
 		if (fits > 0 && preferred_core)
-			return idle_core ? select_idle_core_cpu(cpu, cpus) : cpu;
+			return cpu;
 		/*
 		 * Only the min performance hint (i.e. uclamp_min) doesn't fit.
 		 * Look for the CPU with best capacity.
@@ -7877,7 +7865,6 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 			best_cap = cpu_cap;
 			best_cpu = cpu;
 			best_fits = fits;
-			best_idle_core = idle_core;
 		}
 	}
 
@@ -7893,8 +7880,6 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
 	 */
 	if (prefers_idle_core && best_fits > ASYM_IDLE_CORE_BIAS)
 		set_idle_cores(target, false);
-	else if (best_idle_core)
-		best_cpu = select_idle_core_cpu(best_cpu, cpus);
 
 	return best_cpu;
 }
