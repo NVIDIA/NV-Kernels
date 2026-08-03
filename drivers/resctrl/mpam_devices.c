@@ -2096,6 +2096,9 @@ static int mpam_save_mbwu_state(void *arg)
 		if (val & (long_counter ? MSMON___L_NRDY : MSMON___NRDY))
 			continue;
 
+		if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc))
+			val *= 64;
+
 		cfg->mon = i;
 		cfg->pmg = FIELD_GET(MSMON_CFG_x_FLT_PMG, cur_flt);
 		cfg->match_pmg = FIELD_GET(MSMON_CFG_x_CTL_MATCH_PMG, cur_ctl);
