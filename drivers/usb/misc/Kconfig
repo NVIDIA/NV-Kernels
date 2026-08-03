@@ -194,6 +194,8 @@ config USB_USBIO
 	  This driver can also be built as a module. If so, the module
 	  will be called usbio.
 
+source "drivers/usb/misc/lstp/Kconfig"
+
 source "drivers/usb/misc/sisusbvga/Kconfig"
 
 config USB_LD
