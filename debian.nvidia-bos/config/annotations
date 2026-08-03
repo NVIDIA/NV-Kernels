@@ -273,6 +273,9 @@ CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM dri
 CONFIG_SENSORS_SPD5118                          policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_SENSORS_SPD5118                          note<'Enable SPD5118 temperature sensor support for DDR5 memory modules'>
 
+CONFIG_SEPARATE_LSTP_IPMI_POSTCODES             policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_SEPARATE_LSTP_IPMI_POSTCODES             note<'Keep LSTP IPMI POST codes on the standard message path'>
+
 CONFIG_SFC_CXL                                  policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_SFC_CXL                                  note<'Solarflare SFC9100-family CXL Type-2 device support; not needed for NVIDIA platforms'>
 
@@ -293,6 +296,12 @@ CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM dri
 
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
+
+CONFIG_USB_LSTP                                 policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_USB_LSTP                                 note<'Enable the LSTP USB multi-function device for supported platforms'>
+
+CONFIG_USB_LSTP_SPI_SPIDEV                      policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_USB_LSTP_SPI_SPIDEV                      note<'Create spidev devices for LSTP SPI channels without firmware descriptions'>
 
 CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'n'}>
 CONFIG_VFIO_CONTAINER                           note<'LP: #2095028'>
