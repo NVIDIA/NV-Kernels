@@ -15114,6 +15114,12 @@ L:	linux-scsi@vger.kernel.org
 S:	Maintained
 F:	drivers/scsi/sym53c8xx_2/
 
+LOW-SPEED TRANSPORT PROTOCOL (LSTP) USB DRIVER
+M:	Adrian Ambrozewicz <aambrozewicz@nvidia.com>
+L:	linux-usb@vger.kernel.org
+S:	Supported
+F:	drivers/usb/misc/lstp/
+
 LT3074 HARDWARE MONITOR DRIVER
 M:	Cedric Encarnacion <cedricjustine.encarnacion@analog.com>
 L:	linux-hwmon@vger.kernel.org

@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config USB_LSTP
+	tristate "LSTP USB adapter support"
+	depends on USB
+	depends on I2C
+	depends on SPI_MASTER
+	depends on GPIOLIB
+	depends on LEDS_CLASS
+	depends on TTY
+	select GPIOLIB_IRQCHIP
+	help
+	  This adds support for the Low-Speed Transport Protocol (LSTP)
+	  USB adapter. The LSTP adapter exposes firmware-configured I2C, SPI,
+	  GPIO, UART, IPMI, and MMIO channels over a single USB interface.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called lstp.
+
+	  If unsure, say N.
+
+config USB_LSTP_SPI_SPIDEV
+	bool "Auto-create spidev devices for LSTP SPI channels"
+	depends on USB_LSTP
+	depends on SPI_SPIDEV
+	help
+	  Enable this option to make the lstp module default to creating spidev
+	  child devices for SPI channels that do not have firmware-described
+	  child devices.
+
+	  This only sets the compile-time default for the auto_bind_spidev module
+	  parameter. The default can still be overridden at module load time.
+
+	  If unsure, say N.
+
+config SEPARATE_LSTP_IPMI_POSTCODES
+	bool "Separate LSTP IPMI post code writes to separate miscdevice"
+	depends on USB_LSTP
+	help
+	  Enable this option to route IPMI post code writes to a separate
+	  miscdevice instead of the main IPMI message path. Since POST codes
+	  do not require a response, this allows faster processing by
+	  bypassing the standard IPMI request-response handling.
+
+	  If unsure, say N.
