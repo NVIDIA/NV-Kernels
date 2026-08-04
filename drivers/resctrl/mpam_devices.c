@@ -139,6 +139,13 @@ static int mpam_pcc_chan_put(struct mpam_pcc_chan *pcc_chan)
 	return -ENOENT;
 }
 
+static void mpam_msc_release(void *to_free)
+{
+	struct mpam_msc *msc = to_free;
+
+	mpam_pcc_chan_put(msc->pcc_chan);
+}
+
 /*
  * Number of MSCs that have been probed. Once all MSCs have been probed MPAM
  * can be enabled.
@@ -243,6 +250,7 @@ static LLIST_HEAD(mpam_garbage);
 static inline void init_garbage(struct mpam_garbage *garbage)
 {
 	init_llist_node(&garbage->llist);
+	garbage->release = NULL;
 }
 
 #define add_to_garbage(x)				\
@@ -263,6 +271,9 @@ static void mpam_free_garbage(void)
 	synchronize_srcu(&mpam_srcu);
 
 	llist_for_each_entry_safe(iter, tmp, to_free, llist) {
+		if (iter->release)
+			iter->release(iter->to_free);
+
 		if (iter->pdev)
 			devm_kfree(&iter->pdev->dev, iter->to_free);
 		else
@@ -2458,8 +2469,6 @@ static void mpam_msc_drv_remove(struct platform_device *pdev)
 {
 	struct mpam_msc *msc = platform_get_drvdata(pdev);
 
-	mpam_pcc_chan_put(msc->pcc_chan);
-
 	mutex_lock(&mpam_list_lock);
 	mpam_msc_destroy(msc);
 	mutex_unlock(&mpam_list_lock);
@@ -2482,6 +2491,7 @@ static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 	if (!msc)
 		return ERR_PTR(-ENOMEM);
 	init_garbage(&msc->garbage);
+	msc->garbage.release = mpam_msc_release;
 	msc->garbage.pdev = pdev;
 
 	err = devm_mutex_init(dev, &msc->probe_lock);
