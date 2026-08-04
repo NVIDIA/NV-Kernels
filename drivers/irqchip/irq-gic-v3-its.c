@@ -5091,9 +5091,15 @@ static void its_restore_enable(void *data)
 	raw_spin_unlock(&its_lock);
 }
 
+static void its_syscore_shutdown(void *data)
+{
+	its_save_disable(data);
+}
+
 static const struct syscore_ops its_syscore_ops = {
 	.suspend = its_save_disable,
 	.resume = its_restore_enable,
+	.shutdown = its_syscore_shutdown,
 };
 
 static struct syscore its_syscore = {
