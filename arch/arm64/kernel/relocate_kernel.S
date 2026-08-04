@@ -12,6 +12,7 @@
 #include <linux/linkage.h>
 
 #include <asm/assembler.h>
+#include <asm/drtm.h>
 #include <asm/kexec.h>
 #include <asm/page.h>
 #include <asm/sysreg.h>
@@ -45,6 +46,7 @@ SYM_CODE_START(arm64_relocate_new_kernel)
 	ldr	x28, [x0, #KIMAGE_START]
 	ldr	x27, [x0, #KIMAGE_ARCH_EL2_VECTORS]
 	ldr	x26, [x0, #KIMAGE_ARCH_DTB_MEM]
+	ldr	x25, [x0, #KIMAGE_ARCH_DRTM_PARAMS]
 
 	/* Setup the list loop variables. */
 	ldr	x18, [x0, #KIMAGE_ARCH_ZERO_PAGE] /* x18 = zero page for BBM */
@@ -92,6 +94,24 @@ SYM_CODE_START(arm64_relocate_new_kernel)
 	mov     x0, #HVC_SOFT_RESTART
 	hvc	#0				/* Jumps from el2 */
 .Lel1:
+	/* DRTM Check: if drtm_params is 0, proceed to normal boot */
+	cbz	x25, .Lel1_normal
+
+	/* Save DTB PA in DLME Data Slot */
+	ldr	x1, [x25, #DRTM_PARAMS_DLME_REGION_ADDR]
+	ldr	x2, [x25, #DRTM_PARAMS_DLME_DATA_OFFSET]
+	add	x1, x1, x2
+	sub	x1, x1, #8		/* x1 = DLME DTB Slot PA */
+	str	x26, [x1]		/* Write DTB PA into DLME */
+	mov	x1, x25			/* PA of DRTM_PARAMS */
+	mov_q	x0, DRTM_SMC_DYNAMIC_LAUNCH
+	smc	#0			/* Hand over to D-CRTM (TF-A) */
+
+	/*
+	 * If SMC returns, TF-A rejected or failed the Dynamic Launch.
+	 * Fail-open to standard boot by falling through to .Lel1_normal.
+	 */
+.Lel1_normal:
 	mov	x0, x26				/* dtb address */
 	mov	x1, xzr
 	mov	x2, xzr
