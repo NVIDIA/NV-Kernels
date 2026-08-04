@@ -6,12 +6,14 @@
 #ifndef _ASM_ARM64_DRTM_H
 #define _ASM_ARM64_DRTM_H
 
+#include <linux/const.h>
+
 #ifndef __ASSEMBLY__
 #include <linux/types.h>
 #endif
 
 /* DRTM SMC Function IDs (DEN0113 v1.2 §3.2-3.10) */
-#define DRTM_SMC_FN_BASE		0xC4000110UL
+#define DRTM_SMC_FN_BASE		_AC(0xC4000110, UL)
 #define DRTM_SMC_VERSION		(DRTM_SMC_FN_BASE + 0x00)
 #define DRTM_SMC_FEATURES		(DRTM_SMC_FN_BASE + 0x01)
 #define DRTM_SMC_UNPROTECT_MEMORY	(DRTM_SMC_FN_BASE + 0x03)
@@ -22,6 +24,10 @@
 #define DRTM_SMC_SET_TCB_HASH		(DRTM_SMC_FN_BASE + 0x08)
 #define DRTM_SMC_LOCK_TCB_HASH		(DRTM_SMC_FN_BASE + 0x09)
 #define DRTM_SMC_ENABLE_SECURE_INTERRUPTS (DRTM_SMC_FN_BASE + 0x0A) /* 0xC400011A */
+
+/* DRTM_FEATURES query parameter flags (DEN0113 v1.2 §3.3) */
+#define DRTM_FEAT_QUERY_64BIT		_AC(0x8000000000000000, ULL)
+#define DRTM_FEAT_MEM_REQ		0x2
 
 /* DRTM Return Codes (DEN0113 v1.2 §3.18, Table 20) */
 #define DRTM_SUCCESS			0
@@ -37,7 +43,7 @@
 #define DRTM_LAUNCH_FEAT_MEM_PROT_ALL	(0x0 << 3)
 #define DRTM_LAUNCH_FEAT_SEC_INT_DISABLE (0x1 << 7) /* DEN0113 Table 9 */
 
-/* DRTM page size */
+/* DRTM page size and default sizes */
 #define DRTM_PAGE_SIZE			0x1000
 
 /*
@@ -55,6 +61,26 @@
 	((0x0ULL << 55) | (0x0ULL << 52) | ((1ULL << 52) - 1ULL))
 
 #ifndef __ASSEMBLY__
+/*
+ * DRTM Parameters (DEN0113 v1.2 §3.13 / Table 9)
+ * Struct must be packed — passed directly to TF-A via SMC.
+ */
+struct drtm_parameters {
+	__le16	revision;
+	__le16	reserved;
+	__le32	launch_features;
+	__le64	dlme_region_address;
+	__le64	dlme_region_size;
+	__le64	dlme_image_start;
+	__le64	dlme_entry_point_offset;
+	__le64	dlme_image_size;
+	__le64	dlme_data_offset;
+	__le64	nw_dce_region_address;
+	__le64	nw_dce_region_size;
+	__le64	mem_prot_table_address;
+	__le64	mem_prot_table_size;
+} __packed;
+
 /*
  * Memory Region Descriptor Table (DEN0113 v1.2 §3.14, Table 11): header
  * followed by num_regions descriptors, consumed in place from the DLME

@@ -116,6 +116,10 @@ struct kimage_arch {
 	phys_addr_t zero_page;
 	unsigned long phys_offset;
 	unsigned long t0sz;
+	unsigned long drtm_dlme_size;
+	bool secure_launch;
+	phys_addr_t drtm_params;
+	unsigned long drtm_sl_entry_offset;
 };
 
 #ifdef CONFIG_KEXEC_FILE

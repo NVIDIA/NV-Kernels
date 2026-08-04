@@ -18,6 +18,8 @@
 #include <asm/cpufeature.h>
 #include <asm/image.h>
 #include <asm/memory.h>
+#include <asm/drtm.h>
+#include <linux/arm-smccc.h>
 
 static int image_probe(const char *kernel_buf, unsigned long kernel_len)
 {
@@ -57,6 +59,10 @@ static void *image_load(struct kimage *image,
 
 	/* Check cpu features */
 	flags = le64_to_cpu(h->flags);
+	if (arm64_image_flag_field(flags, ARM64_IMAGE_FLAG_SECURE_LAUNCH) && h->res4)
+		image->arch.drtm_sl_entry_offset = le64_to_cpu(h->res4);
+	else
+		image->arch.drtm_sl_entry_offset = 0;
 	be_image = arm64_image_flag_field(flags, ARM64_IMAGE_FLAG_BE);
 	be_kernel = IS_ENABLED(CONFIG_CPU_BIG_ENDIAN);
 	if ((be_image != be_kernel) && !system_supports_mixed_endian())
@@ -87,6 +93,34 @@ static void *image_load(struct kimage *image,
 	/* Adjust kernel segment with TEXT_OFFSET */
 	kbuf.memsz += text_offset;
 
+	if (cmdline && strstr(cmdline, "drtm=on")) {
+		struct arm_smccc_res res;
+		unsigned long dlme_size;
+
+		if (!image->arch.drtm_sl_entry_offset) {
+			pr_warn("kexec_file_load: drtm=on requested, but target kernel does not advertise DRTM Secure Launch capability (flags bit 4 / res4 offset). Falling back to normal boot without DRTM.\n");
+			goto out_normal_boot;
+		}
+
+		/* Query D-CRTM (TF-A) for DLME minimum memory requirement */
+		arm_smccc_smc(DRTM_SMC_FEATURES,
+				  DRTM_FEAT_QUERY_64BIT | DRTM_FEAT_MEM_REQ,
+				  0, 0, 0, 0, 0, 0, &res);
+		if ((s64)res.a0 > 0) {
+			dlme_size = res.a1 * DRTM_PAGE_SIZE;
+			pr_info("kexec_file: DRTM SMC requested %lu bytes for DLME\n",
+				dlme_size);
+		} else {
+			pr_warn("kexec_file_load: drtm=on requested, but active TF-A returned SMCCC_NOT_SUPPORTED (%lld). Falling back to normal boot without DRTM.\n",
+				(s64)res.a0);
+			goto out_normal_boot;
+		}
+
+		image->arch.secure_launch = true;
+		image->arch.drtm_dlme_size = dlme_size;
+		kbuf.memsz += dlme_size;
+	}
+out_normal_boot:
 	kernel_segment_number = image->nr_segments;
 
 	/*
