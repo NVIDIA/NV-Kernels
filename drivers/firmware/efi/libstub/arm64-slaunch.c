@@ -32,26 +32,6 @@
 /* From sl_stub.S — accessible via __efistub_ alias in image-vars.h */
 extern char sl_entry[];
 
-/*
- * DRTM Parameters (DEN0113 v1.2 §3.13 / Table 9)
- * Struct must be packed — passed directly to TF-A via SMC.
- */
-struct sl_drtm_params {
-	__le16	revision;
-	__le16	reserved;
-	__le32	launch_features;
-	__le64	dlme_region_address;
-	__le64	dlme_region_size;
-	__le64	dlme_image_start;
-	__le64	dlme_entry_point_offset;
-	__le64	dlme_image_size;
-	__le64	dlme_data_offset;
-	__le64	nw_dce_region_address;
-	__le64	nw_dce_region_size;
-	__le64	mem_prot_table_address;
-	__le64	mem_prot_table_size;
-} __packed;
-
 #define SL_PE_DEBUG_DIRECTORY_INDEX	6
 
 struct sl_pe_debug_directory_entry {
@@ -316,12 +296,12 @@ bool efi_slaunch_requested(void)
  * TF-A requires DRTM_PARAMETERS to be 4KB-aligned; we are past
  * ExitBootServices so cannot allocate — use a static buffer.
  */
-static struct sl_drtm_params sl_params __aligned(SL_DRTM_PAGE_SIZE);
+static struct drtm_parameters sl_params __aligned(SL_DRTM_PAGE_SIZE);
 
 void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 				 unsigned long fdt_addr)
 {
-	struct sl_drtm_params *params = &sl_params;
+	struct drtm_parameters *params = &sl_params;
 	unsigned long image_size, kernel_memsize;
 	unsigned long dlme_data_offset;
 	unsigned long sl_entry_offset;

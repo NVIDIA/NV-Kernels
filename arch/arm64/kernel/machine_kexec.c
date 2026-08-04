@@ -24,6 +24,7 @@
 #include <asm/page.h>
 #include <asm/sections.h>
 #include <asm/trans_pgd.h>
+#include <asm/drtm.h>
 
 /**
  * kexec_image_info - For debugging output.
@@ -146,6 +147,44 @@ int machine_kexec_post_load(struct kimage *kimage)
 	if (rc)
 		return rc;
 	kimage->arch.phys_offset = virt_to_phys(kimage) - (long)kimage;
+
+	kimage->arch.drtm_params = 0;
+	if (kimage->arch.secure_launch && kimage->nr_segments > 0) {
+		void *dp = kexec_page_alloc(kimage);
+		struct drtm_parameters *params;
+		unsigned long image_size, dlme_data_offset, kernel_addr, sl_entry_offset;
+
+		if (!dp)
+			return -ENOMEM;
+
+		params = (struct drtm_parameters *)dp;
+		image_size = kimage->segment[0].bufsz;
+		dlme_data_offset = kimage->segment[0].memsz - kimage->arch.drtm_dlme_size;
+		kernel_addr = kimage->segment[0].mem;
+		sl_entry_offset = kimage->arch.drtm_sl_entry_offset;
+
+		params->revision = DRTM_PARAMS_REVISION;
+		params->launch_features = 0;
+		params->dlme_region_address = kernel_addr;
+		params->dlme_region_size = kimage->segment[0].memsz;
+		params->dlme_image_start = 0;
+		params->dlme_entry_point_offset = sl_entry_offset;
+		params->dlme_image_size = image_size;
+		params->dlme_data_offset = dlme_data_offset;
+
+		dcache_clean_inval_poc((unsigned long)dp,
+					   (unsigned long)dp + sizeof(*params));
+		kimage->arch.drtm_params = __pa(dp);
+
+		if (kimage->arch.dtb_mem) {
+			u64 *dtb_slot = __va(kernel_addr + dlme_data_offset +
+						 SL_DLME_DTB_SLOT_OFFSET);
+
+			*dtb_slot = kimage->arch.dtb_mem;
+			dcache_clean_inval_poc((unsigned long)dtb_slot,
+						   (unsigned long)dtb_slot + sizeof(*dtb_slot));
+		}
+	}
 
 	/* Flush the reloc_code in preparation for its execution. */
 	dcache_clean_inval_poc((unsigned long)reloc_code,
