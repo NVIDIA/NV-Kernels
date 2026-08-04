@@ -51,17 +51,31 @@
 
 #define __HEAD_FLAG_PHYS_BASE	1
 
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+#define __HEAD_FLAG_SECURE_LAUNCH	1
+#else
+#define __HEAD_FLAG_SECURE_LAUNCH	0
+#endif
+
 #define __HEAD_FLAGS		(__HEAD_FLAG(BE)	| \
 				 __HEAD_FLAG(PAGE_SIZE) | \
-				 __HEAD_FLAG(PHYS_BASE))
+				 __HEAD_FLAG(PHYS_BASE) | \
+				 __HEAD_FLAG(SECURE_LAUNCH))
 
 /*
  * These will output as part of the Image header, which should be little-endian
  * regardless of the endianness of the kernel. While constant values could be
  * endian swapped in head.S, all are done here for consistency.
  */
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+#define SL_ENTRY_LE64	DEFINE_IMAGE_LE64(_sl_entry_offset_le, sl_entry - _text)
+#else
+#define SL_ENTRY_LE64	DEFINE_IMAGE_LE64(_sl_entry_offset_le, 0)
+#endif
+
 #define HEAD_SYMBOLS						\
 	DEFINE_IMAGE_LE64(_kernel_size_le, _end - _text);	\
-	DEFINE_IMAGE_LE64(_kernel_flags_le, __HEAD_FLAGS);
+	DEFINE_IMAGE_LE64(_kernel_flags_le, __HEAD_FLAGS);	\
+	SL_ENTRY_LE64;
 
 #endif /* __ARM64_KERNEL_IMAGE_H */

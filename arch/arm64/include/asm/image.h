@@ -20,6 +20,9 @@
 #define ARM64_IMAGE_FLAG_PAGE_SIZE_64K		3
 #define ARM64_IMAGE_FLAG_PHYS_BASE		1
 
+#define ARM64_IMAGE_FLAG_SECURE_LAUNCH_SHIFT	4
+#define ARM64_IMAGE_FLAG_SECURE_LAUNCH_MASK	1
+
 #ifndef __ASSEMBLER__
 
 #define arm64_image_flag_field(flags, field) \
