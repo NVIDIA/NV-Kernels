@@ -83,6 +83,21 @@ static DECLARE_WORK(mpam_broken_work, &mpam_disable);
 /* When mpam is disabled, the printed reason to aid debugging */
 static char *mpam_disable_reason;
 
+void mpam_fb_disable_mpam(int err, int mpam_fb_err)
+{
+	static char mpam_fb_reason[64];
+
+	/* Prevent repeated calls when mpam_disable() does MSC accesses. */
+	if (!mpam_is_enabled())
+		return;
+
+	snprintf(mpam_fb_reason, sizeof(mpam_fb_reason),
+		 "MPAM-Fb error %d, kernel error %d", mpam_fb_err, err);
+
+	mpam_disable_reason = mpam_fb_reason;
+	schedule_work(&mpam_broken_work);
+}
+
 /*
  * Whether resctrl has been setup. Used by cpuhp in preference to
  * mpam_is_enabled(). The disable call after an error interrupt makes
@@ -179,8 +194,11 @@ static void mpam_assert_partid_sizes_fixed(void)
 
 static int __mpam_read_reg(struct mpam_msc *msc, u16 reg, u32 *res)
 {
-	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
 
+	if (msc->iface == MPAM_IFACE_PCC)
+		return mpam_fb_send_read_request(msc, reg, res);
+
+	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
 	*res = readl_relaxed(msc->mapped_hwpage + reg);
 
 	return 0;
@@ -197,9 +215,12 @@ static inline int _mpam_read_partsel_reg(struct mpam_msc *msc, u16 reg,
 
 static int __mpam_write_reg(struct mpam_msc *msc, u16 reg, u32 val)
 {
-	WARN_ON_ONCE(reg + sizeof(u32) > msc->mapped_hwpage_sz);
-	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
 
+	if (msc->iface == MPAM_IFACE_PCC)
+		return mpam_fb_send_write_request(msc, reg, val);
+
+	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
+	WARN_ON_ONCE(reg + sizeof(u32) > msc->mapped_hwpage_sz);
 	writel_relaxed(val, msc->mapped_hwpage + reg);
 
 	return 0;
@@ -1160,8 +1181,11 @@ static int mpam_msc_read_mbwu_l(struct mpam_msc *msc, u64 *res)
 
 	mpam_mon_sel_lock_held(msc);
 
-	WARN_ON_ONCE((MSMON_MBWU_L + sizeof(u64)) > msc->mapped_hwpage_sz);
-	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
+	if (msc->iface == MPAM_IFACE_MMIO) {
+		WARN_ON_ONCE((MSMON_MBWU_L + sizeof(u64)) > msc->mapped_hwpage_sz);
+		WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(),
+					       &msc->accessibility));
+	}
 
 	ret = __mpam_read_reg(msc, MSMON_MBWU_L + 4, &mbwu_l_high2);
 	if (ret)
@@ -1195,8 +1219,11 @@ static int mpam_msc_zero_mbwu_l(struct mpam_msc *msc)
 
 	mpam_mon_sel_lock_held(msc);
 
-	WARN_ON_ONCE((MSMON_MBWU_L + sizeof(u64)) > msc->mapped_hwpage_sz);
-	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &msc->accessibility));
+	if (msc->iface == MPAM_IFACE_MMIO) {
+		WARN_ON_ONCE((MSMON_MBWU_L + sizeof(u64)) > msc->mapped_hwpage_sz);
+		WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(),
+					       &msc->accessibility));
+	}
 
 	ret = __mpam_write_reg(msc, MSMON_MBWU_L, 0);
 	if (ret)
@@ -1508,11 +1535,16 @@ static int _msmon_read(struct mpam_component *comp, struct mon_read *arg)
 					 srcu_read_lock_held(&mpam_srcu)) {
 			arg->ris = ris;
 
-			err = smp_call_function_any(&msc->accessibility,
-						    __ris_msmon_read, arg,
-						    true);
-			if (!err && arg->err)
+			if (msc->iface == MPAM_IFACE_MMIO) {
+				err = smp_call_function_any(&msc->accessibility,
+							    __ris_msmon_read,
+							    arg, true);
+				if (!err)
+					err = arg->err;
+			} else {
+				__ris_msmon_read(arg);
 				err = arg->err;
+			}
 
 			/*
 			 * Save one error to be returned to the caller, but
@@ -2031,6 +2063,9 @@ static int mpam_get_msc_preferred_cpu(struct mpam_msc *msc)
 
 static int mpam_touch_msc(struct mpam_msc *msc, int (*fn)(void *a), void *arg)
 {
+	if (msc->iface != MPAM_IFACE_MMIO)
+		return fn(arg);
+
 	lockdep_assert_irqs_enabled();
 	lockdep_assert_cpus_held();
 	WARN_ON_ONCE(!srcu_read_lock_held((&mpam_srcu)));
