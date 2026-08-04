@@ -56,6 +56,7 @@ struct mpam_garbage {
 	struct llist_node	llist;
 
 	void			*to_free;
+	void			(*release)(void *to_free);
 	struct platform_device	*pdev;
 };
 
