@@ -84,7 +84,7 @@ The decompressed kernel image contains a 64-byte header as follows::
   u64 flags;			/* kernel flags, little endian */
   u64 res2	= 0;		/* reserved */
   u64 res3	= 0;		/* reserved */
-  u64 res4	= 0;		/* reserved */
+  u64 res4	= 0;		/* DRTM sl_entry offset, little endian */
   u32 magic	= 0x644d5241;	/* Magic number, little endian, "ARM\x64" */
   u32 res5;			/* reserved (used for PE COFF offset) */
 
@@ -127,7 +127,14 @@ Header notes:
 			  2MB aligned base such that all image_size bytes
 			  counted from the start of the image are within
 			  the 48-bit addressable range of physical memory
-  Bits 4-63	Reserved.
+  Bit 4		DRTM Secure Launch
+
+			0
+			  Kernel does not support DRTM Secure Launch
+			1
+			  Kernel supports DRTM Secure Launch; res4 contains
+			  the byte offset to sl_entry from start of Image
+  Bits 5-63	Reserved.
   ============= ===============================================================
 
 - When image_size is zero, a bootloader should attempt to keep as much

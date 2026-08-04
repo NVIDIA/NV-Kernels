@@ -65,7 +65,7 @@
 	le64sym	_kernel_flags_le		// Informative flags, little-endian
 	.quad	0				// reserved
 	.quad	0				// reserved
-	.quad	0				// reserved
+	le64sym	_sl_entry_offset_le		// DRTM SL Entry offset
 	.ascii	ARM64_IMAGE_MAGIC		// Magic number
 	.long	.Lpe_header_offset		// Offset to the PE header.
 
