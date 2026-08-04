@@ -676,9 +676,13 @@ int intel_pasid_setup_nested(struct intel_iommu *iommu, struct device *dev,
 /*
  * Cache invalidations after change in a scalable-mode context table entry
  * when all PASID table entries of the device are known to be non-present.
+ *
+ * @sid identifies the context entry that was modified, which may be a DMA
+ * alias of @info->dev rather than its own requester ID.
  */
 static void intel_context_flush_no_pasid(struct device_domain_info *info,
-					 struct context_entry *context, u16 did)
+					 struct context_entry *context, u16 did,
+					 u16 sid)
 {
 	struct intel_iommu *iommu = info->iommu;
 
@@ -686,8 +690,7 @@ static void intel_context_flush_no_pasid(struct device_domain_info *info,
 	 * The Domain-ID field is ignored for scalable-mode device-selective
 	 * context-cache invalidations.
 	 */
-	iommu->flush.flush_context(iommu, did,
-				   PCI_DEVID(info->bus, info->devfn),
+	iommu->flush.flush_context(iommu, did, sid,
 				   DMA_CCMD_MASK_NOBIT, DMA_CCMD_DEVICE_INVL);
 	devtlb_invalidation_with_pasid(iommu, info->dev, IOMMU_NO_PASID);
 }
@@ -710,7 +713,7 @@ static void device_pasid_table_teardown(struct device *dev, u8 bus, u8 devfn)
 	context_clear_present(context);
 	__iommu_flush_cache(iommu, context, sizeof(*context));
 	spin_unlock(&iommu->lock);
-	intel_context_flush_no_pasid(info, context, did);
+	intel_context_flush_no_pasid(info, context, did, PCI_DEVID(bus, devfn));
 	context_clear_entry(context);
 	__iommu_flush_cache(iommu, context, sizeof(*context));
 }
