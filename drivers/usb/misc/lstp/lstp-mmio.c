@@ -124,6 +124,8 @@ static ssize_t lstp_mmio_read(struct file *file, char __user *buf, size_t count,
 	ret = lstp_mmio_validate_range(caller_offset, count);
 	if (ret)
 		return ret;
+	if (!count)
+		return 0;
 
 	mutex_lock(&ctx->lock);
 	if (ctx->stopped) {
@@ -135,16 +137,6 @@ static ssize_t lstp_mmio_read(struct file *file, char __user *buf, size_t count,
 
 	/* Probe enforces bulk_rx_size >= LSTP_USB_EP_MIN_SIZE; anchor the fixed request here. */
 	BUILD_BUG_ON(sizeof(struct lstp_header) + sizeof(req) > LSTP_USB_EP_MIN_SIZE);
-
-	if (!count) {
-		req = (struct lstp_mmio_read_req){
-			.offset = cpu_to_le32((u32)caller_offset),
-			.length = cpu_to_le16(0),
-		};
-
-		ret = lstp_request(ch, LSTP_MMIO_CMD_READ, &req, sizeof(req), NULL, 0, NULL, NULL);
-		goto out_unlock;
-	}
 
 	while (done < count) {
 		size_t chunk = min3(count - done, ch->max_rx_payload, (size_t)U16_MAX);
@@ -197,6 +189,8 @@ static ssize_t lstp_mmio_write(struct file *file, const char __user *buf, size_t
 	ret = lstp_mmio_validate_range(caller_offset, count);
 	if (ret)
 		return ret;
+	if (!count)
+		return 0;
 
 	mutex_lock(&ctx->lock);
 	if (ctx->stopped) {
@@ -209,13 +203,6 @@ static ssize_t lstp_mmio_write(struct file *file, const char __user *buf, size_t
 
 	/* Probe enforces bulk_tx_size >= LSTP_USB_EP_MIN_SIZE; anchor the fixed request here. */
 	BUILD_BUG_ON(sizeof(struct lstp_header) + sizeof(*req) > LSTP_USB_EP_MIN_SIZE);
-
-	if (!count) {
-		req->offset = cpu_to_le32((u32)caller_offset);
-
-		ret = lstp_request(ch, LSTP_MMIO_CMD_WRITE, req, sizeof(*req), NULL, 0, NULL, NULL);
-		goto out_unlock;
-	}
 
 	while (done < count) {
 		size_t chunk = min(count - done, ch->max_tx_payload - sizeof(*req));
