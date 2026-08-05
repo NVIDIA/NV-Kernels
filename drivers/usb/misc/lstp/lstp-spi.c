@@ -410,6 +410,8 @@ static int lstp_spi_init(struct lstp_channel *ch, const struct lstp_channel_init
  */
 static int lstp_spi_start(struct lstp_channel *ch)
 {
+	unsigned int child_count = 0;
+	struct fwnode_handle *child;
 	int ret;
 	struct lstp_spi_priv *priv = ch->priv;
 	struct spi_controller *ctrl;
@@ -430,9 +432,6 @@ static int lstp_spi_start(struct lstp_channel *ch)
 	}
 
 	if (ch->fwnode) {
-		unsigned int child_count = 0;
-		struct fwnode_handle *child;
-
 		fwnode_for_each_available_child_node(ch->fwnode, child)
 			child_count++;
 
@@ -444,7 +443,9 @@ static int lstp_spi_start(struct lstp_channel *ch)
 			dev_info(ch->dev, "%s: ch_%d: Firmware node present with %u SPI devices\n",
 				 __func__, ch->ch_id, child_count);
 		}
-	} else if (lstp_auto_bind_spidev) {
+	}
+
+	if (!child_count && lstp_auto_bind_spidev) {
 		ret = lstp_spi_create_spidev(ctrl, ch);
 		if (ret)
 			return ret;
