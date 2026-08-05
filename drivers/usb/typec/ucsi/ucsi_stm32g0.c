@@ -408,7 +408,8 @@ static int ucsi_stm32g0_sync_write(struct ucsi *ucsi, unsigned int offset, const
 	if (ret)
 		goto out_clear_bit;
 
-	if (!wait_for_completion_timeout(&g0->complete, msecs_to_jiffies(5000)))
+	if (!wait_for_completion_timeout(&g0->complete,
+					 msecs_to_jiffies(UCSI_TIMEOUT_MS)))
 		ret = -ETIMEDOUT;
 	else
 		return 0;

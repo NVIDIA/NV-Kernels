@@ -598,7 +598,8 @@ static int ucsi_ccg_sync_write(struct ucsi *ucsi, unsigned int offset,
 	if (ret)
 		goto err_clear_bit;
 
-	if (!wait_for_completion_timeout(&uc->complete, msecs_to_jiffies(5000)))
+	if (!wait_for_completion_timeout(&uc->complete,
+					 msecs_to_jiffies(UCSI_TIMEOUT_MS)))
 		ret = -ETIMEDOUT;
 
 err_clear_bit:

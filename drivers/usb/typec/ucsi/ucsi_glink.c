@@ -176,7 +176,8 @@ static int pmic_glink_ucsi_sync_write(struct ucsi *__ucsi, unsigned int offset,
 	ret = pmic_glink_ucsi_locked_write(ucsi, offset, val, val_len);
 	mutex_unlock(&ucsi->lock);
 
-	left = wait_for_completion_timeout(&ucsi->sync_ack, 5 * HZ);
+	left = wait_for_completion_timeout(&ucsi->sync_ack,
+					   msecs_to_jiffies(UCSI_TIMEOUT_MS));
 	if (!left) {
 		dev_err(ucsi->dev, "timeout waiting for UCSI sync write response\n");
 		/* return 0 here and let core UCSI code handle the CCI_BUSY */
