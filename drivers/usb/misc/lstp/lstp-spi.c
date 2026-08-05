@@ -143,6 +143,19 @@ static int lstp_spi_do_transfer(struct lstp_channel *ch, struct spi_transfer *xf
 }
 
 /**
+ * lstp_spi_deassert_cs() - Best-effort chip-select recovery after an error.
+ * @ch:      LSTP channel to recover
+ * @cs_bits: Chip select selection bits (LSTP_SPI_CMD_CS0..CS1)
+ *
+ * Return: 0 on success, negative errno on failure.
+ */
+static int lstp_spi_deassert_cs(struct lstp_channel *ch, u8 cs_bits)
+{
+	return lstp_request(ch, LSTP_SPI_CMD_WRITE | cs_bits | LSTP_SPI_CMD_CS_DEASSERT, NULL, 0,
+			    NULL, 0, NULL, NULL);
+}
+
+/**
  * lstp_spi_transfer_one_message() - Execute a complete SPI message.
  * @ctrl: SPI controller performing the transfer
  * @mesg: SPI message containing one or more transfers
@@ -185,21 +198,27 @@ static int lstp_spi_transfer_one_message(struct spi_controller *ctrl, struct spi
 
 	list_for_each_entry(xfer, &mesg->transfers, transfer_list) {
 		u8 cs_flags = 0;
+		bool deassert_after;
 		bool is_last = list_is_last(&xfer->transfer_list, &mesg->transfers);
 
-		if (!cs_active) {
+		if (!cs_active)
 			cs_flags |= LSTP_SPI_CMD_CS_ASSERT;
-			cs_active = true;
-		}
 
-		if ((is_last && !xfer->cs_change) || (!is_last && xfer->cs_change)) {
+		deassert_after = (is_last && !xfer->cs_change) || (!is_last && xfer->cs_change);
+		if (deassert_after)
 			cs_flags |= LSTP_SPI_CMD_CS_DEASSERT;
-			cs_active = false;
-		}
 
 		ret = lstp_spi_do_transfer(ch, xfer, cs_bits, cs_flags);
-		if (ret)
+		if (ret) {
+			int recovery_ret = lstp_spi_deassert_cs(ch, cs_bits);
+
+			if (recovery_ret)
+				dev_err(ch->dev, "%s: ch_%d: Could not deassert CS%u (%pe)\n",
+					__func__, ch->ch_id, chip_select, ERR_PTR(recovery_ret));
 			break;
+		}
+
+		cs_active = !deassert_after;
 
 		mesg->actual_length += xfer->len;
 
