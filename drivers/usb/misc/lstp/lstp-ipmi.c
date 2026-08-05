@@ -69,13 +69,16 @@ struct ipmi_lstp_msg {
  * @tx_mutex:  Serializes lstp_ipmi_write() against lstp_ipmi_stop().
  *             Owned by @ctx (kref-pinned) rather than @ch -- see the
  *             rationale in lstp_ipmi_write().
+ * @rx_mutex:  Serializes readers and protects @pending_msg/@pending_len
+ *             while userspace copies may sleep.
  * @lock:      Serializes @running, @msg_count and the @fifo producer/
- *             consumer paths. Held only across kfifo_in / kfifo_out;
- *             copy_to_user() in lstp_ipmi_read() runs after the unlock.
+ *             consumer paths. Held only across kfifo_in / kfifo_out.
  * @req_wq:    Wait queue for blocked readers / pollers.
  * @fifo:      Inbound IPMI requests pending read(), one variable-size
  *             record per message (2-byte length prefix per record).
  *             Drops oldest records on overflow until the new one fits.
+ * @pending_msg: Record removed from @fifo but not yet copied successfully.
+ * @pending_len: Length of @pending_msg, or zero if no record is retained.
  * @msg_count: Per-message tag echoed back on write() to drop responses
  *             to stale requests.
  * @postcodes: Embedded postcodes sub-device.
@@ -88,9 +91,12 @@ struct lstp_ipmi_ctx {
 	bool running;
 	bool stopped;
 	struct mutex tx_mutex; /* serializes write() vs lstp_ipmi_stop() */
+	struct mutex rx_mutex; /* protects the retained userspace read */
 	spinlock_t lock; /* protects @running, @msg_count, @fifo */
 	wait_queue_head_t req_wq;
 	struct kfifo_rec_ptr_2 fifo;
+	struct ipmi_lstp_msg pending_msg;
+	unsigned int pending_len;
 	u8 msg_count;
 	struct lstp_ipmi_postcodes postcodes;
 };
@@ -123,7 +129,8 @@ static inline bool lstp_ipmi_stopped(struct lstp_ipmi_ctx *ctx)
  */
 static inline bool lstp_ipmi_readable(struct lstp_ipmi_ctx *ctx)
 {
-	return !kfifo_is_empty(&ctx->fifo) || lstp_ipmi_stopped(ctx);
+	return READ_ONCE(ctx->pending_len) || !kfifo_is_empty(&ctx->fifo) ||
+	       lstp_ipmi_stopped(ctx);
 }
 
 /**
@@ -141,6 +148,7 @@ static void lstp_ipmi_ctx_release(struct kref *kref)
 	if (ctx->ida_id >= 0)
 		ida_free(&lstp_ipmi_ida, ctx->ida_id);
 	kfree(ctx->miscdev.name);
+	mutex_destroy(&ctx->rx_mutex);
 	mutex_destroy(&ctx->tx_mutex);
 	kfree(ctx);
 }
@@ -255,42 +263,61 @@ static int lstp_ipmi_open(struct inode *inode, struct file *file)
  *
  * Context: Process context. May sleep.
  *
- * Return: Bytes read, or -EAGAIN / -ERESTARTSYS / -ENODEV.
+ * Return: Bytes read, or -EAGAIN / -ERESTARTSYS / -ENODEV / -EMSGSIZE /
+ *         -EFAULT.
  */
 static ssize_t lstp_ipmi_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct lstp_ipmi_ctx *ctx = to_ctx(file);
-	struct ipmi_lstp_msg msg;
 	unsigned long flags;
-	unsigned int len = 0;
+	unsigned int len;
 	int ret;
 
 	/*
-	 * Drain into a stack-local @msg under @ctx->lock, then copy_to_user
-	 * outside the lock since it may sleep. Loop to handle two threads
-	 * sharing an fd both winning the wait_event() but only one the
-	 * kfifo_out().
+	 * Keep one record outside the drop-oldest FIFO until userspace has
+	 * accepted it. The mutex also serializes threads sharing the fd.
 	 */
-	while (!len) {
+	ret = mutex_lock_interruptible(&ctx->rx_mutex);
+	if (ret)
+		return ret;
+
+	while (!READ_ONCE(ctx->pending_len)) {
 		if (kfifo_is_empty(&ctx->fifo)) {
-			if (lstp_ipmi_stopped(ctx))
-				return -ENODEV;
-			if (file->f_flags & O_NONBLOCK)
-				return -EAGAIN;
+			if (lstp_ipmi_stopped(ctx)) {
+				ret = -ENODEV;
+				goto out_unlock;
+			}
+			if (file->f_flags & O_NONBLOCK) {
+				ret = -EAGAIN;
+				goto out_unlock;
+			}
 			ret = wait_event_interruptible(ctx->req_wq, lstp_ipmi_readable(ctx));
 			if (ret)
-				return ret;
+				goto out_unlock;
 		}
 
 		spin_lock_irqsave(&ctx->lock, flags);
-		len = kfifo_out(&ctx->fifo, &msg, sizeof(msg));
+		len = kfifo_out(&ctx->fifo, &ctx->pending_msg, sizeof(ctx->pending_msg));
 		spin_unlock_irqrestore(&ctx->lock, flags);
+		WRITE_ONCE(ctx->pending_len, len);
 	}
 
-	len = min_t(unsigned int, count, len);
-	if (copy_to_user(buf, &msg, len))
-		return -EFAULT;
-	return len;
+	len = READ_ONCE(ctx->pending_len);
+	if (count < len) {
+		ret = -EMSGSIZE;
+		goto out_unlock;
+	}
+	if (copy_to_user(buf, &ctx->pending_msg, len)) {
+		ret = -EFAULT;
+		goto out_unlock;
+	}
+
+	WRITE_ONCE(ctx->pending_len, 0);
+	ret = len;
+
+out_unlock:
+	mutex_unlock(&ctx->rx_mutex);
+	return ret;
 }
 
 /**
@@ -402,7 +429,7 @@ static __poll_t lstp_ipmi_poll(struct file *file, poll_table *wait)
 	poll_wait(file, &ctx->req_wq, wait);
 	if (lstp_ipmi_stopped(ctx))
 		return EPOLLHUP;
-	if (!kfifo_is_empty(&ctx->fifo))
+	if (READ_ONCE(ctx->pending_len) || !kfifo_is_empty(&ctx->fifo))
 		return POLLIN | POLLRDNORM;
 
 	return 0;
@@ -573,6 +600,7 @@ static int lstp_ipmi_init(struct lstp_channel *ch, const struct lstp_channel_ini
 	ctx->ch = ch;
 	spin_lock_init(&ctx->lock);
 	mutex_init(&ctx->tx_mutex);
+	mutex_init(&ctx->rx_mutex);
 	init_waitqueue_head(&ctx->req_wq);
 
 	ret = devm_add_action_or_reset(ch->dev, lstp_ipmi_ctx_put_cb, ctx);
