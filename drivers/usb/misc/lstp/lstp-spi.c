@@ -377,6 +377,9 @@ static int lstp_spi_init(struct lstp_channel *ch, const struct lstp_channel_init
 	spi_controller_set_devdata(ctrl, ch);
 	ctrl->bus_num = -1;
 	ctrl->num_chipselect = num_devices;
+	ctrl->bits_per_word_mask = SPI_BPW_MASK(8);
+	ctrl->min_speed_hz = speed_hz;
+	ctrl->max_speed_hz = speed_hz;
 	ctrl->transfer_one_message = lstp_spi_transfer_one_message;
 	ctrl->max_transfer_size = lstp_spi_max_xfer_size;
 	ctrl->set_cs_timing = lstp_spi_set_cs_timing;
