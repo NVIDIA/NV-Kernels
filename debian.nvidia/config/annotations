@@ -198,6 +198,9 @@ CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablem
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM drivers'>
 
+CONFIG_SEPARATE_LSTP_IPMI_POSTCODES             policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_SEPARATE_LSTP_IPMI_POSTCODES             note<'Keep LSTP IPMI POST codes on the standard message path'>
+
 CONFIG_SPI_TEGRA210_QUAD                        policy<{'arm64': 'y'}>
 CONFIG_SPI_TEGRA210_QUAD                        note<'Ensures the TPM is available before the IMA driver initializes'>
 
@@ -215,6 +218,12 @@ CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM dri
 
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
+
+CONFIG_USB_LSTP                                 policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_USB_LSTP                                 note<'Enable the LSTP USB multi-function device for supported platforms'>
+
+CONFIG_USB_LSTP_SPI_SPIDEV                      policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_USB_LSTP_SPI_SPIDEV                      note<'Create spidev devices for LSTP SPI channels without firmware descriptions'>
 
 CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'n'}>
 CONFIG_VFIO_CONTAINER                           note<'LP: #2095028'>
