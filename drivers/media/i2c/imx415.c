@@ -486,7 +486,7 @@ static int imx415_write(struct imx415 *sensor, u32 addr, u32 value)
 				    ((addr >> IMX415_REG_SIZE_SHIFT) & 3) * 8,
 				    addr & IMX415_REG_ADDR_MASK, ret);
 
-	return 0;
+	return ret;
 }
 
 static int imx415_set_testpattern(struct imx415 *sensor, int val)
