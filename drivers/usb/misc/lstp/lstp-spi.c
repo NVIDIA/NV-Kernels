@@ -14,8 +14,9 @@
  * more details.
  */
 
-#include <linux/spi/spi.h>
 #include <linux/err.h>
+#include <linux/kmod.h>
+#include <linux/spi/spi.h>
 
 #include "lstp-main.h"
 
@@ -268,27 +269,55 @@ static size_t lstp_spi_max_xfer_size(struct spi_device *spi)
  * @ch:   LSTP channel to create spidev devices for
  *
  * Creates spidev devices on a SPI controller based on the number of chip selects.
- * Uses the "spidev" modalias which must be present in spidev's allowlist.
+ * The generic "spidev" modalias is not in spidev's device ID table, so set a
+ * driver override before registering each device.
+ *
+ * Return: 0 on success, negative errno on failure.
  */
-static void lstp_spi_create_spidev(struct spi_controller *ctrl, struct lstp_channel *ch)
+static int lstp_spi_create_spidev(struct spi_controller *ctrl, struct lstp_channel *ch)
 {
 	struct lstp_spi_priv *priv = ch->priv;
+	struct spi_device *spi;
+	int ret;
 	u8 cs;
-	struct spi_board_info info;
+
+	/* driver_override does not provide a module alias, so load spidev first. */
+	request_module("spidev");
 
 	for (cs = 0; cs < ctrl->num_chipselect; cs++) {
-		info = (struct spi_board_info){
-			.max_speed_hz = priv->current_speed_hz,
-			.mode = SPI_MODE_0,
-			.chip_select = cs,
-		};
-		strscpy(info.modalias, "spidev", sizeof(info.modalias));
+		spi = spi_alloc_device(ctrl);
+		if (!spi)
+			return -ENOMEM;
 
-		if (!spi_new_device(ctrl, &info)) {
-			dev_err(ch->dev, "%s: ch_%d: Could not create spidev for CS%u\n", __func__,
+		spi_set_chipselect(spi, 0, cs);
+		spi->cs_index_mask = BIT(0);
+		spi->max_speed_hz = priv->current_speed_hz;
+		spi->mode = SPI_MODE_0;
+		strscpy(spi->modalias, "spidev", sizeof(spi->modalias));
+
+		ret = device_set_driver_override(&spi->dev, "spidev");
+		if (ret)
+			goto err_put;
+
+		ret = spi_add_device(spi);
+		if (ret)
+			goto err_put;
+
+		if (!device_is_bound(&spi->dev)) {
+			dev_err(ch->dev, "%s: ch_%d: Could not bind spidev for CS%u\n", __func__,
 				ch->ch_id, cs);
+			spi_unregister_device(spi);
+			return -ENODEV;
 		}
 	}
+
+	return 0;
+
+err_put:
+	spi_dev_put(spi);
+	dev_err(ch->dev, "%s: ch_%d: Could not create spidev for CS%u (%pe)\n", __func__,
+		ch->ch_id, cs, ERR_PTR(ret));
+	return ret;
 }
 
 /**
@@ -413,7 +442,9 @@ static int lstp_spi_start(struct lstp_channel *ch)
 				 __func__, ch->ch_id, child_count);
 		}
 	} else if (lstp_auto_bind_spidev) {
-		lstp_spi_create_spidev(ctrl, ch);
+		ret = lstp_spi_create_spidev(ctrl, ch);
+		if (ret)
+			return ret;
 	}
 
 	deprecated_lstp_channel_publish_child_dev(ch, &ctrl->dev);
