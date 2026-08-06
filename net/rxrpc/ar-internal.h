@@ -341,20 +341,9 @@ struct rxrpc_peer {
 	int			debug_id;	/* debug ID for printks */
 	struct sockaddr_rxrpc	srx;		/* remote address */
 
-	/* calculated RTT cache */
-#define RXRPC_RTT_CACHE_SIZE 32
-	spinlock_t		rtt_input_lock;	/* RTT lock for input routine */
-	ktime_t			rtt_last_req;	/* Time of last RTT request */
-	unsigned int		rtt_count;	/* Number of samples we've got */
-	unsigned int		rtt_taken;	/* Number of samples taken (wrapping) */
-	struct minmax		min_rtt;	/* Estimated minimum RTT */
-
-	u32			srtt_us;	/* smoothed round trip time << 3 in usecs */
-	u32			mdev_us;	/* medium deviation			*/
-	u32			mdev_max_us;	/* maximal mdev for the last rtt period	*/
-	u32			rttvar_us;	/* smoothed mdev_max			*/
-	u32			rto_j;		/* Retransmission timeout in jiffies */
-	u8			backoff;	/* Backoff timeout */
+	/* Calculated RTT cache */
+	unsigned int		recent_srtt_us;
+	unsigned int		recent_rto_us;
 
 	u8			cong_ssthresh;	/* Congestion slow-start threshold */
 };
@@ -737,6 +726,18 @@ struct rxrpc_call {
 	rxrpc_seq_t		acks_hard_ack;	/* Latest hard-ack point */
 	rxrpc_seq_t		acks_lowest_nak; /* Lowest NACK in the buffer (or ==tx_hard_ack) */
 	rxrpc_serial_t		acks_highest_serial; /* Highest serial number ACK'd */
+
+	/* Calculated RTT cache */
+	ktime_t			rtt_last_req;	/* Time of last RTT request */
+	unsigned int		rtt_count;	/* Number of samples we've got */
+	unsigned int		rtt_taken;	/* Number of samples taken (wrapping) */
+	struct minmax		min_rtt;	/* Estimated minimum RTT */
+	u32			srtt_us;	/* smoothed round trip time << 3 in usecs */
+	u32			mdev_us;	/* medium deviation			*/
+	u32			mdev_max_us;	/* maximal mdev for the last rtt period	*/
+	u32			rttvar_us;	/* smoothed mdev_max			*/
+	u32			rto_j;		/* Retransmission timeout in jiffies */
+	u8			backoff;	/* Backoff timeout (as shift) */
 };
 
 /*
@@ -1236,10 +1237,10 @@ static inline int rxrpc_abort_eproto(struct rxrpc_call *call,
 /*
  * rtt.c
  */
-void rxrpc_peer_add_rtt(struct rxrpc_call *, enum rxrpc_rtt_rx_trace, int,
+void rxrpc_call_add_rtt(struct rxrpc_call *, enum rxrpc_rtt_rx_trace, int,
 			rxrpc_serial_t, rxrpc_serial_t, ktime_t, ktime_t);
-unsigned long rxrpc_get_rto_backoff(struct rxrpc_peer *, bool);
-void rxrpc_peer_init_rtt(struct rxrpc_peer *);
+unsigned long rxrpc_get_rto_backoff(struct rxrpc_call *, bool);
+void rxrpc_call_init_rtt(struct rxrpc_call *);
 
 /*
  * rxkad.c

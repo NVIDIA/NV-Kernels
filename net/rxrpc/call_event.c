@@ -45,8 +45,8 @@ void rxrpc_propose_delay_ACK(struct rxrpc_call *call, rxrpc_serial_t serial,
 
 	if (rxrpc_soft_ack_delay < expiry)
 		expiry = rxrpc_soft_ack_delay;
-	if (call->peer->srtt_us != 0)
-		ack_at = usecs_to_jiffies(call->peer->srtt_us >> 3);
+	if (call->srtt_us != 0)
+		ack_at = usecs_to_jiffies(call->srtt_us >> 3);
 	else
 		ack_at = expiry;
 
@@ -125,7 +125,7 @@ void rxrpc_resend(struct rxrpc_call *call, struct sk_buff *ack_skb)
 
 	now = ktime_get_real();
 	max_age = ktime_sub_us(now, jiffies_to_usecs(
-				rxrpc_get_rto_backoff(call->peer, false)));
+				rxrpc_get_rto_backoff(call, false)));
 	oldest = now;
 
 	if (list_empty(&call->tx_buffer))
@@ -219,7 +219,7 @@ void rxrpc_resend(struct rxrpc_call *call, struct sk_buff *ack_skb)
 no_further_resend:
 no_resend:
 	resend_at = nsecs_to_jiffies(ktime_to_ns(ktime_sub(now, oldest)));
-	resend_at += jiffies + rxrpc_get_rto_backoff(call->peer,
+	resend_at += jiffies + rxrpc_get_rto_backoff(call,
 						     !list_empty(&retrans_queue));
 	WRITE_ONCE(call->resend_at, resend_at);
 
@@ -234,7 +234,7 @@ no_resend:
 		rxrpc_reduce_call_timer(call, resend_at, jiffies,
 					rxrpc_timer_set_for_resend);
 		ack_ts = ktime_sub(now, call->acks_latest_ts);
-		if (ktime_to_us(ack_ts) < (call->peer->srtt_us >> 3))
+		if (ktime_to_us(ack_ts) < (call->srtt_us >> 3))
 			goto out;
 		rxrpc_send_ACK(call, RXRPC_ACK_PING, 0,
 			       rxrpc_propose_ack_ping_for_lost_ack);
@@ -361,8 +361,8 @@ static void rxrpc_transmit_some_data(struct rxrpc_call *call)
  */
 static void rxrpc_send_initial_ping(struct rxrpc_call *call)
 {
-	if (call->peer->rtt_count < 3 ||
-	    ktime_before(ktime_add_ms(call->peer->rtt_last_req, 1000),
+	if (call->rtt_count < 3 ||
+	    ktime_before(ktime_add_ms(call->rtt_last_req, 1000),
 			 ktime_get_real()))
 		rxrpc_send_ACK(call, RXRPC_ACK_PING, 0,
 			       rxrpc_propose_ack_ping_for_params);
@@ -501,10 +501,10 @@ bool rxrpc_input_call_event(struct rxrpc_call *call)
 			       rxrpc_propose_ack_rx_idle);
 
 	if (call->ackr_nr_unacked > 2) {
-		if (call->peer->rtt_count < 3)
+		if (call->rtt_count < 3)
 			rxrpc_send_ACK(call, RXRPC_ACK_PING, 0,
 				       rxrpc_propose_ack_ping_for_rtt);
-		else if (ktime_before(ktime_add_ms(call->peer->rtt_last_req, 1000),
+		else if (ktime_before(ktime_add_ms(call->rtt_last_req, 1000),
 				      ktime_get_real()))
 			rxrpc_send_ACK(call, RXRPC_ACK_PING, 0,
 				       rxrpc_propose_ack_ping_for_old_rtt);

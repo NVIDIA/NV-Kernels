@@ -241,7 +241,7 @@ int rxrpc_send_ack_packet(struct rxrpc_call *call, struct rxrpc_txbuf *txb)
 		trace_rxrpc_tx_packet(call->debug_id, &txb->wire,
 				      rxrpc_tx_point_call_ack);
 		if (txb->wire.flags & RXRPC_REQUEST_ACK)
-			call->peer->rtt_last_req = ktime_get_real();
+			call->rtt_last_req = ktime_get_real();
 	}
 	rxrpc_tx_backoff(call, ret);
 
@@ -371,9 +371,9 @@ int rxrpc_send_data_packet(struct rxrpc_call *call, struct rxrpc_txbuf *txb)
 		why = rxrpc_reqack_slow_start;
 	else if (call->tx_winsize <= 2)
 		why = rxrpc_reqack_small_txwin;
-	else if (call->peer->rtt_count < 3 && txb->seq & 1)
+	else if (call->rtt_count < 3)
 		why = rxrpc_reqack_more_rtt;
-	else if (ktime_before(ktime_add_ms(call->peer->rtt_last_req, 1000), ktime_get_real()))
+	else if (ktime_before(ktime_add_ms(call->rtt_last_req, 1000), ktime_get_real()))
 		why = rxrpc_reqack_old_rtt;
 	else
 		goto dont_set_request_ack;
@@ -446,11 +446,11 @@ done:
 	if (ret >= 0) {
 		call->tx_last_sent = txb->last_sent;
 		if (txb->wire.flags & RXRPC_REQUEST_ACK) {
-			call->peer->rtt_last_req = txb->last_sent;
-			if (call->peer->rtt_count > 1) {
+			call->rtt_last_req = txb->last_sent;
+			if (call->rtt_count > 1) {
 				unsigned long nowj = jiffies, ack_lost_at;
 
-				ack_lost_at = rxrpc_get_rto_backoff(call->peer, false);
+				ack_lost_at = rxrpc_get_rto_backoff(call, false);
 				ack_lost_at += nowj;
 				WRITE_ONCE(call->ack_lost_at, ack_lost_at);
 				rxrpc_reduce_call_timer(call, ack_lost_at, nowj,
@@ -728,7 +728,7 @@ void rxrpc_transmit_one(struct rxrpc_call *call, struct rxrpc_txbuf *txb)
 		}
 	} else {
 		unsigned long now = jiffies;
-		unsigned long resend_at = now + call->peer->rto_j;
+		unsigned long resend_at = now + call->rto_j;
 
 		WRITE_ONCE(call->resend_at, resend_at);
 		rxrpc_reduce_call_timer(call, resend_at, now,
