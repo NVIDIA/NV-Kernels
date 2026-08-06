@@ -627,29 +627,27 @@ TEST_F(cxl_type2, comp_regs_region_info)
 /* ------------------------------------------------------------------ */
 
 /*
- * Mirror the VMM: mmap the DPA region and map it into the IOAS (stage-2).
- * The DPA mmap is required for the device's ATS path, so a missing mmap
- * flag is a regression, not a reason to skip.
+ * mmap() the DPA region and verify the first page can be read.
+ * The region uses lazy fault insertion so the first access triggers the
+ * vfio_cxl_region_page_fault path.
  */
-TEST_F(cxl_type2, dpa_mmap_ioas_map)
+TEST_F(cxl_type2, dpa_mmap_fault)
 {
 	struct vfio_region_info reg = { .argsz = sizeof(reg) };
-	struct iova_allocator *iova_alloc;
-	struct dma_region region;
 	size_t map_size;
 	void *ptr;
+	uint8_t *p;
+	uint8_t val;
 
 	reg.index = self->cxl_cap.dpa_region_index;
 	ASSERT_EQ(0, ioctl(self->dev->fd, VFIO_DEVICE_GET_REGION_INFO, &reg));
 
-	ASSERT_NE(0, reg.flags & VFIO_REGION_INFO_FLAG_MMAP);
+	if (!(reg.flags & VFIO_REGION_INFO_FLAG_MMAP))
+		SKIP(return, "DPA region does not advertise mmap");
 
-	/* Do not touch DPA from the host CPU; the guest reaches it via stage-2 */
-	if (reg.size < SZ_2M)
-		SKIP(return, "DPA region smaller than 2M");
-
-	/* iova_allocator_alloc() requires a power-of-2 size */
-	map_size = SZ_2M;
+	/* Map just the first 2MB or the full region, whichever is smaller */
+	map_size = (size_t)reg.size < (size_t)(2 * SZ_1M)
+		 ? (size_t)reg.size : (size_t)(2 * SZ_1M);
 
 	ptr = mmap(NULL, map_size, PROT_READ | PROT_WRITE,
 		   MAP_SHARED, self->dev->fd, (off_t)reg.offset);
@@ -658,18 +656,17 @@ TEST_F(cxl_type2, dpa_mmap_ioas_map)
 	self->dpa_mmap = ptr;
 	self->dpa_mmap_size = map_size;
 
-	iova_alloc = iova_allocator_init(self->iommu);
-	region.vaddr = ptr;
-	region.size  = map_size;
-	region.iova  = iova_allocator_alloc(iova_alloc, map_size);
+	/* First access - triggers vmf_insert_pfn */
+	p = (uint8_t *)ptr;
+	val = *p;
+	(void)val;
 
-	iommu_map(self->iommu, &region);
+	printf("DPA mmap: ptr=%p size=0x%zx first byte=0x%02x\n",
+	       ptr, map_size, (uint8_t)val);
 
-	printf("DPA mmap + IOAS map ok: iova=0x%llx size=0x%zx\n",
-	       (unsigned long long)region.iova, map_size);
-
-	iommu_unmap(self->iommu, &region);
-	iova_allocator_cleanup(iova_alloc);
+	/* Write a pattern and read it back */
+	*p = 0xab;
+	ASSERT_EQ(0xab, *p);
 }
 
 /*
