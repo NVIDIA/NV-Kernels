@@ -431,6 +431,7 @@ static int lstp_spi_start(struct lstp_channel *ch)
 {
 	unsigned int child_count = 0;
 	struct fwnode_handle *child;
+	void *devres_group;
 	int ret;
 	struct lstp_spi_priv *priv = ch->priv;
 	struct spi_controller *ctrl;
@@ -442,12 +443,15 @@ static int lstp_spi_start(struct lstp_channel *ch)
 	}
 
 	ctrl = priv->ctrl;
+	devres_group = devres_open_group(ch->dev, NULL, GFP_KERNEL);
+	if (!devres_group)
+		return -ENOMEM;
 
 	ret = devm_spi_register_controller(ch->dev, ctrl);
 	if (ret) {
 		dev_err(ch->dev, "%s: ch_%d: Could not register SPI controller (%pe)\n", __func__,
 			ch->ch_id, ERR_PTR(ret));
-		return ret;
+		goto err_release_group;
 	}
 
 	if (ch->fwnode) {
@@ -467,14 +471,19 @@ static int lstp_spi_start(struct lstp_channel *ch)
 	if (!child_count && lstp_auto_bind_spidev) {
 		ret = lstp_spi_create_spidev(ctrl, ch);
 		if (ret)
-			return ret;
+			goto err_release_group;
 	}
+	devres_close_group(ch->dev, devres_group);
 
 	deprecated_lstp_channel_publish_child_dev(ch, &ctrl->dev);
 
 	dev_info(ch->dev, "%s: ch_%d: Started as %s (devices=%u, speed=%u Hz)\n", __func__,
 		 ch->ch_id, ch->display_name, ctrl->num_chipselect, priv->current_speed_hz);
 	return 0;
+
+err_release_group:
+	devres_release_group(ch->dev, devres_group);
+	return ret;
 }
 
 /* clang-format off */
