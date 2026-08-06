@@ -991,13 +991,13 @@ static void shrink_worker(struct work_struct *w)
 		 */
 		if (!memcg) {
 			spin_unlock(&zswap_pools_lock);
-			if (++failures == MAX_RECLAIM_RETRIES)
-				break;
+			if (!mem_cgroup_disabled()) {
+				if (++failures == MAX_RECLAIM_RETRIES)
+					break;
 
-			goto resched;
-		}
-
-		if (!mem_cgroup_tryget_online(memcg)) {
+				goto resched;
+			}
+		} else if (!mem_cgroup_tryget_online(memcg)) {
 			/* drop the reference from mem_cgroup_iter() */
 			mem_cgroup_iter_break(NULL, memcg);
 			pool->next_shrink = NULL;
@@ -1007,12 +1007,14 @@ static void shrink_worker(struct work_struct *w)
 				break;
 
 			goto resched;
+		} else {
+			spin_unlock(&zswap_pools_lock);
 		}
-		spin_unlock(&zswap_pools_lock);
 
 		ret = shrink_memcg(memcg);
 		/* drop the extra reference */
-		mem_cgroup_put(memcg);
+		if (memcg)
+			mem_cgroup_put(memcg);
 
 		if (ret == -EINVAL)
 			break;
