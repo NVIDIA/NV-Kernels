@@ -27,7 +27,8 @@ static u32 __rxrpc_set_rto(const struct rxrpc_peer *peer)
 
 static u32 rxrpc_bound_rto(u32 rto)
 {
-	return min(rto, RXRPC_RTO_MAX);
+	return clamp_t(u32, msecs_to_jiffies(200),
+		       rto + msecs_to_jiffies(100), RXRPC_RTO_MAX);
 }
 
 /*

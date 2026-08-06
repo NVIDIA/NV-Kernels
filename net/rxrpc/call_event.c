@@ -124,7 +124,8 @@ void rxrpc_resend(struct rxrpc_call *call, struct sk_buff *ack_skb)
 	_enter("{%d,%d}", call->acks_hard_ack, call->tx_top);
 
 	now = ktime_get_real();
-	max_age = ktime_sub_us(now, jiffies_to_usecs(call->peer->rto_j));
+	max_age = ktime_sub_us(now, jiffies_to_usecs(
+				rxrpc_get_rto_backoff(call->peer, false)));
 	oldest = now;
 
 	if (list_empty(&call->tx_buffer))
