@@ -1035,10 +1035,7 @@ int acpi_dev_gpio_irq_wake_get_by(struct acpi_device *adev, const char *con_id, 
 			if (ret < 0)
 				return ret;
 
-			/* ACPI uses hundredths of milliseconds units */
-			ret = gpio_set_debounce_timeout(desc, info.debounce * 10);
-			if (ret)
-				return ret;
+			acpi_gpio_set_debounce_timeout(desc, info.debounce);
 
 			irq_flags = acpi_dev_get_irq_type(info.triggering,
 							  info.polarity);
