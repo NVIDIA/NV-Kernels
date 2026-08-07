@@ -57,7 +57,6 @@ endif
 # linux source package.
 ifneq ($(DEB_SOURCE),linux)
 	do_tools_bpftool = false
-	do_tools_perf = false
 endif
 
 # The linux-source package may only be built for the linux source package
