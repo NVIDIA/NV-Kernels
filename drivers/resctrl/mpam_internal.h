@@ -414,13 +414,7 @@ struct mpam_resctrl_res {
 struct mpam_resctrl_mon {
 	struct mpam_class	*class;
 
-	/*
-	 * Array of allocated MBWU monitors, indexed by (closid, rmid).
-	 * When ABMC is not in use, this array directly maps (closid, rmid)
-	 * to the allocated monitor. Otherwise this array is sparse, and
-	 * un-assigned (closid, rmid) are -1.
-	 */
-	int			*mbwu_idx_to_mon;
+	/* per-class data that resctrl needs will live here */
 };
 
 static inline int mpam_alloc_csu_mon(struct mpam_class *class)
