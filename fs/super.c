@@ -889,16 +889,35 @@ EXPORT_SYMBOL(drop_super_exclusive);
 enum super_iter_flags_t {
 	SUPER_ITER_EXCL		= (1U << 0),
 	SUPER_ITER_UNLOCKED	= (1U << 1),
+	SUPER_ITER_REVERSE	= (1U << 2),
 };
 
-void __iterate_supers(void (*f)(struct super_block *, void *), void *arg,
-		      unsigned int flags)
+static inline struct super_block *first_super(enum super_iter_flags_t flags)
+{
+	if (flags & SUPER_ITER_REVERSE)
+		return list_last_entry(&super_blocks, struct super_block, s_list);
+	return list_first_entry(&super_blocks, struct super_block, s_list);
+}
+
+static inline struct super_block *next_super(struct super_block *sb,
+					     enum super_iter_flags_t flags)
+{
+	if (flags & SUPER_ITER_REVERSE)
+		return list_prev_entry(sb, s_list);
+	return list_next_entry(sb, s_list);
+}
+
+static void __iterate_supers(void (*f)(struct super_block *, void *), void *arg,
+			     enum super_iter_flags_t flags)
 {
 	struct super_block *sb, *p = NULL;
 	bool excl = flags & SUPER_ITER_EXCL;
 
-	spin_lock(&sb_lock);
-	list_for_each_entry(sb, &super_blocks, s_list) {
+	guard(spinlock)(&sb_lock);
+
+	for (sb = first_super(flags);
+	     !list_entry_is_head(sb, &super_blocks, s_list);
+	     sb = next_super(sb, flags)) {
 		if (super_flags(sb, SB_DYING))
 			continue;
 		sb->s_count++;
@@ -918,7 +937,11 @@ void __iterate_supers(void (*f)(struct super_block *, void *), void *arg,
 	}
 	if (p)
 		__put_super(p);
-	spin_unlock(&sb_lock);
+}
+
+void iterate_supers(void (*f)(struct super_block *, void *), void *arg)
+{
+	__iterate_supers(f, arg, 0);
 }
 
 /**
@@ -1101,7 +1124,8 @@ static void do_emergency_remount_callback(struct super_block *sb, void *unused)
 
 static void do_emergency_remount(struct work_struct *work)
 {
-	__iterate_supers(do_emergency_remount_callback, NULL, SUPER_ITER_EXCL);
+	__iterate_supers(do_emergency_remount_callback, NULL,
+			 SUPER_ITER_EXCL | SUPER_ITER_REVERSE);
 	kfree(work);
 	printk("Emergency Remount complete\n");
 }
