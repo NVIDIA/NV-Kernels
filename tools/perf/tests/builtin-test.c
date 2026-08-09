@@ -638,8 +638,12 @@ int cmd_test(int argc, const char **argv)
 	rlimit__bump_memlock();
 
 	ret = test_suites__setup();
-	if (ret < 0)
+	if (ret < 0) {
+		intlist__delete(skiplist);
 		return ret;
+	}
 
-	return __cmd_test(argc, argv, skiplist);
+	ret = __cmd_test(argc, argv, skiplist);
+	intlist__delete(skiplist);
+	return ret;
 }
