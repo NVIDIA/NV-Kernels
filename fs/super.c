@@ -1149,17 +1149,23 @@ void emergency_remount(void)
 
 static void do_thaw_all_callback(struct super_block *sb)
 {
-	bool locked = super_lock_excl(sb);
+	bool active = false;
 
-	if (locked && sb->s_root) {
-		if (IS_ENABLED(CONFIG_BLOCK))
-			while (sb->s_bdev && !bdev_thaw(sb->s_bdev))
-				pr_warn("Emergency Thaw on %pg\n", sb->s_bdev);
-		thaw_super_locked(sb, FREEZE_HOLDER_USERSPACE);
-		return;
-	}
-	if (locked)
+	if (super_lock_excl(sb)) {
+		active = atomic_inc_not_zero(&sb->s_active);
 		super_unlock_excl(sb);
+	}
+	if (!active)
+		return;
+
+	/* fs_bdev_thaw() acquires s_umount so it must not be held here */
+	if (IS_ENABLED(CONFIG_BLOCK))
+		while (sb->s_bdev && !bdev_thaw(sb->s_bdev))
+			pr_warn("Emergency Thaw on %pg\n", sb->s_bdev);
+
+	if (super_lock_excl(sb))
+		thaw_super_locked(sb, FREEZE_HOLDER_USERSPACE);
+	deactivate_super(sb);
 }
 
 static void do_thaw_all(struct work_struct *work)
