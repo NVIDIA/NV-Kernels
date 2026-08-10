@@ -286,10 +286,29 @@ static ssize_t modalias_show(struct device *dev,
 			     struct device_attribute *da, char *buf)
 {
 	struct i3c_device *i3c = dev_to_i3cdev(dev);
-	struct i3c_device_info devinfo;
+	struct i3c_device_info devinfo = {};
+	u8 static_addr_method = 0;
 	u16 manuf, part, ext;
+	int ret;
 
-	i3c_device_get_info(i3c, &devinfo);
+	i3c_bus_normaluse_lock(i3c->bus);
+	if (i3c->desc) {
+		devinfo = i3c->desc->info;
+		if (i3c->desc->boardinfo)
+			static_addr_method = i3c->desc->boardinfo->static_addr_method;
+	}
+	i3c_bus_normaluse_unlock(i3c->bus);
+
+	if ((static_addr_method & I3C_ADDR_METHOD_SETAASA) && !devinfo.pid) {
+		ret = of_device_modalias(dev, buf, PAGE_SIZE);
+		if (ret != -ENODEV)
+			return ret;
+
+		ret = acpi_device_modalias(dev, buf, PAGE_SIZE - 1);
+		if (ret != -ENODEV)
+			return ret;
+	}
+
 	manuf = I3C_PID_MANUF_ID(devinfo.pid);
 	part = I3C_PID_PART_ID(devinfo.pid);
 	ext = I3C_PID_EXTRA_INFO(devinfo.pid);
@@ -317,11 +336,27 @@ ATTRIBUTE_GROUPS(i3c_device);
 static int i3c_device_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
 	const struct i3c_device *i3cdev = dev_to_i3cdev(dev);
-	struct i3c_device_info devinfo;
+	struct i3c_device_info devinfo = {};
+	u8 static_addr_method = 0;
 	u16 manuf, part, ext;
+	int ret;
 
-	if (i3cdev->desc)
+	if (i3cdev->desc) {
 		devinfo = i3cdev->desc->info;
+		if (i3cdev->desc->boardinfo)
+			static_addr_method = i3cdev->desc->boardinfo->static_addr_method;
+	}
+
+	if ((static_addr_method & I3C_ADDR_METHOD_SETAASA) && !devinfo.pid) {
+		ret = of_device_uevent_modalias(dev, env);
+		if (ret != -ENODEV)
+			return ret;
+
+		ret = acpi_device_uevent_modalias(dev, env);
+		if (ret != -ENODEV)
+			return ret;
+	}
+
 	manuf = I3C_PID_MANUF_ID(devinfo.pid);
 	part = I3C_PID_PART_ID(devinfo.pid);
 	ext = I3C_PID_EXTRA_INFO(devinfo.pid);
