@@ -2285,8 +2285,12 @@ static int i3c_master_bus_init(struct i3c_master_controller *master)
 		 * addressable.
 		 */
 
-		if (i3cboardinfo->static_addr)
-			i3c_master_early_i3c_dev_add(master, i3cboardinfo);
+		if (i3cboardinfo->static_addr) {
+			ret = i3c_master_early_i3c_dev_add(master, i3cboardinfo);
+			if (ret && (i3cboardinfo->static_addr_method &
+				    I3C_ADDR_METHOD_SETAASA))
+				goto err_rstdaa;
+		}
 	}
 
 	/*
