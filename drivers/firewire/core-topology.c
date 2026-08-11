@@ -203,6 +203,18 @@ static struct fw_node *build_tree(struct fw_card *card,
 			return NULL;
 		}
 
+		/*
+		 * Check that the node reports exactly one parent
+		 * port, except for the root, which of course should
+		 * have no parents.
+		 */
+		if ((next_sid == end && parent_port_count != 0) ||
+		    (next_sid < end && parent_port_count != 1)) {
+			fw_err(card, "parent port inconsistency for node %d: "
+			       "parent_count=%d\n", phy_id, parent_port_count);
+			return NULL;
+		}
+
 		q = *sid;
 		if (phy_id != SELF_ID_PHY_ID(q)) {
 			fw_err(card, "PHY ID mismatch in self ID: %d != %d\n",
@@ -266,18 +278,6 @@ static struct fw_node *build_tree(struct fw_card *card,
 				child = fw_node(child->link.next);
 				break;
 			}
-		}
-
-		/*
-		 * Check that the node reports exactly one parent
-		 * port, except for the root, which of course should
-		 * have no parents.
-		 */
-		if ((next_sid == end && parent_port_count != 0) ||
-		    (next_sid < end && parent_port_count != 1)) {
-			fw_err(card, "parent port inconsistency for node %d: "
-			       "parent_count=%d\n", phy_id, parent_port_count);
-			return NULL;
 		}
 
 		/* Pop the child nodes off the stack and push the new node. */
