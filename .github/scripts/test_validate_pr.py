@@ -14,6 +14,8 @@ VALIDATE_PR = pathlib.Path(__file__).with_name("validate-pr")
 SUBJECT = "fixture: insert payload"
 UPSTREAM_SOB = "Signed-off-by: Upstream Author <upstream@example.com>"
 LOCAL_SOB = "Signed-off-by: Local Author <local@example.com>"
+UNRESOLVED_SHA = "deadbeef" * 5
+PATCH_MSGID = "fixture-patch@example.com"
 
 
 class ValidatePrPatchIdTest(unittest.TestCase):
@@ -184,7 +186,7 @@ class ValidatePrPatchIdTest(unittest.TestCase):
         local = self._git("rev-parse", "HEAD")
         return parent, local, upstream
 
-    def _build_case(self, change, context_parent=True):
+    def _build_case(self, change, context_parent=True, linux_next=False):
         self._git("checkout", "-b", "upstream-topic", self.base)
         self._set_identity("Upstream Author", "upstream@example.com")
         lines = self._read_fixture()
@@ -204,6 +206,14 @@ class ValidatePrPatchIdTest(unittest.TestCase):
 
         if change == "exact":
             self._git("cherry-pick", "-x", "--signoff", upstream)
+            if linux_next:
+                message = self._git("log", "-1", "--format=%B")
+                message = message.replace(
+                    "(cherry picked from commit {})".format(upstream),
+                    "(cherry picked from commit {} linux-next)".format(
+                        upstream), 1)
+                self._git("commit", "--amend", "-F", "-",
+                          input_text=message)
         else:
             lines = self._read_fixture()
             anchors = [i for i, line in enumerate(lines) if line == "anchor"]
@@ -287,13 +297,72 @@ os.execv(real_git, [real_git, *args])
         env["VALIDATE_PR_FAKE_GIT_MODE"] = mode
         return env
 
-    def _validate(self, parent, local, git_mode=None):
+    def _fake_b4_env(self, commit, expected_msgid=None, fail=False):
+        env = self._fake_git_env("")
+        fake_b4 = self.repo / "fake-bin" / "b4"
+        fake_b4.write_text("""#!/usr/bin/env python3
+import os
+import subprocess
+import sys
+
+if os.environ.get("VALIDATE_PR_FAKE_B4_FAIL") == "1":
+    sys.exit(1)
+
+expected = os.environ.get("VALIDATE_PR_FAKE_B4_MSGID")
+if expected and sys.argv[-1] != expected:
+    sys.stderr.write("unexpected b4 URL: {}\\n".format(sys.argv[-1]))
+    sys.exit(1)
+if "--single-message" not in sys.argv:
+    sys.stderr.write("missing --single-message\\n")
+    sys.exit(1)
+
+real_git = os.environ["VALIDATE_PR_REAL_GIT"]
+result = subprocess.run(
+    [real_git, "format-patch", "--stdout", "{}^..{}".format(
+        os.environ["VALIDATE_PR_FAKE_B4_COMMIT"],
+        os.environ["VALIDATE_PR_FAKE_B4_COMMIT"])],
+    capture_output=True)
+sys.stdout.buffer.write(result.stdout)
+sys.stderr.buffer.write(result.stderr)
+sys.exit(result.returncode)
+""")
+        fake_b4.chmod(0o755)
+        env["VALIDATE_PR_FAKE_B4_COMMIT"] = commit
+        env["VALIDATE_PR_FAKE_B4_MSGID"] = expected_msgid or ""
+        env["VALIDATE_PR_FAKE_B4_FAIL"] = "1" if fail else "0"
+        return env
+
+    def _b4_less_env(self):
+        """Env whose PATH holds git only, so b4 raises FileNotFoundError."""
+        bare_bin = self.repo / "bare-bin"
+        bare_bin.mkdir(exist_ok=True)
+        os.symlink(self.real_git, bare_bin / "git")
+        env = os.environ.copy()
+        env["PATH"] = str(bare_bin)
+        return env
+
+    def _build_linux_next_url_case(self, links):
+        parent, local = self._build_case(
+            "exact", context_parent=False, linux_next=True)
+        message = self._git("log", "-1", "--format=%B")
+        lines = message.splitlines()
+        trailer = next(index for index, line in enumerate(lines)
+                       if line.startswith("(cherry picked from commit "))
+        lines[trailer] = "(cherry picked from commit {} linux-next)".format(
+            UNRESOLVED_SHA)
+        for link in reversed(links):
+            lines.insert(trailer, link)
+        self._git("commit", "--amend", "-F", "-",
+                  input_text="\n".join(lines) + "\n")
+        return parent, self._git("rev-parse", "HEAD")
+
+    def _validate(self, parent, local, git_mode=None, env=None):
         return subprocess.run(
             [sys.executable, str(VALIDATE_PR),
              "{}..{}".format(parent, local), "upstream", "linux",
              "--no-update"],
             cwd=self.repo,
-            env=self._fake_git_env(git_mode) if git_mode else None,
+            env=self._fake_git_env(git_mode) if git_mode else env,
             text=True,
             capture_output=True,
         )
@@ -337,6 +406,68 @@ os.execv(real_git, [real_git, *args])
 
         self.assertEqual(result.returncode, 0, self._output(result))
         self.assertEqual(self._patch_id_status(result, local), "match")
+
+    def test_accepts_linux_next_cherry_pick(self):
+        parent, local = self._build_case(
+            "exact", context_parent=False, linux_next=True)
+
+        result = self._validate(parent, local)
+
+        self.assertEqual(result.returncode, 0, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "match")
+
+    def test_accepts_linux_next_patch_url_without_source_commit(self):
+        parent, local = self._build_linux_next_url_case([
+            "Link: https://lore.kernel.org/all/earlier@example.com/",
+            "Link: https://patch.msgid.link/{}".format(PATCH_MSGID),
+        ])
+
+        result = self._validate(
+            parent, local,
+            env=self._fake_b4_env(local, expected_msgid=PATCH_MSGID))
+
+        self.assertEqual(result.returncode, 0, self._output(result))
+        self.assertNotIn("cannot resolve upstream SHA", result.stdout)
+        self.assertIn("ok, backporter: local", result.stdout)
+        self.assertEqual(self._patch_id_status(result, local), "match")
+
+    def test_reports_linux_next_patch_fetch_failure(self):
+        parent, local = self._build_linux_next_url_case([
+            "Link: https://patch.msgid.link/{}".format(PATCH_MSGID),
+        ])
+
+        result = self._validate(
+            parent, local,
+            env=self._fake_b4_env(
+                local, expected_msgid=PATCH_MSGID, fail=True))
+
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertIn("unable to fetch patch URL", result.stdout)
+        self.assertNotIn("cannot resolve upstream SHA", result.stdout)
+        self.assertNotIn("patch-ID mismatch with upstream", result.stdout)
+
+    def test_reports_linux_next_pick_without_patch_link(self):
+        parent, local = self._build_linux_next_url_case([
+            "Link: https://www.mipi.org/specifications/i3c-sensor-specification",
+        ])
+
+        result = self._validate(
+            parent, local, env=self._fake_b4_env(local))
+
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertIn("needs a public patch Link: trailer", result.stdout)
+        self.assertNotIn("cannot resolve upstream SHA", result.stdout)
+
+    def test_reports_missing_b4_as_fetch_failure(self):
+        parent, local = self._build_linux_next_url_case([
+            "Link: https://patch.msgid.link/{}".format(PATCH_MSGID),
+        ])
+
+        result = self._validate(parent, local, env=self._b4_less_env())
+
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertIn("unable to fetch patch URL", result.stdout)
+        self.assertNotIn("Traceback", result.stderr)
 
     def test_rejects_git_show_failure_with_patch_output(self):
         parent, local = self._build_case("exact", context_parent=False)

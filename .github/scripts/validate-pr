@@ -32,7 +32,9 @@ args = parser.parse_args()
 
 
 def get_cherry_pick_sha(message):
-    m = re.search(r'\(cherry picked from commit ([a-fA-F0-9]+)\)', message)
+    m = re.search(
+        r'\(cherry picked from commit ([a-fA-F0-9]+)(?: linux-next)?\)',
+        message)
     return m.group(1) if m else None
 
 def get_backported_commit_sha(message):
@@ -50,6 +52,28 @@ def get_upstream_commit_sha(message):
 def get_backport_url(message):
     m = re.search(r'\(backported from (https?://[^\)]+)\)', message)
     return m.group(1) if m else None
+
+def is_linux_next_cherry_pick(message):
+    return bool(re.search(
+        r'\(cherry picked from commit [a-fA-F0-9]+ linux-next\)', message))
+
+def get_linux_next_patch_url(message):
+    """Return the public patch URL attached to a linux-next cherry-pick."""
+    if not is_linux_next_cherry_pick(message):
+        return None
+    links = []
+    for m in re.finditer(
+            r'^Link:\s+(https?://\S+)', message, re.MULTILINE):
+        url = m.group(1).rstrip(').,')
+        if re.search(r'(?:lore\.kernel\.org|patch\.msgid\.link|'
+                     r'patchwork\.kernel\.org)', url):
+            links.append(url)
+    for url in reversed(links):
+        if 'patch.msgid.link' in url:
+            return url
+    if links:
+        return links[-1]
+    return None
 
 def is_sauce(subject):
     return bool(re.match(r'^NVIDIA:.*SAUCE:', subject))
@@ -106,7 +130,7 @@ def get_local_provenance_entries(message):
     entries = []
     patterns = [
         (r'^\[[\w][\w .\-]+:.*\]', '[Name: note]'),
-        (r'^\(cherry picked from commit [a-fA-F0-9]+\)',
+        (r'^\(cherry picked from commit [a-fA-F0-9]+(?: linux-next)?\)',
          '(cherry picked from commit ...)'),
         (r'^\(backported from commit [a-fA-F0-9]+\)',
          '(backported from commit ...)'),
@@ -476,13 +500,24 @@ def describe_sob_simple(message):
 
 
 def describe_sob_chain_backport(message):
-    """Check SOB ordering for a (backported from <url>) commit.
+    """Check SOB ordering for a URL-backed backport commit.
 
-    Correct order: original-author trailers, then (backported from ...), then
-    optional [Name: note], then backporter SOB.  Returns a short status
-    string; strings starting with 'MISSING' or 'ORDER' indicate an error.
+    Correct order: original-author trailers, then the provenance trailer, then
+    optional [Name: note], then backporter SOB.  Returns a short status string;
+    strings starting with 'MISSING' or 'ORDER' indicate an error.
     """
-    bp_match = re.search(r'\(backported from https?://[^\)]+\)', message)
+    provenance = None
+    for pattern, label in (
+            (r'\(backported from https?://[^\)]+\)',
+             '(backported from ...)'),
+            (r'\(cherry picked from commit [a-fA-F0-9]+ linux-next\)',
+             '(cherry picked from commit ... linux-next)')):
+        match = re.search(pattern, message)
+        if match:
+            provenance = (match, label)
+            break
+    bp_match = provenance[0] if provenance else None
+    provenance_label = provenance[1] if provenance else None
     if bp_match is None:
         return 'no backport tag'
     bp_pos = bp_match.start()
@@ -491,14 +526,15 @@ def describe_sob_chain_backport(message):
     sobs = get_sob_entries(message)
     after  = [s for pos, s in sobs if pos > bp_pos]
     if not after:
-        return 'MISSING: no Signed-off-by after (backported from ...)'
+        return 'MISSING: no Signed-off-by after {}'.format(provenance_label)
     first_backporter_sob_pos = min(pos for pos, _ in sobs if pos > bp_pos)
     if any(pos < bp_pos for pos, _ in notes):
-        return ('ORDER: move [Name: note] after (backported from ...) and'
-                ' before the backporter Signed-off-by')
+        return ('ORDER: move [Name: note] after {} and'
+                ' before the backporter Signed-off-by').format(
+                    provenance_label)
     if any(pos > first_backporter_sob_pos for pos, _ in notes):
         return ('ORDER: move [Name: note] before the backporter Signed-off-by'
-                ' and after (backported from ...)')
+                ' and after {}').format(provenance_label)
     last_provenance_pos, last_provenance_label, _ = (
         get_local_provenance_entries(message)[-1])
     after = [s for pos, s in sobs if pos > last_provenance_pos]
@@ -610,12 +646,26 @@ def _b4_fetch_series(url, workdir):
     if url in _b4_series_cache:
         return _b4_series_cache[url]
 
-    result = subprocess.run(
-        ['b4', 'am', '-o', '-', url],
-        capture_output=True,
-        timeout=120,
-        cwd=workdir,
-    )
+    b4_url = url
+    msgid_url = re.match(r'https?://patch\.msgid\.link/([^/?#]+)', url)
+    if msgid_url:
+        b4_url = msgid_url.group(1)
+
+    b4_args = ['b4', 'am', '-o', '-']
+    if msgid_url:
+        b4_args.append('--single-message')
+    b4_args.append(b4_url)
+    try:
+        result = subprocess.run(
+            b4_args,
+            capture_output=True,
+            timeout=120,
+            cwd=workdir,
+        )
+    except (OSError, subprocess.SubprocessError):
+        # b4 missing from PATH, not executable, or timed out.
+        _b4_series_cache[url] = None
+        return None
     if result.returncode != 0 or not result.stdout:
         _b4_series_cache[url] = None
         return None
@@ -648,7 +698,7 @@ def _b4_fetch_series(url, workdir):
     return patches
 
 
-def check_backport_diff(commit):
+def check_backport_diff(commit, url=None):
     """Compare local commit diff against the matching upstream patch via b4.
 
     Returns (status_str, is_error).  is_error is True only when a matching
@@ -661,13 +711,15 @@ def check_backport_diff(commit):
       'no-match'   – series fetched but no patch matches this commit's subject
       'no-diff'    – series has no patches with diffs (cover-letter only)
       'fetch-err'  – b4 failed (network/tool issue) → warning, not error
-      'non-lore'   – URL is not a lore.kernel.org link → skipped
+      'non-lore'   – URL is not a supported public patch link → skipped
     """
-    url = get_backport_url(commit.message)
+    url = url or get_backport_url(commit.message)
     if url is None:
         return 'N/A', False, 'N/A'
 
-    if 'lore.kernel.org' not in url and 'patchwork.kernel.org' not in url:
+    if not re.search(
+            r'(?:lore\.kernel\.org|patch\.msgid\.link|'
+            r'patchwork\.kernel\.org)', url):
         return 'non-lore', False, 'non-lore'
 
     patches = _b4_fetch_series(url, commit.repo.working_dir)
@@ -704,13 +756,14 @@ def check_backport_diff(commit):
 
 
 def build_digest(commits, repo, upstream_remote=None):
-    """Build digest rows for cherry-pick and backported-from commits."""
+    """Build digest rows for cherry-pick and URL-backed commits."""
     rows = []
     errors = []
 
     for commit in commits:
         src_sha = get_upstream_commit_sha(commit.message)
         bp_url  = get_backport_url(commit.message)
+        linux_next_url = get_linux_next_patch_url(commit.message)
 
         # --- SAUCE / Revert: no upstream reference, show as informational row ---
         if src_sha is None and bp_url is None:
@@ -738,6 +791,40 @@ def build_digest(commits, repo, upstream_remote=None):
                              upstream='[{}] {}'.format(kind, display),
                              patch_id='N/A', subject='N/A',
                              sob=sob_status, error=sob_error))
+            continue
+
+        # --- linux-next: validate against the stable patch URL, not the SHA ---
+        # linux-next is rebuilt frequently and its commit objects are not
+        # available from the origin/linux ref fetched by CI.
+        if linux_next_url:
+            local_sha12 = commit.hexsha[:12]
+            sob_status = describe_sob_chain_backport(commit.message)
+            sob_error = sob_status.startswith(('MISSING', 'ORDER'))
+            if sob_error:
+                errors.append("E: {} (\"{}\"): linux-next trailer order: {}".format(
+                    local_sha12, subject_of(commit)[:40], sob_status))
+
+            diff_status, _, subj_status = check_backport_diff(
+                commit, linux_next_url)
+            diff_error = diff_status not in ('match', 'noted')
+            if diff_error:
+                if diff_status == 'fetch-err':
+                    detail = 'unable to fetch patch URL {}'.format(linux_next_url)
+                elif diff_status == 'no-match':
+                    detail = 'patch URL has no matching subject'
+                elif diff_status == 'no-diff':
+                    detail = 'patch URL contains no patch diff'
+                else:
+                    detail = 'diff MISMATCH with linux-next patch'
+                errors.append("E: {} (\"{}\"): {}".format(
+                    local_sha12, subject_of(commit)[:40], detail))
+
+            patch_subj = _norm_sauce_subject(subject_of(commit))
+            rows.append(dict(local=local_sha12,
+                             upstream=patch_subj,
+                             patch_id=diff_status, subject=subj_status,
+                             sob=sob_status,
+                             error=sob_error or diff_error))
             continue
 
         # --- backported-from: check SOB order + compare diff against lore patch ---
@@ -779,8 +866,17 @@ def build_digest(commits, repo, upstream_remote=None):
                     pass
 
         if upstream is None:
-            errors.append("E: {} (\"{}\"): cannot resolve upstream SHA {}".format(
-                local_sha12, subject_of(commit)[:40], upstream_sha12))
+            if is_linux_next_cherry_pick(commit.message):
+                # The linux-next SHA is rebuilt daily and is not fetchable from
+                # the origin/linux ref CI has; point at the trailer that is.
+                errors.append(
+                    "E: {} (\"{}\"): linux-next cherry-pick needs a public patch"
+                    " Link: trailer (patch.msgid.link, lore.kernel.org or"
+                    " patchwork.kernel.org); SHA {} is not resolvable".format(
+                        local_sha12, subject_of(commit)[:40], upstream_sha12))
+            else:
+                errors.append("E: {} (\"{}\"): cannot resolve upstream SHA {}".format(
+                    local_sha12, subject_of(commit)[:40], upstream_sha12))
             rows.append(dict(local=local_sha12, upstream=upstream_sha12,
                              patch_id='ERROR', subject='ERROR', sob='ERROR',
                              error=True))
@@ -798,8 +894,9 @@ def build_digest(commits, repo, upstream_remote=None):
         else:
             pid_status = 'MISMATCH'
             pid_error  = True
-            errors.append("E: {} (\"{}\"): patch-ID mismatch with upstream {}".format(
-                local_sha12, subject_of(commit)[:40], upstream_sha12))
+            errors.append(
+                "E: {} (\"{}\"): patch-ID mismatch with upstream {}".format(
+                    local_sha12, subject_of(commit)[:40], upstream_sha12))
 
         # Subject
         local_subj    = subject_of(commit)
