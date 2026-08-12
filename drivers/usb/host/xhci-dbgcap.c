@@ -729,6 +729,43 @@ static void xhci_dbc_stop(struct xhci_dbc *dbc)
 	pm_runtime_put_sync(dbc->dev); /* note, was self.controller */
 }
 
+/*
+ * Tear down DbC software state after the platform has made xHCI registers
+ * inaccessible.  Mark the state disabled before draining asynchronous work so
+ * neither the worker nor a request completion can issue another MMIO access.
+ */
+static void xhci_dbc_stop_no_hw(struct xhci_dbc *dbc)
+{
+	enum dbc_state state;
+	unsigned long flags;
+
+	spin_lock_irqsave(&dbc->lock, flags);
+	state = dbc->state;
+	dbc->state = DS_DISABLED;
+	spin_unlock_irqrestore(&dbc->lock, flags);
+
+	/* Stop the worker and prevent request completions from requeueing it. */
+	disable_delayed_work_sync(&dbc->event_work);
+
+	if (state == DS_DISABLED)
+		return;
+
+	if (state == DS_CONFIGURED) {
+		spin_lock_irqsave(&dbc->lock, flags);
+		xhci_dbc_flush_requests(dbc);
+		spin_unlock_irqrestore(&dbc->lock, flags);
+
+		if (dbc->driver->disconnect)
+			dbc->driver->disconnect(dbc);
+	}
+
+	xhci_dbc_mem_cleanup(dbc);
+
+	/* DS_INITIALIZED is left behind only after a failed start already put. */
+	if (state >= DS_ENABLED)
+		pm_runtime_put_noidle(dbc->dev);
+}
+
 static void
 handle_ep_halt_changes(struct xhci_dbc *dbc, struct dbc_ep *dep, bool halted)
 {
@@ -1458,15 +1495,22 @@ err:
 }
 
 /* undo what xhci_alloc_dbc() did */
-void xhci_dbc_remove(struct xhci_dbc *dbc)
+void xhci_dbc_remove(struct xhci_dbc *dbc, bool hw_accessible)
 {
 	if (!dbc)
 		return;
-	/* stop hw, stop wq and call dbc->ops->stop() */
-	xhci_dbc_stop(dbc);
 
-	/* remove sysfs files */
+	/* Prevent a concurrent sysfs write from restarting DbC during removal. */
 	sysfs_remove_groups(&dbc->dev->kobj, dbc_dev_groups);
+
+	/* stop hw when possible, then stop work and call dbc->ops->stop() */
+	if (hw_accessible) {
+		/* Removal is final; prevent callbacks from requeueing the worker. */
+		disable_delayed_work_sync(&dbc->event_work);
+		xhci_dbc_stop(dbc);
+	} else {
+		xhci_dbc_stop_no_hw(dbc);
+	}
 
 	kfree(dbc);
 }
@@ -1496,18 +1540,19 @@ int xhci_create_dbc_dev(struct xhci_hcd *xhci)
 	return ret;
 }
 
-void xhci_remove_dbc_dev(struct xhci_hcd *xhci)
+void xhci_remove_dbc_dev(struct xhci_hcd *xhci, bool hw_accessible)
 {
 	unsigned long		flags;
 
 	if (!xhci->dbc)
 		return;
 
-	xhci_dbc_tty_remove(xhci->dbc);
+	xhci_dbc_tty_remove(xhci->dbc, hw_accessible);
 	spin_lock_irqsave(&xhci->lock, flags);
 	xhci->dbc = NULL;
 	spin_unlock_irqrestore(&xhci->lock, flags);
 }
+EXPORT_SYMBOL_GPL(xhci_remove_dbc_dev);
 
 #ifdef CONFIG_PM
 int xhci_dbc_suspend(struct xhci_hcd *xhci)
