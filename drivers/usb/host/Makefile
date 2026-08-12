@@ -22,6 +22,11 @@ endif
 xhci-mtk-hcd-y := xhci-mtk.o xhci-mtk-sch.o
 
 xhci-plat-hcd-y := xhci-plat.o
+
+ifneq ($(CONFIG_USB_XHCI_MTK_V2), )
+	xhci-plat-hcd-y		+= xhci-mtk-v2.o
+endif
+
 ifneq ($(CONFIG_USB_XHCI_MVEBU), )
 	xhci-plat-hcd-y		+= xhci-mvebu.o
 endif
