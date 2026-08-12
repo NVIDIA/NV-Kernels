@@ -77,6 +77,17 @@ config USB_XHCI_MTK
 	  found in MediaTek SoCs.
 	  If unsure, say N.
 
+config USB_XHCI_MTK_V2
+	tristate "xHCI support for MediaTek MT8901 SoC"
+	depends on ACPI
+	depends on MTK_POWER_WRAP
+	depends on ARM64 || COMPILE_TEST
+	select USB_XHCI_PLATFORM
+	default y
+	help
+	  Say 'Y' to enable the support for the xHCI host controller
+	  for the MT8901 SoC.
+
 config USB_XHCI_MVEBU
 	tristate "xHCI support for Marvell Armada 375/38x/37xx"
 	select USB_XHCI_PLATFORM

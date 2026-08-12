@@ -1375,8 +1375,8 @@ static void xhci_kill_endpoint_urbs(struct xhci_hcd *xhci,
  * URBs need to be given back as usb core might be waiting with device locks
  * held for the URBs to finish during device disconnect, blocking host remove.
  *
- * Call with xhci->lock held.
- * lock is relased and re-acquired while giving back urb.
+ * Call with xhci->lock held. xHCI uses HCD_BH, so URB completion
+ * callbacks are deferred and the lock remains held while they are queued.
  */
 void xhci_hc_died(struct xhci_hcd *xhci)
 {
@@ -1405,6 +1405,7 @@ void xhci_hc_died(struct xhci_hcd *xhci)
 	if (notify)
 		usb_hc_died(xhci_to_hcd(xhci));
 }
+EXPORT_SYMBOL_GPL(xhci_hc_died);
 
 /*
  * When we get a completion for a Set Transfer Ring Dequeue Pointer command,
@@ -3019,11 +3020,13 @@ static int xhci_handle_event_trb(struct xhci_hcd *xhci, struct xhci_interrupter 
 		else
 			xhci_warn(xhci, "ERROR unknown event type %d\n", trb_type);
 	}
-	/* Any of the above functions may drop and re-acquire the lock, so check
-	 * to make sure a watchdog timer didn't mark the host as non-responsive.
+	/*
+	 * Any of the above functions may drop and re-acquire the lock.  Stop if
+	 * suspend or failed recovery made the controller inaccessible meanwhile.
 	 */
-	if (xhci->xhc_state & XHCI_STATE_DYING) {
-		xhci_dbg(xhci, "xHCI host dying, returning from event handler.\n");
+	if (!HCD_HW_ACCESSIBLE(xhci_to_hcd(xhci)) ||
+	    xhci->xhc_state & XHCI_STATE_DYING) {
+		xhci_dbg(xhci, "xHCI host inaccessible, returning from event handler.\n");
 		return -ENODEV;
 	}
 
@@ -3090,6 +3093,9 @@ static int xhci_handle_events(struct xhci_hcd *xhci, struct xhci_interrupter *ir
 	int err = 0;
 	u64 temp;
 
+	if (!HCD_HW_ACCESSIBLE(xhci_to_hcd(xhci)))
+		return -ENODEV;
+
 	xhci_clear_interrupt_pending(ir);
 
 	/* Event ring hasn't been allocated yet. */
@@ -3102,7 +3108,7 @@ static int xhci_handle_events(struct xhci_hcd *xhci, struct xhci_interrupter *ir
 	    xhci->xhc_state & XHCI_STATE_HALTED) {
 		xhci_dbg(xhci, "xHCI dying, ignoring interrupt. Shouldn't IRQs be disabled?\n");
 
-		/* Clear the event handler busy flag (RW1C) */
+		/* Clear the event handler busy flag (RW1C). */
 		temp = xhci_read_64(xhci, &ir->ir_set->erst_dequeue);
 		xhci_write_64(xhci, temp | ERST_EHB, &ir->ir_set->erst_dequeue);
 		return -ENODEV;
@@ -3112,6 +3118,15 @@ static int xhci_handle_events(struct xhci_hcd *xhci, struct xhci_interrupter *ir
 	while (unhandled_event_trb(ir->event_ring)) {
 		if (!skip_events)
 			err = xhci_handle_event_trb(xhci, ir, ir->event_ring->dequeue);
+		if (err) {
+			/*
+			 * The event was consumed before the controller became
+			 * inaccessible. Advance only the software dequeue pointer;
+			 * updating ERDP below would access unavailable hardware.
+			 */
+			inc_deq(xhci, ir->event_ring);
+			return err;
+		}
 
 		/*
 		 * If half a segment of events have been handled in one go then
@@ -3129,8 +3144,6 @@ static int xhci_handle_events(struct xhci_hcd *xhci, struct xhci_interrupter *ir
 		/* Update SW event ring dequeue pointer */
 		inc_deq(xhci, ir->event_ring);
 
-		if (err)
-			break;
 	}
 
 	xhci_update_erst_dequeue(xhci, ir, true);
@@ -3181,6 +3194,12 @@ irqreturn_t xhci_irq(struct usb_hcd *hcd)
 	u32 status;
 
 	spin_lock(&xhci->lock);
+	/* Recheck after taking the lock to close the accessibility TOCTOU. */
+	if (unlikely(HCD_DEAD(hcd) || !HCD_HW_ACCESSIBLE(hcd))) {
+		ret = IRQ_NONE;
+		goto out;
+	}
+
 	/* Check if the xHC generated the interrupt, or the irq is shared */
 	status = readl(&xhci->op_regs->status);
 	if (status == ~(u32)0) {
