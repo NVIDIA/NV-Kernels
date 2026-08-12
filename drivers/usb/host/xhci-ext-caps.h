@@ -8,6 +8,9 @@
  * Some code borrowed from the Linux EHCI driver.
  */
 
+#ifndef __XHCI_EXT_CAPS_H
+#define __XHCI_EXT_CAPS_H
+
 /* HC should halt within 16 ms, but use 32 ms as some hosts take longer */
 #define XHCI_MAX_HALT_USEC	(32 * 1000)
 /* HC not running - set to 1 when run/stop bit is cleared. */
@@ -155,3 +158,4 @@ static inline int xhci_find_next_ext_cap(void __iomem *base, u32 start, int id)
 
 	return 0;
 }
+#endif /* __XHCI_EXT_CAPS_H */
