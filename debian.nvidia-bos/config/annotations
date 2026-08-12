@@ -297,6 +297,9 @@ CONFIG_UBUNTU_ODM_DRIVERS                       note<'Disable all Ubuntu ODM dri
 CONFIG_ULTRASOC_SMB                             policy<{'arm64': 'n'}>
 CONFIG_ULTRASOC_SMB                             note<'Required for Grace enablement'>
 
+CONFIG_USB_XHCI_MTK_V2                          policy<{'arm64': 'm'}>
+CONFIG_USB_XHCI_MTK_V2                          note<'MediaTek MT8901 xHCI ACPI glue and PHY support.'>
+
 CONFIG_VFIO_CONTAINER                           policy<{'amd64': 'y', 'arm64': 'n'}>
 CONFIG_VFIO_CONTAINER                           note<'LP: #2095028'>
 
