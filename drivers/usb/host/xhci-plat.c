@@ -15,6 +15,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/pm_wakeirq.h>
 #include <linux/usb/phy.h>
 #include <linux/slab.h>
 #include <linux/acpi.h>
@@ -23,8 +24,10 @@
 #include <linux/usb/xhci-sideband.h>
 
 #include "xhci.h"
+#include "xhci-dbgcap.h"
 #include "xhci-plat.h"
 #include "xhci-mvebu.h"
+#include "xhci-mtk-v2.h"
 
 static struct hc_driver __read_mostly xhci_plat_hc_driver;
 
@@ -97,7 +100,6 @@ static int xhci_plat_setup(struct usb_hcd *hcd)
 {
 	int ret;
 
-
 	ret = xhci_priv_init_quirk(hcd);
 	if (ret)
 		return ret;
@@ -164,6 +166,8 @@ int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const s
 	int			irq;
 	struct xhci_plat_priv	*priv = NULL;
 	const struct of_device_id *of_match;
+	bool mtk_hw_prepared = false;
+	int wakeup_irq = -1;
 
 	if (usb_disabled())
 		return -ENODEV;
@@ -246,6 +250,26 @@ int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const s
 		*priv = *priv_match;
 	}
 
+	if (priv && priv->is_mtk_v2) {
+
+		wakeup_irq = platform_get_irq_optional(pdev, 1);
+		if (wakeup_irq == -EPROBE_DEFER) {
+			ret = wakeup_irq;
+			goto disable_clk;
+		}
+
+		ret = xhci_mtk_get_resources(pdev, xhci);
+		if (ret)
+			goto disable_clk;
+
+		ret = xhci_mtk_prepare_hw(xhci);
+		if (ret) {
+			goto free_rscs;
+		}
+
+		mtk_hw_prepared = true;
+	}
+
 	device_set_wakeup_capable(&pdev->dev, true);
 
 	xhci->main_hcd = hcd;
@@ -296,12 +320,12 @@ int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const s
 		if (IS_ERR(hcd->usb_phy)) {
 			ret = PTR_ERR(hcd->usb_phy);
 			if (ret == -EPROBE_DEFER)
-				goto disable_clk;
+				goto free_rscs;
 			hcd->usb_phy = NULL;
 		} else {
 			ret = usb_phy_init(hcd->usb_phy);
 			if (ret)
-				goto disable_clk;
+				goto free_rscs;
 		}
 	}
 
@@ -355,6 +379,15 @@ int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const s
 			goto put_usb3_hcd;
 	}
 
+	if (wakeup_irq > 0) {
+		ret = dev_pm_set_dedicated_wake_irq_reverse(&pdev->dev, wakeup_irq);
+		if (ret) {
+			dev_err(&pdev->dev, "set wakeup irq %d failed\n", wakeup_irq);
+			goto dealloc_usb3_hcd;
+		}
+		dev_info(&pdev->dev, "wakeup irq %d\n", wakeup_irq);
+	}
+
 	device_enable_async_suspend(&pdev->dev);
 	pm_runtime_put_noidle(&pdev->dev);
 
@@ -363,9 +396,20 @@ int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const s
 	 * runtime pm using power/control in sysfs.
 	 */
 	pm_runtime_forbid(&pdev->dev);
+	if (priv && priv->is_mtk_v2) {
+		/*
+		 * Runtime PM is unsupported until Power Wrap can report an
+		 * authoritative final state after a transition failure. Keep
+		 * system sleep enabled, but prevent userspace from enabling the
+		 * unsafe runtime suspend path through power/control.
+		 */
+		pm_runtime_disable(&pdev->dev);
+	}
 
 	return 0;
 
+dealloc_usb3_hcd:
+	usb_remove_hcd(xhci->shared_hcd);
 
 put_usb3_hcd:
 	usb_put_hcd(xhci->shared_hcd);
@@ -375,6 +419,12 @@ dealloc_usb2_hcd:
 
 disable_usb_phy:
 	usb_phy_shutdown(hcd->usb_phy);
+
+free_rscs:
+	if (mtk_hw_prepared)
+		xhci_mtk_release_hw(xhci, true);
+	if (priv && priv->is_mtk_v2)
+		xhci_mtk_free_resources(pdev, xhci);
 
 disable_clk:
 	clk_disable_unprepare(xhci->clk);
@@ -427,12 +477,44 @@ static int xhci_generic_plat_probe(struct platform_device *pdev)
 			return ret;
 	}
 
-	if (pdev->dev.of_node)
-		priv_match = of_device_get_match_data(&pdev->dev);
-	else
+	priv_match = device_get_match_data(&pdev->dev);
+	if (!priv_match)
 		priv_match = dev_get_platdata(&pdev->dev);
 
 	return xhci_plat_probe(pdev, sysdev, priv_match);
+}
+
+static void xhci_plat_hc_died(struct xhci_hcd *xhci, bool hw_accessible)
+{
+	struct usb_hcd *hcd = xhci_to_hcd(xhci);
+
+	/*
+	 * Make the host dead and update accessibility under the same lock.  This
+	 * keeps unlink and timeout paths from touching registers while an IRQ
+	 * which passed usb_hcd_irq()'s accessibility check is synchronized.
+	 */
+	spin_lock_irq(&xhci->lock);
+	if (hw_accessible) {
+		set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+		if (xhci->shared_hcd)
+			set_bit(HCD_FLAG_HW_ACCESSIBLE,
+				&xhci->shared_hcd->flags);
+	} else {
+		clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+		if (xhci->shared_hcd)
+			clear_bit(HCD_FLAG_HW_ACCESSIBLE,
+				  &xhci->shared_hcd->flags);
+	}
+	xhci_hc_died(xhci);
+	spin_unlock_irq(&xhci->lock);
+
+	if (hcd->irq > 0)
+		synchronize_irq(hcd->irq);
+
+	/* A dead host must not leave DbC work or register sysfs files live. */
+	mutex_lock(&xhci->mutex);
+	xhci_remove_dbc_dev(xhci, hw_accessible);
+	mutex_unlock(&xhci->mutex);
 }
 
 void xhci_plat_remove(struct platform_device *dev)
@@ -442,28 +524,59 @@ void xhci_plat_remove(struct platform_device *dev)
 	struct clk *clk = xhci->clk;
 	struct clk *reg_clk = xhci->reg_clk;
 	struct usb_hcd *shared_hcd = xhci->shared_hcd;
+	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
+	bool mtk_hw_accessible = true;
+	bool mtk_host_suspended = false;
+	int ret;
 
 	xhci->xhc_state |= XHCI_STATE_REMOVING;
 	pm_runtime_get_sync(&dev->dev);
+	if (priv->is_mtk_v2) {
+		mtk_hw_accessible = HCD_HW_ACCESSIBLE(hcd);
+		if (!mtk_hw_accessible) {
+			mtk_host_suspended = true;
+			ret = xhci_mtk_exit_lps(xhci);
+			if (ret) {
+				dev_warn(&dev->dev,
+					 "failed to recover D0 for removal (%d)\n",
+					 ret);
+			} else {
+				mtk_hw_accessible = true;
+			}
+		}
+		if (mtk_host_suspended)
+			xhci_plat_hc_died(xhci, mtk_hw_accessible);
+	}
+
+	if (priv->is_mtk_v2)
+		dev_pm_clear_wake_irq(&dev->dev);
 
 	if (shared_hcd) {
 		usb_remove_hcd(shared_hcd);
 		xhci->shared_hcd = NULL;
 	}
 
-	usb_phy_shutdown(hcd->usb_phy);
+	if (!priv->is_mtk_v2 || mtk_hw_accessible)
+		usb_phy_shutdown(hcd->usb_phy);
 
 	usb_remove_hcd(hcd);
 
 	if (shared_hcd)
 		usb_put_hcd(shared_hcd);
 
+	if (priv->is_mtk_v2) {
+		xhci_mtk_release_hw(xhci, mtk_hw_accessible);
+		xhci_mtk_free_resources(dev, xhci);
+	}
+
 	clk_disable_unprepare(clk);
 	clk_disable_unprepare(reg_clk);
 	reset_control_assert(xhci->reset);
+
 	usb_put_hcd(hcd);
 
-	pm_runtime_disable(&dev->dev);
+	if (pm_runtime_enabled(&dev->dev))
+		pm_runtime_disable(&dev->dev);
 	pm_runtime_put_noidle(&dev->dev);
 	pm_runtime_set_suspended(&dev->dev);
 }
@@ -473,10 +586,16 @@ static int xhci_plat_suspend_common(struct device *dev)
 {
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-	int ret;
+	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
+	int ret, rollback_ret;
 
-	if (pm_runtime_suspended(dev))
-		pm_runtime_resume(dev);
+	if (pm_runtime_suspended(dev)) {
+		ret = pm_runtime_resume(dev);
+		if (ret < 0)
+			return ret;
+	}
+	if (priv->is_mtk_v2 && !HCD_HW_ACCESSIBLE(hcd))
+		return -ESHUTDOWN;
 
 	ret = xhci_priv_suspend_quirk(hcd);
 	if (ret)
@@ -488,6 +607,19 @@ static int xhci_plat_suspend_common(struct device *dev)
 	ret = xhci_suspend(xhci, device_may_wakeup(dev));
 	if (ret)
 		return ret;
+
+	if (priv->is_mtk_v2) {
+		ret = xhci_mtk_enter_lps(xhci);
+		if (ret) {
+			rollback_ret = xhci_resume(xhci, false, false);
+			if (rollback_ret) {
+				xhci_plat_hc_died(xhci, true);
+				dev_err(dev, "failed to roll back xHCI suspend (%d)\n",
+					rollback_ret);
+			}
+			return ret;
+		}
+	}
 
 	if (!device_may_wakeup(dev) && (xhci->quirks & XHCI_SUSPEND_RESUME_CLKS)) {
 		clk_disable_unprepare(xhci->clk);
@@ -535,24 +667,45 @@ static int xhci_plat_resume_common(struct device *dev, bool power_lost)
 		}
 	}
 
+	if (priv->is_mtk_v2) {
+		ret = xhci_mtk_exit_lps(xhci);
+		if (ret)
+			goto hc_inaccessible;
+	}
+
+	/*
+	 * System PM clears its suspended bookkeeping before invoking this
+	 * callback and does not restore it on error.  Once the platform low-power
+	 * exit succeeds, do not re-enter low power on later errors because
+	 * subsequent callbacks may access the host registers.
+	 */
 	ret = xhci_priv_resume_quirk(hcd);
 	if (ret)
 		goto disable_clks;
 
 	ret = xhci_resume(xhci, power_lost || priv->power_lost, false);
-	if (ret)
+	if (ret) {
+		if (priv->is_mtk_v2)
+			xhci_plat_hc_died(xhci, true);
 		goto disable_clks;
+	}
 
 	ret = xhci_priv_post_resume_quirk(hcd);
 	if (ret)
 		goto disable_clks;
 
-	pm_runtime_disable(dev);
-	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
+	if (priv->is_mtk_v2) {
+		pm_runtime_set_active(dev);
+	} else {
+		pm_runtime_disable(dev);
+		pm_runtime_set_active(dev);
+		pm_runtime_enable(dev);
+	}
 
 	return 0;
 
+hc_inaccessible:
+	xhci_plat_hc_died(xhci, false);
 disable_clks:
 	if (!device_may_wakeup(dev) && (xhci->quirks & XHCI_SUSPEND_RESUME_CLKS)) {
 		clk_disable_unprepare(xhci->clk);
@@ -590,19 +743,31 @@ static int __maybe_unused xhci_plat_runtime_suspend(struct device *dev)
 {
 	struct usb_hcd  *hcd = dev_get_drvdata(dev);
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
 	int ret;
+
+	if (priv->is_mtk_v2)
+		return -EOPNOTSUPP;
 
 	ret = xhci_priv_suspend_quirk(hcd);
 	if (ret)
 		return ret;
 
-	return xhci_suspend(xhci, true);
+	ret = xhci_suspend(xhci, true);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
 static int __maybe_unused xhci_plat_runtime_resume(struct device *dev)
 {
 	struct usb_hcd  *hcd = dev_get_drvdata(dev);
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
+
+	if (priv->is_mtk_v2)
+		return -EOPNOTSUPP;
 
 	return xhci_resume(xhci, false, true);
 }
@@ -622,9 +787,19 @@ const struct dev_pm_ops xhci_plat_pm_ops = {
 EXPORT_SYMBOL_GPL(xhci_plat_pm_ops);
 
 #ifdef CONFIG_ACPI
+#if IS_ENABLED(CONFIG_USB_XHCI_MTK_V2)
+static const struct xhci_plat_priv xhci_plat_mtk_v2 = {
+	.is_mtk_v2 = 1,
+};
+#endif
+
 static const struct acpi_device_id usb_xhci_acpi_match[] = {
 	/* XHCI-compliant USB Controller */
 	{ "PNP0D10", },
+#if IS_ENABLED(CONFIG_USB_XHCI_MTK_V2)
+	{ "NVDA8000", (kernel_ulong_t)&xhci_plat_mtk_v2, },
+	{ "NVDA8001", (kernel_ulong_t)&xhci_plat_mtk_v2, },
+#endif
 	{ "PNP0D15", },
 	{ }
 };
