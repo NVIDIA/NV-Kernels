@@ -11,6 +11,12 @@
 #include <soc/tegra/bpmp.h>
 #include <soc/tegra/bpmp-abi.h>
 
+/*
+ * Bound BPMP debugfs firmware data retained while mirroring directory trees.
+ * The same limit also sizes the legacy MRQ_DEBUGFS whole-tree dump buffer.
+ */
+#define BPMP_DEBUGFS_FIRMWARE_DATA_MAX SZ_512K
+
 static DEFINE_MUTEX(bpmp_debug_lock);
 
 struct seqbuf {
@@ -175,8 +181,19 @@ static int mrq_debug_close(struct tegra_bpmp *bpmp, u32 fd)
 	return 0;
 }
 
+static int bpmp_debug_validate_read_chunk(const char *caller, u32 readlen,
+					  u32 remaining)
+{
+	if (!readlen || readlen > DEBUG_READ_MAX_SZ || readlen > remaining) {
+		pr_err("%s: read data length invalid\n", caller);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int mrq_debug_read(struct tegra_bpmp *bpmp, const char *name,
-			  char *data, size_t sz_data, u32 *nbytes)
+			  size_t remaining_budget, void **datap, u32 *nbytes)
 {
 	struct mrq_debug_request req = {
 		.cmd = CMD_DEBUG_READ,
@@ -194,20 +211,34 @@ static int mrq_debug_read(struct tegra_bpmp *bpmp, const char *name,
 		},
 	};
 	u32 fd = 0, len = 0;
-	int remaining, err, close_err;
+	char *data = NULL, *ptr;
+	u32 remaining;
+	int err, close_err;
+
+	*datap = NULL;
+	*nbytes = 0;
 
 	mutex_lock(&bpmp_debug_lock);
 	err = mrq_debug_open(bpmp, name, &fd, &len, 0);
 	if (err)
 		goto out;
 
-	if (len > sz_data) {
+	if (len > remaining_budget) {
 		err = -EFBIG;
 		goto close;
 	}
 
+	if (len) {
+		data = kvmalloc(len, GFP_KERNEL);
+		if (!data) {
+			err = -ENOMEM;
+			goto close;
+		}
+	}
+
 	req.frd.fd = fd;
 	remaining = len;
+	ptr = data;
 
 	while (remaining > 0) {
 		err = tegra_bpmp_transfer(bpmp, &msg);
@@ -218,23 +249,27 @@ static int mrq_debug_read(struct tegra_bpmp *bpmp, const char *name,
 			goto close;
 		}
 
-		if (resp.frd.readlen > remaining) {
-			pr_err("%s: read data length invalid\n", __func__);
-			err = -EINVAL;
+		err = bpmp_debug_validate_read_chunk(__func__,
+						     resp.frd.readlen,
+						     remaining);
+		if (err)
 			goto close;
-		}
 
-		memcpy(data, resp.frd.data, resp.frd.readlen);
-		data += resp.frd.readlen;
+		memcpy(ptr, resp.frd.data, resp.frd.readlen);
+		ptr += resp.frd.readlen;
 		remaining -= resp.frd.readlen;
 	}
-
-	*nbytes = len;
 
 close:
 	close_err = mrq_debug_close(bpmp, fd);
 	if (!err)
 		err = close_err;
+	if (err) {
+		kvfree(data);
+	} else {
+		*datap = data;
+		*nbytes = len;
+	}
 out:
 	mutex_unlock(&bpmp_debug_lock);
 	return err;
@@ -322,7 +357,8 @@ static int bpmp_debug_show(struct seq_file *m, void *p)
 		},
 	};
 	u32 fd = 0, len = 0;
-	int remaining, err, close_err;
+	u32 remaining;
+	int err, close_err;
 
 	filename = get_filename(bpmp, file, fnamebuf, sizeof(fnamebuf));
 	if (!filename)
@@ -345,11 +381,11 @@ static int bpmp_debug_show(struct seq_file *m, void *p)
 			goto close;
 		}
 
-		if (resp.frd.readlen > remaining) {
-			pr_err("%s: read data length invalid\n", __func__);
-			err = -EINVAL;
+		err = bpmp_debug_validate_read_chunk(__func__,
+						     resp.frd.readlen,
+						     remaining);
+		if (err)
 			goto close;
-		}
 
 		seq_write(m, resp.frd.data, resp.frd.readlen);
 		remaining -= resp.frd.readlen;
@@ -403,34 +439,31 @@ static const struct file_operations bpmp_debug_fops = {
 
 static int bpmp_populate_debugfs_inband(struct tegra_bpmp *bpmp,
 					struct dentry *parent,
-					char *ppath)
+					char *ppath,
+					size_t remaining_budget)
 {
 	const size_t pathlen = SZ_256;
-	const size_t bufsize = SZ_16K;
+	size_t child_budget;
 	struct dentry *dentry;
 	u32 dsize, attrs = 0;
 	struct seqbuf seqbuf;
-	char *buf, *pathbuf;
+	void *buf = NULL;
+	char *pathbuf;
 	const char *name;
 	int err = 0;
 
 	if (!bpmp || !parent || !ppath)
 		return -EINVAL;
 
-	buf = kmalloc(bufsize, GFP_KERNEL);
-	if (!buf)
-		return -ENOMEM;
-
 	pathbuf = kzalloc(pathlen, GFP_KERNEL);
-	if (!pathbuf) {
-		kfree(buf);
+	if (!pathbuf)
 		return -ENOMEM;
-	}
 
-	err = mrq_debug_read(bpmp, ppath, buf, bufsize, &dsize);
+	err = mrq_debug_read(bpmp, ppath, remaining_budget, &buf, &dsize);
 	if (err)
 		goto out;
 
+	child_budget = remaining_budget - dsize;
 	seqbuf_init(&seqbuf, buf, dsize);
 
 	while (!seqbuf_eof(&seqbuf)) {
@@ -458,7 +491,8 @@ static int bpmp_populate_debugfs_inband(struct tegra_bpmp *bpmp,
 			}
 
 			err = bpmp_populate_debugfs_inband(bpmp, dentry,
-							   pathbuf);
+							   pathbuf,
+							   child_budget);
 			if (err < 0)
 				goto out;
 		} else {
@@ -477,7 +511,7 @@ static int bpmp_populate_debugfs_inband(struct tegra_bpmp *bpmp,
 
 out:
 	kfree(pathbuf);
-	kfree(buf);
+	kvfree(buf);
 
 	return err;
 }
@@ -743,7 +777,7 @@ static int bpmp_populate_dir(struct tegra_bpmp *bpmp, struct seqbuf *seqbuf,
 static int bpmp_populate_debugfs_shmem(struct tegra_bpmp *bpmp)
 {
 	struct seqbuf seqbuf;
-	const size_t sz = SZ_512K;
+	const size_t sz = BPMP_DEBUGFS_FIRMWARE_DATA_MAX;
 	dma_addr_t phys;
 	size_t nbytes;
 	void *virt;
@@ -805,7 +839,8 @@ int tegra_bpmp_init_debugfs(struct tegra_bpmp *bpmp)
 
 	if (inband)
 		err = bpmp_populate_debugfs_inband(bpmp, bpmp->debugfs_mirror,
-						   "/");
+						   "/",
+						   BPMP_DEBUGFS_FIRMWARE_DATA_MAX);
 	else
 		err = bpmp_populate_debugfs_shmem(bpmp);
 
