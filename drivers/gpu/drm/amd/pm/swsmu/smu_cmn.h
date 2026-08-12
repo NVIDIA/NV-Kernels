@@ -30,6 +30,18 @@
 #define FDO_PWM_MODE_STATIC  1
 #define FDO_PWM_MODE_STATIC_RPM 5
 
+#define smu_cmn_init_soft_gpu_metrics(ptr, frev, crev)         \
+	do {                                                   \
+		typecheck(struct gpu_metrics_v##frev##_##crev, \
+			  typeof(*(ptr)));                     \
+		struct metrics_table_header *header =          \
+			(struct metrics_table_header *)(ptr);  \
+		memset(header, 0xFF, sizeof(*(ptr)));          \
+		header->format_revision = frev;                \
+		header->content_revision = crev;               \
+		header->structure_size = sizeof(*(ptr));       \
+	} while (0)
+
 extern const int link_speed[];
 
 /* Helper to Convert from PCIE Gen 1/2/3/4/5/6 to 0.1 GT/s speed units */
@@ -114,8 +126,6 @@ int smu_cmn_get_metrics_table(struct smu_context *smu,
 			      bool bypass_cache);
 
 int smu_cmn_get_combo_pptable(struct smu_context *smu);
-
-void smu_cmn_init_soft_gpu_metrics(void *table, uint8_t frev, uint8_t crev);
 
 int smu_cmn_set_mp1_state(struct smu_context *smu,
 			  enum pp_mp1_state mp1_state);
