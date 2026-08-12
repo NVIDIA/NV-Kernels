@@ -224,16 +224,17 @@ static inline struct dbc_ep *get_out_ep(struct xhci_dbc *dbc)
 
 #ifdef CONFIG_USB_XHCI_DBGCAP
 int xhci_create_dbc_dev(struct xhci_hcd *xhci);
-void xhci_remove_dbc_dev(struct xhci_hcd *xhci);
+void xhci_remove_dbc_dev(struct xhci_hcd *xhci, bool hw_accessible);
 int xhci_dbc_init(void);
 void xhci_dbc_exit(void);
 int dbc_tty_init(void);
 void dbc_tty_exit(void);
-int xhci_dbc_tty_probe(struct device *dev, void __iomem *res, struct xhci_hcd *xhci);
-void xhci_dbc_tty_remove(struct xhci_dbc *dbc);
+int xhci_dbc_tty_probe(struct device *dev, void __iomem *res,
+		       struct xhci_hcd *xhci);
+void xhci_dbc_tty_remove(struct xhci_dbc *dbc, bool hw_accessible);
 struct xhci_dbc *xhci_alloc_dbc(struct device *dev, void __iomem *res,
 				 const struct dbc_driver *driver);
-void xhci_dbc_remove(struct xhci_dbc *dbc);
+void xhci_dbc_remove(struct xhci_dbc *dbc, bool hw_accessible);
 struct dbc_request *dbc_alloc_request(struct xhci_dbc *dbc,
 				      unsigned int direction,
 				      gfp_t flags);
@@ -249,7 +250,8 @@ static inline int xhci_create_dbc_dev(struct xhci_hcd *xhci)
 	return 0;
 }
 
-static inline void xhci_remove_dbc_dev(struct xhci_hcd *xhci)
+static inline void xhci_remove_dbc_dev(struct xhci_hcd *xhci,
+				       bool hw_accessible)
 {
 }
 static inline int xhci_dbc_init(void)
