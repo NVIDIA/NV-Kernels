@@ -1227,6 +1227,12 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	portnum1 = wIndex & 0xff;
 
 	spin_lock_irqsave(&xhci->lock, flags);
+	if (unlikely(!HCD_HW_ACCESSIBLE(hcd) ||
+		     xhci->xhc_state & XHCI_STATE_DYING)) {
+		spin_unlock_irqrestore(&xhci->lock, flags);
+		return -ESHUTDOWN;
+	}
+
 	switch (typeReq) {
 	case GetHubStatus:
 		/* No power source, over-current reported per port */
@@ -1674,6 +1680,11 @@ int xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 	 * a non-zero value even if there are no status changes.
 	 */
 	spin_lock_irqsave(&xhci->lock, flags);
+	if (unlikely(!HCD_HW_ACCESSIBLE(hcd) ||
+		     xhci->xhc_state & XHCI_STATE_DYING)) {
+		spin_unlock_irqrestore(&xhci->lock, flags);
+		return 0;
+	}
 
 	status = bus_state->resuming_ports;
 
