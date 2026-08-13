@@ -13,6 +13,7 @@
  * CXL subsystem and require direct DPA region access from the guest.
  */
 
+#include <linux/bitfield.h>
 #include <linux/vfio_pci_core.h>
 #include <linux/pci.h>
 #include <cxl/cxl.h>
