@@ -171,7 +171,7 @@ CONFIG_DRM_NOUVEAU_SIL164                       note<'Disable nouveau for NVIDIA
 CONFIG_DRM_NOUVEAU_SVM                          policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_DRM_NOUVEAU_SVM                          note<'Disable nouveau for NVIDIA kernels'>
 
-CONFIG_DW_I3C_MASTER                            policy<{'arm64': 'm'}>
+CONFIG_DW_I3C_MASTER                            policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_DW_I3C_MASTER                            note<'Enable DesignWare I3C master controller for Tegra410'>
 
 CONFIG_EFI_CAPSULE_LOADER                       policy<{'amd64': 'm', 'arm64': 'y'}>
@@ -189,7 +189,7 @@ CONFIG_GENERIC_CPU_CACHE_MAINTENANCE            note<'Selected by arm64 via arch
 CONFIG_GPIO_AAEON                               policy<{'amd64': '-'}>
 CONFIG_GPIO_AAEON                               note<'Disable all Ubuntu ODM drivers'>
 
-CONFIG_I3C                                      policy<{'arm64': 'm'}>
+CONFIG_I3C                                      policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_I3C                                      note<'Enable I3C bus support for Tegra410 and SPD5118 temperature sensors'>
 
 CONFIG_IOMMUFD_VFIO_CONTAINER                   policy<{'arm64': 'y'}>
@@ -270,7 +270,7 @@ CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablem
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM drivers'>
 
-CONFIG_SENSORS_SPD5118                          policy<{'arm64': 'm'}>
+CONFIG_SENSORS_SPD5118                          policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_SENSORS_SPD5118                          note<'Enable SPD5118 temperature sensor support for DDR5 memory modules'>
 
 CONFIG_SFC_CXL                                  policy<{'amd64': 'n', 'arm64': 'n'}>
