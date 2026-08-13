@@ -941,7 +941,7 @@ static ssize_t file_read(struct dso *dso, struct machine *machine,
 
 	if (dso->data.fd < 0) {
 		dso->data.status = DSO_DATA_STATUS_ERROR;
-		ret = -errno;
+		ret = dso->data.fd;
 		goto out;
 	}
 
@@ -1064,8 +1064,8 @@ static int file_size(struct dso *dso, struct machine *machine)
 	try_to_open_dso(dso, machine);
 
 	if (dso->data.fd < 0) {
-		ret = -errno;
 		dso->data.status = DSO_DATA_STATUS_ERROR;
+		ret = dso->data.fd;
 		goto out;
 	}
 
