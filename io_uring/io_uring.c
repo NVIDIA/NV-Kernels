@@ -549,7 +549,7 @@ void io_eventfd_ops(struct rcu_head *rcu)
 		call_rcu(&ev_fd->rcu, io_eventfd_free);
 }
 
-static void io_eventfd_signal(struct io_ring_ctx *ctx)
+static void io_eventfd_signal(struct io_ring_ctx *ctx, bool defer)
 {
 	struct io_ev_fd *ev_fd = NULL;
 
@@ -572,7 +572,7 @@ static void io_eventfd_signal(struct io_ring_ctx *ctx)
 	if (ev_fd->eventfd_async && !io_wq_current_is_worker())
 		goto out;
 
-	if (likely(eventfd_signal_allowed())) {
+	if (!defer && likely(eventfd_signal_allowed())) {
 		eventfd_signal_mask(ev_fd->cq_ev_fd, EPOLL_URING_WAKE);
 	} else {
 		atomic_inc(&ev_fd->refs);
@@ -606,7 +606,7 @@ static void io_eventfd_flush_signal(struct io_ring_ctx *ctx)
 	if (skip)
 		return;
 
-	io_eventfd_signal(ctx);
+	io_eventfd_signal(ctx, false);
 }
 
 void __io_commit_cqring_flush(struct io_ring_ctx *ctx)
@@ -1349,7 +1349,7 @@ static inline void io_req_local_work_add(struct io_kiocb *req, unsigned flags)
 		if (ctx->flags & IORING_SETUP_TASKRUN_FLAG)
 			atomic_or(IORING_SQ_TASKRUN, &ctx->rings->sq_flags);
 		if (ctx->has_evfd)
-			io_eventfd_signal(ctx);
+			io_eventfd_signal(ctx, flags & IOU_F_TWQ_IN_WAKE);
 	}
 
 	nr_wait = atomic_read(&ctx->cq_wait_nr);
