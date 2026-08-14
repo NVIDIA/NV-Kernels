@@ -1,0 +1,5 @@
+BaseOS Reviewer dual-architecture build smoke test
+==================================================
+
+This temporary documentation-only change exercises the automated ARM64 and
+amd64 kernel package builders. The pull request is not intended to be merged.
