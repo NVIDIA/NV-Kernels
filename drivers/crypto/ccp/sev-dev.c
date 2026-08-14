@@ -577,7 +577,7 @@ static int __sev_platform_shutdown_locked(int *error)
 	return ret;
 }
 
-static int sev_platform_shutdown(int *error)
+static int sev_platform_shutdown_cmd(int *error)
 {
 	int rc;
 
@@ -1326,7 +1326,7 @@ e_err:
 
 static void sev_firmware_shutdown(struct sev_device *sev)
 {
-	sev_platform_shutdown(NULL);
+	sev_platform_shutdown_cmd(NULL);
 
 	if (sev_es_tmr) {
 		/* The TMR area was encrypted, flush it from the cache */
@@ -1343,6 +1343,15 @@ static void sev_firmware_shutdown(struct sev_device *sev)
 		sev_init_ex_buffer = NULL;
 	}
 }
+
+void sev_platform_shutdown(void)
+{
+	if (!psp_master || !psp_master->sev_data)
+		return;
+
+	sev_firmware_shutdown(psp_master->sev_data);
+}
+EXPORT_SYMBOL_GPL(sev_platform_shutdown);
 
 void sev_dev_destroy(struct psp_device *psp)
 {

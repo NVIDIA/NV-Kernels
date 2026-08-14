@@ -638,6 +638,7 @@ int sev_guest_df_flush(int *error);
 int sev_guest_decommission(struct sev_data_decommission *data, int *error);
 
 void *psp_copy_user_blob(u64 uaddr, u32 len);
+void sev_platform_shutdown(void);
 
 #else	/* !CONFIG_CRYPTO_DEV_SP_PSP */
 
@@ -661,6 +662,8 @@ static inline int
 sev_issue_cmd_external_user(struct file *filep, unsigned int id, void *data, int *error) { return -ENODEV; }
 
 static inline void *psp_copy_user_blob(u64 __user uaddr, u32 len) { return ERR_PTR(-EINVAL); }
+
+static inline void sev_platform_shutdown(void) { }
 
 #endif	/* CONFIG_CRYPTO_DEV_SP_PSP */
 
