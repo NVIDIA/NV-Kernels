@@ -465,10 +465,10 @@ static int realtek_smi_probe(struct platform_device *pdev)
 		return PTR_ERR(priv->reset);
 	}
 	if (priv->reset) {
-		gpiod_set_value(priv->reset, 1);
+		gpiod_set_value_cansleep(priv->reset, 1);
 		dev_dbg(dev, "asserted RESET\n");
 		msleep(REALTEK_HW_STOP_DELAY);
-		gpiod_set_value(priv->reset, 0);
+		gpiod_set_value_cansleep(priv->reset, 0);
 		msleep(REALTEK_HW_START_DELAY);
 		dev_dbg(dev, "deasserted RESET\n");
 	}
