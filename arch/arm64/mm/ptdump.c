@@ -77,6 +77,8 @@ struct pg_state {
 	struct seq_file *seq;
 	const struct addr_marker *marker;
 	unsigned long start_address;
+	/* exclusive end, ULONG_MAX represents an end at 1 << 64 */
+	unsigned long end_address;
 	int level;
 	u64 current_prot;
 	bool check_wx;
@@ -332,9 +334,19 @@ static void note_page_pgd(struct ptdump_state *pt_st, unsigned long addr, pgd_t 
 
 static void note_page_flush(struct ptdump_state *pt_st)
 {
+	struct pg_state *st = container_of(pt_st, struct pg_state, ptdump);
+	unsigned long end = st->end_address;
 	pte_t pte_zero = {0};
 
-	note_page(pt_st, 0, -1, pte_val(pte_zero));
+	/*
+	 * Address spaces that end at 1 << 64 have end_address == ULONG_MAX,
+	 * but note_page() expects the exclusive end. In this case adjust end
+	 * to the wraparound value 0.
+	 */
+	if (end == ULONG_MAX)
+		end = 0;
+
+	note_page(pt_st, end, -1, pte_val(pte_zero));
 }
 
 void ptdump_walk(struct seq_file *s, struct ptdump_info *info)
@@ -348,6 +360,7 @@ void ptdump_walk(struct seq_file *s, struct ptdump_info *info)
 	st = (struct pg_state){
 		.seq = s,
 		.marker = info->markers,
+		.end_address = end,
 		.level = -1,
 		.ptdump = {
 			.note_page_pte = note_page_pte,
@@ -390,6 +403,7 @@ void ptdump_check_wx(void)
 			{ 0, NULL},
 			{ -1, NULL},
 		},
+		.end_address = ~0UL,
 		.level = -1,
 		.check_wx = true,
 		.ptdump = {
