@@ -442,8 +442,9 @@ static int create_trip_attrs(struct thermal_zone_device *tz, int mask)
 
 	for (indx = 0; indx < tz->num_trips; indx++) {
 		/* create trip type attribute */
-		snprintf(tz->trip_type_attrs[indx].name, THERMAL_NAME_LENGTH,
-			 "trip_point_%d_type", indx);
+		scnprintf(tz->trip_type_attrs[indx].name,
+			  sizeof(tz->trip_type_attrs[indx].name),
+			  "trip_point_%d_type", indx);
 
 		sysfs_attr_init(&tz->trip_type_attrs[indx].attr.attr);
 		tz->trip_type_attrs[indx].attr.attr.name =
@@ -453,8 +454,9 @@ static int create_trip_attrs(struct thermal_zone_device *tz, int mask)
 		attrs[indx] = &tz->trip_type_attrs[indx].attr.attr;
 
 		/* create trip temp attribute */
-		snprintf(tz->trip_temp_attrs[indx].name, THERMAL_NAME_LENGTH,
-			 "trip_point_%d_temp", indx);
+		scnprintf(tz->trip_temp_attrs[indx].name,
+			  sizeof(tz->trip_temp_attrs[indx].name),
+			  "trip_point_%d_temp", indx);
 
 		sysfs_attr_init(&tz->trip_temp_attrs[indx].attr.attr);
 		tz->trip_temp_attrs[indx].attr.attr.name =
@@ -469,8 +471,9 @@ static int create_trip_attrs(struct thermal_zone_device *tz, int mask)
 		}
 		attrs[indx + tz->num_trips] = &tz->trip_temp_attrs[indx].attr.attr;
 
-		snprintf(tz->trip_hyst_attrs[indx].name, THERMAL_NAME_LENGTH,
-			 "trip_point_%d_hyst", indx);
+		scnprintf(tz->trip_hyst_attrs[indx].name,
+			  sizeof(tz->trip_hyst_attrs[indx].name),
+			  "trip_point_%d_hyst", indx);
 
 		sysfs_attr_init(&tz->trip_hyst_attrs[indx].attr.attr);
 		tz->trip_hyst_attrs[indx].attr.attr.name =
