@@ -1,0 +1,7 @@
+BaseOS Reviewer progress-comment canary
+=======================================
+
+This temporary draft-PR change validates that BaseOS Reviewer creates its
+maintained GitHub comment as soon as a review is queued, before Boro finishes.
+
+This file is test-only and is not intended to be merged.
