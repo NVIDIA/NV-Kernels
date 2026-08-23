@@ -173,7 +173,7 @@ xrep_refc_stash(
 	if (xchk_should_terminate(sc, &error))
 		return error;
 
-	irec.rc_refcount = min_t(uint64_t, MAXREFCOUNT, refcount);
+	irec.rc_refcount = min_t(uint64_t, XFS_REFC_REFCOUNT_MAX, refcount);
 
 	error = xrep_refc_check_ext(rr->sc, &irec);
 	if (error)
@@ -453,7 +453,7 @@ xrep_refc_find_refcounts(
 	/*
 	 * Set up a sparse array to store all the rmap records that we're
 	 * tracking to generate a reference count record.  If this exceeds
-	 * MAXREFCOUNT, we clamp rc_refcount.
+	 * XFS_REFC_REFCOUNT_MAX, we clamp rc_refcount.
 	 */
 	descr = xchk_xfile_ag_descr(sc, "rmap record bag");
 	error = xfarray_create(descr, 0, sizeof(struct xrep_refc_rmap),
