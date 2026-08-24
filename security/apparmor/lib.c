@@ -501,6 +501,8 @@ bool aa_policy_init(struct aa_policy *policy, const char *prefix,
 	char *hname;
 	size_t hname_sz;
 
+	INIT_LIST_HEAD(&policy->list);
+	INIT_LIST_HEAD(&policy->profiles);
 	hname_sz = (prefix ? strlen(prefix) + 2 : 0) + strlen(name) + 1;
 	/* freed by policy_free */
 	hname = aa_str_alloc(hname_sz, gfp);
@@ -513,8 +515,6 @@ bool aa_policy_init(struct aa_policy *policy, const char *prefix,
 	policy->hname = hname;
 	/* base.name is a substring of fqname */
 	policy->name = basename(policy->hname);
-	INIT_LIST_HEAD(&policy->list);
-	INIT_LIST_HEAD(&policy->profiles);
 
 	return true;
 }
