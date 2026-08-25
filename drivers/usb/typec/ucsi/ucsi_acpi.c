@@ -155,6 +155,54 @@ static const struct dmi_system_id ucsi_acpi_quirks[] = {
 	{ }
 };
 
+/*
+ * NVIDIA vendor extension for GB10 platforms: the firmware exposes an EC
+ * control path to disable USB4 through a vendor _DSM on the UCSI device.
+ * The presence check via acpi_check_dsm() gates it so non-GB10
+ * UCSI hardware is unaffected.
+ */
+static void ucsi_acpi_nvidia_disable_usb4_gb10(struct ucsi_acpi *ua)
+{
+	static const guid_t nvidia_usb4_dsm_guid =
+		GUID_INIT(0x58ee92f1, 0x76ca, 0x48da,
+			  0x92, 0xf0, 0xd5, 0x48, 0xe8, 0x3e, 0x80, 0xea);
+	const u32 rev = 0;
+	const u32 fn_disable = 2;
+	acpi_handle handle = ACPI_HANDLE(ua->dev);
+	union acpi_object *out;
+
+	if (!acpi_check_dsm(handle, &nvidia_usb4_dsm_guid, rev,
+			    1u << fn_disable))
+		return;
+
+	out = acpi_evaluate_dsm(handle, &nvidia_usb4_dsm_guid, rev,
+				fn_disable, NULL);
+	if (!out) {
+		dev_warn(ua->dev, "NVIDIA USB4 disable _DSM: evaluation failed\n");
+		return;
+	}
+
+	if (out->type == ACPI_TYPE_BUFFER && out->buffer.length >= 1)
+		dev_info(ua->dev, "NVIDIA USB4 disable _DSM: returned 0x%02x (%s)\n",
+			 out->buffer.pointer[0],
+			 out->buffer.pointer[0] == 1 ? "success" : "failure");
+	else
+		dev_warn(ua->dev, "NVIDIA USB4 disable _DSM: unexpected return type=%d len=%u\n",
+			 out->type,
+			 out->type == ACPI_TYPE_BUFFER ? out->buffer.length : 0);
+
+	ACPI_FREE(out);
+}
+
+/*
+ * Vendor-specific quirks that must run before UCSI async work is queued,
+ * on both cold probe and resume.
+ */
+static void ucsi_acpi_apply_vendor_quirks(struct ucsi_acpi *ua)
+{
+	ucsi_acpi_nvidia_disable_usb4_gb10(ua);
+}
+
 static void ucsi_acpi_notify(acpi_handle handle, u32 event, void *data)
 {
 	struct ucsi_acpi *ua = data;
@@ -220,6 +268,8 @@ static int ucsi_acpi_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	ucsi_acpi_apply_vendor_quirks(ua);
+
 	ret = ucsi_register(ua->ucsi);
 	if (ret) {
 		acpi_remove_notify_handler(ACPI_HANDLE(&pdev->dev),
@@ -255,6 +305,8 @@ static int ucsi_acpi_suspend(struct device *dev)
 static int ucsi_acpi_resume(struct device *dev)
 {
 	struct ucsi_acpi *ua = dev_get_drvdata(dev);
+
+	ucsi_acpi_apply_vendor_quirks(ua);
 
 	return ucsi_resume(ua->ucsi);
 }
