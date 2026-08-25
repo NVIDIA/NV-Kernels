@@ -43,7 +43,8 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 	status = efi_kaslr_relocate_kernel(image_addr,
 					   reserve_addr, reserve_size,
 					   kernel_size, kernel_codesize, kernel_memsize,
-					   efi_kaslr_get_phys_seed(image_handle));
+					   efi_kaslr_get_phys_seed(image_handle),
+					   NULL);
 	if (status != EFI_SUCCESS) {
 		efi_err("Failed to relocate kernel\n");
 		*image_size = 0;

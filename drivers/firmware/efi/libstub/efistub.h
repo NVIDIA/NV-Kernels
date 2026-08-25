@@ -1246,13 +1246,16 @@ const u8 *__efi_get_smbios_string(const struct efi_smbios_record *record,
 
 void efi_remap_image(unsigned long image_base, unsigned alloc_size,
 		     unsigned long code_size);
+typedef efi_status_t (*efi_image_pre_remap_t)(unsigned long image_addr,
+					      unsigned long image_size);
 efi_status_t efi_kaslr_relocate_kernel(unsigned long *image_addr,
 				       unsigned long *reserve_addr,
 				       unsigned long *reserve_size,
 				       unsigned long kernel_size,
 				       unsigned long kernel_codesize,
 				       unsigned long kernel_memsize,
-				       u32 phys_seed);
+				       u32 phys_seed,
+				       efi_image_pre_remap_t pre_remap);
 u32 efi_kaslr_get_phys_seed(efi_handle_t image_handle);
 
 asmlinkage efi_status_t __efiapi
@@ -1272,7 +1275,8 @@ bool efi_slaunch_enabled(const char *cmdline);
 void efi_slaunch_set_cmdline(const char *cmdline);
 bool efi_slaunch_requested(void);
 void efi_slaunch_get_dlme_data_size(void);
-void efi_slaunch_scrub_imagebase(unsigned long kernel_addr);
+efi_status_t efi_slaunch_prepare_image(unsigned long kernel_addr,
+				       unsigned long kernel_size);
 extern unsigned long sl_dlme_data_reserve;
 /* Page gap below the DLME data region so the Preamble->DLME DTB-PA
  * handoff slot (SL_DLME_DTB_SLOT_OFFSET) is dedicated scratch, not the
