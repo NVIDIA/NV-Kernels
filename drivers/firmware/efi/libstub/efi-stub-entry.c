@@ -16,6 +16,15 @@ static void *kernel_image_addr(void *addr)
 
 struct sysfb_display_info *alloc_primary_display(void)
 {
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+	/*
+	 * Do not return the core kernel's sysfb_primary_display when
+	 * slaunch is requested since this will affect measurement.
+	 */
+	if (efi_slaunch_requested())
+		return NULL;
+#endif
+
 	if (IS_ENABLED(CONFIG_ARM))
 		return __alloc_primary_display();
 

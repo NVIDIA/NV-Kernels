@@ -23,6 +23,9 @@
 #include <linux/security.h>
 
 #include <asm/efi.h>
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+#include <asm/drtm.h>
+#endif
 
 unsigned long __initdata primary_display_table = EFI_INVALID_TABLE_ADDR;
 
@@ -69,6 +72,13 @@ EXPORT_SYMBOL_GPL(sysfb_primary_display);
 static void __init init_primary_display(void)
 {
 	struct sysfb_display_info *dpy;
+
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+	if (slaunch_active()) {
+		primary_display_table = EFI_INVALID_TABLE_ADDR;
+		return;
+	}
+#endif
 
 	if (primary_display_table != EFI_INVALID_TABLE_ADDR) {
 		dpy = early_memremap(primary_display_table, sizeof(*dpy));
