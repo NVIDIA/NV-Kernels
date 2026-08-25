@@ -207,6 +207,11 @@ static bool gtp_check_ms(struct sk_buff *skb, struct pdp_ctx *pctx,
 static int gtp_rx(struct pdp_ctx *pctx, struct sk_buff *skb,
 			unsigned int hdrlen, unsigned int role)
 {
+	if (skb_is_gso(skb)) {
+		netdev_dbg(pctx->dev, "GSO is not supported in GTP\n");
+		goto err;
+	}
+
 	if (!gtp_check_ms(skb, pctx, hdrlen, role)) {
 		netdev_dbg(pctx->dev, "No PDP ctx for this MS\n");
 		return 1;
