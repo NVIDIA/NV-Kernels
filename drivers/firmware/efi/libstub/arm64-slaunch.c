@@ -7,8 +7,11 @@
  */
 
 #include <linux/efi.h>
+#include <linux/pe.h>
+#include <linux/unaligned.h>
 #include <asm/drtm.h>
 #include <asm/efi.h>
+#include <asm/image.h>
 #include <asm/sections.h>
 
 #include "efistub.h"
@@ -47,6 +50,19 @@ struct sl_drtm_params {
 	__le64	nw_dce_region_size;
 	__le64	mem_prot_table_address;
 	__le64	mem_prot_table_size;
+} __packed;
+
+#define SL_PE_DEBUG_DIRECTORY_INDEX	6
+
+struct sl_pe_debug_directory_entry {
+	__le32	characteristics;
+	__le32	timestamp;
+	__le16	major_version;
+	__le16	minor_version;
+	__le32	type;
+	__le32	size_of_data;
+	__le32	address_of_raw_data;
+	__le32	pointer_to_raw_data;
 } __packed;
 
 static u64 sl_smc_ret(u64 fn, u64 arg1)
@@ -135,58 +151,108 @@ void efi_slaunch_get_dlme_data_size(void)
 		 sl_dlme_data_reserve / 1024, min_pages);
 }
 
-/*
- * Zero the PE/COFF Optional Header ImageBase on the relocated kernel
- * buffer (pre-EBS): LoadImage patched it with the load PA, diverging the
- * D-CRTM-measured bytes from the on-disk Image. Pre-EBS because
- * efi_remap_image() marked the header RO; flip RW, zero, restore RO.
- */
-void efi_slaunch_scrub_imagebase(unsigned long kernel_addr)
+static bool sl_range_in_image(unsigned long offset, unsigned long size,
+			      unsigned long image_size)
 {
-	efi_guid_t guid = EFI_MEMORY_ATTRIBUTE_PROTOCOL_GUID;
-	efi_memory_attribute_protocol_t *memattr;
-	efi_status_t status;
-	u32 e_lfanew;
-	volatile u64 *image_base_ptr;
-	unsigned long page_base;
+	return offset <= image_size && size <= image_size - offset;
+}
 
-	if (!kernel_addr)
-		return;
+/*
+ * Prepare the final DLME image after relocation but before efi_remap_image().
+ * The arm64 PE header emits zero for ImageBase and every debug-record RVA,
+ * but UEFI PE loaders may replace those fields with runtime addresses. Restore
+ * the emitted values so the measured image is independent of its load PA.
+ *
+ * The source buffer is firmware-controlled. Bound every header and table that
+ * is consumed here and refuse the DRTM launch if it is not the expected arm64
+ * Linux PE32+ image. The destination is a fresh writable allocation, so this
+ * does not depend on EFI_MEMORY_ATTRIBUTE_PROTOCOL being implemented.
+ */
+efi_status_t efi_slaunch_prepare_image(unsigned long kernel_addr,
+				       unsigned long kernel_size)
+{
+	u8 *image = (u8 *)kernel_addr;
+	struct mz_hdr *mz;
+	struct pe_hdr *pe;
+	struct pe32plus_opt_hdr *opt;
+	struct data_dirent *dirs;
+	struct data_dirent *debug_dir;
+	struct sl_pe_debug_directory_entry *debug_entries = NULL;
+	unsigned long pe_offset, opt_offset;
+	unsigned long debug_offset = 0, debug_size = 0;
+	unsigned long debug_count = 0, i;
+	u16 opt_size;
+	u32 data_dirs;
 
-	e_lfanew = *(volatile u32 *)((char *)kernel_addr + 0x3c);
-	image_base_ptr = (volatile u64 *)((char *)kernel_addr +
-					  e_lfanew + 4 + 20 + 0x18);
-	page_base = (unsigned long)image_base_ptr & ~(SL_DRTM_PAGE_SIZE - 1UL);
+	if (!kernel_addr ||
+	    !sl_range_in_image(0, sizeof(*mz), kernel_size))
+		goto invalid;
 
-	status = efi_bs_call(locate_protocol, &guid, NULL, (void **)&memattr);
-	if (status != EFI_SUCCESS) {
-		efi_warn("DRTM: no EFI_MEMORY_ATTRIBUTE_PROTOCOL; "
-			 "skipping PE ImageBase scrub\n");
-		return;
+	mz = (struct mz_hdr *)image;
+	if (get_unaligned_le16(&mz->magic) != IMAGE_DOS_SIGNATURE ||
+	    memcmp(image + offsetof(struct arm64_image_header, magic),
+		   ARM64_IMAGE_MAGIC, sizeof(ARM64_IMAGE_MAGIC) - 1))
+		goto invalid;
+
+	pe_offset = get_unaligned_le32(&mz->peaddr);
+	if (!sl_range_in_image(pe_offset, sizeof(*pe), kernel_size))
+		goto invalid;
+
+	pe = (struct pe_hdr *)(image + pe_offset);
+	if (get_unaligned_le32(&pe->magic) != IMAGE_NT_SIGNATURE ||
+	    get_unaligned_le16(&pe->machine) != IMAGE_FILE_MACHINE_ARM64)
+		goto invalid;
+
+	opt_size = get_unaligned_le16(&pe->opt_hdr_size);
+	opt_offset = pe_offset + sizeof(*pe);
+	if (opt_size < sizeof(*opt) ||
+	    !sl_range_in_image(opt_offset, opt_size, kernel_size))
+		goto invalid;
+
+	opt = (struct pe32plus_opt_hdr *)(image + opt_offset);
+	if (get_unaligned_le16(&opt->magic) !=
+	    IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+		goto invalid;
+
+	data_dirs = get_unaligned_le32(&opt->data_dirs);
+	if (data_dirs > (opt_size - sizeof(*opt)) / sizeof(*dirs))
+		goto invalid;
+
+	if (data_dirs > SL_PE_DEBUG_DIRECTORY_INDEX) {
+		dirs = (struct data_dirent *)((u8 *)opt + sizeof(*opt));
+		debug_dir = &dirs[SL_PE_DEBUG_DIRECTORY_INDEX];
+		debug_offset = get_unaligned_le32(&debug_dir->virtual_address);
+		debug_size = get_unaligned_le32(&debug_dir->size);
+
+		if (!!debug_offset != !!debug_size)
+			goto invalid;
+		if (debug_size) {
+			if (debug_size % sizeof(*debug_entries) ||
+			    !sl_range_in_image(debug_offset, debug_size,
+					       kernel_size))
+				goto invalid;
+			debug_entries = (void *)(image + debug_offset);
+			debug_count = debug_size / sizeof(*debug_entries);
+		}
 	}
 
-	status = memattr->clear_memory_attributes(memattr, page_base,
-						  SL_DRTM_PAGE_SIZE,
-						  EFI_MEMORY_RO);
-	if (status != EFI_SUCCESS) {
-		efi_warn("DRTM: clear EFI_MEMORY_RO failed for PE header page: 0x%lx\n",
-			 status);
-		return;
-	}
+	put_unaligned_le64(0, &opt->image_base);
+	for (i = 0; i < debug_count; i++)
+		put_unaligned_le32(0, &debug_entries[i].address_of_raw_data);
 
-	*image_base_ptr = 0;
-	sl_dc_cvac_range((unsigned long)image_base_ptr, 8);
+	sl_dc_cvac_range((unsigned long)&opt->image_base,
+			 sizeof(opt->image_base));
+	if (debug_size)
+		sl_dc_cvac_range((unsigned long)debug_entries, debug_size);
 	asm volatile("dsb sy" : : : "memory");
 
-	status = memattr->set_memory_attributes(memattr, page_base,
-						SL_DRTM_PAGE_SIZE,
-						EFI_MEMORY_RO);
-	if (status != EFI_SUCCESS)
-		efi_warn("DRTM: restore EFI_MEMORY_RO on PE header page failed: 0x%lx\n",
-			 status);
+	efi_info("DRTM: canonicalized PE ImageBase and %lu debug record(s)\n",
+		 debug_count);
+	return EFI_SUCCESS;
 
-	efi_info("DRTM: PE ImageBase zeroed at 0x%lx\n",
-		 (unsigned long)image_base_ptr);
+invalid:
+	efi_err("DRTM: malformed PE/COFF image; refusing Secure Launch\n");
+	return EFI_LOAD_ERROR;
 }
 
 /*
@@ -312,11 +378,7 @@ void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 	sl_dc_cvac_range((unsigned long)params, sizeof(*params));
 	sl_dc_cvac_range(kernel_addr + dlme_data_offset +
 			 SL_DLME_DTB_SLOT_OFFSET, sizeof(u64));
-	/*
-	 * NOTE: the PE ImageBase scrub happens pre-EBS in
-	 * efi_slaunch_scrub_imagebase(); the memory-attribute protocol used
-	 * to unprotect the header page is unreachable after boot services exit.
-	 */
+	/* The final image was canonicalized and cache-cleaned before remapping. */
 	asm volatile("dsb sy" : : : "memory");
 
 	/*

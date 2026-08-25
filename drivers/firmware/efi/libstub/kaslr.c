@@ -92,6 +92,7 @@ static bool check_image_region(u64 base, u64 size)
  * @kernel_codesize:	Size of the text
  * @kernel_memsize:	Size of the text + data + bss
  * @phys_seed:		Random seed used for the relocation
+ * @pre_remap:		Optional final-image preparation callback
  *
  * If KASLR is not enabled, this function relocates the kernel to a fixed
  * address (or leave it as its current location). If KASLR is enabled, the
@@ -105,7 +106,8 @@ efi_status_t efi_kaslr_relocate_kernel(unsigned long *image_addr,
 				       unsigned long kernel_size,
 				       unsigned long kernel_codesize,
 				       unsigned long kernel_memsize,
-				       u32 phys_seed)
+				       u32 phys_seed,
+				       efi_image_pre_remap_t pre_remap)
 {
 	efi_status_t status;
 	u64 min_kimg_align = efi_get_kimg_min_align();
@@ -127,7 +129,8 @@ efi_status_t efi_kaslr_relocate_kernel(unsigned long *image_addr,
 	if (status != EFI_SUCCESS) {
 		if (!check_image_region(*image_addr, kernel_memsize)) {
 			efi_err("FIRMWARE BUG: Image BSS overlaps adjacent EFI memory region\n");
-		} else if (IS_ALIGNED(*image_addr, min_kimg_align) &&
+		} else if (!pre_remap &&
+			   IS_ALIGNED(*image_addr, min_kimg_align) &&
 			   (unsigned long)_end < EFI_ALLOC_LIMIT &&
 			   *reserve_size == kernel_memsize) {
 			/*
@@ -154,6 +157,15 @@ efi_status_t efi_kaslr_relocate_kernel(unsigned long *image_addr,
 	}
 
 	memcpy((void *)*reserve_addr, (void *)*image_addr, kernel_size);
+	if (pre_remap) {
+		status = pre_remap(*reserve_addr, kernel_size);
+		if (status != EFI_SUCCESS) {
+			efi_free(*reserve_size, *reserve_addr);
+			*reserve_addr = 0;
+			*reserve_size = 0;
+			return status;
+		}
+	}
 	*image_addr = *reserve_addr;
 	efi_icache_sync(*image_addr, *image_addr + kernel_codesize);
 	efi_remap_image(*image_addr, *reserve_size, kernel_codesize);

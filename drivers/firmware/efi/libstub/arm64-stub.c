@@ -22,6 +22,7 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 				 efi_handle_t image_handle)
 {
 	unsigned long kernel_size, kernel_codesize, kernel_memsize;
+	efi_image_pre_remap_t pre_remap = NULL;
 
 	if (image->image_base != _text) {
 		efi_err("FIRMWARE BUG: efi_loaded_image_t::image_base has bogus value\n");
@@ -46,26 +47,20 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 	 */
 	if (efi_slaunch_requested()) {
 		efi_slaunch_get_dlme_data_size();
-		if (sl_drtm_available)
+		if (sl_drtm_available) {
 			*reserve_size += SL_DLME_DTB_SLOT_GAP +
 					 sl_dlme_data_reserve;
+			pre_remap = efi_slaunch_prepare_image;
+		}
 	}
 #endif
 	*image_addr = (unsigned long)_text;
 
-	{
-		efi_status_t st;
-
-		st = efi_kaslr_relocate_kernel(image_addr, reserve_addr,
-					       reserve_size, kernel_size,
-					       kernel_codesize, kernel_memsize,
-					       efi_kaslr_get_phys_seed(image_handle));
-#ifdef CONFIG_ARM64_SECURE_LAUNCH
-		if (st == EFI_SUCCESS)
-			efi_slaunch_scrub_imagebase(*image_addr);
-#endif
-		return st;
-	}
+	return efi_kaslr_relocate_kernel(image_addr, reserve_addr,
+					 reserve_size, kernel_size,
+					 kernel_codesize, kernel_memsize,
+					 efi_kaslr_get_phys_seed(image_handle),
+					 pre_remap);
 }
 
 asmlinkage void primary_entry(void);
