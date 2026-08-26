@@ -3276,7 +3276,6 @@ CONFIG_CRYPTO_DEV_SP_CCP                        policy<{'amd64': 'y', 'arm64': '
 CONFIG_CRYPTO_DEV_SP_PSP                        policy<{'amd64': 'y'}>
 CONFIG_CRYPTO_DEV_SUN4I_SS                      policy<{'arm64': 'm'}>
 CONFIG_CRYPTO_DEV_SUN4I_SS_DEBUG                policy<{'arm64': 'n'}>
-CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG                 policy<{'arm64': 'y'}>
 CONFIG_CRYPTO_DEV_SUN8I_CE                      policy<{'arm64': 'm'}>
 CONFIG_CRYPTO_DEV_SUN8I_CE_DEBUG                policy<{'arm64': 'n'}>
 CONFIG_CRYPTO_DEV_SUN8I_CE_HASH                 policy<{'arm64': 'y'}>
