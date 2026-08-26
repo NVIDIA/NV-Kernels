@@ -5755,6 +5755,7 @@ CONFIG_IIO_CROS_EC_SENSORS_CORE                 policy<{'amd64': 'm', 'arm64': '
 CONFIG_IIO_CROS_EC_SENSORS_LID_ANGLE            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm'}>
 CONFIG_IIO_HRTIMER_TRIGGER                      policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_IIO_INTERRUPT_TRIGGER                    policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
+CONFIG_IIO_INV_SENSORS_TIMESTAMP                policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_IIO_KFIFO_BUF                            policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_IIO_MS_SENSORS_I2C                       policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
 CONFIG_IIO_MUX                                  policy<{'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm'}>
