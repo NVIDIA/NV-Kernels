@@ -656,6 +656,7 @@ static int ice_devlink_nvm_snapshot(struct devlink *devlink,
 				    const struct devlink_region_ops *ops,
 				    struct netlink_ext_ack *extack, u8 **data)
 {
+	enum ice_aq_err read_aq_err = ICE_AQ_RC_OK;
 	struct ice_pf *pf = devlink_priv(devlink);
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
@@ -668,26 +669,15 @@ static int ice_devlink_nvm_snapshot(struct devlink *devlink,
 	if (!nvm_data)
 		return -ENOMEM;
 
-	status = ice_acquire_nvm(hw, ICE_RES_READ);
-	if (status) {
-		dev_dbg(dev, "ice_acquire_nvm failed, err %d aq_err %d\n",
-			status, hw->adminq.sq_last_status);
-		NL_SET_ERR_MSG_MOD(extack, "Failed to acquire NVM semaphore");
-		vfree(nvm_data);
-		return -EIO;
-	}
-
-	status = ice_read_flat_nvm(hw, 0, &nvm_size, nvm_data, false);
+	status = ice_read_flat_nvm(hw, 0, &nvm_size, nvm_data, false,
+				   &read_aq_err);
 	if (status) {
 		dev_dbg(dev, "ice_read_flat_nvm failed after reading %u bytes, err %d aq_err %d\n",
-			nvm_size, status, hw->adminq.sq_last_status);
+			nvm_size, status, read_aq_err);
 		NL_SET_ERR_MSG_MOD(extack, "Failed to read NVM contents");
-		ice_release_nvm(hw);
 		vfree(nvm_data);
 		return -EIO;
 	}
-
-	ice_release_nvm(hw);
 
 	*data = nvm_data;
 
