@@ -127,7 +127,7 @@ static void *image_load(struct kimage *image,
 
 		image->arch.secure_launch = true;
 		image->arch.drtm_dlme_size = dlme_size;
-		kbuf.memsz += dlme_size;
+		kbuf.memsz += SL_DLME_DTB_SLOT_GAP + dlme_size;
 	}
 out_normal_boot:
 	kernel_segment_number = image->nr_segments;

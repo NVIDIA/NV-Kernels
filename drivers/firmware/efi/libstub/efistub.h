@@ -1278,10 +1278,6 @@ void efi_slaunch_get_dlme_data_size(void);
 efi_status_t efi_slaunch_prepare_image(unsigned long kernel_addr,
 				       unsigned long kernel_size);
 extern unsigned long sl_dlme_data_reserve;
-/* Page gap below the DLME data region so the Preamble->DLME DTB-PA
- * handoff slot (SL_DLME_DTB_SLOT_OFFSET) is dedicated scratch, not the
- * kernel image tail. */
-#define SL_DLME_DTB_SLOT_GAP		0x1000
 extern bool sl_drtm_available;
 void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 				 unsigned long fdt_addr);
