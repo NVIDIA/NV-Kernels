@@ -109,7 +109,7 @@ void efi_slaunch_get_dlme_data_size(void)
 	register u64 x1 __asm__("x1") = (1ULL << 63) | 0x2;
 	register u64 x2 __asm__("x2") = 0;
 	register u64 x3 __asm__("x3") = 0;
-	u32 min_pages;
+	u32 min_pages, nw_dce_pages;
 
 	asm volatile("smc #0"
 		: "+r"(x0), "+r"(x1), "+r"(x2), "+r"(x3)
@@ -118,10 +118,21 @@ void efi_slaunch_get_dlme_data_size(void)
 		  "x11", "x12", "x13", "x14", "x15", "x16", "x17",
 		  "memory");
 
-	/* DRTM_FEATURES success is x0 > 0; x1[31:0] = min DLME data pages. */
+	/*
+	 * DRTM_FEATURES success is x0 > 0. X1[31:0] is the minimum
+	 * DLME data size and X1[63:32] is the Normal-world DCE region
+	 * size, both in 4 KiB pages.
+	 */
 	if ((s64)x0 <= 0)
 		return;
-	min_pages = (u32)(x1 & 0xFFFFFFFF);
+	nw_dce_pages = (u32)(x1 >> 32);
+	if (nw_dce_pages) {
+		efi_warn("DRTM: %u-page Normal-world DCE region requested but not supported\n",
+			 nw_dce_pages);
+		return;
+	}
+
+	min_pages = (u32)x1;
 	if (min_pages == 0)
 		return;
 
