@@ -118,6 +118,7 @@ struct kimage_arch {
 	unsigned long t0sz;
 	unsigned long drtm_dlme_size;
 	bool secure_launch;
+	bool drtm_enforce;
 	phys_addr_t drtm_params;
 	unsigned long drtm_sl_entry_offset;
 };

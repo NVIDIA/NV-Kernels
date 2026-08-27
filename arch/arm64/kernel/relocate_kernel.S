@@ -47,6 +47,7 @@ SYM_CODE_START(arm64_relocate_new_kernel)
 	ldr	x27, [x0, #KIMAGE_ARCH_EL2_VECTORS]
 	ldr	x26, [x0, #KIMAGE_ARCH_DTB_MEM]
 	ldr	x25, [x0, #KIMAGE_ARCH_DRTM_PARAMS]
+	ldrb	w24, [x0, #KIMAGE_ARCH_DRTM_ENFORCE]
 
 	/* Setup the list loop variables. */
 	ldr	x18, [x0, #KIMAGE_ARCH_ZERO_PAGE] /* x18 = zero page for BBM */
@@ -113,8 +114,13 @@ SYM_CODE_START(arm64_relocate_new_kernel)
 
 	/*
 	 * If SMC returns, TF-A rejected or failed the Dynamic Launch.
-	 * Fail-open to standard boot by falling through to .Lel1_normal.
+	 * Fall through to a normal boot unless drtm=enforce was requested.
 	 */
+	cbz	w24, .Lel1_normal
+.Lel1_drtm_failed:
+	wfi
+	b	.Lel1_drtm_failed
+
 .Lel1_normal:
 	mov	x0, x26				/* dtb address */
 	mov	x1, xzr

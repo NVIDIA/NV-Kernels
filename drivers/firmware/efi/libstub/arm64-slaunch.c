@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * ARM64 DRTM Secure Launch — EFI stub component. Builds DRTM_PARAMETERS
- * and issues DRTM_DYNAMIC_LAUNCH when the cmdline has "drtm=on". The SMC
- * does not return on success: D-CRTM measures the image and ERETs to
- * sl_entry. Copyright (c) 2025-2026, NVIDIA Corporation.
+ * and issues DRTM_DYNAMIC_LAUNCH when requested by the drtm= command-line
+ * option. The SMC does not return on success: D-CRTM measures the image and
+ * ERETs to sl_entry. Copyright (c) 2025-2026, NVIDIA Corporation.
  */
 
 #include <linux/efi.h>
@@ -59,11 +59,6 @@ static u64 sl_smc_ret(u64 fn, u64 arg1)
 		  "x11", "x12", "x13", "x14", "x15", "x16", "x17",
 		  "memory");
 	return x0;
-}
-
-static void sl_smc(u64 fn, u64 arg1)
-{
-	sl_smc_ret(fn, arg1);
 }
 
 /* Read CTR_EL0.DminLine and return cache line size in bytes. */
@@ -246,51 +241,57 @@ invalid:
 	return EFI_LOAD_ERROR;
 }
 
-/*
- * Token-aware cmdline match: true iff `tok` is a standalone
- * whitespace-delimited word in `cmdline`, not a substring of another
- * option (so "drtm=on" does not match "nodrtm=on" or "root=...drtm=on").
- */
-static bool sl_cmdline_token(const char *cmdline, const char *tok)
+enum sl_drtm_policy {
+	SL_DRTM_OFF,
+	SL_DRTM_ON,
+	SL_DRTM_ENFORCE,
+};
+
+static enum sl_drtm_policy sl_parse_drtm_policy(const char *cmdline)
 {
-	size_t toklen = strlen(tok);
+	enum sl_drtm_policy policy = SL_DRTM_OFF;
 	const char *p = cmdline;
 
-	while ((p = strstr(p, tok)) != NULL) {
-		bool start_ok = (p == cmdline) || p[-1] == ' ' || p[-1] == '\t';
-		bool end_ok = p[toklen] == '\0' || p[toklen] == ' ' ||
-			      p[toklen] == '\t';
+	if (!p)
+		return policy;
 
-		if (start_ok && end_ok)
-			return true;
-		p += toklen;
+	while (*p) {
+		const char *end;
+		size_t len;
+
+		while (*p == ' ' || *p == '\t')
+			p++;
+		end = p;
+		while (*end && *end != ' ' && *end != '\t')
+			end++;
+		len = end - p;
+
+		if (len == sizeof("drtm=off") - 1 &&
+		    !memcmp(p, "drtm=off", len))
+			policy = SL_DRTM_OFF;
+		else if (len == sizeof("drtm=on") - 1 &&
+			 !memcmp(p, "drtm=on", len))
+			policy = SL_DRTM_ON;
+		else if (len == sizeof("drtm=enforce") - 1 &&
+			 !memcmp(p, "drtm=enforce", len))
+			policy = SL_DRTM_ENFORCE;
+
+		p = end;
 	}
-	return false;
+
+	return policy;
 }
 
-bool efi_slaunch_enabled(const char *cmdline)
-{
-	if (!cmdline)
-		return false;
-	/*
-	 * A detected DRTM launch forces EFI runtime services off in
-	 * slaunch_setup() (via disable_runtime), so no efi=noruntime token is
-	 * needed here; drtm=on alone requests the launch.
-	 */
-	return sl_cmdline_token(cmdline, "drtm=on");
-}
-
-/* Canonical converted command line, recorded once by the stub entry. */
-static const char *sl_cmdline;
+static enum sl_drtm_policy sl_policy;
 
 /*
- * Record the stub's canonical converted command line for the DRTM gates.
- * Reusing it avoids a second efi_convert_cmdline(), which would measure
- * the EFI LoadOptions a second time (duplicate PCR 9 event).
+ * Parse the canonical converted command line once. This avoids a second
+ * efi_convert_cmdline(), which would measure the EFI LoadOptions a second
+ * time and add a duplicate PCR 9 event.
  */
 void efi_slaunch_set_cmdline(const char *cmdline)
 {
-	sl_cmdline = cmdline;
+	sl_policy = sl_parse_drtm_policy(cmdline);
 }
 
 /*
@@ -300,7 +301,12 @@ void efi_slaunch_set_cmdline(const char *cmdline)
  */
 bool efi_slaunch_requested(void)
 {
-	return efi_slaunch_enabled(sl_cmdline);
+	return sl_policy != SL_DRTM_OFF;
+}
+
+bool efi_slaunch_enforced(void)
+{
+	return sl_policy == SL_DRTM_ENFORCE;
 }
 
 /*
@@ -309,8 +315,7 @@ bool efi_slaunch_requested(void)
  */
 static struct drtm_parameters sl_params __aligned(SL_DRTM_PAGE_SIZE);
 
-void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
-				 unsigned long fdt_addr)
+void efi_slaunch_drtm(unsigned long kernel_addr, unsigned long fdt_addr)
 {
 	struct drtm_parameters *params = &sl_params;
 	unsigned long image_size, kernel_memsize;
@@ -376,14 +381,17 @@ void __noreturn efi_slaunch_drtm(unsigned long kernel_addr,
 	 * DRTM_DYNAMIC_LAUNCH — does not return on success.
 	 * D-CRTM: measures kernel, populates DLME data, ERETs to sl_entry
 	 */
-	sl_smc(SL_DRTM_SMC_DYNAMIC_LAUNCH, (u64)params);
+	sl_smc_ret(SL_DRTM_SMC_DYNAMIC_LAUNCH, (u64)params);
 
 	/*
 	 * The launch SMC returns only on failure (success ERETs to sl_entry).
-	 * Boot services are gone here, so we cannot print; the pre-EBS notice
-	 * in efi_boot_kernel() flagged that reaching this halt means the
-	 * dynamic launch failed.
+	 * With drtm=on, return to the EFI boot path for a normal boot. With
+	 * drtm=enforce, fail closed. Boot services are gone, so the pre-EBS
+	 * notice is the last diagnostic available in the enforced case.
 	 */
+	if (!efi_slaunch_enforced())
+		return;
+
 	for (;;)
 		asm volatile("wfi");
 }

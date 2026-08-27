@@ -1400,6 +1400,14 @@ Kernel parameters
 			match the *.
 			Format: <driver_name1>,<driver_name2>...
 
+	drtm=		[ARM64]
+			Format: { off | on | enforce }
+			off: Boot normally without requesting a DRTM launch.
+			on: Request a DRTM launch and fall back to a normal boot
+			if DRTM preparation or the launch fails.
+			enforce: Request a DRTM launch and refuse to boot the
+			target kernel if DRTM preparation or the launch fails.
+
 	drm.edid_firmware=[<connector>:]<file>[,[<connector>:]<file>]
 			Broken monitors, graphic adapters, KVMs and EDIDless
 			panels may send no or incorrect EDID data sets.

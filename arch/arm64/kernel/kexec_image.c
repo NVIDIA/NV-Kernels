@@ -21,6 +21,47 @@
 #include <asm/drtm.h>
 #include <linux/arm-smccc.h>
 
+enum image_drtm_policy {
+	IMAGE_DRTM_OFF,
+	IMAGE_DRTM_ON,
+	IMAGE_DRTM_ENFORCE,
+};
+
+static enum image_drtm_policy image_drtm_policy(const char *cmdline)
+{
+	enum image_drtm_policy policy = IMAGE_DRTM_OFF;
+	const char *p = cmdline;
+
+	if (!p)
+		return policy;
+
+	while (*p) {
+		const char *end;
+		size_t len;
+
+		while (*p == ' ' || *p == '\t')
+			p++;
+		end = p;
+		while (*end && *end != ' ' && *end != '\t')
+			end++;
+		len = end - p;
+
+		if (len == sizeof("drtm=off") - 1 &&
+		    !memcmp(p, "drtm=off", len))
+			policy = IMAGE_DRTM_OFF;
+		else if (len == sizeof("drtm=on") - 1 &&
+			 !memcmp(p, "drtm=on", len))
+			policy = IMAGE_DRTM_ON;
+		else if (len == sizeof("drtm=enforce") - 1 &&
+			 !memcmp(p, "drtm=enforce", len))
+			policy = IMAGE_DRTM_ENFORCE;
+
+		p = end;
+	}
+
+	return policy;
+}
+
 static int image_probe(const char *kernel_buf, unsigned long kernel_len)
 {
 	const struct arm64_image_header *h =
@@ -44,8 +85,9 @@ static void *image_load(struct kimage *image,
 	u64 flags, value;
 	bool be_image, be_kernel;
 	struct kexec_buf kbuf = {};
-	unsigned long text_offset, kernel_segment_number;
+	unsigned long text_offset, kernel_segment_number, normal_memsz;
 	struct kexec_segment *kernel_segment;
+	enum image_drtm_policy drtm_policy;
 	int ret;
 
 	/*
@@ -92,14 +134,21 @@ static void *image_load(struct kimage *image,
 
 	/* Adjust kernel segment with TEXT_OFFSET */
 	kbuf.memsz += text_offset;
+	normal_memsz = kbuf.memsz;
 
-	if (cmdline && strstr(cmdline, "drtm=on")) {
+	drtm_policy = image_drtm_policy(cmdline);
+	if (drtm_policy != IMAGE_DRTM_OFF) {
 		struct arm_smccc_res res;
 		unsigned long dlme_size;
 		u32 dlme_pages, nw_dce_pages;
+		const char *policy_name = drtm_policy == IMAGE_DRTM_ENFORCE ?
+			"enforce" : "on";
 
 		if (!image->arch.drtm_sl_entry_offset) {
-			pr_warn("kexec_file_load: drtm=on requested, but target kernel does not advertise DRTM Secure Launch capability (flags bit 4 / res4 offset). Falling back to normal boot without DRTM.\n");
+			pr_warn("drtm=%s requested, but the target kernel does not advertise DRTM Secure Launch capability\n",
+				policy_name);
+			if (drtm_policy == IMAGE_DRTM_ENFORCE)
+				return ERR_PTR(-EOPNOTSUPP);
 			goto out_normal_boot;
 		}
 
@@ -111,8 +160,10 @@ static void *image_load(struct kimage *image,
 			dlme_pages = (u32)res.a1;
 			nw_dce_pages = (u32)(res.a1 >> 32);
 			if (nw_dce_pages) {
-				pr_warn("kexec_file_load: DRTM requested a %u-page Normal-world DCE region, which is not supported. Falling back to normal boot without DRTM.\n",
+				pr_warn("DRTM requested an unsupported %u-page Normal-world DCE region\n",
 					nw_dce_pages);
+				if (drtm_policy == IMAGE_DRTM_ENFORCE)
+					return ERR_PTR(-EOPNOTSUPP);
 				goto out_normal_boot;
 			}
 
@@ -120,12 +171,17 @@ static void *image_load(struct kimage *image,
 			pr_info("kexec_file: DRTM SMC requested %lu bytes for DLME data\n",
 				dlme_size);
 		} else {
-			pr_warn("kexec_file_load: drtm=on requested, but active TF-A returned SMCCC_NOT_SUPPORTED (%lld). Falling back to normal boot without DRTM.\n",
+			pr_warn("drtm=%s requested, but DRTM_FEATURES failed (%lld)\n",
+				policy_name,
 				(s64)res.a0);
+			if (drtm_policy == IMAGE_DRTM_ENFORCE)
+				return ERR_PTR(-EOPNOTSUPP);
 			goto out_normal_boot;
 		}
 
 		image->arch.secure_launch = true;
+		image->arch.drtm_enforce =
+			drtm_policy == IMAGE_DRTM_ENFORCE;
 		image->arch.drtm_dlme_size = dlme_size;
 		kbuf.memsz += SL_DLME_DTB_SLOT_GAP + dlme_size;
 	}
@@ -153,6 +209,17 @@ out_normal_boot:
 		image->nr_segments -= 1;
 		kbuf.buf_min = kernel_segment->mem + kernel_segment->memsz;
 		kbuf.mem = KEXEC_BUF_MEM_UNKNOWN;
+	}
+
+	if (ret && image->arch.secure_launch &&
+	    !image->arch.drtm_enforce) {
+		pr_warn("DRTM image placement failed; retrying a normal boot\n");
+		image->arch.secure_launch = false;
+		image->arch.drtm_dlme_size = 0;
+		kbuf.buf_min = 0;
+		kbuf.mem = KEXEC_BUF_MEM_UNKNOWN;
+		kbuf.memsz = normal_memsz;
+		goto out_normal_boot;
 	}
 
 	if (ret) {
