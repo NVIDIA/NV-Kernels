@@ -99,10 +99,14 @@ SYM_CODE_START(arm64_relocate_new_kernel)
 
 	/* Save DTB PA in DLME Data Slot */
 	ldr	x1, [x25, #DRTM_PARAMS_DLME_REGION_ADDR]
+	CPU_BE(rev	x1, x1)
 	ldr	x2, [x25, #DRTM_PARAMS_DLME_DATA_OFFSET]
+	CPU_BE(rev	x2, x2)
 	add	x1, x1, x2
 	sub	x1, x1, #8		/* x1 = DLME DTB Slot PA */
-	str	x26, [x1]		/* Write DTB PA into DLME */
+	mov	x3, x26
+	CPU_BE(rev	x3, x3)
+	str	x3, [x1]		/* Write little-endian DTB PA */
 	mov	x1, x25			/* PA of DRTM_PARAMS */
 	mov_q	x0, DRTM_SMC_DYNAMIC_LAUNCH
 	smc	#0			/* Hand over to D-CRTM (TF-A) */

@@ -163,24 +163,29 @@ int machine_kexec_post_load(struct kimage *kimage)
 		kernel_addr = kimage->segment[0].mem;
 		sl_entry_offset = kimage->arch.drtm_sl_entry_offset;
 
-		params->revision = DRTM_PARAMS_REVISION;
-		params->launch_features = 0;
-		params->dlme_region_address = kernel_addr;
-		params->dlme_region_size = kimage->segment[0].memsz;
-		params->dlme_image_start = 0;
-		params->dlme_entry_point_offset = sl_entry_offset;
-		params->dlme_image_size = image_size;
-		params->dlme_data_offset = dlme_data_offset;
+		params->revision = cpu_to_le16(DRTM_PARAMS_REVISION);
+		params->reserved = cpu_to_le16(0);
+		params->launch_features = cpu_to_le32(0);
+		params->dlme_region_address = cpu_to_le64(kernel_addr);
+		params->dlme_region_size = cpu_to_le64(kimage->segment[0].memsz);
+		params->dlme_image_start = cpu_to_le64(0);
+		params->dlme_entry_point_offset = cpu_to_le64(sl_entry_offset);
+		params->dlme_image_size = cpu_to_le64(image_size);
+		params->dlme_data_offset = cpu_to_le64(dlme_data_offset);
+		params->nw_dce_region_address = cpu_to_le64(0);
+		params->nw_dce_region_size = cpu_to_le64(0);
+		params->mem_prot_table_address = cpu_to_le64(0);
+		params->mem_prot_table_size = cpu_to_le64(0);
 
 		dcache_clean_inval_poc((unsigned long)dp,
 					   (unsigned long)dp + sizeof(*params));
 		kimage->arch.drtm_params = __pa(dp);
 
 		if (kimage->arch.dtb_mem) {
-			u64 *dtb_slot = __va(kernel_addr + dlme_data_offset +
-						 SL_DLME_DTB_SLOT_OFFSET);
+			__le64 *dtb_slot = __va(kernel_addr + dlme_data_offset +
+						    SL_DLME_DTB_SLOT_OFFSET);
 
-			*dtb_slot = kimage->arch.dtb_mem;
+			*dtb_slot = cpu_to_le64(kimage->arch.dtb_mem);
 			dcache_clean_inval_poc((unsigned long)dtb_slot,
 						   (unsigned long)dtb_slot + sizeof(*dtb_slot));
 		}
