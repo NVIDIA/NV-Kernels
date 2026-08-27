@@ -96,6 +96,7 @@ static void *image_load(struct kimage *image,
 	if (cmdline && strstr(cmdline, "drtm=on")) {
 		struct arm_smccc_res res;
 		unsigned long dlme_size;
+		u32 dlme_pages, nw_dce_pages;
 
 		if (!image->arch.drtm_sl_entry_offset) {
 			pr_warn("kexec_file_load: drtm=on requested, but target kernel does not advertise DRTM Secure Launch capability (flags bit 4 / res4 offset). Falling back to normal boot without DRTM.\n");
@@ -107,8 +108,16 @@ static void *image_load(struct kimage *image,
 				  DRTM_FEAT_QUERY_64BIT | DRTM_FEAT_MEM_REQ,
 				  0, 0, 0, 0, 0, 0, &res);
 		if ((s64)res.a0 > 0) {
-			dlme_size = res.a1 * DRTM_PAGE_SIZE;
-			pr_info("kexec_file: DRTM SMC requested %lu bytes for DLME\n",
+			dlme_pages = (u32)res.a1;
+			nw_dce_pages = (u32)(res.a1 >> 32);
+			if (nw_dce_pages) {
+				pr_warn("kexec_file_load: DRTM requested a %u-page Normal-world DCE region, which is not supported. Falling back to normal boot without DRTM.\n",
+					nw_dce_pages);
+				goto out_normal_boot;
+			}
+
+			dlme_size = (unsigned long)dlme_pages * DRTM_PAGE_SIZE;
+			pr_info("kexec_file: DRTM SMC requested %lu bytes for DLME data\n",
 				dlme_size);
 		} else {
 			pr_warn("kexec_file_load: drtm=on requested, but active TF-A returned SMCCC_NOT_SUPPORTED (%lld). Falling back to normal boot without DRTM.\n",
