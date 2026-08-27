@@ -47,10 +47,12 @@
 #define DRTM_PAGE_SIZE			0x1000
 
 /*
- * Preamble->DLME DTB-PA handoff slot: DTB PA written 8 bytes below the
- * DLME data region; sl_entry reads it via X0+X1-8 after D-CRTM ERET.
- * Private contract (not DEN0113); DTB PA validated before FDT is parsed.
+ * Preamble->DLME DTB-PA handoff slot: reserve a page below the DLME data
+ * region and write the DTB PA into its final 8 bytes. sl_entry reads it via
+ * X0+X1-8 after D-CRTM ERET. Private contract (not DEN0113); DTB PA validated
+ * before FDT is parsed.
  */
+#define SL_DLME_DTB_SLOT_GAP		DRTM_PAGE_SIZE
 #define SL_DLME_DTB_SLOT_OFFSET		(-8)
 
 /*
