@@ -43,10 +43,13 @@
 #include <linux/io.h>
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/interrupt.h>
+#include <linux/list.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/platform_device.h>
+#include <linux/spinlock.h>
+#include <linux/suspend.h>
 #include <linux/uaccess.h>
 #include <linux/watchdog.h>
 #include <asm/arch_timer.h>
@@ -88,6 +91,10 @@
  *			indicate whether to adjust wdd->timeout to avoid a race with WS0
  * @refresh_base:	Virtual address of the watchdog refresh frame
  * @control_base:	Virtual address of the watchdog control frame
+ * @node:		Entry in the list of instances the sleep notifier owns
+ * @hw_armed:		The watchdog is logically running (started by firmware,
+ *			early_enable or userspace); the hardware follows it except
+ *			while a system sleep transition is in progress
  */
 struct sbsa_gwdt {
 	struct watchdog_device	wdd;
@@ -96,7 +103,19 @@ struct sbsa_gwdt {
 	bool			need_ws0_race_workaround;
 	void __iomem		*refresh_base;
 	void __iomem		*control_base;
+	struct list_head	node;
+	bool			hw_armed;
 };
+
+/*
+ * System sleep state shared by all instances. The notifier recording a
+ * transition is registered once, at driver init, before any device can be
+ * probed, so a probe at any later point finds the transition already
+ * recorded instead of racing its own registration against *_PREPARE.
+ */
+static LIST_HEAD(sbsa_gwdt_list);
+static DEFINE_SPINLOCK(sbsa_gwdt_lock); /* list, sleeping, hw_armed */
+static bool sbsa_gwdt_sleeping;
 
 #define DEFAULT_TIMEOUT		10 /* seconds */
 
@@ -250,12 +269,33 @@ static void sbsa_gwdt_get_version(struct watchdog_device *wdd)
 		!action && (impl == SBSA_GWDT_IMPL_MEDIATEK);
 }
 
+static void sbsa_gwdt_hw_start(struct sbsa_gwdt *gwdt)
+{
+	/* writing WCS will cause an explicit watchdog refresh */
+	writel(SBSA_GWDT_WCS_EN, gwdt->control_base + SBSA_GWDT_WCS);
+}
+
+static void sbsa_gwdt_hw_stop(struct sbsa_gwdt *gwdt)
+{
+	/* Simply write 0 to WCS to clean WCS_EN bit */
+	writel(0, gwdt->control_base + SBSA_GWDT_WCS);
+}
+
 static int sbsa_gwdt_start(struct watchdog_device *wdd)
 {
 	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
+	unsigned long flags;
 
-	/* writing WCS will cause an explicit watchdog refresh */
-	writel(SBSA_GWDT_WCS_EN, gwdt->control_base + SBSA_GWDT_WCS);
+	spin_lock_irqsave(&sbsa_gwdt_lock, flags);
+	gwdt->hw_armed = true;
+	/*
+	 * While a system sleep transition is in progress nobody can refresh
+	 * the watchdog: leave the hardware stopped and let the PM_POST_*
+	 * notifier arm it once everything has resumed.
+	 */
+	if (!sbsa_gwdt_sleeping)
+		sbsa_gwdt_hw_start(gwdt);
+	spin_unlock_irqrestore(&sbsa_gwdt_lock, flags);
 
 	return 0;
 }
@@ -263,9 +303,12 @@ static int sbsa_gwdt_start(struct watchdog_device *wdd)
 static int sbsa_gwdt_stop(struct watchdog_device *wdd)
 {
 	struct sbsa_gwdt *gwdt = watchdog_get_drvdata(wdd);
+	unsigned long flags;
 
-	/* Simply write 0 to WCS to clean WCS_EN bit */
-	writel(0, gwdt->control_base + SBSA_GWDT_WCS);
+	spin_lock_irqsave(&sbsa_gwdt_lock, flags);
+	gwdt->hw_armed = false;
+	sbsa_gwdt_hw_stop(gwdt);
+	spin_unlock_irqrestore(&sbsa_gwdt_lock, flags);
 
 	return 0;
 }
@@ -294,12 +337,133 @@ static const struct watchdog_ops sbsa_gwdt_ops = {
 	.get_timeleft	= sbsa_gwdt_get_timeleft,
 };
 
+/*
+ * Per-device suspend/resume callbacks alone would stop the watchdog only
+ * once this device itself is suspended, one of the last steps of suspend
+ * entry, and restart it during device resume, before tasks are thawed. A
+ * watchdog running from boot (early_enable) would therefore be armed, with
+ * nobody refreshing it, through task freezing and every other device's
+ * suspend callback on the way down, and again from device resume until
+ * userspace runs on the way up; anything stalling past the timeout in
+ * either window resets the system.
+ *
+ * Own the transition from a PM notifier instead: stop at the *_PREPARE
+ * events, before anything is frozen, and restart at PM_POST_*, after
+ * everything has resumed. The state (hw_armed per instance, one sleeping
+ * flag) is kept under a lock shared with the watchdog ops so that a
+ * userspace stop or magic close after thaw cannot race the restart, and a
+ * start requested while the transition is in progress is deferred to
+ * PM_POST_*. The transition is recorded at *_PREPARE whether or not the
+ * watchdog was armed at that moment, so a start between *_PREPARE and
+ * task freezing is deferred as well instead of arming hardware nobody
+ * refreshes.
+ *
+ * The notifier is registered at driver init, so a probe that runs while
+ * the driver is loaded finds a transition already recorded, whatever its
+ * interleaving with *_PREPARE, and applies it when it adopts the hardware
+ * state. What remains is the driver being loaded after PM_SUSPEND_PREPARE
+ * has run: the probe then checks for a suspend already past task freezing
+ * and stops the hardware itself, and the device ->prepare callback, which
+ * the PM core runs after waiting for outstanding probes and before any
+ * device suspend callback, applies the same stop. Neither has a resume
+ * counterpart: PM_POST_* is the only place that re-arms the hardware.
+ */
+static void sbsa_gwdt_sleep_stop(void)
+{
+	struct sbsa_gwdt *gwdt;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sbsa_gwdt_lock, flags);
+	/*
+	 * Idempotent on purpose: the *_PREPARE notifier and the device
+	 * ->prepare callback both land here, and a probe that adopted a
+	 * firmware-armed watchdog after *_PREPARE relies on a later call
+	 * actually stopping the hardware.
+	 */
+	sbsa_gwdt_sleeping = true;
+	list_for_each_entry(gwdt, &sbsa_gwdt_list, node)
+		if (gwdt->hw_armed)
+			sbsa_gwdt_hw_stop(gwdt);
+	spin_unlock_irqrestore(&sbsa_gwdt_lock, flags);
+}
+
+static void sbsa_gwdt_sleep_restart(void)
+{
+	struct sbsa_gwdt *gwdt;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sbsa_gwdt_lock, flags);
+	if (sbsa_gwdt_sleeping) {
+		sbsa_gwdt_sleeping = false;
+		list_for_each_entry(gwdt, &sbsa_gwdt_list, node)
+			if (gwdt->hw_armed)
+				sbsa_gwdt_hw_start(gwdt);
+	}
+	spin_unlock_irqrestore(&sbsa_gwdt_lock, flags);
+}
+
+static int sbsa_gwdt_pm_notify(struct notifier_block *nb, unsigned long mode,
+			       void *data)
+{
+	switch (mode) {
+	case PM_SUSPEND_PREPARE:
+	case PM_HIBERNATION_PREPARE:
+	case PM_RESTORE_PREPARE:
+		sbsa_gwdt_sleep_stop();
+		break;
+	case PM_POST_SUSPEND:
+	case PM_POST_HIBERNATION:
+	case PM_POST_RESTORE:
+		sbsa_gwdt_sleep_restart();
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block sbsa_gwdt_pm_nb = {
+	.notifier_call = sbsa_gwdt_pm_notify,
+};
+
+static void sbsa_gwdt_remove_instance(void *data)
+{
+	struct sbsa_gwdt *gwdt = data;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sbsa_gwdt_lock, flags);
+	list_del(&gwdt->node);
+	/*
+	 * PM_POST_* no longer applies to this instance. If a transition
+	 * stopped the hardware, put it back into the state the last start or
+	 * stop asked for, so a probe that fails while the system heads into
+	 * sleep does not leave a firmware-started watchdog silently disabled;
+	 * without a driver such a watchdog is armed and unrefreshed whether
+	 * or not a transition is in progress, exactly as a probe failure
+	 * outside a transition leaves it.
+	 */
+	if (sbsa_gwdt_sleeping && gwdt->hw_armed)
+		sbsa_gwdt_hw_start(gwdt);
+	spin_unlock_irqrestore(&sbsa_gwdt_lock, flags);
+}
+
+static int sbsa_gwdt_prepare(struct device *dev)
+{
+	sbsa_gwdt_sleep_stop();
+
+	return 0;
+}
+
+static const struct dev_pm_ops sbsa_gwdt_pm_ops = {
+	.prepare = pm_sleep_ptr(sbsa_gwdt_prepare),
+};
+
 static int sbsa_gwdt_probe(struct platform_device *pdev)
 {
 	void __iomem *rf_base, *cf_base;
 	struct device *dev = &pdev->dev;
 	struct watchdog_device *wdd;
 	struct sbsa_gwdt *gwdt;
+	unsigned long flags;
 	int ret, irq;
 	u32 status;
 	bool early_action;
@@ -325,6 +489,34 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 	gwdt->clk = arch_timer_get_cntfrq();
 	gwdt->refresh_base = rf_base;
 	gwdt->control_base = cf_base;
+	status = readl(cf_base + SBSA_GWDT_WCS);
+
+	/*
+	 * Adopt the firmware state and join the list under the lock: a
+	 * transition the notifier has already recorded applies to this
+	 * instance at once, and a *_PREPARE landing after this point finds
+	 * hw_armed set. pm_suspend_in_progress() covers the driver being
+	 * loaded after PM_SUSPEND_PREPARE ran: it is true from the end of
+	 * task freezing until the devices have resumed, and PM_POST_SUSPEND
+	 * always follows its clearing, so a transition seen here is one the
+	 * notifier will see the end of; read under the lock, a PM_POST_SUSPEND
+	 * racing it finds the flag set. The hibernation counterpart stays
+	 * true past PM_POST_HIBERNATION and would record a transition nobody
+	 * ends, so that case, like the interval between *_PREPARE and the end
+	 * of task freezing, relies on the device ->prepare callback instead.
+	 */
+	spin_lock_irqsave(&sbsa_gwdt_lock, flags);
+	gwdt->hw_armed = !!(status & SBSA_GWDT_WCS_EN);
+	if (pm_suspend_in_progress())
+		sbsa_gwdt_sleeping = true;
+	if (sbsa_gwdt_sleeping && gwdt->hw_armed)
+		sbsa_gwdt_hw_stop(gwdt);
+	list_add(&gwdt->node, &sbsa_gwdt_list);
+	spin_unlock_irqrestore(&sbsa_gwdt_lock, flags);
+
+	ret = devm_add_action_or_reset(dev, sbsa_gwdt_remove_instance, gwdt);
+	if (ret)
+		return ret;
 
 	wdd = &gwdt->wdd;
 	wdd->parent = dev;
@@ -349,11 +541,15 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 		wdd->min_timeout = 3;
 	}
 
-	status = readl(cf_base + SBSA_GWDT_WCS);
 	if (status & SBSA_GWDT_WCS_WS1) {
 		dev_warn(dev, "System reset by WDT.\n");
 		wdd->bootstatus |= WDIOF_CARDRESET;
 	}
+	/*
+	 * hw_armed already reflects WCS_EN (adopted above, under the lock);
+	 * a transition recorded before or since has stopped the hardware
+	 * and PM_POST_* re-arms it.
+	 */
 	if (status & SBSA_GWDT_WCS_EN)
 		set_bit(WDOG_HW_RUNNING, &wdd->status);
 
@@ -414,32 +610,6 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 	return 0;
 }
 
-/* Disable watchdog if it is active during suspend */
-static int __maybe_unused sbsa_gwdt_suspend(struct device *dev)
-{
-	struct sbsa_gwdt *gwdt = dev_get_drvdata(dev);
-
-	if (watchdog_hw_running(&gwdt->wdd))
-		sbsa_gwdt_stop(&gwdt->wdd);
-
-	return 0;
-}
-
-/* Enable watchdog if necessary */
-static int __maybe_unused sbsa_gwdt_resume(struct device *dev)
-{
-	struct sbsa_gwdt *gwdt = dev_get_drvdata(dev);
-
-	if (watchdog_hw_running(&gwdt->wdd))
-		sbsa_gwdt_start(&gwdt->wdd);
-
-	return 0;
-}
-
-static const struct dev_pm_ops sbsa_gwdt_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(sbsa_gwdt_suspend, sbsa_gwdt_resume)
-};
-
 static const struct of_device_id sbsa_gwdt_of_match[] = {
 	{ .compatible = "arm,sbsa-gwdt", },
 	{},
@@ -455,14 +625,41 @@ MODULE_DEVICE_TABLE(platform, sbsa_gwdt_pdev_match);
 static struct platform_driver sbsa_gwdt_driver = {
 	.driver = {
 		.name = DRV_NAME,
-		.pm = &sbsa_gwdt_pm_ops,
+		.pm = pm_sleep_ptr(&sbsa_gwdt_pm_ops),
 		.of_match_table = sbsa_gwdt_of_match,
 	},
 	.probe = sbsa_gwdt_probe,
 	.id_table = sbsa_gwdt_pdev_match,
 };
 
-module_platform_driver(sbsa_gwdt_driver);
+static int __init sbsa_gwdt_init(void)
+{
+	int ret;
+
+	/*
+	 * Register the sleep notifier before any device can be probed, so
+	 * that every transition from here on is recorded before a probe
+	 * adopts a running watchdog. Its failure is fatal: without it a
+	 * running watchdog would survive into system sleep unrefreshed.
+	 */
+	ret = register_pm_notifier(&sbsa_gwdt_pm_nb);
+	if (ret)
+		return ret;
+
+	ret = platform_driver_register(&sbsa_gwdt_driver);
+	if (ret)
+		unregister_pm_notifier(&sbsa_gwdt_pm_nb);
+
+	return ret;
+}
+module_init(sbsa_gwdt_init);
+
+static void __exit sbsa_gwdt_exit(void)
+{
+	platform_driver_unregister(&sbsa_gwdt_driver);
+	unregister_pm_notifier(&sbsa_gwdt_pm_nb);
+}
+module_exit(sbsa_gwdt_exit);
 
 MODULE_DESCRIPTION("SBSA Generic Watchdog Driver");
 MODULE_AUTHOR("Fu Wei <fu.wei@linaro.org>");
