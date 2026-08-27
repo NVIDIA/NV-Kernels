@@ -425,7 +425,7 @@ void mptcp_subflow_reset(struct sock *ssk)
 
 	/* No need to delay the actual close for to-be discarded data. */
 	__skb_queue_purge(&ssk->sk_receive_queue);
-	tcp_send_active_reset(ssk, GFP_ATOMIC);
+	tcp_send_active_reset(ssk);
 	tcp_done(ssk);
 	if (!test_and_set_bit(MPTCP_WORK_CLOSE_SUBFLOW, &mptcp_sk(sk)->flags))
 		mptcp_schedule_work(sk);
@@ -1383,7 +1383,7 @@ reset:
 			tcp_set_state(ssk, TCP_CLOSE);
 			while ((skb = skb_peek(&ssk->sk_receive_queue)))
 				sk_eat_skb(ssk, skb);
-			tcp_send_active_reset(ssk, GFP_ATOMIC);
+			tcp_send_active_reset(ssk);
 			WRITE_ONCE(subflow->data_avail, false);
 			return false;
 		}
