@@ -315,14 +315,19 @@ struct policydb {
 	u32 process_trans_perms;
 } __randomize_layout;
 
+struct policy_file {
+	char *data;
+	size_t len;
+};
+
 extern void policydb_destroy(struct policydb *p);
 extern int policydb_load_isids(struct policydb *p, struct sidtab *s);
 extern int policydb_context_isvalid(struct policydb *p, struct context *c);
 extern int policydb_class_isvalid(struct policydb *p, unsigned int class);
 extern int policydb_type_isvalid(struct policydb *p, unsigned int type);
 extern int policydb_role_isvalid(struct policydb *p, unsigned int role);
-extern int policydb_read(struct policydb *p, void *fp);
-extern int policydb_write(struct policydb *p, void *fp);
+extern int policydb_read(struct policydb *p, struct policy_file *fp);
+extern int policydb_write(struct policydb *p, struct policy_file *fp);
 
 extern struct filename_trans_datum *policydb_filenametr_search(
 	struct policydb *p, struct filename_trans_key *key);
@@ -345,14 +350,9 @@ extern struct role_trans_datum *policydb_roletr_search(
 #define POLICYDB_MAGIC SELINUX_MAGIC
 #define POLICYDB_STRING "SE Linux"
 
-struct policy_file {
-	char *data;
-	size_t len;
-};
-
 struct policy_data {
 	struct policydb *p;
-	void *fp;
+	struct policy_file *fp;
 };
 
 static inline int next_entry(void *buf, struct policy_file *fp, size_t bytes)
