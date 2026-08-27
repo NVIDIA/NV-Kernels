@@ -174,6 +174,7 @@ int main(void)
   DEFINE(KIMAGE_ARCH_PHYS_OFFSET,	offsetof(struct kimage, arch.phys_offset));
   DEFINE(KIMAGE_ARCH_TTBR1,		offsetof(struct kimage, arch.ttbr1));
   DEFINE(KIMAGE_ARCH_DRTM_PARAMS,	offsetof(struct kimage, arch.drtm_params));
+  DEFINE(KIMAGE_ARCH_DRTM_ENFORCE,	offsetof(struct kimage, arch.drtm_enforce));
   DEFINE(DRTM_PARAMS_DLME_REGION_ADDR,	offsetof(struct drtm_parameters, dlme_region_address));
   DEFINE(DRTM_PARAMS_DLME_DATA_OFFSET,	offsetof(struct drtm_parameters, dlme_data_offset));
   DEFINE(KIMAGE_HEAD,			offsetof(struct kimage, head));

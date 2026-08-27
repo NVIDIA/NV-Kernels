@@ -24,6 +24,8 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 {
 	unsigned long kernel_size, kernel_codesize, kernel_memsize;
 	efi_image_pre_remap_t pre_remap = NULL;
+	efi_status_t status;
+	u32 phys_seed;
 
 	if (image->image_base != _text) {
 		efi_err("FIRMWARE BUG: efi_loaded_image_t::image_base has bogus value\n");
@@ -52,16 +54,35 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 			*reserve_size += SL_DLME_DTB_SLOT_GAP +
 					 sl_dlme_data_reserve;
 			pre_remap = efi_slaunch_prepare_image;
+		} else if (efi_slaunch_enforced()) {
+			efi_err("DRTM: enforced launch is unavailable\n");
+			return EFI_UNSUPPORTED;
 		}
 	}
 #endif
 	*image_addr = (unsigned long)_text;
+	phys_seed = efi_kaslr_get_phys_seed(image_handle);
 
-	return efi_kaslr_relocate_kernel(image_addr, reserve_addr,
-					 reserve_size, kernel_size,
-					 kernel_codesize, kernel_memsize,
-					 efi_kaslr_get_phys_seed(image_handle),
-					 pre_remap);
+	status = efi_kaslr_relocate_kernel(image_addr, reserve_addr,
+					   reserve_size, kernel_size,
+					   kernel_codesize, kernel_memsize,
+					   phys_seed, pre_remap);
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+	if (status != EFI_SUCCESS && sl_drtm_available &&
+	    !efi_slaunch_enforced()) {
+		efi_warn("DRTM: image preparation failed; booting normally\n");
+		sl_drtm_available = false;
+		*reserve_addr = 0;
+		*reserve_size = kernel_memsize;
+		status = efi_kaslr_relocate_kernel(image_addr, reserve_addr,
+						   reserve_size, kernel_size,
+						   kernel_codesize,
+						   kernel_memsize, phys_seed,
+						   NULL);
+	}
+#endif
+
+	return status;
 }
 
 asmlinkage void primary_entry(void);

@@ -355,15 +355,22 @@ efi_status_t efi_boot_kernel(void *handle, efi_loaded_image_t *image,
 
 #ifdef CONFIG_ARM64_SECURE_LAUNCH
 	/*
-	 * Announce the DRTM decision while boot services can still print: the
-	 * launch runs after ExitBootServices with no console, so a failed
-	 * launch only halts. The info breadcrumb is suppressed by "quiet" (and
-	 * by the default log level on 7.0); the error survives "quiet".
+	 * Announce the DRTM policy while boot services can still print. The
+	 * launch runs after ExitBootServices with no console; a returned SMC
+	 * falls back to normal boot for drtm=on and halts for drtm=enforce.
 	 */
-	if (efi_slaunch_enabled(cmdline_ptr) && sl_drtm_available)
-		efi_info("DRTM: launching; a halt after this means it failed\n");
-	else if (efi_slaunch_enabled(cmdline_ptr))
-		efi_err("DRTM: firmware lacks DRTM support; booting normally\n");
+	if (efi_slaunch_requested() && sl_drtm_available) {
+		if (efi_slaunch_enforced())
+			efi_info("DRTM: enforcing launch; a halt means it failed\n");
+		else
+			efi_info("DRTM: launching with normal-boot fallback\n");
+	} else if (efi_slaunch_requested()) {
+		if (efi_slaunch_enforced()) {
+			efi_err("DRTM: enforced launch is unavailable\n");
+			return EFI_UNSUPPORTED;
+		}
+		efi_warn("DRTM: firmware lacks DRTM support; booting normally\n");
+	}
 #endif
 
 	status = allocate_new_fdt_and_exit_boot(handle, image, &fdt_addr,
@@ -378,7 +385,7 @@ efi_status_t efi_boot_kernel(void *handle, efi_loaded_image_t *image,
 
 #ifdef CONFIG_ARM64_SECURE_LAUNCH
 	/* Requested + firmware-advertised launch; announced pre-EBS above. */
-	if (efi_slaunch_enabled(cmdline_ptr) && sl_drtm_available)
+	if (efi_slaunch_requested() && sl_drtm_available)
 		efi_slaunch_drtm(kernel_addr, fdt_addr);
 #endif
 

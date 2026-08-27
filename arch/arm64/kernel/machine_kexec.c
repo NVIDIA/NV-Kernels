@@ -154,8 +154,13 @@ int machine_kexec_post_load(struct kimage *kimage)
 		struct drtm_parameters *params;
 		unsigned long image_size, dlme_data_offset, kernel_addr, sl_entry_offset;
 
-		if (!dp)
-			return -ENOMEM;
+		if (!dp) {
+			if (kimage->arch.drtm_enforce)
+				return -ENOMEM;
+			pr_warn("DRTM parameters allocation failed; booting normally\n");
+			kimage->arch.secure_launch = false;
+			goto out_drtm;
+		}
 
 		params = (struct drtm_parameters *)dp;
 		image_size = kimage->segment[0].bufsz;
@@ -191,6 +196,7 @@ int machine_kexec_post_load(struct kimage *kimage)
 		}
 	}
 
+out_drtm:
 	/* Flush the reloc_code in preparation for its execution. */
 	dcache_clean_inval_poc((unsigned long)reloc_code,
 			       (unsigned long)reloc_code + reloc_size);
