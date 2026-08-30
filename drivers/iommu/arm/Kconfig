@@ -109,6 +109,9 @@ config ARM_SMMU_V3_IOMMUFD
 
 	  Say Y here if you are doing development and testing on this feature.
 
+config ARM_SMMU_V3_KEXEC
+	def_bool CRASH_DUMP
+
 config ARM_SMMU_V3_KUNIT_TEST
 	tristate "KUnit tests for arm-smmu-v3 driver"  if !KUNIT_ALL_TESTS
 	depends on KUNIT
