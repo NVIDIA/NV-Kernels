@@ -1296,6 +1296,7 @@ int arm_smmu_kdump_adopt_deferred_l2_strtab(struct arm_smmu_device *smmu,
 					    u32 sid, phys_addr_t base, u32 span,
 					    struct arm_smmu_strtab_l2 **l2table);
 bool arm_smmu_kdump_is_attach_deferred(struct arm_smmu_master *master);
+void arm_smmu_device_kdump_probe(struct arm_smmu_device *smmu);
 #else /* CONFIG_CRASH_DUMP */
 static inline int arm_smmu_kdump_adopt_strtab(struct arm_smmu_device *smmu)
 {
@@ -1314,6 +1315,10 @@ static inline bool
 arm_smmu_kdump_is_attach_deferred(struct arm_smmu_master *master)
 {
 	return false;
+}
+
+static inline void arm_smmu_device_kdump_probe(struct arm_smmu_device *smmu)
+{
 }
 #endif /* CONFIG_CRASH_DUMP */
 
