@@ -1546,10 +1546,6 @@ static bool __init slaunch_validate_initrd_extents(u64 *out_start, u64 *out_size
 	slaunch_inject_initrd(&start, &size);
 #endif
 
-	if (!IS_ALIGNED(start, PAGE_SIZE))
-		panic("slaunch: initrd start 0x%llx not page-aligned\n",
-		      start);
-
 	if (check_add_overflow(start, size, &end))
 		panic("slaunch: initrd [0x%llx + %llu] wraps u64\n",
 		      start, size);
@@ -1595,7 +1591,9 @@ static void __init slaunch_measure_initrd(void)
 
 	/*
 	 * Chunked early_memremap + streaming hash with the active algorithm:
-	 * map one page at a time, feed into the streaming context, finalise.
+	 * map at most the remainder of one page at a time, feed the exact
+	 * byte extent into the streaming context, then finalise. An EFI initrd
+	 * is not required to start on the kernel's PAGE_SIZE boundary.
 	 * Both APIs (sha256/sha384_init/update/final) are safe in setup_arch()
 	 * (see the sl_hash_data() comment).
 	 */
@@ -1606,12 +1604,16 @@ static void __init slaunch_measure_initrd(void)
 
 	remaining = size;
 	while (remaining > 0) {
-		size_t chunk = min_t(u64, remaining, (u64)PAGE_SIZE);
+		u64 pa = start + off;
+		size_t chunk;
 
-		p = early_memremap(start + off, chunk);
+		chunk = min_t(u64, remaining,
+			      (u64)PAGE_SIZE - (pa & (PAGE_SIZE - 1)));
+
+		p = early_memremap(pa, chunk);
 		if (!p)
 			panic("slaunch: initrd chunk remap failed at 0x%llx (chunk %zu)\n",
-			      start + off, chunk);
+			      pa, chunk);
 		if (sl_active_algo == SL_HASH_SHA384)
 			sha384_update(&sctx384, p, chunk);
 		else
