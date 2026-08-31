@@ -2445,6 +2445,37 @@ config ARM64_SECURE_LAUNCH
 
 	  If unsure, say N.
 
+config ARM64_SECURE_LAUNCH_MEASUREMENT
+	bool
+	depends on ARM64_SECURE_LAUNCH
+
+config ARM64_SECURE_LAUNCH_FIRME
+	bool "Extend DLME measurements through Arm FIRME"
+	depends on ARM64_SECURE_LAUNCH
+	select ARM64_SECURE_LAUNCH_MEASUREMENT
+	default n
+	help
+	  Extend every ordered DLME-side measurement through the DEN0149
+	  FIRME ATTEST_EXT_CLAIMS service before recording the corresponding
+	  DRTM event-log entry. Any unavailable, denied, or failed extension
+	  stops the DRTM boot. A failed call is never retried because the
+	  service may already have changed the measurement register.
+
+	  The configured FIRME slot remains available for later extensions
+	  through the platform FIRME interface. Non-DRTM boots issue no FIRME
+	  calls.
+
+	  If unsure, say N.
+
+config ARM64_SECURE_LAUNCH_FIRME_SLOT
+	int "FIRME slot for the DLME event chain"
+	depends on ARM64_SECURE_LAUNCH_FIRME
+	range 1 4
+	default 1
+	help
+	  Select the platform-assigned FIRME extensible-measurement slot.
+	  FIRME selector 0 is not an extensible-measurement slot.
+
 config ARM64_SECURE_LAUNCH_SELFTEST
 	bool "ARM64 DRTM Secure Launch validation self-tests"
 	depends on ARM64_SECURE_LAUNCH

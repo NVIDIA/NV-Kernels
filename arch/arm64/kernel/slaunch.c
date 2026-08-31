@@ -1096,10 +1096,10 @@ void __init slaunch_reserve_dlme_data(void)
 }
 
 /*
- * Record an in-memory SHA-256 measurement into slaunch_measurements[]
- * for later replay into the DRTM event log on PCR 18. The table is
- * memblock_alloc-backed and grows geometrically, so platforms with many
- * ACPI tables are not capped (seeded by slaunch_measurements_init()).
+ * Extend and record a measurement into slaunch_measurements[] for later
+ * replay into the DRTM event log on PCR 18. The table is memblock_alloc-
+ * backed and grows geometrically, so platforms with many ACPI tables are
+ * not capped (seeded by slaunch_measurements_init()).
  */
 /*
  * hash is sized for the largest digest (SHA-512, 64 B) so one struct
@@ -1167,28 +1167,22 @@ static void __init slaunch_measurements_reserve(unsigned int needed)
 	slaunch_measurement_capacity = new_cap;
 }
 
-static void __init slaunch_measure(const char *desc, const void *data,
-				   size_t size)
+static void __init slaunch_record_measurement(const char *desc,
+					       const u8 *hash)
 {
 	const struct sl_hash_alg_info *ainfo = sl_active_alg_info();
-	u8 hash[SL_HASH_MAX_DIGEST_SIZE];
 	struct slaunch_measurement *m;
+	long status;
 
 	/*
-	 * Hash with the active algorithm via sl_hash_data() (sha256()/
-	 * sha384()), safe in setup_arch() since the arch SIMD fast-paths
-	 * are static-key gated until subsys_initcall.
+	 * The hardware state must change before its matching software record
+	 * is committed. A non-zero response is final: retrying an ambiguous
+	 * call could extend the same digest twice and make replay impossible.
 	 */
-	sl_hash_data(data, size, hash);
-
-	pr_info("slaunch: measured %s (%zu bytes) %s: %*phN\n",
-		desc, size, ainfo->name,
-		(int)ainfo->digest_size, hash);
-
-	/* Future revision: also extend this hash into a hardware measurement
-	 * engine (TPM HASH_START or platform-specific equivalent) so the
-	 * measurement is anchored beyond the in-memory event log.
-	 */
+	status = slaunch_extend_measurement(hash, ainfo->digest_size);
+	if (status)
+		panic("slaunch: measurement extend failed for %s: %ld\n",
+		      desc, status);
 
 	slaunch_measurements_reserve(slaunch_measurement_count + 1);
 
@@ -1200,6 +1194,25 @@ static void __init slaunch_measure(const char *desc, const void *data,
 		       SL_HASH_MAX_DIGEST_SIZE - ainfo->digest_size);
 	m->digest_size = ainfo->digest_size;
 	m->tpm_alg_id = ainfo->tpm_alg_id;
+}
+
+static void __init slaunch_measure(const char *desc, const void *data,
+				   size_t size)
+{
+	const struct sl_hash_alg_info *ainfo = sl_active_alg_info();
+	u8 hash[SL_HASH_MAX_DIGEST_SIZE];
+
+	/*
+	 * Hash with the active algorithm via sl_hash_data() (sha256()/
+	 * sha384()), safe in setup_arch() since the arch SIMD fast-paths
+	 * are static-key gated until subsys_initcall.
+	 */
+	sl_hash_data(data, size, hash);
+	slaunch_record_measurement(desc, hash);
+
+	pr_info("slaunch: measured %s (%zu bytes) %s: %*phN\n",
+		desc, size, ainfo->name,
+		(int)ainfo->digest_size, hash);
 }
 
 /*
@@ -1575,7 +1588,6 @@ static void __init slaunch_measure_initrd(void)
 	struct sha256_ctx sctx256;
 	struct sha384_ctx sctx384;
 	u8 hash[SL_HASH_MAX_DIGEST_SIZE];
-	struct slaunch_measurement *m;
 	void *p;
 
 	if (!slaunch_validate_initrd_extents(&start, &size))
@@ -1613,18 +1625,10 @@ static void __init slaunch_measure_initrd(void)
 	else
 		sha256_final(&sctx256, hash);
 
+	slaunch_record_measurement("initrd", hash);
+
 	pr_info("slaunch: measured initrd (%llu bytes) %s: %*phN\n",
 		size, ainfo->name, (int)ainfo->digest_size, hash);
-
-	slaunch_measurements_reserve(slaunch_measurement_count + 1);
-	m = &slaunch_measurements[slaunch_measurement_count++];
-	strscpy(m->desc, "initrd", sizeof(m->desc));
-	memcpy(m->hash, hash, ainfo->digest_size);
-	if (ainfo->digest_size < SL_HASH_MAX_DIGEST_SIZE)
-		memset(m->hash + ainfo->digest_size, 0,
-		       SL_HASH_MAX_DIGEST_SIZE - ainfo->digest_size);
-	m->digest_size = ainfo->digest_size;
-	m->tpm_alg_id = ainfo->tpm_alg_id;
 }
 
 /*
