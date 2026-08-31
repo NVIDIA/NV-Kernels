@@ -90,12 +90,13 @@
 	 * which is only defined for those parts of the image that are covered
 	 * by a section declaration. Since this header is not covered by any
 	 * section, the debug table must be emitted elsewhere. So stick it in
-	 * the .init.rodata section instead.
+	 * the EFI stub's writable data section instead. This keeps loader-
+	 * mutable debug-directory records outside the DLME image.
 	 *
 	 * Note that the payloads themselves are permitted to have zero RVAs,
 	 * which means we can simply put those right after the section headers.
 	 */
-	__INITRODATA
+	.pushsection ".efistub.data", "aw"
 
 	.align	2
 .Lefi_debug_table:
@@ -121,7 +122,7 @@
 	.long	.Lefi_dll_characteristics_ex - .L_head	// FileOffset
 #endif
 	.set	.Lefi_debug_table_size, . - .Lefi_debug_table
-	.previous
+	.popsection
 #endif
 
 	// Section table

@@ -1246,16 +1246,13 @@ const u8 *__efi_get_smbios_string(const struct efi_smbios_record *record,
 
 void efi_remap_image(unsigned long image_base, unsigned alloc_size,
 		     unsigned long code_size);
-typedef efi_status_t (*efi_image_pre_remap_t)(unsigned long image_addr,
-					      unsigned long image_size);
 efi_status_t efi_kaslr_relocate_kernel(unsigned long *image_addr,
 				       unsigned long *reserve_addr,
 				       unsigned long *reserve_size,
 				       unsigned long kernel_size,
 				       unsigned long kernel_codesize,
 				       unsigned long kernel_memsize,
-				       u32 phys_seed,
-				       efi_image_pre_remap_t pre_remap);
+				       u32 phys_seed);
 u32 efi_kaslr_get_phys_seed(efi_handle_t image_handle);
 
 asmlinkage efi_status_t __efiapi
@@ -1275,8 +1272,6 @@ void efi_slaunch_set_cmdline(const char *cmdline);
 bool efi_slaunch_requested(void);
 bool efi_slaunch_enforced(void);
 void efi_slaunch_get_dlme_data_size(void);
-efi_status_t efi_slaunch_prepare_image(unsigned long kernel_addr,
-				       unsigned long kernel_size);
 extern unsigned long sl_dlme_data_reserve;
 extern bool sl_drtm_available;
 void efi_slaunch_drtm(unsigned long kernel_addr, unsigned long fdt_addr);

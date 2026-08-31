@@ -7,11 +7,8 @@
  */
 
 #include <linux/efi.h>
-#include <linux/pe.h>
-#include <linux/unaligned.h>
 #include <asm/drtm.h>
 #include <asm/efi.h>
-#include <asm/image.h>
 #include <asm/sections.h>
 
 #include "efistub.h"
@@ -31,19 +28,6 @@
 
 /* From sl_stub.S — accessible via __efistub_ alias in image-vars.h */
 extern char sl_entry[];
-
-#define SL_PE_DEBUG_DIRECTORY_INDEX	6
-
-struct sl_pe_debug_directory_entry {
-	__le32	characteristics;
-	__le32	timestamp;
-	__le16	major_version;
-	__le16	minor_version;
-	__le32	type;
-	__le32	size_of_data;
-	__le32	address_of_raw_data;
-	__le32	pointer_to_raw_data;
-} __packed;
 
 static u64 sl_smc_ret(u64 fn, u64 arg1)
 {
@@ -137,110 +121,6 @@ void efi_slaunch_get_dlme_data_size(void)
 		 sl_dlme_data_reserve / 1024, min_pages);
 }
 
-static bool sl_range_in_image(unsigned long offset, unsigned long size,
-			      unsigned long image_size)
-{
-	return offset <= image_size && size <= image_size - offset;
-}
-
-/*
- * Prepare the final DLME image after relocation but before efi_remap_image().
- * The arm64 PE header emits zero for ImageBase and every debug-record RVA,
- * but UEFI PE loaders may replace those fields with runtime addresses. Restore
- * the emitted values so the measured image is independent of its load PA.
- *
- * The source buffer is firmware-controlled. Bound every header and table that
- * is consumed here and refuse the DRTM launch if it is not the expected arm64
- * Linux PE32+ image. The destination is a fresh writable allocation, so this
- * does not depend on EFI_MEMORY_ATTRIBUTE_PROTOCOL being implemented.
- */
-efi_status_t efi_slaunch_prepare_image(unsigned long kernel_addr,
-				       unsigned long kernel_size)
-{
-	u8 *image = (u8 *)kernel_addr;
-	struct mz_hdr *mz;
-	struct pe_hdr *pe;
-	struct pe32plus_opt_hdr *opt;
-	struct data_dirent *dirs;
-	struct data_dirent *debug_dir;
-	struct sl_pe_debug_directory_entry *debug_entries = NULL;
-	unsigned long pe_offset, opt_offset;
-	unsigned long debug_offset = 0, debug_size = 0;
-	unsigned long debug_count = 0, i;
-	u16 opt_size;
-	u32 data_dirs;
-
-	if (!kernel_addr ||
-	    !sl_range_in_image(0, sizeof(*mz), kernel_size))
-		goto invalid;
-
-	mz = (struct mz_hdr *)image;
-	if (get_unaligned_le16(&mz->magic) != IMAGE_DOS_SIGNATURE ||
-	    memcmp(image + offsetof(struct arm64_image_header, magic),
-		   ARM64_IMAGE_MAGIC, sizeof(ARM64_IMAGE_MAGIC) - 1))
-		goto invalid;
-
-	pe_offset = get_unaligned_le32(&mz->peaddr);
-	if (!sl_range_in_image(pe_offset, sizeof(*pe), kernel_size))
-		goto invalid;
-
-	pe = (struct pe_hdr *)(image + pe_offset);
-	if (get_unaligned_le32(&pe->magic) != IMAGE_NT_SIGNATURE ||
-	    get_unaligned_le16(&pe->machine) != IMAGE_FILE_MACHINE_ARM64)
-		goto invalid;
-
-	opt_size = get_unaligned_le16(&pe->opt_hdr_size);
-	opt_offset = pe_offset + sizeof(*pe);
-	if (opt_size < sizeof(*opt) ||
-	    !sl_range_in_image(opt_offset, opt_size, kernel_size))
-		goto invalid;
-
-	opt = (struct pe32plus_opt_hdr *)(image + opt_offset);
-	if (get_unaligned_le16(&opt->magic) !=
-	    IMAGE_NT_OPTIONAL_HDR64_MAGIC)
-		goto invalid;
-
-	data_dirs = get_unaligned_le32(&opt->data_dirs);
-	if (data_dirs > (opt_size - sizeof(*opt)) / sizeof(*dirs))
-		goto invalid;
-
-	if (data_dirs > SL_PE_DEBUG_DIRECTORY_INDEX) {
-		dirs = (struct data_dirent *)((u8 *)opt + sizeof(*opt));
-		debug_dir = &dirs[SL_PE_DEBUG_DIRECTORY_INDEX];
-		debug_offset = get_unaligned_le32(&debug_dir->virtual_address);
-		debug_size = get_unaligned_le32(&debug_dir->size);
-
-		if (!!debug_offset != !!debug_size)
-			goto invalid;
-		if (debug_size) {
-			if (debug_size % sizeof(*debug_entries) ||
-			    !sl_range_in_image(debug_offset, debug_size,
-					       kernel_size))
-				goto invalid;
-			debug_entries = (void *)(image + debug_offset);
-			debug_count = debug_size / sizeof(*debug_entries);
-		}
-	}
-
-	put_unaligned_le64(0, &opt->image_base);
-	for (i = 0; i < debug_count; i++)
-		put_unaligned_le32(0, &debug_entries[i].address_of_raw_data);
-
-	sl_dc_cvac_range((unsigned long)&opt->image_base,
-			 sizeof(opt->image_base));
-	if (debug_size)
-		sl_dc_cvac_range((unsigned long)debug_entries, debug_size);
-	asm volatile("dsb sy" : : : "memory");
-
-	efi_info("DRTM: canonicalized PE ImageBase and %lu debug record(s)\n",
-		 debug_count);
-	return EFI_SUCCESS;
-
-invalid:
-	efi_err("DRTM: malformed PE/COFF image; refusing Secure Launch\n");
-	return EFI_LOAD_ERROR;
-}
-
 enum sl_drtm_policy {
 	SL_DRTM_OFF,
 	SL_DRTM_ON,
@@ -318,7 +198,7 @@ static struct drtm_parameters sl_params __aligned(SL_DRTM_PAGE_SIZE);
 void efi_slaunch_drtm(unsigned long kernel_addr, unsigned long fdt_addr)
 {
 	struct drtm_parameters *params = &sl_params;
-	unsigned long image_size, kernel_memsize;
+	unsigned long image_start, image_size, kernel_memsize;
 	unsigned long dlme_data_offset;
 	unsigned long sl_entry_offset;
 
@@ -328,15 +208,17 @@ void efi_slaunch_drtm(unsigned long kernel_addr, unsigned long fdt_addr)
 	 * EFI-stub symbol resolution, which can fail under PIC/GOT.
 	 */
 
-	/* Compute sl_entry offset from kernel image base */
-	sl_entry_offset = (unsigned long)sl_entry - (unsigned long)_text;
+	/* The entry-point offset is relative to the measured DLME image. */
+	sl_entry_offset = (unsigned long)sl_entry - (unsigned long)_stext;
 
 	/*
-	 * DLME region layout: [_text.._edata] measured image, [_edata.._end]
-	 * BSS, then D-CRTM-populated DLME data after _end. FDT is separate
-	 * (wherever efi_allocate_pages() put it).
+	 * DLME region layout: [_text.._stext] unmeasured PE header,
+	 * [_stext.._edata] measured image, [_edata.._end] BSS, then
+	 * D-CRTM-populated DLME data after _end. FDT is separate (wherever
+	 * efi_allocate_pages() put it).
 	 */
-	image_size = (unsigned long)(_edata - _text);
+	image_start = (unsigned long)(_stext - _text);
+	image_size = (unsigned long)(_edata - _stext);
 	kernel_memsize = (unsigned long)(_end - _text);
 	dlme_data_offset = SL_ROUND_UP_PAGE(kernel_memsize) + SL_DLME_DTB_SLOT_GAP;
 
@@ -357,7 +239,7 @@ void efi_slaunch_drtm(unsigned long kernel_addr, unsigned long fdt_addr)
 	params->launch_features = cpu_to_le32(DRTM_LAUNCH_FEAT_MEM_PROT_ALL | DRTM_LAUNCH_FEAT_SEC_INT_DISABLE);
 	params->dlme_region_address = cpu_to_le64(kernel_addr);
 	params->dlme_region_size = cpu_to_le64(dlme_data_offset + sl_dlme_data_reserve);
-	params->dlme_image_start = cpu_to_le64(0);
+	params->dlme_image_start = cpu_to_le64(image_start);
 	params->dlme_entry_point_offset = cpu_to_le64(sl_entry_offset);
 	params->dlme_image_size = cpu_to_le64(image_size);
 	params->dlme_data_offset = cpu_to_le64(dlme_data_offset);
@@ -374,7 +256,6 @@ void efi_slaunch_drtm(unsigned long kernel_addr, unsigned long fdt_addr)
 	sl_dc_cvac_range((unsigned long)params, sizeof(*params));
 	sl_dc_cvac_range(kernel_addr + dlme_data_offset +
 			 SL_DLME_DTB_SLOT_OFFSET, sizeof(u64));
-	/* The final image was canonicalized and cache-cleaned before remapping. */
 	asm volatile("dsb sy" : : : "memory");
 
 	/*

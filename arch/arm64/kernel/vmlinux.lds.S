@@ -345,9 +345,10 @@ SECTIONS
 	_edata = .;
 
 	/*
-	 * EFI-stub writable statics (.efistub.data/.bss) placed AFTER _edata
-	 * so the DRTM measurement bounds [_text, _edata) never cover
-	 * stub-mutable data; __pecoff_data_rawsize is computed past
+	 * EFI-stub writable data (.efistub.data/.bss), including the
+	 * loader-mutable PE debug directory, is placed AFTER _edata so the
+	 * DRTM measurement bounds [_stext, _edata) never cover it;
+	 * __pecoff_data_rawsize is computed past
 	 * __efistub_end. Stub text/rodata stay in PE .text (buckets above).
 	 * The section is padded to a page so [__efistub_start, __efistub_end)
 	 * owns its tail page exclusively and free_initmem() can free and
