@@ -194,8 +194,8 @@ static const struct tsm_report_ops nvidia_firme_tsm_ops = {
 /* ================================================================
  * TSM Measurement Registers (MR) — FIRME_ATTEST_EXT_CLAIMS backend
  *
- * Exposes PSC measurement slots via sysfs. Writing to a slot sends
- * data to PSC by calling FIRME_ATTEST_EXT_CLAIMS SMC (0xC400040B).
+ * Exposes write-only PSC extension inputs via sysfs. Writing sends data to
+ * PSC through FIRME_ATTEST_EXT_CLAIMS SMC (0xC400040B).
  *
  * Slot 0 (bmdr): 100-byte BMDR device report per GPU
  *   [0-47]  identity_digest  (SHA-384 of device cert chain)
@@ -208,6 +208,13 @@ static const struct tsm_report_ops nvidia_firme_tsm_ops = {
 
 #define FIRME_MR_NUM_SLOTS		4
 
+/*
+ * The current TSM MR contract requires mr_value storage for every register.
+ * FIRME has no authoritative PSC readback, so these buffers are retained only
+ * to satisfy that contract without changing the shared TSM framework. The
+ * write-only attributes never expose or update them; callers obtain the PSC
+ * measurement values from a fresh CMW instead.
+ */
 static u8 firme_mr_bmdr_value[FIRME_BMDR_SIZE];
 static u8 firme_mr_rem_values[FIRME_MR_NUM_SLOTS - 1][SHA384_DIGEST_SIZE];
 
@@ -247,10 +254,8 @@ static int firme_mr_extend(const struct tsm_measurements *tm,
 
 	pr_debug("nvidia-firme: EXT_CLAIMS returned status=%ld\n", (long)res.a0);
 
-	if ((long)res.a0 == FIRME_SUCCESS) {
-		memcpy(mr->mr_value, data, mr->mr_size);
+	if ((long)res.a0 == FIRME_SUCCESS)
 		return 0;
-	}
 
 	if ((long)res.a0 == FIRME_INVALID_PARAMETERS) {
 		pr_err("nvidia-firme: EXT_CLAIMS failed: invalid parameters (slot=%u size=%u)\n",
@@ -268,41 +273,33 @@ static int firme_mr_extend(const struct tsm_measurements *tm,
 	return -EIO;
 }
 
-static int firme_mr_refresh(const struct tsm_measurements *tm)
-{
-	/* MR values are cached locally after each extend call.
-	 * PSC doesn't provide a read-back API, so refresh is a no-op. */
-	return 0;
-}
-
 static struct tsm_measurement_register firme_mrs[FIRME_MR_NUM_SLOTS] = {
 	{
 		.mr_name = "bmdr",
 		.mr_value = firme_mr_bmdr_value,
 		.mr_size = FIRME_BMDR_SIZE,
-		.mr_flags = TSM_MR_F_READABLE | TSM_MR_F_WRITABLE
-			    | TSM_MR_F_NOHASH,
+		.mr_flags = TSM_MR_F_WRITABLE | TSM_MR_F_NOHASH,
 		.mr_hash = 0,
 	},
 	{
 		.mr_name = "rem0",
 		.mr_value = firme_mr_rem_values[0],
 		.mr_size = SHA384_DIGEST_SIZE,
-		.mr_flags = TSM_MR_F_READABLE | TSM_MR_F_WRITABLE,
+		.mr_flags = TSM_MR_F_WRITABLE,
 		.mr_hash = HASH_ALGO_SHA384,
 	},
 	{
 		.mr_name = "rem1",
 		.mr_value = firme_mr_rem_values[1],
 		.mr_size = SHA384_DIGEST_SIZE,
-		.mr_flags = TSM_MR_F_READABLE | TSM_MR_F_WRITABLE,
+		.mr_flags = TSM_MR_F_WRITABLE,
 		.mr_hash = HASH_ALGO_SHA384,
 	},
 	{
 		.mr_name = "rem2",
 		.mr_value = firme_mr_rem_values[2],
 		.mr_size = SHA384_DIGEST_SIZE,
-		.mr_flags = TSM_MR_F_READABLE | TSM_MR_F_WRITABLE,
+		.mr_flags = TSM_MR_F_WRITABLE,
 		.mr_hash = HASH_ALGO_SHA384,
 	},
 };
@@ -310,7 +307,6 @@ static struct tsm_measurement_register firme_mrs[FIRME_MR_NUM_SLOTS] = {
 static struct tsm_measurements firme_measurements = {
 	.mrs = firme_mrs,
 	.nr_mrs = FIRME_MR_NUM_SLOTS,
-	.refresh = firme_mr_refresh,
 	.write = firme_mr_extend,
 };
 
