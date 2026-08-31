@@ -2436,7 +2436,7 @@ CONFIG_BT_VIRTIO                                policy<{'amd64': 'm', 'arm64': '
 CONFIG_BUFFER_HEAD                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_BUG                                      policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_BUG_ON_DATA_CORRUPTION                   policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
-CONFIG_BUILDTIME_MCOUNT_SORT                    policy<{'amd64': 'y', 'armhf': 'y'}>
+CONFIG_BUILDTIME_MCOUNT_SORT                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y'}>
 CONFIG_BUILDTIME_TABLE_SORT                     policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_BUILD_SALT                               policy<{'amd64': '""', 'arm64': '""', 'armhf': '""', 'ppc64el': '""', 'riscv64': '""', 's390x': '""'}>
 CONFIG_BUILTIN_RETURN_ADDRESS_STRIPS_PAC        policy<{'arm64': 'y'}>
@@ -5221,7 +5221,7 @@ CONFIG_FTRACE_MCOUNT_USE_CC                     policy<{'amd64': 'y', 's390x': '
 CONFIG_FTRACE_MCOUNT_USE_PATCHABLE_FUNCTION_ENTRY policy<{'arm64': 'y', 'ppc64el': 'y'}>
 CONFIG_FTRACE_MCOUNT_USE_RECORDMCOUNT           policy<{'armhf': 'y', 'ppc64el': '-', 'riscv64': '-'}>
 CONFIG_FTRACE_RECORD_RECURSION                  policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': '-', 's390x': 'n'}>
-CONFIG_FTRACE_SORT_STARTUP_TEST                 policy<{'amd64': 'n', 'armhf': 'n'}>
+CONFIG_FTRACE_SORT_STARTUP_TEST                 policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n'}>
 CONFIG_FTRACE_STARTUP_TEST                      policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
 CONFIG_FTRACE_SYSCALLS                          policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_FTR_FIXUP_SELFTEST                       policy<{'ppc64el': 'n'}>
@@ -5628,7 +5628,7 @@ CONFIG_HAVE_ARM_SMCCC_DISCOVERY                 policy<{'arm64': 'y', 'armhf': '
 CONFIG_HAVE_ARM_TWD                             policy<{'armhf': 'y'}>
 CONFIG_HAVE_ASM_MODVERSIONS                     policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_HAVE_BOOTMEM_INFO_NODE                   policy<{'amd64': 'y', 'ppc64el': 'y'}>
-CONFIG_HAVE_BUILDTIME_MCOUNT_SORT               policy<{'amd64': 'y', 'armhf': 'y'}>
+CONFIG_HAVE_BUILDTIME_MCOUNT_SORT               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y'}>
 CONFIG_HAVE_CALL_THUNKS                         policy<{'amd64': 'y'}>
 CONFIG_HAVE_CLK                                 policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_HAVE_CLK_PREPARE                         policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
