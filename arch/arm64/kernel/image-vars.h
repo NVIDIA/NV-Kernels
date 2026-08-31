@@ -34,6 +34,7 @@ PROVIDE(__efistub_primary_entry		= primary_entry);
 PROVIDE(__efistub_caches_clean_inval_pou = __pi_caches_clean_inval_pou);
 
 PROVIDE(__efistub__text			= _text);
+PROVIDE(__efistub__stext		= _stext);
 PROVIDE(__efistub__end			= _end);
 PROVIDE(__efistub___inittext_end       	= __inittext_end);
 PROVIDE(__efistub__edata		= _edata);

@@ -23,7 +23,6 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 				 efi_handle_t image_handle)
 {
 	unsigned long kernel_size, kernel_codesize, kernel_memsize;
-	efi_image_pre_remap_t pre_remap = NULL;
 	efi_status_t status;
 	u32 phys_seed;
 
@@ -53,7 +52,6 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 		if (sl_drtm_available) {
 			*reserve_size += SL_DLME_DTB_SLOT_GAP +
 					 sl_dlme_data_reserve;
-			pre_remap = efi_slaunch_prepare_image;
 		} else if (efi_slaunch_enforced()) {
 			efi_err("DRTM: enforced launch is unavailable\n");
 			return EFI_UNSUPPORTED;
@@ -66,19 +64,18 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 	status = efi_kaslr_relocate_kernel(image_addr, reserve_addr,
 					   reserve_size, kernel_size,
 					   kernel_codesize, kernel_memsize,
-					   phys_seed, pre_remap);
+					   phys_seed);
 #ifdef CONFIG_ARM64_SECURE_LAUNCH
 	if (status != EFI_SUCCESS && sl_drtm_available &&
 	    !efi_slaunch_enforced()) {
-		efi_warn("DRTM: image preparation failed; booting normally\n");
+		efi_warn("DRTM: image relocation failed; booting normally\n");
 		sl_drtm_available = false;
 		*reserve_addr = 0;
 		*reserve_size = kernel_memsize;
 		status = efi_kaslr_relocate_kernel(image_addr, reserve_addr,
 						   reserve_size, kernel_size,
 						   kernel_codesize,
-						   kernel_memsize, phys_seed,
-						   NULL);
+						   kernel_memsize, phys_seed);
 	}
 #endif
 
