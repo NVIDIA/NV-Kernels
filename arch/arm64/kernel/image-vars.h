@@ -86,6 +86,10 @@ PI_EXPORT_SYM(__initdata_begin);
 PI_EXPORT_SYM(__initdata_end);
 PI_EXPORT_SYM(_data);
 
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+PI_EXPORT_SYM(sl_dlme_region_pa);
+#endif
+
 #ifdef CONFIG_KVM
 
 /*
