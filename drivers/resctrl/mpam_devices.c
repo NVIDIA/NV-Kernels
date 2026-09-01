@@ -2248,6 +2248,13 @@ static void _enable_percpu_irq(void *_irq)
 	enable_percpu_irq(*irq, IRQ_TYPE_NONE);
 }
 
+static void _disable_percpu_irq(void *_irq)
+{
+	int *irq = _irq;
+
+	disable_percpu_irq(*irq);
+}
+
 static int mpam_cpu_online(unsigned int cpu)
 {
 	struct mpam_msc *msc;
@@ -2446,9 +2453,17 @@ static void mpam_msc_destroy(struct mpam_msc *msc)
 	add_to_garbage(msc);
 }
 
+static void mpam_unregister_msc_irq(struct mpam_msc *msc);
+
 static void mpam_msc_drv_remove(struct platform_device *pdev)
 {
 	struct mpam_msc *msc = platform_get_drvdata(pdev);
+
+	scoped_guard(cpus_read_lock) {
+		guard(srcu)(&mpam_srcu);
+
+		mpam_unregister_msc_irq(msc);
+	}
 
 	mutex_lock(&mpam_list_lock);
 	mpam_msc_destroy(msc);
@@ -3094,35 +3109,44 @@ static int mpam_register_irqs(void)
 	return 0;
 }
 
-static void mpam_unregister_irqs(void)
+static void mpam_unregister_msc_irq(struct mpam_msc *msc)
 {
 	int irq;
+
+	lockdep_assert_cpus_held();
+
+	irq = platform_get_irq_byname_optional(msc->pdev, "error");
+	if (irq <= 0)
+		return;
+
+	guard(mutex)(&msc->error_irq_lock);
+	if (msc->error_irq_hw_enabled) {
+		if (!mpam_touch_msc(msc, mpam_disable_msc_ecr, msc))
+			msc->error_irq_hw_enabled = false;
+	}
+
+	if (msc->error_irq_req) {
+		if (irq_is_percpu(irq)) {
+			msc->reenable_error_ppi = 0;
+			on_each_cpu_mask(&msc->accessibility,
+					 &_disable_percpu_irq, &irq, true);
+			free_percpu_irq(irq, msc->error_dev_id);
+		} else {
+			devm_free_irq(&msc->pdev->dev, irq, msc);
+		}
+		msc->error_irq_req = false;
+	}
+}
+
+static void mpam_unregister_irqs(void)
+{
 	struct mpam_msc *msc;
 
 	guard(cpus_read_lock)();
 	guard(srcu)(&mpam_srcu);
 	list_for_each_entry_srcu(msc, &mpam_all_msc, all_msc_list,
-				 srcu_read_lock_held(&mpam_srcu)) {
-		irq = platform_get_irq_byname_optional(msc->pdev, "error");
-		if (irq <= 0)
-			continue;
-
-		guard(mutex)(&msc->error_irq_lock);
-		if (msc->error_irq_hw_enabled) {
-			if (!mpam_touch_msc(msc, mpam_disable_msc_ecr, msc))
-				msc->error_irq_hw_enabled = false;
-		}
-
-		if (msc->error_irq_req) {
-			if (irq_is_percpu(irq)) {
-				msc->reenable_error_ppi = 0;
-				free_percpu_irq(irq, msc->error_dev_id);
-			} else {
-				devm_free_irq(&msc->pdev->dev, irq, msc);
-			}
-			msc->error_irq_req = false;
-		}
-	}
+				 srcu_read_lock_held(&mpam_srcu))
+		mpam_unregister_msc_irq(msc);
 }
 
 static void __destroy_component_cfg(struct mpam_component *comp)
