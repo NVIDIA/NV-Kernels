@@ -427,8 +427,10 @@ static bool cpu_power_down_ok(struct dev_pm_domain *pd)
 
 static bool cpu_system_power_down_ok(struct dev_pm_domain *pd)
 {
-	s64 constraint_ns = cpu_wakeup_latency_qos_limit() * NSEC_PER_USEC;
 	struct generic_pm_domain *genpd = pd_to_genpd(pd);
+	s32 constraint_us = cpu_wakeup_latency_qos_limit();
+	bool no_constraint;
+	s64 constraint_ns;
 	int state_idx = genpd->state_count - 1;
 
 	if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN)) {
@@ -436,12 +438,17 @@ static bool cpu_system_power_down_ok(struct dev_pm_domain *pd)
 		return true;
 	}
 
+	no_constraint = constraint_us == PM_QOS_RESUME_LATENCY_NO_CONSTRAINT;
+	constraint_ns = no_constraint ? PM_QOS_RESUME_LATENCY_NO_CONSTRAINT_NS :
+			(s64)constraint_us * NSEC_PER_USEC;
+
 	/* Find the deepest state for the latency constraint. */
 	while (state_idx >= 0) {
 		s64 latency_ns = genpd->states[state_idx].power_off_latency_ns +
 				 genpd->states[state_idx].power_on_latency_ns;
 
-		if (latency_ns <= constraint_ns) {
+		/* The no-constraint value is a sentinel, not a latency budget. */
+		if (no_constraint || latency_ns <= constraint_ns) {
 			genpd->state_idx = state_idx;
 			return true;
 		}
