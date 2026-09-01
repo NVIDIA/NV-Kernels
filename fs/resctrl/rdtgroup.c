@@ -3346,7 +3346,7 @@ static int rdt_move_group_iommus(struct rdtgroup *from, struct rdtgroup *to)
 {
 	struct kset *iommu_groups;
 	struct iommu_group *group;
-	int err = 0, iommu_group_id;
+	int err, ret = 0, iommu_group_id;
 	struct kobject *group_kobj = NULL;
 
 	if (!IS_ENABLED(CONFIG_RESCTRL_IOMMU))
@@ -3369,17 +3369,15 @@ static int rdt_move_group_iommus(struct rdtgroup *from, struct rdtgroup *to)
 			err = kstrtoint(group_kobj->name, 0, &iommu_group_id);
 			if (!err)
 				err = rdtgroup_move_iommu(iommu_group_id, to);
+			if (err && !ret)
+				ret = err;
 		}
 
 		iommu_group_put(group);
-		if (err) {
-			kobject_put(group_kobj);
-			break;
-		}
 	}
 
 	kset_put(iommu_groups);
-	return err;
+	return ret;
 }
 
 static void free_all_child_rdtgrp(struct rdtgroup *rdtgrp)
