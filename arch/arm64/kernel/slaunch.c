@@ -1215,6 +1215,32 @@ static void __init slaunch_measure(const char *desc, const void *data,
 		(int)ainfo->digest_size, hash);
 }
 
+static void __init slaunch_measure_kaslr_seed_source(void)
+{
+	const char *source;
+
+	switch (sl_kaslr_seed_source) {
+	case SL_KASLR_SEED_SMCCC_TRNG:
+		source = "SMCCC_TRNG";
+		break;
+	case SL_KASLR_SEED_CPU_RNDR:
+		source = "CPU_RNDR";
+		break;
+	case SL_KASLR_SEED_FDT_UNTRUSTED:
+		source = "FDT_UNTRUSTED";
+		break;
+	case SL_KASLR_SEED_DISABLED:
+		source = "DISABLED";
+		break;
+	default:
+		panic("slaunch: invalid KASLR seed source: %u\n",
+		      sl_kaslr_seed_source);
+	}
+
+	/* Attest only the provenance label; the seed remains secret. */
+	slaunch_measure(source, source, strlen(source));
+}
+
 /*
  * Measure ACPI tables (RSDP, XSDT, and each XSDT-referenced table) while
  * DMA protection is still active (before the slaunch_unprotect_memory
@@ -2239,6 +2265,7 @@ void __init slaunch_measure_post_efi(void)
 	slaunch_measurements_init();
 	slaunch_selftest();
 	slaunch_verify_hash_algo();
+	slaunch_measure_kaslr_seed_source();
 	slaunch_measure_acpi();
 
 	/*

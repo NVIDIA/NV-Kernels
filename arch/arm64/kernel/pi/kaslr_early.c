@@ -112,9 +112,23 @@ static u64 __init get_kaslr_seed(void *fdt, int node)
 #ifdef CONFIG_ARM64_SECURE_LAUNCH
 	if (slaunch_active()) {
 		seed = get_trng_seed();
-		if (!seed)
-			seed = get_rndr_seed();
-		return seed ? seed : fdt_seed;
+		if (seed) {
+			sl_kaslr_seed_source = SL_KASLR_SEED_SMCCC_TRNG;
+			return seed;
+		}
+
+		seed = get_rndr_seed();
+		if (seed) {
+			sl_kaslr_seed_source = SL_KASLR_SEED_CPU_RNDR;
+			return seed;
+		}
+
+		if (fdt_seed) {
+			sl_kaslr_seed_source = SL_KASLR_SEED_FDT_UNTRUSTED;
+			return fdt_seed;
+		}
+
+		return 0;
 	}
 #endif
 
@@ -124,6 +138,11 @@ static u64 __init get_kaslr_seed(void *fdt, int node)
 u64 __init kaslr_early_init(void *fdt, int chosen)
 {
 	u64 seed, range;
+
+#ifdef CONFIG_ARM64_SECURE_LAUNCH
+	if (slaunch_active())
+		sl_kaslr_seed_source = SL_KASLR_SEED_DISABLED;
+#endif
 
 	if (kaslr_disabled_cmdline())
 		return 0;
