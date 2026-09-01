@@ -62,6 +62,12 @@
 #define DRTM_MEM_PROT_FULL_RANGE	\
 	((0x0ULL << 55) | (0x0ULL << 52) | ((1ULL << 52) - 1ULL))
 
+/* KASLR seed provenance recorded in REM0 and the DRTM event log. */
+#define SL_KASLR_SEED_DISABLED		0
+#define SL_KASLR_SEED_SMCCC_TRNG	1
+#define SL_KASLR_SEED_CPU_RNDR		2
+#define SL_KASLR_SEED_FDT_UNTRUSTED	3
+
 #ifndef __ASSEMBLY__
 /*
  * DRTM Parameters (DEN0113 v1.2 §3.13 / Table 9)
@@ -136,6 +142,7 @@ struct dlme_data_header {
 #ifdef CONFIG_ARM64_SECURE_LAUNCH
 extern unsigned long sl_dlme_region_pa;
 extern unsigned long sl_dlme_data_offset;
+extern u32 sl_kaslr_seed_source;
 
 void slaunch_early_init(void);
 void slaunch_setup(void);

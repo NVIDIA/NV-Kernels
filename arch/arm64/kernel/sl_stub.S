@@ -53,3 +53,4 @@ SYM_CODE_END(sl_entry)
 	.align 3
 SYM_DATA(sl_dlme_region_pa,	.quad 0)
 SYM_DATA(sl_dlme_data_offset,	.quad 0)
+SYM_DATA(sl_kaslr_seed_source,	.long SL_KASLR_SEED_DISABLED)
