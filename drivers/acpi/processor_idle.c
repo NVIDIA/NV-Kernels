@@ -1054,6 +1054,7 @@ int acpi_processor_power_state_has_changed(struct acpi_processor *pr)
 				continue;
 
 			cpuidle_unregister_device_no_lock(dev);
+			per_cpu(acpi_cpuidle_device, cpu) = NULL;
 			kfree(dev);
 			_pr->flags.power = 0;
 		}
@@ -1196,6 +1197,7 @@ void acpi_processor_power_exit(struct acpi_processor *pr)
 
 	if (pr->flags.power) {
 		cpuidle_unregister_device(dev);
+		per_cpu(acpi_cpuidle_device, pr->id) = NULL;
 		kfree(dev);
 	}
 
