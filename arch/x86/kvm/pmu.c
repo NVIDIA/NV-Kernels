@@ -601,14 +601,6 @@ void kvm_pmu_deliver_pmi(struct kvm_vcpu *vcpu)
 
 bool kvm_pmu_is_valid_msr(struct kvm_vcpu *vcpu, u32 msr)
 {
-	switch (msr) {
-	case MSR_CORE_PERF_GLOBAL_STATUS:
-	case MSR_CORE_PERF_GLOBAL_CTRL:
-	case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
-		return kvm_pmu_has_perf_global_ctrl(vcpu_to_pmu(vcpu));
-	default:
-		break;
-	}
 	return static_call(kvm_x86_pmu_msr_idx_to_pmc)(vcpu, msr) ||
 		static_call(kvm_x86_pmu_is_valid_msr)(vcpu, msr);
 }
