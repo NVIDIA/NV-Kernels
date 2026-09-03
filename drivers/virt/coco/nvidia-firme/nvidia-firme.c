@@ -5,9 +5,9 @@
  * TSM report backend and TSM measurement register backend for ARM FIRME
  * (DEN0149) on NVIDIA Grace (TH500) platforms.
  *
- * - TSM Reports: invokes FIRME_ATTEST_PAT_GET (0xC4000408) to retrieve
+ * - TSM Reports: invokes FIRME_ATTEST_PAT_GET (0xC2000408) to retrieve
  *   platform attestation tokens from EL3/PSC via configfs.
- * - TSM MR: invokes FIRME_ATTEST_EXT_CLAIMS (0xC400040B) to extend
+ * - TSM MR: invokes FIRME_ATTEST_EXT_CLAIMS (0xC200040B) to extend
  *   measurement registers and submit BMDR device reports to PSC
  *   via sysfs.
  *
@@ -23,8 +23,8 @@
 #include <linux/types.h>
 #include <crypto/hash_info.h>
 
-/* FIRME SMC Function IDs — DEN0149, SMC64, Fast call, OEN=4 (Std Svc) */
-#define FIRME_FID(fn)			(0xC4000000UL | (fn))
+/* NVIDIA Grace FIRME SMC Function IDs: SMC64, Fast call, OEN=2 (SiP). */
+#define FIRME_FID(fn)			(0xC2000000UL | (fn))
 #define FIRME_SERVICE_VERSION		FIRME_FID(0x0400)
 #define FIRME_ATTEST_PAT_GET		FIRME_FID(0x0408)
 #define FIRME_ATTEST_EXTEND		FIRME_FID(0x040B)
@@ -195,7 +195,7 @@ static const struct tsm_report_ops nvidia_firme_tsm_ops = {
  * TSM Measurement Registers (MR) — FIRME_ATTEST_EXT_CLAIMS backend
  *
  * Exposes write-only PSC extension inputs via sysfs. Writing sends data to
- * PSC through FIRME_ATTEST_EXT_CLAIMS SMC (0xC400040B).
+ * PSC through FIRME_ATTEST_EXT_CLAIMS SMC (0xC200040B).
  *
  * Slot 0 (bmdr): 100-byte BMDR device report per GPU
  *   [0-47]  identity_digest  (SHA-384 of device cert chain)

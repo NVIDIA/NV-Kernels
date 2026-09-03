@@ -12,10 +12,10 @@
 #include <asm/drtm.h>
 #include <asm/memory.h>
 
-/* DEN0149 ATTEST_EXT_CLAIMS, SMC64 fast call in the standard-service range. */
+/* NVIDIA Grace ATTEST_EXT_CLAIMS, SMC64 fast call in the SiP range. */
 #define FIRME_ATTEST_EXT_CLAIMS					\
 	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, ARM_SMCCC_SMC_64,\
-			   ARM_SMCCC_OWNER_STANDARD, 0x040b)
+			   ARM_SMCCC_OWNER_SIP, 0x040b)
 #define FIRME_MAX_MEASUREMENT_SIZE	48
 
 /*
