@@ -3299,6 +3299,10 @@ static int __swap_duplicate(swp_entry_t entry, unsigned char usage)
 	int err;
 
 	p = swp_swap_info(entry);
+	if (WARN_ON_ONCE(!p)) {
+		pr_err("%s%08lx\n", Bad_file, entry.val);
+		return -EINVAL;
+	}
 
 	offset = swp_offset(entry);
 	ci = lock_cluster_or_swap_info(p, offset);
