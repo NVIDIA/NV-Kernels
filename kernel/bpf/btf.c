@@ -6368,6 +6368,10 @@ bool btf_ctx_access(int off, int size, enum bpf_access_type type,
 	bpf_log(log, "func '%s' arg%d has btf_id %d type %s '%s'\n",
 		tname, arg, info->btf_id, btf_type_str(t),
 		__btf_name_by_offset(btf, t->name_off));
+	if (prog->expected_attach_type == BPF_TRACE_RAW_TP && arg == 1 &&
+	    (!strcmp(tname, "signal_generate") ||
+	     !strcmp(tname, "signal_deliver")))
+		info->reg_type = SCALAR_VALUE;
 	return true;
 }
 
