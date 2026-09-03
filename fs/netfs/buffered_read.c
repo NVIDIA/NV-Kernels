@@ -252,6 +252,8 @@ int netfs_read_folio(struct file *file, struct folio *folio)
 	struct folio *sink = NULL;
 	int ret;
 
+	folio_wait_writeback(folio);
+
 	_enter("%lx", folio->index);
 
 	rreq = netfs_alloc_request(mapping, file,
