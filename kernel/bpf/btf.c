@@ -6270,6 +6270,9 @@ bool btf_ctx_access(int off, int size, enum bpf_access_type type,
 	info->reg_type = PTR_TO_BTF_ID;
 	if (prog_args_trusted(prog))
 		info->reg_type |= PTR_TRUSTED;
+	if (prog->expected_attach_type == BPF_TRACE_RAW_TP && arg == 0 &&
+	    !strcmp(tname, "sched_process_wait"))
+		info->reg_type |= PTR_MAYBE_NULL;
 
 	if (tgt_prog) {
 		enum bpf_prog_type tgt_type;
