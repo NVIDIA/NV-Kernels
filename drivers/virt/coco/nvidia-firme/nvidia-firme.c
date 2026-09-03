@@ -8,8 +8,7 @@
  * - TSM Reports: invokes FIRME_ATTEST_PAT_GET (0xC2000408) to retrieve
  *   platform attestation tokens from EL3/PSC via configfs.
  * - TSM MR: invokes FIRME_ATTEST_EXT_CLAIMS (0xC200040B) to extend
- *   measurement registers and submit BMDR device reports to PSC
- *   via sysfs.
+ *   measurement registers in PSC via sysfs.
  *
  * Copyright (c) 2025-2026, NVIDIA Corporation. All rights reserved.
  */
@@ -40,12 +39,6 @@
 
 /* SHA-384 digest size */
 #define SHA384_DIGEST_SIZE		48
-
-/*
- * BMDR (Baremetal Device Report) entry size for slot 0.
- * Layout: [48 identity_digest][48 mexchange_digest][1 gpu_id][3 reserved]
- */
-#define FIRME_BMDR_SIZE			100
 
 /*
  * Shared buffer sizing.  ATF computes: size = (page_count + 1) * 4KB.
@@ -197,16 +190,11 @@ static const struct tsm_report_ops nvidia_firme_tsm_ops = {
  * Exposes write-only PSC extension inputs via sysfs. Writing sends data to
  * PSC through FIRME_ATTEST_EXT_CLAIMS SMC (0xC200040B).
  *
- * Slot 0 (bmdr): 100-byte BMDR device report per GPU
- *   [0-47]  identity_digest  (SHA-384 of device cert chain)
- *   [48-95] mexchange_digest (SHA-384 of SPDM measurement exchange)
- *   [96]    gpu_device_id
- *   [97-99] reserved (0)
- *
- * Slot 1+ (rem0-rem2): 48-byte SHA-384 extensible measurement slots
+ * rem0-rem2 map to PSC slots 1-3. PSC slot 0 is not exposed by Linux.
  * ================================================================ */
 
-#define FIRME_MR_NUM_SLOTS		4
+#define FIRME_MR_NUM_SLOTS		3
+#define FIRME_REM_FIRST_SLOT		1
 
 /*
  * The current TSM MR contract requires mr_value storage for every register.
@@ -215,21 +203,20 @@ static const struct tsm_report_ops nvidia_firme_tsm_ops = {
  * write-only attributes never expose or update them; callers obtain the PSC
  * measurement values from a fresh CMW instead.
  */
-static u8 firme_mr_bmdr_value[FIRME_BMDR_SIZE];
-static u8 firme_mr_rem_values[FIRME_MR_NUM_SLOTS - 1][SHA384_DIGEST_SIZE];
+static u8 firme_mr_rem_values[FIRME_MR_NUM_SLOTS][SHA384_DIGEST_SIZE];
 
 /**
  * firme_mr_extend - Submit data to PSC via FIRME_ATTEST_EXT_CLAIMS SMC.
  *
- * For slot 0 (bmdr): sends a 100-byte BMDR device report per GPU.
- * For slot 1+ (rem): sends a 48-byte SHA-384 digest for REM extension.
+ * Sends a 48-byte SHA-384 digest for REM extension. The visible rem0-rem2
+ * register numbers are translated to PSC slots 1-3.
  */
 static int firme_mr_extend(const struct tsm_measurements *tm,
 			    const struct tsm_measurement_register *mr,
 			    const u8 *data)
 {
 	struct arm_smccc_res res;
-	unsigned int slot_index = mr - tm->mrs;
+	unsigned int slot_index = FIRME_REM_FIRST_SLOT + (mr - tm->mrs);
 	void *buf;
 	phys_addr_t buf_phys;
 
@@ -274,13 +261,6 @@ static int firme_mr_extend(const struct tsm_measurements *tm,
 }
 
 static struct tsm_measurement_register firme_mrs[FIRME_MR_NUM_SLOTS] = {
-	{
-		.mr_name = "bmdr",
-		.mr_value = firme_mr_bmdr_value,
-		.mr_size = FIRME_BMDR_SIZE,
-		.mr_flags = TSM_MR_F_WRITABLE | TSM_MR_F_NOHASH,
-		.mr_hash = 0,
-	},
 	{
 		.mr_name = "rem0",
 		.mr_value = firme_mr_rem_values[0],
