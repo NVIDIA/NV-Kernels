@@ -76,7 +76,7 @@ static inline bool __try_cmpxchg64(volatile u64 *ptr, u64 *pold, u64 new)
 	__typeof__(*(ptr)) __new = (n);				\
 	alternative_io(LOCK_PREFIX_HERE				\
 			"call cmpxchg8b_emu",			\
-			"lock; cmpxchg8b (%%esi)" ,		\
+			"lock cmpxchg8b (%%esi)" ,		\
 		       X86_FEATURE_CX8,				\
 		       "=A" (__ret),				\
 		       "S" ((ptr)), "0" (__old),		\
