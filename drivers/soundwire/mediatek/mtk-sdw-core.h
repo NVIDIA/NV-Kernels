@@ -110,6 +110,10 @@
 #define MCP_INT_PARITY_ERR          BIT(8)
 #define MCP_INT_DATA_BUS_CLASH      BIT(9)
 #define MCP_INT_CTL_BUS_CLASH       BIT(10)
+/* Line-level errors that a marginal or unterminated link refires continuously. */
+#define MCP_INT_LINE_ERRORS         (MCP_INT_PARITY_ERR | \
+				     MCP_INT_DATA_BUS_CLASH | \
+				     MCP_INT_CTL_BUS_CLASH)
 #define MCP_INT_DP_INT              BIT(11)
 #define MCP_INT_SLV_NOT_ATTACH      BIT(12)
 #define MCP_INT_SLV_ATTACHED        BIT(13)
@@ -202,6 +206,10 @@ struct mtk_sdw_core {
 	struct delayed_work attach_check_work;
 	unsigned int dev0_repoll_count;
 	unsigned int bus_reset_count;
+	unsigned int clash_burst;
+	unsigned long clash_window;
+	/* serializes all MCP_INTMASK read-modify-write updates */
+	spinlock_t intmask_lock;
 };
 
 struct mtk_sdw_pdi_params {
