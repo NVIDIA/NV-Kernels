@@ -53,6 +53,7 @@ struct mtk_sdw_dai {
 	bool use_group_sync;
 	unsigned int group_sync_id;
 	bool need_enable_delay;
+	bool suspended;
 };
 
 /*
@@ -66,6 +67,8 @@ struct mtk_sdw_clk_ops {
 	int (*disable_link_clock)(struct mtk_sdw *mst, int link);
 	int (*enable_power_domain)(struct mtk_sdw *mst);
 	int (*disable_power_domain)(struct mtk_sdw *mst);
+	int (*enable_spm_request)(struct mtk_sdw *mst, int link);
+	int (*disable_spm_request)(struct mtk_sdw *mst, int link);
 };
 
 int mtk_sdw_clk_ops_select(struct mtk_sdw *mst, int hw_ver);
@@ -80,6 +83,10 @@ struct mtk_sdw {
 	const struct mtk_sdw_top_cfg *top_cfg;
 	void __iomem *top_pdi; /* base + top_cfg->pdi_base */
 	void __iomem *top_con; /* base + top_cfg->con_base */
+	unsigned int *top_pdi_reg_backup;
+	unsigned int top_pdi_reg_backup_num;
+	unsigned int *top_con_reg_backup;
+	unsigned int top_con_reg_backup_num;
 	const struct mtk_sdw_clk_ops *clk_ops;
 	u32 hw_ver;
 	/* group_lock: serializes group_refcnt[] group-sync allocation */
