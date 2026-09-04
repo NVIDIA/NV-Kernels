@@ -295,6 +295,59 @@ static const struct snd_soc_acpi_link_adr mtk_sdw_cs42l43_cs35l56x2_l1[] = {
 	{}
 };
 
+/*
+ * Config 4: SDW1 = CS42L43 (jack codec) + 4x CS35L56 (amps, aggregated),
+ * link0 unused. All five devices on link1: CS42L43 at uid 0x30, amps at
+ * uids 0x30/0x31/0x34/0x35 (peripherals of different part numbers may
+ * share unique IDs on one link). Superset of the two-amp single-link
+ * entry, so it must precede that entry in the machine table.
+ */
+static const struct snd_soc_acpi_adr_device cs35l56x4_cs42l43_l1_adr[] = {
+	{
+		.adr = 0x00013001FA424301ull,
+		/* Speaker Playback endpoint (num 3) excluded as on the other
+		 * Cirrus entries: the amps are SoundWire peripherals, not the
+		 * cs42l43 sidecar path.
+		 */
+		.num_endpoints = ARRAY_SIZE(cs42l43_endpoints),
+		.endpoints = cs42l43_endpoints,
+		.name_prefix = "cs42l43",
+	},
+	{
+		.adr = 0x00013001FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[0],
+		.name_prefix = "AMP1",
+	},
+	{
+		.adr = 0x00013101FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[1],
+		.name_prefix = "AMP2",
+	},
+	{
+		.adr = 0x00013401FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[2],
+		.name_prefix = "AMP3",
+	},
+	{
+		.adr = 0x00013501FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[3],
+		.name_prefix = "AMP4",
+	},
+};
+
+static const struct snd_soc_acpi_link_adr mtk_sdw_cs42l43_cs35l56x4_l1[] = {
+	{
+		.mask = BIT(1),
+		.num_adr = ARRAY_SIZE(cs35l56x4_cs42l43_l1_adr),
+		.adr_d = cs35l56x4_cs42l43_l1_adr,
+	},
+	{}
+};
+
 static struct snd_soc_acpi_mach mtk_sdw_machines[] = {
 	{
 		.link_mask = BIT(0) | BIT(1),
@@ -309,6 +362,17 @@ static struct snd_soc_acpi_mach mtk_sdw_machines[] = {
 	{
 		.link_mask = BIT(0) | BIT(1),
 		.links     = mtk_sdw_cs35l56_l0_cs42l43_l1,
+		.drv_name  = "mtk_sdw_mc",
+	},
+	/*
+	 * The four-amp single-link entry must precede the two-amp one:
+	 * matching is first-fit and tolerates extra enumerated peripherals,
+	 * so on a four-amp board the two-amp entry would otherwise win and
+	 * register a card with only half the speakers.
+	 */
+	{
+		.link_mask = BIT(1),
+		.links     = mtk_sdw_cs42l43_cs35l56x4_l1,
 		.drv_name  = "mtk_sdw_mc",
 	},
 	{
