@@ -97,6 +97,8 @@ struct pwrap_driver_data {
 	//struct pwrap_dev_ctrl dev_ctrl;
 	struct platform_device *pdev;
 	struct acpi_buffer acpi_path;
+	/* Platform id from the PLID method, 0 when unavailable */
+	unsigned long long plid;
 };
 
 /* Create the sysfs debug/test nodes (non-fatal; group is devm-managed) */
