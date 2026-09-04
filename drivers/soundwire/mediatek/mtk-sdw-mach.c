@@ -81,10 +81,124 @@ static const struct snd_soc_acpi_link_adr mtk_sdw_rt1320_l0_rt712_l1[] = {
 	{}
 };
 
+/*
+ * Config 1: SDW0 = 4x CS35L56 (amps, aggregated), SDW1 = CS42L43 (jack codec).
+ * Topology: uids 0x30-0x33 on link0, 0x30 on
+ * link1. Speaker position vs uid mapping to be confirmed on hardware; the
+ * group positions below assume uid order.
+ */
+static const struct snd_soc_acpi_endpoint cs35l56_endpoints[] = {
+	{
+		.num = 0,
+		.aggregated = 1,
+		.group_position = 0,
+		.group_id = 1,
+	},
+	{
+		.num = 0,
+		.aggregated = 1,
+		.group_position = 1,
+		.group_id = 1,
+	},
+	{
+		.num = 0,
+		.aggregated = 1,
+		.group_position = 2,
+		.group_id = 1,
+	},
+	{
+		.num = 0,
+		.aggregated = 1,
+		.group_position = 3,
+		.group_id = 1,
+	},
+};
+
+static const struct snd_soc_acpi_endpoint cs42l43_endpoints[] = {
+	{ /* Jack Playback Endpoint */
+		.num = 0,
+		.aggregated = 0,
+		.group_position = 0,
+		.group_id = 0,
+	},
+	{ /* DMIC Capture Endpoint */
+		.num = 1,
+		.aggregated = 0,
+		.group_position = 0,
+		.group_id = 0,
+	},
+	{ /* Jack Capture Endpoint */
+		.num = 2,
+		.aggregated = 0,
+		.group_position = 0,
+		.group_id = 0,
+	},
+};
+
+static const struct snd_soc_acpi_adr_device cs35l56x4_l0_adr[] = {
+	{
+		.adr = 0x00003001FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[0],
+		.name_prefix = "AMP1",
+	},
+	{
+		.adr = 0x00003101FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[1],
+		.name_prefix = "AMP2",
+	},
+	{
+		.adr = 0x00003201FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[2],
+		.name_prefix = "AMP3",
+	},
+	{
+		.adr = 0x00003301FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[3],
+		.name_prefix = "AMP4",
+	},
+};
+
+static const struct snd_soc_acpi_adr_device cs42l43_l1_adr[] = {
+	{
+		.adr = 0x00013001FA424301ull,
+		/*
+		 * The cs42l43 Speaker Playback endpoint (num 3, the sidecar-amp
+		 * path) is intentionally not in cs42l43_endpoints: on these
+		 * boards the speaker amps are separate SoundWire peripherals.
+		 */
+		.num_endpoints = ARRAY_SIZE(cs42l43_endpoints),
+		.endpoints = cs42l43_endpoints,
+		.name_prefix = "cs42l43",
+	},
+};
+
+static const struct snd_soc_acpi_link_adr mtk_sdw_cs35l56_l0_cs42l43_l1[] = {
+	{
+		.mask = BIT(0),
+		.num_adr = ARRAY_SIZE(cs35l56x4_l0_adr),
+		.adr_d = cs35l56x4_l0_adr,
+	},
+	{
+		.mask = BIT(1),
+		.num_adr = ARRAY_SIZE(cs42l43_l1_adr),
+		.adr_d = cs42l43_l1_adr,
+	},
+	{}
+};
+
 static struct snd_soc_acpi_mach mtk_sdw_machines[] = {
 	{
 		.link_mask = BIT(0) | BIT(1),
 		.links     = mtk_sdw_rt1320_l0_rt712_l1,
+		.drv_name  = "mtk_sdw_mc",
+	},
+	{
+		.link_mask = BIT(0) | BIT(1),
+		.links     = mtk_sdw_cs35l56_l0_cs42l43_l1,
 		.drv_name  = "mtk_sdw_mc",
 	},
 	{}
