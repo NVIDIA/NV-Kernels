@@ -3,7 +3,7 @@
 config SND_SOC_SOF_MTK_TOPLEVEL
 	bool "SOF support for MTK audio DSPs"
 	depends on ARM64 || COMPILE_TEST
-	depends on SND_SOC_SOF_OF
+	depends on SND_SOC_SOF_OF || SND_SOC_SOF_ACPI
 	help
 	  This adds support for Sound Open Firmware for Mediatek platforms.
 	  It is top level for all mediatek platforms.
@@ -39,6 +39,16 @@ config SND_SOC_SOF_MT8195
 	help
 	  This adds support for Sound Open Firmware for Mediatek platforms
 	  using the mt8195 processors.
+	  Say Y if you have such a device.
+	  If unsure select "N".
+
+config SND_SOC_SOF_MT8901
+	tristate "SOF support for MT8901 audio DSP"
+	depends on ARCH_MEDIATEK && ACPI
+	depends on MTK_POWER_WRAP
+	help
+	  This adds support for Sound Open Firmware for Mediatek platforms
+	  using the mt8901 processors.
 	  Say Y if you have such a device.
 	  If unsure select "N".
 
