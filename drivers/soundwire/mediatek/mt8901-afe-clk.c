@@ -741,6 +741,54 @@ static int mt8901_afe_disable_sdw_active_clock(struct mtk_sdw *mst)
 	return 0;
 }
 
+static int mt8901_sdw_enable_spm_request(struct mtk_sdw *mst, int link)
+{
+	int ret;
+
+	ret = mt8901_afe_send_spm_req(mst, AFE_SPM_CTRL_SRCCLKENA_REQ, true);
+	if (ret) {
+		dev_err(mst->dev, "[%d]request SRCCLKENA failed\n", link);
+		return ret;
+	}
+
+	if (link == MTK_SDW_CONTROLLER_1) {
+		/* Link1 requires VCORE because the PINs are not AO */
+		ret = mt8901_afe_send_spm_req(mst, AFE_SPM_CTRL_VCORE_REQ,
+					      true);
+		if (ret) {
+			dev_err(mst->dev, "[%d]request VCORE failed\n", link);
+			mt8901_afe_send_spm_req(mst, AFE_SPM_CTRL_SRCCLKENA_REQ,
+						false);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int mt8901_sdw_disable_spm_request(struct mtk_sdw *mst, int link)
+{
+	int ret;
+	int last_ret = 0;
+
+	ret = mt8901_afe_send_spm_req(mst, AFE_SPM_CTRL_SRCCLKENA_REQ, false);
+	if (ret) {
+		dev_err(mst->dev, "[%d]release SRCCLKENA failed\n", link);
+		last_ret = ret;
+	}
+
+	if (link == MTK_SDW_CONTROLLER_1) {
+		ret = mt8901_afe_send_spm_req(mst, AFE_SPM_CTRL_VCORE_REQ,
+					      false);
+		if (ret) {
+			dev_err(mst->dev, "[%d]release VCORE failed\n", link);
+			last_ret = ret;
+		}
+	}
+
+	return last_ret;
+}
+
 static int mt8901_sdw_enable_link_clock(struct mtk_sdw *mst, int link)
 {
 	struct mtk_sdw_link *sdw_link = &mst->links[link];
@@ -913,4 +961,6 @@ const struct mtk_sdw_clk_ops mt8901_clk_ops = {
 	.disable_link_clock     = mt8901_sdw_disable_link_clock,
 	.enable_power_domain    = mt8901_sdw_enable_power_domain,
 	.disable_power_domain   = mt8901_sdw_disable_power_domain,
+	.enable_spm_request     = mt8901_sdw_enable_spm_request,
+	.disable_spm_request    = mt8901_sdw_disable_spm_request,
 };

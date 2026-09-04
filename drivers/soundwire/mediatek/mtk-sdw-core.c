@@ -495,7 +495,8 @@ static int mtk_do_config_update(struct mtk_sdw_core *core)
 	ret = readl_poll_timeout(core->regs + MCP_CONFIGUPDATE, val,
 				 !(val & MCP_CONFIGUPDATE_CU), 100, 2000);
 	if (ret) {
-		dev_err(core->dev, "config update timeout\n");
+		dev_err(core->dev, "[%u]config update timeout\n",
+			core->bus.link_id);
 		return ret;
 	}
 	return 0;
@@ -509,11 +510,9 @@ static int mtk_init_clock_ctrl(struct mtk_sdw_core *core)
 	int r;
 	u32 val;
 
-	dev_dbg(core->dev, "mclk %d max %d row %d col %d\n",
-		prop->mclk_freq,
-		prop->max_clk_freq,
-		prop->default_row,
-		prop->default_col);
+	dev_dbg(core->dev, "[%u]mclk %d max %d row %d col %d\n",
+		bus->link_id, prop->mclk_freq, prop->max_clk_freq,
+		prop->default_row, prop->default_col);
 
 	/* Set clock divider */
 	if (bus->params.curr_dr_freq && prop->mclk_freq) {
@@ -537,7 +536,7 @@ static int mtk_init_clock_ctrl(struct mtk_sdw_core *core)
 
 	if (prop->default_frame_rate % SDW_GSYNC_HZ) {
 		dev_warn(core->dev,
-			 "[%u] FrameRate:%u not aligned with GSYNC:%d",
+			 "[%u]FrameRate:%u not aligned with GSYNC:%d",
 			 bus->link_id, prop->default_frame_rate, SDW_GSYNC_HZ);
 	}
 
@@ -595,7 +594,7 @@ int mtk_sdw_core_bus_reset(struct mtk_sdw_core *core)
 		     MCP_CONTROL_SOFT_RST);
 	core_updatel(core, MCP_CONFIG, MCP_CONFIG_OP_MODE,
 		     FIELD_PREP(MCP_CONFIG_OP_MODE,
-				MCP_OP_MODE_CLK_LOW_DATA_OFF_KEEPER_ON));
+				SDWC_OM_CLK_LOW_DATA_OFF_KEEPER_ON));
 	ret = mtk_do_config_update(core);
 	if (ret)
 		return ret;
@@ -613,7 +612,7 @@ static int mtk_init_config_setting(struct mtk_sdw_core *core)
 	mask = MCP_CONFIG_MCR | MCP_CONFIG_OP_MODE;
 
 	val = FIELD_PREP(MCP_CONFIG_MCR, SDW_DEFAULT_MAX_CMD_RETRY) |
-	      FIELD_PREP(MCP_CONFIG_OP_MODE, MCP_OP_MODE_NORMAL);
+	      FIELD_PREP(MCP_CONFIG_OP_MODE, SDWC_OM_NORMAL);
 
 	core_updatel(core, MCP_CONFIG, mask, val);
 
@@ -797,8 +796,9 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 
 	core_writel(core, MCP_SLAVEINTSTAT0, stat0);
 	core_writel(core, MCP_SLAVEINTSTAT1, stat1);
-	dev_dbg_ratelimited(core->dev, "Slave intstat0: 0x%x, intstat1 0x%x\n",
-			    stat0, stat1);
+	dev_dbg_ratelimited(core->dev,
+			    "[%u]Slave intstat0: 0x%x, intstat1 0x%x\n",
+			    core->bus.link_id, stat0, stat1);
 
 	slv_intstat = ((u64)stat1 << 32) | stat0;
 
@@ -810,7 +810,7 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 		if (dev0_stat == MCP_SLAVESTAT_ATTACHED) {
 			slv_intstat = MCP_SLAVEINTSTAT_ATTACHED;
 			dev_info(core->dev,
-				 "[%u] slave attached Dev0Stat:0x%x Retries:%d",
+				 "[%u]slave attached Dev0Stat:0x%x Retries:%d",
 				 core->bus.link_id, dev0_stat, retries);
 			/*
 			 * Pace the enumeration rounds. A peripheral that just
@@ -1153,4 +1153,76 @@ void mtk_sdw_configure_port_params(struct mtk_sdw_core *core,
 				  params->bpt_payload_type);
 
 	core_updatel(core, offset, mask, val);
+}
+
+/* passing sync=false without a follow up config update would leave the reset
+ * pending.
+ */
+static int mtk_sdw_reset_master(struct mtk_sdw_core *core, bool sync)
+{
+	int ret = 0;
+
+	core_updatel(core, MCP_CONTROL, MCP_CONTROL_SOFT_RST,
+		     MCP_CONTROL_SOFT_RST);
+
+	if (sync) {
+		ret = mtk_do_config_update(core);
+		if (ret) {
+			dev_err(core->dev,
+				"do_config_update failed ret = %d\n", ret);
+		}
+	}
+
+	return ret;
+}
+
+static int mtk_sdw_change_op_mode(struct mtk_sdw_core *core, int mode)
+{
+	u32 val;
+	u32 mask;
+
+	mask = MCP_CONFIG_OP_MODE;
+
+	val = FIELD_PREP(MCP_CONFIG_OP_MODE, mode);
+
+	core_updatel(core, MCP_CONFIG, mask, val);
+
+	return mtk_do_config_update(core);
+}
+
+int mtk_sdw_shutdown_master(struct mtk_sdw_core *core)
+{
+	int ret;
+
+	ret = mtk_sdw_reset_master(core, false);
+	if (ret)
+		return ret;
+
+	ret = mtk_sdw_change_op_mode(core, SDWC_OM_ALL_OFF);
+	if (ret) {
+		dev_err(core->dev, "change to SDWC_OM_ALL_OFF fail, ret = %d\n",
+			ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+int mtk_sdw_reinit_master(struct mtk_sdw_core *core)
+{
+	int ret;
+
+	/* IRQ should be enabled first */
+	mtk_sdw_enable_irq(core, true);
+
+	ret = mtk_sdw_core_hw_init(core);
+	if (ret) {
+		dev_err(core->dev,
+			"[%u]mtk_sdw_core_hw_init failed, ret = %d\n",
+			core->bus.link_id, ret);
+		mtk_sdw_enable_irq(core, false);
+		return ret;
+	}
+
+	return 0;
 }

@@ -10,6 +10,17 @@
 
 #include <linux/soundwire/sdw.h>
 
+enum {
+	SDWC_OM_NORMAL = 0,
+	SDWC_OM_DATA_OFF,
+	SDWC_OM_CLK_DATA_LOW,
+	SDWC_OM_CLK_DATA_OFF,
+	SDWC_OM_KEEPER_OFF,
+	SDWC_OM_CLK_LOW_DATA_OFF_KEEPER_ON,
+	SDWC_OM_CLK_LOW_DATA_HIGH,
+	SDWC_OM_ALL_OFF,
+};
+
 #define SDW_GSYNC_HZ (8000)
 #define SDW_DEFAULT_MAX_CMD_RETRY (5)
 /* =======================================================================
@@ -75,8 +86,6 @@
 /* MCP_CONFIG */
 #define MCP_CONFIG_OP_MODE          GENMASK(2, 0)
 #define MCP_CONFIG_MCR              GENMASK(27, 24)
-#define MCP_OP_MODE_NORMAL          0
-#define MCP_OP_MODE_CLK_LOW_DATA_OFF_KEEPER_ON 5
 
 /* MCP_CONTROL */
 #define MCP_CONTROL_CMD_ACCEPT_MODE BIT(1)
@@ -229,7 +238,7 @@ extern const struct sdw_master_port_ops mtk_sdw_core_port_ops;
  */
 #define MTK_SDW_ATTACH_CHECK_DELAY_MS	2000
 
-int  mtk_sdw_core_init(struct mtk_sdw_core *core);
+int mtk_sdw_core_init(struct mtk_sdw_core *core);
 int mtk_sdw_core_hw_init(struct mtk_sdw_core *core);
 int mtk_sdw_core_bus_reset(struct mtk_sdw_core *core);
 void mtk_sdw_enable_irq(struct mtk_sdw_core *core, bool enable);
@@ -237,12 +246,13 @@ void mtk_sdw_enable_slave_irq(struct mtk_sdw_core *core, bool enable);
 irqreturn_t mtk_sdw_core_irq(int irq, void *data);
 void mtk_sdw_configure_port_params(struct mtk_sdw_core *core,
 				   struct mtk_sdw_port_params *params, u32 dir);
-
 void mtk_sdw_configure_pdi_params(struct mtk_sdw_core *core,
 				  struct mtk_sdw_pdi_params *params);
 void mtk_sdw_clear_pdi_settings(struct mtk_sdw_core *core,
 				struct mtk_sdw_pdi_params *pdi);
 void mtk_sdw_core_dump_dpn_regs(struct mtk_sdw_core *core, unsigned int port,
 				const char *tag);
+int mtk_sdw_shutdown_master(struct mtk_sdw_core *core);
+int mtk_sdw_reinit_master(struct mtk_sdw_core *core);
 
 #endif /* __MTK_SDW_CORE_H */
