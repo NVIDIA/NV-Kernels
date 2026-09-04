@@ -82,4 +82,18 @@ enum mt8901_afe_fs_mode {
 #define MTK_SDW_MAX_DAIS \
 	((MTK_SDW_DP_SOURCE_NUM) + (MTK_SDW_DP_SINK_NUM)) /* BRA not included */
 
+/*
+ * Vendor pin configuration values carried by the ACPI PinFunction()
+ * descriptors of the SoundWire pads:
+ *   0x90: PD=1, PU=0 (plain pull-down)
+ *   0xF0: PD=1, PU=1 (bus-keeper)
+ */
+#define MTK_SDW_PIN_CFG_PD		0x90
+#define MTK_SDW_PIN_CFG_BUS_HOLD	0xF0
+
+struct mtk_sdw_acpi_cb_context {
+	struct device *dev;
+	int err;
+};
+
 #endif /* __MTK_SDW_H */
