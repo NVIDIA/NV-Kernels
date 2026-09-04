@@ -99,6 +99,9 @@ struct pwrap_driver_data {
 	struct acpi_buffer acpi_path;
 };
 
+/* Create the sysfs debug/test nodes (non-fatal; group is devm-managed) */
+int pwrap_create_sys_files(struct platform_device *pdev);
+
 /* Getter for static pwrap_dev_ctrl */
 struct pwrap_dev_ctrl *pwrap_get_dev_ctrl(void);
 void *pwrap_query_dev_config(const char *dev_path);
