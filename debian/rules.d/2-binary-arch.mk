@@ -673,19 +673,18 @@ ifeq ($(do_tools_rtla),true)
 		$(toolspkgdir)/usr/lib/$(DEB_SOURCE)-tools-$(abi_release)/rtla
 endif
 ifeq ($(do_tools_perf),true)
-	# NVIDIA-BOS: ship perf inside the versioned tools package instead of the
-	# unflavoured linux-perf package
+	install -d $(perfpkgdir)/usr/bin
 	install -m755 $(builddirpa)/tools/perf/perf \
-		$(toolspkgdir)/usr/lib/$(DEB_SOURCE)-tools-$(abi_release)/perf
+		$(perfpkgdir)/usr/bin/perf
 ifeq ($(do_tools_perf_jvmti),true)
+	install -d $(perfpkgdir)/usr/lib
 	install -m644 $(builddirpa)/tools/perf/libperf-jvmti.so \
-		$(toolspkgdir)/usr/lib/$(DEB_SOURCE)-tools-$(abi_release)/
+		$(perfpkgdir)/usr/lib/
 endif
 ifeq ($(do_tools_perf_python),true)
-	# NVIDIA-BOS: keep the perf python binding in the ABI-specific tools directory
-	install -d $(toolspkgdir)/usr/lib/$(DEB_SOURCE)-tools-$(abi_release)/python
+	install -d $(perfpkgdir)/usr/lib/python3/dist-packages
 	install -m644 $(builddirpa)/tools/perf/python/perf.*.so \
-		$(toolspkgdir)/usr/lib/$(DEB_SOURCE)-tools-$(abi_release)/python/
+		$(perfpkgdir)/usr/lib/python3/dist-packages/
 endif
 endif # do_tools_perf
 ifeq ($(do_tools_bpftool),true)
