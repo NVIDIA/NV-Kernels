@@ -658,6 +658,39 @@ void mtk_sdw_enable_slave_irq(struct mtk_sdw_core *core, bool enable)
 /*
  * slave IRQ handling
  */
+/*
+ * Experiment/quarantine knob: suppress ALERT handling for one CS35L56
+ * peripheral identified by unique id. An electrically faulty peripheral
+ * that asserts Alert permanently drags the bus core into an endless
+ * alert-read retry storm (every read of its interrupt registers fails
+ * parity), and the extra traffic from a misbehaving responder disturbs
+ * enumeration of the healthy peripherals on the link. Reporting it as
+ * plainly attached quiets the storm so the rest of the link can be
+ * validated. Not for production; diagnostic aid for a bad unit.
+ */
+static int quarantine_uid = -1;
+module_param(quarantine_uid, int, 0644);
+MODULE_PARM_DESC(quarantine_uid,
+		 "Suppress ALERT for the 0x3556 peripheral with this unique id (-1 = off)");
+
+static bool mtk_sdw_quarantined(struct mtk_sdw_core *core, int dev_num)
+{
+	struct sdw_slave *slave;
+
+	if (quarantine_uid < 0)
+		return false;
+
+	list_for_each_entry(slave, &core->bus.slaves, node) {
+		if (slave->dev_num == dev_num &&
+		    slave->id.mfg_id == 0x01fa &&
+		    slave->id.part_id == 0x3556 &&
+		    slave->id.unique_id == quarantine_uid)
+			return true;
+	}
+
+	return false;
+}
+
 static int mtk_sdw_update_slave_status(struct mtk_sdw_core *core,
 				       u64 slave_intstat)
 {
@@ -683,7 +716,8 @@ static int mtk_sdw_update_slave_status(struct mtk_sdw_core *core,
 			}
 
 			if (intstat & MCP_SLAVEINTSTAT_ALERT) {
-				status[i] = SDW_SLAVE_ALERT;
+				status[i] = mtk_sdw_quarantined(core, i) ?
+					SDW_SLAVE_ATTACHED : SDW_SLAVE_ALERT;
 				set_status++;
 			}
 
@@ -709,7 +743,8 @@ static int mtk_sdw_update_slave_status(struct mtk_sdw_core *core,
 				status[i] = SDW_SLAVE_ATTACHED;
 				break;
 			case 2:
-				status[i] = SDW_SLAVE_ALERT;
+				status[i] = mtk_sdw_quarantined(core, i) ?
+					SDW_SLAVE_ATTACHED : SDW_SLAVE_ALERT;
 				break;
 			case 3:
 			default:
