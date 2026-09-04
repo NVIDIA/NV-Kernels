@@ -363,4 +363,18 @@ config SND_SOC_MT8901
 	  Select Y if you have such device.
 	  If unsure select "N".
 
+config SND_SOC_MT8901_LEGACY_SDW_MACH
+	tristate "ASoC Audio driver for MT8901 SoundWire machine"
+	depends on SND_SOC_MT8901 && ACPI
+	depends on SOUNDWIRE_MTK
+	select SND_SOC_SDW_UTILS
+	select SND_SOC_RT712_SDCA_SDW
+	select SND_SOC_RT712_SDCA_DMIC_SDW
+	select SND_SOC_RT1320_SDW
+	help
+	  This adds support for Legacy(No DSP) sound card for MediaTek
+	  MT8901 boards.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
 endmenu
