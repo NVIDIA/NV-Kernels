@@ -271,12 +271,22 @@ CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM drivers'>
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 CONFIG_SENSORS_SPD5118                          policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_SENSORS_SPD5118                          note<'Enable SPD5118 temperature sensor support for DDR5 memory modules'>
 
 CONFIG_SFC_CXL                                  policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_SFC_CXL                                  note<'Solarflare SFC9100-family CXL Type-2 device support; not needed for NVIDIA platforms'>
 =======
+=======
+CONFIG_SND_SOC_MT8901                           policy<{'arm64': 'n'}>
+CONFIG_SND_SOC_MT8901                           note<'MediaTek MT8901 AFE platform driver (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
+
+>>>>>>> NVIDIA: SAUCE: UBUNTU: [Config] annotation for CONFIG_SND_SOC_MT8901 (introduced disabled)
+CONFIG_SND_SOC_MT8901                           policy<{'arm64': 'n'}>
+CONFIG_SND_SOC_MT8901                           note<'MediaTek MT8901 AFE platform driver (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
+
+
 CONFIG_SOUNDWIRE_MTK                            policy<{'arm64': 'n'}>
 CONFIG_SOUNDWIRE_MTK                            note<'MediaTek SoundWire manager (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
 >>>>>>> NVIDIA: SAUCE: UBUNTU: [Config] annotation for CONFIG_SOUNDWIRE_MTK (introduced disabled)
