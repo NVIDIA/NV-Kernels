@@ -642,6 +642,11 @@ void mtk_sdw_enable_irq(struct mtk_sdw_core *core, bool enable)
 
 	core->interrupt_enabled = enable;
 
+	/*
+	 * attach_check_work is NOT cancelled here: its handler calls this
+	 * function, so a sync cancel would self-deadlock. It is cancelled
+	 * explicitly on the teardown paths (link deinit, suspend).
+	 */
 	if (!enable)
 		cancel_delayed_work_sync(&core->status_work);
 
@@ -914,6 +919,61 @@ static int mtk_sdw_compute_params(struct sdw_bus *bus,
 	return 0;
 }
 
+/*
+ * One-shot check scheduled after link init. A re-initialized master (module
+ * reload, and eventually resume) comes up in normal operation mode while the
+ * peripherals still hold their previous device numbers, so they raise no new
+ * attach transition and the interrupt-driven recovery machinery is never
+ * armed: the link sits dead with zero attach events. The reference stack
+ * avoids this by always running its restart choreography on re-init. Detect
+ * the state instead (peripherals declared for the link but every one of them
+ * still UNATTACHED well past the normal attach window) and run the restart,
+ * which drops them to Dev0 and re-enumerates them through the normal
+ * interrupt path. On a first boot out of POST the peripherals attach within
+ * tens of ms, every slave leaves UNATTACHED, and this work does nothing.
+ */
+static void mtk_sdw_attach_check_work(struct work_struct *work)
+{
+	struct mtk_sdw_core *core =
+		container_of(work, struct mtk_sdw_core, attach_check_work.work);
+	struct sdw_slave *slave;
+	bool any_declared = false;
+
+	if (!core->interrupt_enabled)
+		return;
+
+	list_for_each_entry(slave, &core->bus.slaves, node) {
+		any_declared = true;
+		if (slave->status != SDW_SLAVE_UNATTACHED)
+			return;
+	}
+
+	if (!any_declared)
+		return;
+
+	dev_warn(core->dev,
+		 "[%u] no peripheral attached %u ms after init, restarting the bus\n",
+		 core->bus.link_id, MTK_SDW_ATTACH_CHECK_DELAY_MS);
+
+	/*
+	 * Same choreography as the debugfs knob: quiesce interrupt handling
+	 * around the reset, then re-enable it, which also restores the slave
+	 * interrupt masks that SOFT_RST clears - without that the attach
+	 * transitions after the restart never interrupt and enumeration
+	 * stalls after Dev0.
+	 */
+	mtk_sdw_enable_irq(core, false);
+	if (mtk_sdw_core_bus_reset(core)) {
+		dev_err(core->dev, "[%u] post-init bus restart failed\n",
+			core->bus.link_id);
+		mtk_sdw_enable_irq(core, true);
+		return;
+	}
+	mtk_sdw_enable_irq(core, true);
+	schedule_delayed_work(&core->status_work,
+			      msecs_to_jiffies(MTK_SDW_BUS_RESET_SETTLE_MS));
+}
+
 int mtk_sdw_core_init(struct mtk_sdw_core *core)
 {
 	core->bus.ops            = &mtk_sdw_core_ops;
@@ -921,6 +981,7 @@ int mtk_sdw_core_init(struct mtk_sdw_core *core)
 	core->bus.compute_params = mtk_sdw_compute_params;
 
 	INIT_DELAYED_WORK(&core->status_work, mtk_sdw_slave_status_work);
+	INIT_DELAYED_WORK(&core->attach_check_work, mtk_sdw_attach_check_work);
 	return 0;
 }
 
