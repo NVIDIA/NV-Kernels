@@ -255,6 +255,46 @@ static const struct snd_soc_acpi_link_adr mtk_sdw_rt1321_l0_rt713_l1[] = {
 	{}
 };
 
+/*
+ * Config 3: SDW1 = CS42L43 (jack codec) + 2x CS35L56 (amps, aggregated),
+ * link0 unused. Topology: all three devices
+ * on link1, CS42L43 at uid 0x30, amps at uids 0x30/0x31 (peripherals of
+ * different part numbers may share unique IDs on one link).
+ */
+static const struct snd_soc_acpi_adr_device cs35l56x2_cs42l43_l1_adr[] = {
+	{
+		.adr = 0x00013001FA424301ull,
+		/* Speaker Playback endpoint (num 3) excluded as on the HP
+		 * entry: the amps are SoundWire peripherals, not the cs42l43
+		 * sidecar path.
+		 */
+		.num_endpoints = ARRAY_SIZE(cs42l43_endpoints),
+		.endpoints = cs42l43_endpoints,
+		.name_prefix = "cs42l43",
+	},
+	{
+		.adr = 0x00013001FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[0],
+		.name_prefix = "AMP1",
+	},
+	{
+		.adr = 0x00013101FA355601ull,
+		.num_endpoints = 1,
+		.endpoints = &cs35l56_endpoints[1],
+		.name_prefix = "AMP2",
+	},
+};
+
+static const struct snd_soc_acpi_link_adr mtk_sdw_cs42l43_cs35l56x2_l1[] = {
+	{
+		.mask = BIT(1),
+		.num_adr = ARRAY_SIZE(cs35l56x2_cs42l43_l1_adr),
+		.adr_d = cs35l56x2_cs42l43_l1_adr,
+	},
+	{}
+};
+
 static struct snd_soc_acpi_mach mtk_sdw_machines[] = {
 	{
 		.link_mask = BIT(0) | BIT(1),
@@ -269,6 +309,11 @@ static struct snd_soc_acpi_mach mtk_sdw_machines[] = {
 	{
 		.link_mask = BIT(0) | BIT(1),
 		.links     = mtk_sdw_cs35l56_l0_cs42l43_l1,
+		.drv_name  = "mtk_sdw_mc",
+	},
+	{
+		.link_mask = BIT(1),
+		.links     = mtk_sdw_cs42l43_cs35l56x2_l1,
 		.drv_name  = "mtk_sdw_mc",
 	},
 	{}
