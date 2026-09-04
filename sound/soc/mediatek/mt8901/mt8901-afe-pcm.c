@@ -11,6 +11,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/acpi.h>
+#include <linux/pm_runtime.h>
 #include <sound/pcm_params.h>
 #include "mt8901-afe-common.h"
 #include "mt8901-afe-clk.h"
@@ -1684,7 +1685,12 @@ static bool mt8901_is_volatile_reg(struct device *dev, unsigned int reg)
 	case AFE_GASRC11_NEW_IP_VERSION:
 		return true;
 	default:
-		return false;
+		/* SoundWire registers are controlled by another driver */
+		if (reg >= AFE_SOUNDWIRE_REG_BEGIN &&
+		    reg < AFE_SOUNDWIRE_REG_END)
+			return true;
+		else
+			return false;
 	};
 }
 
@@ -1824,11 +1830,233 @@ static int mt8901_afe_init_regs(struct mtk_base_afe *afe)
 				      init_regs, ARRAY_SIZE(init_regs));
 }
 
+/*
+ * The audio datapath resources that sit on top of the register-access
+ * baseline (MTCMOS and the register clock): the main clock, the APLL top
+ * clock gates and the DDR request the memory interfaces need. Brought up by
+ * runtime_resume() once the regmap is live, and by probe when its initial
+ * put leaves the device runtime active, so that an active device is always
+ * in the state a full runtime_resume() produces and runtime_suspend() tears
+ * down exactly that.
+ */
+static int mt8901_afe_datapath_on(struct mtk_base_afe *afe)
+{
+	struct device *dev = afe->dev;
+	int ret;
+
+	ret = mt8901_afe_enable_main_clock(afe);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_enable_main_clock failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = mt8901_afe_enable_apll_top_con_cg(afe);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_enable_apll_top_con_cg failed: %d\n",
+			ret);
+		goto err_apll;
+	}
+
+	/* request DDR for memif */
+	ret = mt8901_afe_send_spm_req(afe, AFE_SPM_CTRL_DDREN_REQ, true);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_send_spm_req enable failed: %d\n",
+			ret);
+		goto err_spm;
+	}
+
+	return 0;
+
+err_spm:
+	mt8901_afe_disable_apll_top_con_cg(afe);
+err_apll:
+	mt8901_afe_disable_main_clock(afe);
+
+	return ret;
+}
+
+static int mt8901_afe_datapath_off(struct mtk_base_afe *afe)
+{
+	struct device *dev = afe->dev;
+	int ret;
+
+	ret = mt8901_afe_send_spm_req(afe, AFE_SPM_CTRL_DDREN_REQ, false);
+	if (ret) {
+		dev_warn(dev,
+			 "mt8901_afe_send_spm_req disable failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = mt8901_afe_disable_apll_top_con_cg(afe);
+	if (ret) {
+		dev_warn(dev, "mt8901_afe_disable_apll_top_con_cg failed: %d\n",
+			 ret);
+		goto err_apll;
+	}
+
+	ret = mt8901_afe_disable_main_clock(afe);
+	if (ret) {
+		dev_warn(dev, "mt8901_afe_disable_main_clock failed: %d\n",
+			 ret);
+		goto err_main;
+	}
+
+	return 0;
+
+err_main:
+	mt8901_afe_enable_apll_top_con_cg(afe);
+err_apll:
+	mt8901_afe_send_spm_req(afe, AFE_SPM_CTRL_DDREN_REQ, true);
+
+	return ret;
+}
+
+static int mt8901_afe_runtime_suspend(struct device *dev)
+{
+	struct mtk_base_afe *afe = dev_get_drvdata(dev);
+	struct mt8901_afe_private *afe_priv = afe->platform_priv;
+	int ret;
+	bool skip = false;
+
+	if (!afe->regmap || afe_priv->pm_runtime_bypass_reg_ctl) {
+		skip = true;
+		goto skip_regmap;
+	}
+
+	ret = mt8901_afe_datapath_off(afe);
+	if (ret)
+		return ret;
+
+	regcache_cache_only(afe->regmap, true);
+	regcache_mark_dirty(afe->regmap);
+
+skip_regmap:
+	ret = mt8901_afe_disable_reg_rw_clk(afe);
+	if (ret) {
+		dev_warn(dev, "mt8901_afe_disable_reg_rw_clk failed: %d\n",
+			 ret);
+		goto err_reg;
+	}
+
+	ret = mt8901_afe_disable_mtcmos(afe, AUDIO_PD);
+	if (ret) {
+		dev_warn(dev, "disable MTCMOS failed\n");
+		goto err_mtcmos;
+	}
+
+	return 0;
+err_mtcmos:
+	mt8901_afe_enable_reg_rw_clk(afe);
+err_reg:
+	if (skip)
+		return ret;
+	regcache_cache_only(afe->regmap, false);
+	mt8901_afe_datapath_on(afe);
+
+	return ret;
+}
+
+static int mt8901_afe_runtime_resume(struct device *dev)
+{
+	struct mtk_base_afe *afe = dev_get_drvdata(dev);
+	struct mt8901_afe_private *afe_priv = afe->platform_priv;
+	int ret;
+
+	ret = mt8901_afe_enable_mtcmos(afe, AUDIO_PD);
+	if (ret) {
+		dev_err(dev, "enable MTCMOS failed\n");
+		return ret;
+	}
+
+	ret = mt8901_afe_enable_reg_rw_clk(afe);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_enable_reg_rw_clk failed: %d\n", ret);
+		goto err_reg;
+	}
+
+	if (!afe->regmap || afe_priv->pm_runtime_bypass_reg_ctl)
+		return 0;
+
+	regcache_cache_only(afe->regmap, false);
+	ret = regcache_sync(afe->regmap);
+	if (ret) {
+		dev_err(dev, "regcache_sync failed: %d", ret);
+		goto err_main;
+	}
+
+	ret = mt8901_afe_datapath_on(afe);
+	if (ret)
+		goto err_main;
+
+	return 0;
+
+err_main:
+	regcache_cache_only(afe->regmap, true);
+	regcache_mark_dirty(afe->regmap);
+
+	mt8901_afe_disable_reg_rw_clk(afe);
+err_reg:
+	mt8901_afe_disable_mtcmos(afe, AUDIO_PD);
+
+	return ret;
+}
+
+/*
+ * Release what the bypass runtime resume took (MTCMOS and the register
+ * access clock) on a probe failure exit that leaves the device runtime
+ * active: the devres pm_runtime_disable() never runs runtime_suspend().
+ */
+static void mt8901_afe_release_bypass_resources(struct mtk_base_afe *afe)
+{
+	mt8901_afe_disable_reg_rw_clk(afe);
+	mt8901_afe_disable_mtcmos(afe, AUDIO_PD);
+}
+
+/*
+ * Devres action, ordered after the ASoC component and the IRQ are released
+ * and before the runtime PM disable registered at the start of probe.
+ *
+ * An outstanding usage reference (user space forbidding runtime PM, for
+ * instance) keeps the device active through the driver core's put around
+ * remove, and the devres runtime PM disable never runs the suspend callback.
+ * With no ASoC users and no IRQ left, force the suspend so everything probe
+ * or a runtime resume left held (MTCMOS, register clock, datapath) is
+ * released and the PM status matches the hardware for the next bind, then
+ * re-enable so the devres disable registered by probe stays balanced. Only
+ * acts once probe has completed: the probe failure exits release what they
+ * took by hand.
+ */
+static void mt8901_afe_pm_teardown(void *data)
+{
+	struct mtk_base_afe *afe = data;
+	struct mt8901_afe_private *afe_priv = afe->platform_priv;
+	struct device *dev = afe->dev;
+	int ret;
+
+	if (!afe_priv->pm_teardown_armed)
+		return;
+
+	ret = pm_runtime_force_suspend(dev);
+	if (ret) {
+		/*
+		 * The PM core re-enabled runtime PM on this failure and the
+		 * callback unwound what it had changed, so hardware and PM
+		 * status still agree (both active). Nothing else can be
+		 * released safely; say so.
+		 */
+		dev_warn(dev, "runtime force suspend failed: %d, device left active\n",
+			 ret);
+		return;
+	}
+	pm_runtime_enable(dev);
+}
+
 static int mt8901_afe_pcm_dev_probe(struct platform_device *pdev)
 {
 	struct mtk_base_afe *afe;
 	struct mt8901_afe_private *afe_priv;
 	struct device *dev = &pdev->dev;
+	bool runtime_active = false;
 	int i, irq_id, ret;
 
 	ret = dma_set_mask_and_coherent(dev,
@@ -1910,40 +2138,32 @@ static int mt8901_afe_pcm_dev_probe(struct platform_device *pdev)
 
 	dev_info(dev, "acpi-asd-hw-ver = %u\n", afe_priv->hw_ver);
 
-	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->base_addr,
-					    &mt8901_afe_regmap_config);
-	if (IS_ERR(afe->regmap)) {
-		ret = PTR_ERR(afe->regmap);
-		return ret;
-	}
-
 	ret = mt8901_afe_init_clock(afe);
 	if (ret) {
 		dev_err(dev, "afe init clock failed: %d\n", ret);
 		return ret;
 	}
 
-	/* ToDo: check if we need to enable clock here */
-	ret = mt8901_afe_enable_main_clock(afe);
-	if (ret) {
-		dev_err(dev, "mt8901_afe_enable_main_clock failed: %d\n", ret);
+	ret = devm_pm_runtime_enable(dev);
+	if (ret)
 		return ret;
-	}
 
-	ret = mt8901_afe_enable_apll_top_con_cg(afe);
-	if (ret) {
-		dev_err(dev, "mt8901_afe_enable_apll_top_con_cg failed: %d\n",
-			ret);
-		mt8901_afe_disable_main_clock(afe);
-		return ret;
+	afe_priv->pm_runtime_bypass_reg_ctl = true;
+	ret = pm_runtime_resume_and_get(dev);
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to resume device\n");
+
+	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->base_addr,
+					    &mt8901_afe_regmap_config);
+	if (IS_ERR(afe->regmap)) {
+		ret = PTR_ERR(afe->regmap);
+		goto err_pm_put;
 	}
 
 	ret = mt8901_afe_init_regs(afe);
 	if (ret) {
 		dev_err(dev, "afe init regs failed: %d\n", ret);
-		mt8901_afe_disable_apll_top_con_cg(afe);
-		mt8901_afe_disable_main_clock(afe);
-		return ret;
+		goto err_pm_put;
 	}
 
 	/*
@@ -1953,28 +2173,143 @@ static int mt8901_afe_pcm_dev_probe(struct platform_device *pdev)
 	 * state asserted, so an earlier request can fire into a half-set-up
 	 * driver.
 	 */
+	/*
+	 * Registered after the regmap and before the IRQ and the component,
+	 * so at devres release it runs once the component and the IRQ are
+	 * gone and while the regmap still exists: see mt8901_afe_pm_teardown().
+	 */
+	ret = devm_add_action_or_reset(dev, mt8901_afe_pm_teardown, afe);
+	if (ret)
+		goto err_pm_put;
+
 	ret = devm_request_threaded_irq(dev, irq_id, NULL,
 					mt8901_afe_irq_handler,
 					IRQF_ONESHOT,
 					"AFE_ISR_Handle", (void *)afe);
 	if (ret) {
-		mt8901_afe_disable_apll_top_con_cg(afe);
-		mt8901_afe_disable_main_clock(afe);
-		return dev_err_probe(dev, ret,
-				     "could not request_irq for AFE_ISR_Handle\n");
+		dev_err_probe(dev, ret,
+			      "could not request_irq for AFE_ISR_Handle\n");
+		goto err_pm_put;
 	}
 
-	/* register component after regcache is in cache-only mode */
+	ret = pm_runtime_put_sync(dev);
+	afe_priv->pm_runtime_bypass_reg_ctl = false;
+	if (ret < 0 && ret != -EAGAIN && ret != -EBUSY) {
+		/*
+		 * The PM core latches a callback error in runtime_error and
+		 * refuses every later runtime get, so the component would be
+		 * unusable. Probe-failure devres disables runtime PM without
+		 * running the suspend callback, so release what the bypass
+		 * resume took (MTCMOS and the register-access clock) here.
+		 */
+		dev_err_probe(dev, ret, "initial runtime suspend failed\n");
+		mt8901_afe_release_bypass_resources(afe);
+		return ret;
+	}
+	/*
+	 * A zero return does not prove the suspend callback ran: with
+	 * another usage reference outstanding (user space forbidding
+	 * runtime PM before probe, for instance) the put only drops the
+	 * count and the device stays active, exactly as on a transient
+	 * -EAGAIN/-EBUSY refusal. Decide on the PM status, not on the
+	 * return value: the regcache may go cache-only only once the
+	 * hardware is actually suspended, and every probe failure exit
+	 * that leaves the device active must release the bypass resources
+	 * by hand. An active device suspends later through the regular
+	 * runtime_suspend(), which switches the regcache itself.
+	 */
+	runtime_active = !pm_runtime_status_suspended(dev);
+	if (runtime_active) {
+		dev_warn(dev, "initial runtime suspend deferred (%d), device left active\n",
+			 ret);
+		/*
+		 * The bypass resume brought up only MTCMOS and the register
+		 * clock, and the next runtime get will find an active device
+		 * and not call runtime_resume(): bring up the rest of the
+		 * datapath here so the device is in the state a full
+		 * runtime_resume() leaves it in, and the runtime_suspend()
+		 * that runs once the outstanding reference is dropped tears
+		 * down exactly that.
+		 */
+		ret = mt8901_afe_datapath_on(afe);
+		if (ret) {
+			mt8901_afe_release_bypass_resources(afe);
+			return dev_err_probe(dev, ret,
+					     "datapath bring-up on the active device failed\n");
+		}
+	} else {
+		regcache_cache_only(afe->regmap, true);
+		regcache_mark_dirty(afe->regmap);
+	}
+
+	/*
+	 * Drop the firmware's default-on MTCMOS vote. Safe on the transient
+	 * path too: the runtime vote keeps the domain powered while the
+	 * device is active. Track it so remove() restores only a vote that
+	 * was actually dropped.
+	 */
+	ret = mt8901_afe_disable_mtcmos(afe, AUDIO_PD);
+	if (ret)
+		dev_warn(dev, "disable MTCMOS failed: %d\n", ret);
+	else
+		afe_priv->default_mtcmos_vote_dropped = true;
+
+	/* Publish the component only once the PM baseline is established. */
 	ret = devm_snd_soc_register_component(dev, &mtk_afe_pcm_platform,
 					      afe->dai_drivers,
 					      afe->num_dai_drivers);
 	if (ret) {
-		mt8901_afe_disable_apll_top_con_cg(afe);
-		mt8901_afe_disable_main_clock(afe);
+		if (afe_priv->default_mtcmos_vote_dropped)
+			mt8901_afe_enable_mtcmos(afe, AUDIO_PD);
+		if (runtime_active) {
+			mt8901_afe_datapath_off(afe);
+			mt8901_afe_release_bypass_resources(afe);
+		}
 		return dev_err_probe(dev, ret, "err_platform\n");
 	}
 
+	/* From here on the devres teardown owns the runtime PM balance. */
+	afe_priv->pm_teardown_armed = true;
+
 	return 0;
+
+err_pm_put:
+	/*
+	 * Bypass mode is still set here, so a put that suspends releases
+	 * the MTCMOS and register clock through runtime_suspend. Whenever
+	 * the device is still active afterwards (a refused put, a callback
+	 * failure that unwound itself, or another usage reference keeping
+	 * it up) both are still held: release them by hand.
+	 */
+	pm_runtime_put_sync(dev);
+	if (!pm_runtime_status_suspended(dev))
+		mt8901_afe_release_bypass_resources(afe);
+
+	return ret;
+}
+
+static void mt8901_afe_pcm_dev_remove(struct platform_device *pdev)
+{
+	struct mtk_base_afe *afe = platform_get_drvdata(pdev);
+	struct mt8901_afe_private *afe_priv = afe->platform_priv;
+	struct device *dev = &pdev->dev;
+	int ret;
+
+	/*
+	 * The runtime PM balance is restored by mt8901_afe_pm_teardown() at
+	 * devres release, after the component and the IRQ are gone. Only the
+	 * firmware's default MTCMOS vote is handled here.
+	 *
+	 * Undo the default-vote drop at the end of probe, which accounts for
+	 * MTCMOS defaulting to on before any driver has ever run, but only if
+	 * probe actually managed to drop it.
+	 */
+	if (!afe_priv->default_mtcmos_vote_dropped)
+		return;
+
+	ret = mt8901_afe_enable_mtcmos(afe, AUDIO_PD);
+	if (ret)
+		dev_warn(dev, "enable MTCMOS failed: %d\n", ret);
 }
 
 /* ACPI match: ASD0 device in Audio.asl (_HID = "NVDA9022") */
@@ -1984,12 +2319,20 @@ static const struct acpi_device_id mt8901_afe_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, mt8901_afe_acpi_match);
 
+static const struct dev_pm_ops mt8901_afe_pm_ops = {
+	SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
+	RUNTIME_PM_OPS(mt8901_afe_runtime_suspend,
+		       mt8901_afe_runtime_resume, NULL)
+};
+
 static struct platform_driver mt8901_afe_pcm_driver = {
 	.driver = {
 		   .name = "mt8901-audio",
 		   .acpi_match_table = ACPI_PTR(mt8901_afe_acpi_match),
+		   .pm = &mt8901_afe_pm_ops,
 	},
 	.probe = mt8901_afe_pcm_dev_probe,
+	.remove = mt8901_afe_pcm_dev_remove,
 };
 
 module_platform_driver(mt8901_afe_pcm_driver);
