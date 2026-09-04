@@ -531,7 +531,7 @@ void mtk_sdw_enable_irq(struct mtk_sdw_core *core, bool enable)
 	core->interrupt_enabled = enable;
 
 	if (!enable)
-		cancel_work_sync(&core->work);
+		cancel_delayed_work_sync(&core->work);
 
 	core_updatel(core, MCP_INTMASK, MCP_INT_IRQ,
 		     enable ? MCP_INT_IRQ : 0);
@@ -613,10 +613,22 @@ static int mtk_sdw_update_slave_status(struct mtk_sdw_core *core,
 	return 0;
 }
 
+/*
+ * A peripheral that soft-resets after enumeration (the cs42l43 does this
+ * during driver probe) drops to Dev0 and takes tens of ms to re-sync
+ * before it can ACK a new device number. The poll loop below exhausts its
+ * retries well inside that window, and the IP raises no further attach
+ * transition for a device already sitting at Dev0, so without a re-poll
+ * the attach is lost and the peripheral stays UNATTACHED forever. Windows
+ * never hits this (its codec stack does not reset after enumeration).
+ */
+#define MTK_SDW_DEV0_REPOLL_MAX		25
+#define MTK_SDW_DEV0_REPOLL_DELAY_MS	20
+
 static void mtk_sdw_slave_status_work(struct work_struct *work)
 {
 	struct mtk_sdw_core *core =
-		container_of(work, struct mtk_sdw_core, work);
+		container_of(work, struct mtk_sdw_core, work.work);
 	u32 stat0;
 	u32 stat1;
 	u32 dev0_stat;
@@ -650,6 +662,24 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 		}
 
 	} while (retries++ < SDW_MAX_DEVICES);
+
+	if (dev0_stat == MCP_SLAVESTAT_ATTACHED &&
+	    core->interrupt_enabled) {
+		if (core->dev0_repoll_count++ < MTK_SDW_DEV0_REPOLL_MAX) {
+			dev_dbg(core->dev,
+				"[%u] Dev0 still attached, re-polling (%u)\n",
+				core->bus.link_id, core->dev0_repoll_count);
+			schedule_delayed_work(&core->work,
+				msecs_to_jiffies(MTK_SDW_DEV0_REPOLL_DELAY_MS));
+		} else {
+			dev_warn(core->dev,
+				 "[%u] Dev0 attach unresolved after %u re-polls, giving up\n",
+				 core->bus.link_id, core->dev0_repoll_count);
+			core->dev0_repoll_count = 0;
+		}
+	} else {
+		core->dev0_repoll_count = 0;
+	}
 
 	mtk_sdw_enable_slave_irq(core, true);
 }
@@ -713,7 +743,7 @@ int mtk_sdw_core_init(struct mtk_sdw_core *core)
 	core->bus.port_ops       = &mtk_sdw_core_port_ops;
 	core->bus.compute_params = mtk_sdw_compute_params;
 
-	INIT_WORK(&core->work, mtk_sdw_slave_status_work);
+	INIT_DELAYED_WORK(&core->work, mtk_sdw_slave_status_work);
 	return 0;
 }
 
@@ -780,8 +810,16 @@ irqreturn_t mtk_sdw_core_irq(int irq, void *data)
 				 bus->link_id, intstat);
 		}
 		if (core->interrupt_enabled) {
-			schedule_work(&core->work);
+			/*
+			 * Mask before scheduling: the work re-enables the
+			 * slave interrupt when it finishes, so masking after
+			 * schedule_delayed_work() races a work that completes
+			 * on another CPU first and leaves the interrupt
+			 * masked forever (all subsequent attach/detach
+			 * transitions are then lost).
+			 */
 			mtk_sdw_enable_slave_irq(core, false);
+			schedule_delayed_work(&core->work, 0);
 			clearstat &= ~MCP_INT_SLV_MASK;
 		}
 	}

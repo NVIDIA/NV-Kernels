@@ -189,7 +189,8 @@ struct mtk_sdw_core {
 	bool interrupt_enabled;
 	u16 attached_slaves;
 	void *priv;
-	struct work_struct work;
+	struct delayed_work work;
+	unsigned int dev0_repoll_count;
 };
 
 struct mtk_sdw_pdi_params {
