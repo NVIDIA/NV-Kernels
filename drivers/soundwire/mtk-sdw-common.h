@@ -69,6 +69,7 @@ struct mtk_sdw {
 	struct mtk_sdw_dai *dais;
 	int num_dais;
 	u16 dp_pdi_mask[MTK_SDW_MAX_DP];
+	struct platform_device *mach_dev;
 };
 
 #endif /* __MTK_SDW_COMMON_H */
