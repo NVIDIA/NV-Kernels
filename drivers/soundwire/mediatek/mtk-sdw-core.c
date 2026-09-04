@@ -125,6 +125,44 @@ static int mtk_core_prep_msg(struct mtk_sdw_core *core, struct sdw_msg *msg)
  * =======================================================================
  */
 static enum sdw_command_response
+mtk_sdw_do_xfer_msg(struct mtk_sdw_core *core, struct sdw_msg *msg, u8 *buf)
+{
+	int i, ret = 0;
+
+	for (i = 0; i < msg->len; i++) {
+		u32 cmd = FIELD_PREP(MCP_CMD_DEV_ADDR, msg->dev_num) |
+			  FIELD_PREP(MCP_CMD_REG_ADDR, msg->addr + i) |
+			  FIELD_PREP(MCP_CMD_SSP_TAG, msg->ssp_sync);
+
+		cmd |= FIELD_PREP(MCP_CMD_FIELD, MCP_CMD_READ);
+		ret = core_send_cmd(core, cmd, &buf[i]);
+		if (ret)
+			break;
+	}
+
+	return ret;
+}
+
+/*
+ * A peripheral that is still re-synchronizing at Dev0 (or several
+ * peripherals colliding there) can return corrupted DevId bytes while
+ * still ACKing the read. The bus core trusts a single read, so a
+ * corrupted ID creates a phantom peripheral that consumes a device
+ * number while the real device stays orphaned. Run the whole DevId
+ * read twice as two complete sequential 0x50..0x55 passes (per-byte
+ * repeat reads would break the peripheral's enumeration commit
+ * tracking) and report the command ignored on mismatch; the core
+ * retries on the next attach pass, by which point the peripheral is
+ * stable.
+ */
+static bool mtk_sdw_is_dev0_devid_msg(struct sdw_msg *msg)
+{
+	return msg->dev_num == 0 && msg->flags == SDW_MSG_FLAG_READ &&
+	       msg->addr == SDW_SCP_DEVID_0 &&
+	       msg->addr + msg->len - 1 == SDW_SCP_DEVID_5;
+}
+
+static enum sdw_command_response
 mtk_sdw_xfer_msg(struct sdw_bus *bus, struct sdw_msg *msg)
 {
 	struct mtk_sdw_core *core = bus_to_core(bus);
@@ -133,6 +171,27 @@ mtk_sdw_xfer_msg(struct sdw_bus *bus, struct sdw_msg *msg)
 	ret = mtk_core_prep_msg(core, msg);
 	if (ret)
 		return SDW_CMD_FAIL_OTHER;
+
+	if (mtk_sdw_is_dev0_devid_msg(msg)) {
+		u8 verify[SDW_SCP_DEVID_5 - SDW_SCP_DEVID_0 + 1] = {0};
+
+		ret = mtk_sdw_do_xfer_msg(core, msg, msg->buf);
+		if (ret)
+			return ret;
+
+		ret = mtk_sdw_do_xfer_msg(core, msg, verify);
+		if (ret)
+			return ret;
+
+		if (memcmp(msg->buf, verify, msg->len)) {
+			dev_dbg(core->dev,
+				"Dev0 DevId unstable (%*ph / %*ph), deferring\n",
+				msg->len, msg->buf, msg->len, verify);
+			return SDW_CMD_IGNORED;
+		}
+
+		return SDW_CMD_OK;
+	}
 
 	for (i = 0; i < msg->len; i++) {
 		u32 cmd = FIELD_PREP(MCP_CMD_DEV_ADDR, msg->dev_num) |
