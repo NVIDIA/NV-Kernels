@@ -619,10 +619,24 @@ static int mtk_init_config_setting(struct mtk_sdw_core *core)
 	return mtk_do_config_update(core);
 }
 
+/*
+ * All MCP_INTMASK updates are read-modify-write and can run concurrently
+ * from the ISR, the status work, and the attach-check work: serialize
+ * them so no path can drop another path's mask bits.
+ */
+static void mtk_sdw_update_intmask(struct mtk_sdw_core *core, u32 mask, u32 val)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&core->intmask_lock, flags);
+	core_updatel(core, MCP_INTMASK, mask, val);
+	spin_unlock_irqrestore(&core->intmask_lock, flags);
+}
+
 static void mtk_sdw_enable_master_irq(struct mtk_sdw_core *core, bool enable)
 {
-	core_updatel(core, MCP_INTMASK, (MCP_INT_MST_ERR_MASK | MCP_INT_WAKEUP),
-		     enable ? (MCP_INT_MST_ERR_MASK | MCP_INT_WAKEUP) : 0);
+	mtk_sdw_update_intmask(core, (MCP_INT_MST_ERR_MASK | MCP_INT_WAKEUP),
+			       enable ? (MCP_INT_MST_ERR_MASK | MCP_INT_WAKEUP) : 0);
 }
 
 void mtk_sdw_enable_irq(struct mtk_sdw_core *core, bool enable)
@@ -649,14 +663,13 @@ void mtk_sdw_enable_irq(struct mtk_sdw_core *core, bool enable)
 	if (!enable)
 		cancel_delayed_work_sync(&core->status_work);
 
-	core_updatel(core, MCP_INTMASK, MCP_INT_IRQ,
-		     enable ? MCP_INT_IRQ : 0);
+	mtk_sdw_update_intmask(core, MCP_INT_IRQ, enable ? MCP_INT_IRQ : 0);
 }
 
 void mtk_sdw_enable_slave_irq(struct mtk_sdw_core *core, bool enable)
 {
-	core_updatel(core, MCP_INTMASK, MCP_INT_SLV_MASK,
-		     enable ? MCP_INT_SLV_MASK : 0);
+	mtk_sdw_update_intmask(core, MCP_INT_SLV_MASK,
+			       enable ? MCP_INT_SLV_MASK : 0);
 }
 
 /*
@@ -980,6 +993,7 @@ int mtk_sdw_core_init(struct mtk_sdw_core *core)
 	core->bus.port_ops       = &mtk_sdw_core_port_ops;
 	core->bus.compute_params = mtk_sdw_compute_params;
 
+	spin_lock_init(&core->intmask_lock);
 	INIT_DELAYED_WORK(&core->status_work, mtk_sdw_slave_status_work);
 	INIT_DELAYED_WORK(&core->attach_check_work, mtk_sdw_attach_check_work);
 	return 0;
@@ -1068,13 +1082,36 @@ irqreturn_t mtk_sdw_core_irq(int irq, void *data)
 		mtk_sdw_handle_master_dp_interrupt(core);
 	}
 
+	if (intstat & (MCP_INT_CTL_BUS_CLASH | MCP_INT_DATA_BUS_CLASH)) {
+		/*
+		 * Isolated clashes at bus power transitions are harmless.
+		 * A persistent clash condition (e.g. floating pads on a
+		 * link with no peripherals) refires the interrupt as fast
+		 * as it is cleared and storms the CPU: mask the clash
+		 * interrupts on this link when a rapid burst is detected.
+		 */
+		if (time_after(jiffies, core->clash_window + HZ / 10)) {
+			core->clash_window = jiffies;
+			core->clash_burst = 0;
+		}
+		if (++core->clash_burst >= 32) {
+			mtk_sdw_update_intmask(core,
+					       MCP_INT_CTL_BUS_CLASH |
+					       MCP_INT_DATA_BUS_CLASH, 0);
+			dev_err(core->dev,
+				"[%u]bus clash interrupt storm: masking clash interrupts IntStatus:0x%x\n",
+				bus->link_id, intstat);
+			core->clash_burst = 0;
+		}
+	}
+
 	if (intstat & (MCP_INT_CTL_BUS_CLASH))
-		dev_err(core->dev, "[%u]control bus clash 0x%x\n", bus->link_id,
-			intstat);
+		dev_err_ratelimited(core->dev, "[%u]control bus clash 0x%x\n",
+				    bus->link_id, intstat);
 
 	if (intstat & (MCP_INT_DATA_BUS_CLASH))
-		dev_err(core->dev, "[%u]data bus clash 0x%x\n", bus->link_id,
-			intstat);
+		dev_err_ratelimited(core->dev, "[%u]data bus clash 0x%x\n",
+				    bus->link_id, intstat);
 
 	if (intstat & MCP_INT_PARITY_ERR)
 		dev_err(core->dev, "[%u]parity error 0x%x\n", bus->link_id,
