@@ -72,6 +72,16 @@ struct mtk_base_memif_data {
 	int minlen_reg;
 	int minlen_mask;
 	int minlen_shift;
+	int maxlen_reg;
+	int maxlen_mask;
+	int maxlen_shift;
+	int domain_reg;
+	int domain_shift;
+	int domain_mask;
+	/* one hart mode */
+	int one_heart_mode_sel_reg;
+	int one_heart_mode_shift;
+	int one_heart_mode_mask_shift;
 };
 
 struct mtk_base_irq_data {
@@ -87,6 +97,11 @@ struct mtk_base_irq_data {
 	int irq_clr_reg;
 	int irq_clr_shift;
 	int irq_status_shift;
+	int irq_domain_reg;
+	int irq_domain_shift;
+	int irq_domain_maskbit;
+	int irq_mask_reg;
+	int irq_mask_shift;
 };
 
 struct device;
