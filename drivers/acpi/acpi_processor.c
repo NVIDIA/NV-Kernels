@@ -17,6 +17,7 @@
 #include <linux/dmi.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/overflow.h>
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 
@@ -1165,34 +1166,47 @@ end:
 }
 
 /**
- * combine_lpi_states - combine local and parent LPI states to form a composite LPI state
- *
+ * combine_lpi_states - combine local and parent LPI states
  * @local: local LPI state
  * @parent: parent LPI state
  * @result: composite LPI state
+ *
+ * Return: true if @local and @parent can form a composite entry.
  */
-static bool combine_lpi_states(struct acpi_lpi_state *local,
-			       struct acpi_lpi_state *parent,
+static bool combine_lpi_states(const struct acpi_lpi_state *local,
+			       const struct acpi_lpi_state *parent,
 			       struct acpi_lpi_state *result)
 {
+	memset(result, 0, sizeof(*result));
+
 	if (parent->entry_method == ACPI_CSTATE_INTEGER) {
-		if (!parent->address) /* 0 means autopromotable */
+		if (check_add_overflow(local->address, parent->address,
+				       &result->address))
 			return false;
-		result->address = local->address + parent->address;
+		result->entry_method = local->entry_method;
 	} else {
 		result->address = parent->address;
+		result->entry_method = parent->entry_method;
 	}
 
-	result->min_residency = max(local->min_residency, parent->min_residency);
-	result->wake_latency = local->wake_latency + parent->wake_latency;
+	/*
+	 * ACPI accumulates wake latency across hierarchy levels, but defines
+	 * minimum residency independently at each level.  The selected parent
+	 * state's value therefore becomes the composite value at this level.
+	 */
+	result->min_residency = parent->min_residency;
+	if (check_add_overflow(local->wake_latency, parent->wake_latency,
+			       &result->wake_latency))
+		return false;
 	result->enable_parent_state = parent->enable_parent_state;
-	result->entry_method = local->entry_method;
 
 	result->flags = parent->flags;
 	result->arch_flags = parent->arch_flags;
+	result->res_cnt_freq = parent->res_cnt_freq;
 	result->index = parent->index;
 
-	scnprintf(result->desc, ACPI_CX_DESC_LEN, "%s+%s", local->desc, parent->desc);
+	scnprintf(result->desc, ACPI_CX_DESC_LEN, "%s+%s", local->desc,
+		  parent->desc);
 	return true;
 }
 
