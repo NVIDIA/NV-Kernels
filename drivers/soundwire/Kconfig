@@ -62,6 +62,7 @@ config SOUNDWIRE_MTK
 	select SOUNDWIRE_GENERIC_ALLOCATION
 	depends on SND_SOC && ACPI
 	depends on MTK_POWER_WRAP
+	depends on PINCTRL_MT8901
 	select SND_SOC_ACPI
 	select SOUNDWIRE_MTK_MT8901_CLK
 	help
