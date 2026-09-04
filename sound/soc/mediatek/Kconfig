@@ -215,6 +215,16 @@ config SND_SOC_MTK_BTCVSD
 	  Select Y if you have such device.
 	  If unsure select "N".
 
+config SND_SOC_MTK_SDCA
+	tristate "SDCA support for Mediatek chip"
+	depends on ACPI
+	select SND_SOC_SDCA
+	help
+	  This enables SDCA support for codecs connecting with the
+	  MediaTek SoundWire master.
+	  Select Y if you use SDCA device.
+	  If unsure select "N".
+
 config SND_SOC_MT8188
 	tristate "ASoC support for MediaTek MT8188 chip"
 	depends on ARCH_MEDIATEK || COMPILE_TEST
