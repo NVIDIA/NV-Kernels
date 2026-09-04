@@ -97,5 +97,14 @@ config MTK_SSPM_CI
 	  by platform firmware communication helpers.
 
 	  If unsure, say N.
+config MTK_POWER_WRAP
+	bool "MediaTek Power Wrap ACPI device-control support"
+	depends on ACPI && ARM64
+	depends on MTK_SSPM_CI
+	help
+	  Say yes here to enable MediaTek Power Wrap support for ACPI based
+	  device power-control flows.
+
+	  If unsure, say N.
 
 endmenu
