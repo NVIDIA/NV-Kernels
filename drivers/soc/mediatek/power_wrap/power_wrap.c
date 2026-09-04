@@ -121,6 +121,100 @@ int mtk_pwrap_dev_request(void *dev_cfg)
 }
 EXPORT_SYMBOL_GPL(mtk_pwrap_dev_request);
 
+/**
+ * mtk_send_power_control_req() - Send a client power control request to SSPM
+ * @pwrctlreq: caller-allocated and -filled request descriptor
+ *
+ * Entry point for other drivers that need to push a power control command to
+ * SSPM over the SCMI interface. The caller allocates and fills @pwrctlreq
+ * (including @dev and an @InBuffer pointing to a struct power_cntl_scmi_data).
+ *
+ * The flow is:
+ *   1. Validate @pwrctlreq and its buffers.
+ *   2. Resolve @dev's ACPI full pathname and use it to look up the matching
+ *      struct pwrap_dev_config (which carries the per-device scmi_config with
+ *      feat_id/dev_id and the SCMI_DEV_REQUEST data words).
+ *   3. Interpret @InBuffer as struct power_cntl_scmi_data.
+ *   4. OR the caller's requestId/customdata into the configured request data
+ *      words and issue sspm_ci_set().
+ *
+ * Return: 0 on success, negative errno on failure.
+ */
+int mtk_send_power_control_req(struct _power_cntrl_request *pwrctlreq)
+{
+	struct power_cntl_scmi_data *scmidata;
+	struct pwrap_scmi_config *scmicfg;
+	struct pwrap_dev_config *cfg;
+	struct acpi_device *adev;
+	struct acpi_buffer path = { ACPI_ALLOCATE_BUFFER, NULL };
+	acpi_status status;
+	int ret;
+
+	if (!pwrctlreq || !pwrctlreq->dev)
+		return -EINVAL;
+
+	if (!pwrctlreq->InBuffer ||
+	    pwrctlreq->InBufferSize < sizeof(struct power_cntl_scmi_data)) {
+		dev_err(pwrctlreq->dev, "%s: invalid input buffer\n", __func__);
+		return -EINVAL;
+	}
+
+	/* Extract the ACPI companion and its full pathname from dev. */
+	adev = ACPI_COMPANION(pwrctlreq->dev);
+	if (!adev) {
+		dev_err(pwrctlreq->dev, "%s: no ACPI companion\n", __func__);
+		return -ENODEV;
+	}
+
+	status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &path);
+	if (ACPI_FAILURE(status)) {
+		dev_err(pwrctlreq->dev, "%s: failed to get ACPI path\n", __func__);
+		return -EINVAL;
+	}
+
+	/* Use the ACPI path to fetch the per-device config / scmi_config. */
+	cfg = pwrap_query_dev_config((char *)path.pointer);
+	if (!cfg) {
+		dev_err(pwrctlreq->dev, "%s: no dev config for \"%s\"\n",
+			__func__, (char *)path.pointer);
+		ret = -ENODEV;
+		goto out;
+	}
+
+	if (cfg->control_type != CTRL_BY_SCMI) {
+		dev_warn(pwrctlreq->dev, "%s: control type 0x%x is not scmi for dev %s\n",
+			 __func__, cfg->control_type, cfg->device_path);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	scmicfg = &cfg->scmi_config;
+
+	/* Interpret the caller's input buffer as SCMI request payload data. */
+	scmidata = (struct power_cntl_scmi_data *)pwrctlreq->InBuffer;
+
+	dev_dbg(pwrctlreq->dev,
+		"%s: scmi payload: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n", __func__,
+		scmicfg->feat_id, scmicfg->dev_id,
+		scmicfg->data[SCMI_DEV_REQUEST][SCMI_DATA_00] | scmidata->requestId,
+		scmicfg->data[SCMI_DEV_REQUEST][SCMI_DATA_01] | scmidata->customdata[SCMI_DATA_00],
+		scmicfg->data[SCMI_DEV_REQUEST][SCMI_DATA_02] | scmidata->customdata[SCMI_DATA_01],
+		scmicfg->data[SCMI_DEV_REQUEST][SCMI_DATA_03] | scmidata->customdata[SCMI_DATA_02]);
+
+	ret = sspm_ci_set(scmicfg->feat_id, scmicfg->dev_id,
+		scmicfg->data[SCMI_DEV_REQUEST][SCMI_DATA_00] | scmidata->requestId,
+		scmicfg->data[SCMI_DEV_REQUEST][SCMI_DATA_01] | scmidata->customdata[SCMI_DATA_00],
+		scmicfg->data[SCMI_DEV_REQUEST][SCMI_DATA_02] | scmidata->customdata[SCMI_DATA_01],
+		scmicfg->data[SCMI_DEV_REQUEST][SCMI_DATA_03] | scmidata->customdata[SCMI_DATA_02]);
+
+	pwrctlreq->BytesReturned = 0;
+
+out:
+	ACPI_FREE(path.pointer);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(mtk_send_power_control_req);
+
 int mtk_pwrap_dev_remove(void *dev_cfg)
 {
 	struct pwrap_dev_config *cfg = (struct pwrap_dev_config *)dev_cfg;
