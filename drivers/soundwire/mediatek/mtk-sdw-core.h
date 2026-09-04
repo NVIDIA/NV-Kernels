@@ -203,6 +203,10 @@ struct mtk_sdw_core {
 	struct delayed_work attach_check_work;
 	unsigned int dev0_repoll_count;
 	unsigned int bus_reset_count;
+	unsigned int clash_burst;
+	unsigned long clash_window;
+	/* serializes all MCP_INTMASK read-modify-write updates */
+	spinlock_t intmask_lock;
 };
 
 struct mtk_sdw_pdi_params {
