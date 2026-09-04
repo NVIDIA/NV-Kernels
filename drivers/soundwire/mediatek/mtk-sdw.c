@@ -111,6 +111,28 @@ static int mtk_sdw_disable_reg_clock(struct mtk_sdw *mst)
 	return ret;
 }
 
+static int mtk_sdw_enable_power(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mst->clk_ops->enable_power_domain(mst);
+	if (ret)
+		dev_err(mst->dev, "failed to enable power, ret %d\n", ret);
+
+	return ret;
+}
+
+static int mtk_sdw_disable_power(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mst->clk_ops->disable_power_domain(mst);
+	if (ret)
+		dev_err(mst->dev, "failed to disable power, ret %d\n", ret);
+
+	return ret;
+}
+
 /* =======================================================================
  * ASoC DAI layer  (ALSA <-> SoundWire stream binding)
  * =======================================================================
@@ -1033,11 +1055,95 @@ static void mtk_sdw_remove(struct platform_device *pdev)
 		mtk_sdw_link_deinit(mst, i);
 }
 
+static int __maybe_unused mtk_sdw_suspend(struct device *dev)
+{
+	struct mtk_sdw *mst = dev_get_drvdata(dev);
+	int i, ret;
+
+	for (i = 0; i < mst->num_links; i++) {
+		struct mtk_sdw_core *core = &mst->links[i].core;
+
+		mtk_sdw_enable_irq(core, false);
+
+		ret = mtk_sdw_disable_top_clock(mst, i);
+		if (ret) {
+			dev_err(dev, "mtk_sdw_disable_top_clock failed: %d\n",
+				ret);
+			goto err_reenable;
+		}
+
+		/*
+		 * The SSPM power refcount is one vote per link (the firmware
+		 * initializes it to the link count, and the Windows driver
+		 * relinquishes once per SoundWire IP), so vote per link, not
+		 * per master, or the count never reaches zero and the SoC
+		 * cannot enter PPS7/PPS8.
+		 */
+		ret = mtk_sdw_disable_power(mst);
+		if (ret) {
+			mtk_sdw_enable_top_clock(mst, i);
+			goto err_reenable;
+		}
+	}
+
+	return 0;
+
+err_reenable:
+	while (--i >= 0) {
+		mtk_sdw_enable_power(mst);
+		mtk_sdw_enable_top_clock(mst, i);
+	}
+	for (i = 0; i < mst->num_links; i++)
+		mtk_sdw_enable_irq(&mst->links[i].core, true);
+
+	return ret;
+}
+
+static int __maybe_unused mtk_sdw_resume(struct device *dev)
+{
+	struct mtk_sdw *mst = dev_get_drvdata(dev);
+	int i, ret;
+
+	for (i = 0; i < mst->num_links; i++) {
+		struct mtk_sdw_core *core = &mst->links[i].core;
+
+		/* One power vote per link; see mtk_sdw_suspend(). */
+		ret = mtk_sdw_enable_power(mst);
+		if (ret)
+			goto err_disable;
+
+		ret = mtk_sdw_enable_top_clock(mst, i);
+		if (ret) {
+			dev_err(dev, "mtk_sdw_enable_top_clock failed: %d\n",
+				ret);
+			mtk_sdw_disable_power(mst);
+			goto err_disable;
+		}
+
+		mtk_sdw_enable_irq(core, true);
+	}
+
+	return 0;
+
+err_disable:
+	while (--i >= 0) {
+		mtk_sdw_enable_irq(&mst->links[i].core, false);
+		mtk_sdw_disable_top_clock(mst, i);
+		mtk_sdw_disable_power(mst);
+	}
+
+	return ret;
+}
+
 static const struct acpi_device_id mtk_sdw_acpi_match[] = {
 	{ "NVDA9100", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, mtk_sdw_acpi_match);
+
+static const struct dev_pm_ops mtk_sdw_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(mtk_sdw_suspend, mtk_sdw_resume)
+};
 
 static struct platform_driver mtk_sdw_driver = {
 	.probe  = mtk_sdw_probe,
@@ -1045,6 +1151,7 @@ static struct platform_driver mtk_sdw_driver = {
 	.driver = {
 		.name             = "mtk-soundwire",
 		.acpi_match_table = mtk_sdw_acpi_match,
+		.pm = &mtk_sdw_pm_ops,
 	},
 };
 module_platform_driver(mtk_sdw_driver);
