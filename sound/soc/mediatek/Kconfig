@@ -382,6 +382,10 @@ config SND_SOC_MT8901_LEGACY_SDW_MACH
 	select SND_SOC_RT712_SDCA_SDW
 	select SND_SOC_RT712_SDCA_DMIC_SDW
 	select SND_SOC_RT1320_SDW
+	select SND_SOC_CS35L56_SDW
+	select MFD_CS42L43_SDW
+	select SND_SOC_CS42L43
+	select SND_SOC_CS42L43_SDW
 	help
 	  This adds support for Legacy(No DSP) sound card for MediaTek
 	  MT8901 boards.
