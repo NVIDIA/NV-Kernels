@@ -7,6 +7,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/iopoll.h>
 #include <linux/soundwire/sdw.h>
@@ -183,6 +184,19 @@ mtk_sdw_xfer_msg(struct sdw_bus *bus, struct sdw_msg *msg)
 		ret = mtk_sdw_do_xfer_msg(core, msg, verify);
 		if (ret)
 			return ret;
+
+		/*
+		 * The status work cleared the Dev0 attach latch and saw it
+		 * stay quiet before handing over to the bus core. A new
+		 * arrival since then latches it again and may have mixed
+		 * into both passes identically; discard this pass.
+		 */
+		if (core_readl(core, MCP_SLAVEINTSTAT0) &
+		    MCP_SLAVEINTSTAT_ATTACHED) {
+			dev_dbg(core->dev,
+				"Dev0 attach changed during DevId read, deferring\n");
+			return SDW_CMD_IGNORED;
+		}
 
 		if (memcmp(msg->buf, verify, msg->len)) {
 			dev_dbg(core->dev,
@@ -699,6 +713,8 @@ static int mtk_sdw_update_slave_status(struct mtk_sdw_core *core,
  */
 #define MTK_SDW_DEV0_REPOLL_MAX		25
 #define MTK_SDW_DEV0_REPOLL_DELAY_MS	20
+#define MTK_SDW_DEV0_SETTLE_MS		30
+#define MTK_SDW_DEV0_SETTLE_ROUNDS	4
 
 static void mtk_sdw_slave_status_work(struct work_struct *work)
 {
@@ -708,6 +724,8 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 	u32 stat1;
 	u32 dev0_stat;
 	int retries = 0;
+	unsigned int n;
+	bool settled;
 	u64 slv_intstat;
 
 	core_writel(core, MCP_INTSTAT, MCP_INT_SLV_MASK);
@@ -723,6 +741,43 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 	slv_intstat = ((u64)stat1 << 32) | stat0;
 
 	do {
+		/*
+		 * Pace the enumeration rounds. A peripheral that just
+		 * dropped to Dev0 (soft reset, late power-up) needs time to
+		 * regain frame sync; reading DevId while it drives misaligned
+		 * data corrupts the response of any synced peripheral
+		 * answering in the same round, and the corruption is
+		 * deterministic (wire-mixed), so re-reads cannot filter it.
+		 * The wait must precede every round including the first, or
+		 * the straggler is enumerated from its mixed response. A
+		 * peripheral arriving at Dev0 during the wait latches a new
+		 * attach transition for Dev0; give it a full interval too,
+		 * bounded so a flapping device cannot stall the work.
+		 */
+		settled = true;
+		for (n = 0; core_get_slave_status(core, 0) == MCP_SLAVESTAT_ATTACHED;
+		     n++) {
+			if (n == MTK_SDW_DEV0_SETTLE_ROUNDS) {
+				/* The last interval latched again: not settled. */
+				settled = false;
+				break;
+			}
+			core_writel(core, MCP_SLAVEINTSTAT0,
+				    MCP_SLAVEINTSTAT_ATTACHED);
+			msleep(MTK_SDW_DEV0_SETTLE_MS);
+			if (!(core_readl(core, MCP_SLAVEINTSTAT0) &
+			      MCP_SLAVEINTSTAT_ATTACHED))
+				break;
+		}
+
+		if (!settled) {
+			dev_dbg(core->dev,
+				"[%u] Dev0 attach still changing after %u rounds, deferring enumeration\n",
+				core->bus.link_id, MTK_SDW_DEV0_SETTLE_ROUNDS);
+			dev0_stat = MCP_SLAVESTAT_ATTACHED;
+			break;
+		}
+
 		mtk_sdw_update_slave_status(core, slv_intstat);
 
 		dev0_stat = core_get_slave_status(core, 0);
