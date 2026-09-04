@@ -344,11 +344,15 @@ err:
 	return ret;
 }
 
+/*
+ * The disable helpers are transactional: on failure they re-enable what they
+ * already released and return the error, so a caller's own unwind can assume
+ * the clocks are still in the state they were in before the call.
+ */
 int mt8901_afe_disable_apll_top_con_cg(struct mtk_base_afe *afe)
 {
 	struct device *dev = afe->dev;
 	int i, ret;
-	int last_ret = 0;
 
 	for (i = ARRAY_SIZE(mt8901_apll_top_con_cgs) - 1; i >= 0; i--) {
 		ret = mt8901_afe_disable_top_cg(afe,
@@ -357,11 +361,17 @@ int mt8901_afe_disable_apll_top_con_cg(struct mtk_base_afe *afe)
 			dev_warn(dev, "disable_top_cg %s failed: %d\n",
 				 mt8901_cg_names[mt8901_apll_top_con_cgs[i]],
 				 ret);
-			last_ret = ret;
+			goto err;
 		}
 	}
 
-	return last_ret;
+	return 0;
+
+err:
+	while (++i < ARRAY_SIZE(mt8901_apll_top_con_cgs))
+		mt8901_afe_enable_top_cg(afe, mt8901_apll_top_con_cgs[i]);
+
+	return ret;
 }
 
 int mt8901_afe_enable_mtcmos(struct mtk_base_afe *afe, unsigned int mtcmos)
@@ -429,7 +439,6 @@ static int mt8901_afe_disable_main_clk_muxes(struct mtk_base_afe *afe)
 {
 	struct device *dev = afe->dev;
 	int i, ret;
-	int last_ret = 0;
 
 	for (i = 0; i < ARRAY_SIZE(mt8901_main_clk_muxes); i++) {
 		ret = mt8901_afe_clk_mux_req(dev, mt8901_main_clk_muxes[i],
@@ -438,11 +447,17 @@ static int mt8901_afe_disable_main_clk_muxes(struct mtk_base_afe *afe)
 		if (ret) {
 			dev_warn(dev, "disable main_clk mux[%d] failed: %d\n",
 				 i, ret);
-			last_ret = ret;
+			goto err;
 		}
 	}
 
-	return last_ret;
+	return 0;
+
+err:
+	while (i-- > 0)
+		mt8901_afe_clk_mux_req(dev, mt8901_main_clk_muxes[i], true);
+
+	return ret;
 }
 
 int mt8901_afe_enable_main_clock(struct mtk_base_afe *afe)
@@ -490,33 +505,41 @@ int mt8901_afe_disable_main_clock(struct mtk_base_afe *afe)
 {
 	struct device *dev = afe->dev;
 	int ret;
-	int last_ret = 0;
 
 	ret = mt8901_afe_disable_afe_on(afe);
 	if (ret) {
 		dev_err(dev, "disable_afe_on failed: %d\n", ret);
-		last_ret = ret;
+		return ret;
 	}
 
 	ret = mt8901_afe_disable_top_cg(afe, AUD_CG_AUDIO_F26M_CK);
 	if (ret) {
 		dev_err(dev, "disable_top_cg F26M failed: %d\n", ret);
-		last_ret = ret;
+		goto err_afe_on;
 	}
 
 	ret = mt8901_afe_disable_top_cg(afe, AUD_CG_AUDIO_HOPPING_CK);
 	if (ret) {
 		dev_err(dev, "disable_top_cg HOPPING failed: %d\n", ret);
-		last_ret = ret;
+		goto err_f26m;
 	}
 
 	ret = mt8901_afe_disable_main_clk_muxes(afe);
 	if (ret) {
 		dev_err(dev, "disable_main_clk_muxes failed: %d\n", ret);
-		last_ret = ret;
+		goto err_hopping;
 	}
 
-	return last_ret;
+	return 0;
+
+err_hopping:
+	mt8901_afe_enable_top_cg(afe, AUD_CG_AUDIO_HOPPING_CK);
+err_f26m:
+	mt8901_afe_enable_top_cg(afe, AUD_CG_AUDIO_F26M_CK);
+err_afe_on:
+	mt8901_afe_enable_afe_on(afe);
+
+	return ret;
 }
 
 int mt8901_afe_enable_reg_rw_clk(struct mtk_base_afe *afe)

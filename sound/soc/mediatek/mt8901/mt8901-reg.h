@@ -1574,6 +1574,8 @@
 #define AFE_GASRC11_NEW_CON13             (0x7b34)
 #define AFE_GASRC11_NEW_CON14             (0x7b38)
 #define AFE_GASRC11_NEW_IP_VERSION        (0x7b3c)
+#define AFE_SOUNDWIRE_REG_BEGIN           (0x9000)
+#define AFE_SOUNDWIRE_REG_END             (0x9600)
 #define AFE_GAIN_DL0_CON0                 (0x9800)
 #define AFE_GAIN_DL0_CON1_R               (0x9804)
 #define AFE_GAIN_DL0_CON1_L               (0x9808)
