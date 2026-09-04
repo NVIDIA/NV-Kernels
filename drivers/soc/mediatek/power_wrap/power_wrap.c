@@ -63,6 +63,34 @@ static struct pwrap_dev_ctrl dev_ctrl;
 #define PWRAP_DVFSRC_FLAG_ADDR	0x12FC00
 #define PWRAP_DVFSRC_FLAG_LEN	0x4
 #define PWRAP_DVFSRC_FLAG_VAL	0x1
+
+/*
+ * USB4 resource-release hook.
+ *
+ * The bootloader leaves the USB4 hardware resources powered on when USB4 is
+ * not used. A single SCMI trigger to the SSPM (feature id 15, no params) tells
+ * the firmware to release them. This was previously a standalone one-call
+ * driver (usb4_hook.c / CONFIG_MTK_USB4_HOOK); it is folded into power_wrap
+ * here to avoid the overhead of a separate driver for a single API call.
+ *
+ * The release is issued from a late_initcall so it runs after the xHCI driver
+ * (device_initcall) that owns the USB4 domain; issuing it earlier lets xHCI
+ * re-power the domain and blocks the deepest suspend state. probe() stashes
+ * the device; the late_initcall consumes it.
+ *
+ * The release is restricted to MT8901. The feature-id 15 trigger encodes
+ * an MT8901 USB4 resource-layout assumption, so gating on the platform id lets
+ * other platforms (e.g. MT8992) boot and be tested without reverting this
+ * change. The platform id is read from the PLID method on the power_wrap ACPI
+ * device (NVDA6210), mirroring the Windows PEP driver's AcpiGetPlatformId();
+ * the value matches the PEP PLAT_IDENTIFIER enum (SOC_MT8901 == 0x2).
+ */
+#define PWRAP_USB4_HOOK_FEATURE_ID	15	/* SSPM SCMI_USB4_HOOK */
+#define PWRAP_PLID_MT8901		0x2	/* SOC_MT8901 */
+
+/* Device stashed by probe for the USB4-release late_initcall. */
+static struct device *pwrap_usb4_dev;
+
 /*
  * BestPerf performance setting register.
  *
@@ -554,6 +582,51 @@ static void pwrap_write_bestperf_flag(struct device *dev)
 	iounmap(vaddr);
 }
 
+/*
+ * pwrap_release_usb4_resources() - release USB4 hardware resources via SSPM
+ *
+ * Sends a single SCMI trigger (feature id 15, no params) telling the firmware
+ * to release the USB4 resources the bootloader leaves powered on. Restricted
+ * to MT8901 via the PLID platform id: on any other platform, or if PLID is not
+ * available, the trigger is skipped so the platform is unaffected. Runs as a
+ * late_initcall (see the USB4 hook note above); does nothing if power_wrap did
+ * not probe. Best-effort: a release failure is logged but not escalated.
+ */
+static int __init pwrap_release_usb4_resources(void)
+{
+	struct device *dev = pwrap_usb4_dev;
+	unsigned long long plid;
+	acpi_status status;
+	int ret;
+
+	if (!dev)
+		return 0;
+
+	status = acpi_evaluate_integer(ACPI_HANDLE(dev), "PLID", NULL, &plid);
+	if (ACPI_FAILURE(status)) {
+		dev_info(dev, "USB4: PLID unavailable (%s), skipping release\n",
+			 acpi_format_exception(status));
+		return 0;
+	}
+
+	if (plid != PWRAP_PLID_MT8901) {
+		dev_info(dev, "USB4: platform id 0x%llx is not MT8901, skipping release\n",
+			 plid);
+		return 0;
+	}
+
+	ret = sspm_ci_set(PWRAP_USB4_HOOK_FEATURE_ID, 0, 0, 0, 0, 0);
+	if (ret)
+		dev_err(dev, "USB4: sspm_ci_set failed to release resources (%d)\n",
+			ret);
+	else
+		dev_info(dev, "USB4: SSPM released usb4 resources\n");
+
+	/* Best-effort: a release failure is logged but not escalated. */
+	return 0;
+}
+late_initcall(pwrap_release_usb4_resources);
+
 static int mtk_pwrap_probe(struct platform_device *pdev)
 {
 	const struct acpi_device_id	*id;
@@ -604,6 +677,12 @@ static int mtk_pwrap_probe(struct platform_device *pdev)
 	if (ret)
 		dev_warn(&pdev->dev,
 			 "failed to create sysfs nodes: %d (continuing)\n", ret);
+
+	/*
+	 * Stash the device for the USB4-release late_initcall, which runs after
+	 * the xHCI driver has probed (see the USB4 hook note above).
+	 */
+	pwrap_usb4_dev = dev;
 
 	return 0;
 }
