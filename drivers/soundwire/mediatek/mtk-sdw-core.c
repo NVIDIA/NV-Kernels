@@ -7,6 +7,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/iopoll.h>
 #include <linux/soundwire/sdw.h>
@@ -683,6 +684,7 @@ static int mtk_sdw_update_slave_status(struct mtk_sdw_core *core,
  */
 #define MTK_SDW_DEV0_REPOLL_MAX		25
 #define MTK_SDW_DEV0_REPOLL_DELAY_MS	20
+#define MTK_SDW_DEV0_SETTLE_MS		30
 
 static void mtk_sdw_slave_status_work(struct work_struct *work)
 {
@@ -716,6 +718,17 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 			dev_info(core->dev,
 				 "[%u] slave attached Dev0Stat:0x%x Retries:%d",
 				 core->bus.link_id, dev0_stat, retries);
+			/*
+			 * Pace the enumeration rounds. A peripheral that just
+			 * dropped to Dev0 (soft reset, late power-up) needs
+			 * time to regain frame sync; reading DevId while it
+			 * drives misaligned data corrupts the response of any
+			 * synced peripheral answering in the same round, and
+			 * the corruption is deterministic (wire-mixed), so
+			 * re-reads cannot filter it. Waiting between rounds
+			 * lets stragglers align before they are enumerated.
+			 */
+			msleep(MTK_SDW_DEV0_SETTLE_MS);
 		} else {
 			break;
 		}
