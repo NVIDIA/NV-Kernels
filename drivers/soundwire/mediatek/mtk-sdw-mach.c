@@ -67,6 +67,39 @@ static const struct snd_soc_acpi_adr_device rt712_l1_adr[] = {
 	},
 };
 
+/*
+ * Variant of the RT1320 pair with the second amp at unique ID 0x31
+ * (the reference layout has it at 0x32).
+ */
+static const struct snd_soc_acpi_adr_device rt1320x2_l0_adr[] = {
+	{
+		.adr = 0x000030025D132001ull,
+		.num_endpoints = 1,
+		.endpoints = &rt1320_endpoints[0],
+		.name_prefix = "rt1320-1",
+	},
+	{
+		.adr = 0x000031025D132001ull,
+		.num_endpoints = 1,
+		.endpoints = &rt1320_endpoints[1],
+		.name_prefix = "rt1320-2",
+	},
+};
+
+static const struct snd_soc_acpi_link_adr mtk_sdw_rt1320x2_l0_rt712_l1[] = {
+	{
+		.mask = BIT(0),
+		.num_adr = ARRAY_SIZE(rt1320x2_l0_adr),
+		.adr_d = rt1320x2_l0_adr,
+	},
+	{
+		.mask = BIT(1),
+		.num_adr = ARRAY_SIZE(rt712_l1_adr),
+		.adr_d = rt712_l1_adr,
+	},
+	{}
+};
+
 static const struct snd_soc_acpi_link_adr mtk_sdw_rt1320_l0_rt712_l1[] = {
 	{
 		.mask = BIT(0),
@@ -357,6 +390,11 @@ static struct snd_soc_acpi_mach mtk_sdw_machines[] = {
 	{
 		.link_mask = BIT(0) | BIT(1),
 		.links     = mtk_sdw_rt1321_l0_rt713_l1,
+		.drv_name  = "mtk_sdw_mc",
+	},
+	{
+		.link_mask = BIT(0) | BIT(1),
+		.links     = mtk_sdw_rt1320x2_l0_rt712_l1,
 		.drv_name  = "mtk_sdw_mc",
 	},
 	{
