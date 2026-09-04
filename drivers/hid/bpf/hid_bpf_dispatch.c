@@ -455,6 +455,10 @@ hid_bpf_hw_request(struct hid_bpf_ctx *ctx, __u8 *buf, size_t buf__sz,
 
 	report_len = hid_report_len(report);
 
+	/* unnumbered reports need to have a report ID reserved in the first byte */
+	if (report_enum->numbered == 0)
+		report_len += 1;
+
 	if (buf__sz > report_len)
 		buf__sz = report_len;
 
