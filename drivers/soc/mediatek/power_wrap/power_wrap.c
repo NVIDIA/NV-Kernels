@@ -1,0 +1,455 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (c) 2026 MediaTek Inc.
+ */
+#include <linux/acpi.h>
+#include <linux/init.h>
+#include <linux/io.h>
+#include <linux/miscdevice.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
+#include <linux/printk.h>
+#include <linux/slab.h>
+
+#include "power_wrap.h"
+
+/*
+ *	ACPI _DSM UUID for DPM
+ *	(64B66B51-38F7-3391-C689-4FA2109179AB)
+ */
+const guid_t pwrap_dsm_dpm_uuid = GUID_INIT(
+	0x64b66b51, 0x38f7, 0x3391,
+	0xc6, 0x89, 0x4f, 0xa2, 0x10, 0x91, 0x79, 0xab
+);
+
+enum mtk_pwrap_type {
+	NVDA6210,
+};
+
+enum acpi_crs_mem_res {
+	/* ACPI memory resource data type */
+	ACPI_CRS_MEM_RES0 = 0,
+	ACPI_CRS_MEM_RES1,
+	ACPI_CRS_MEM_RES_NUM,
+};
+
+enum acpi_crs_irq_res {
+	/* ACPI interrupt resource data type */
+	ACPI_CRS_IRQ_RES0 = 0,
+	ACPI_CRS_IRQ_RES1,
+	ACPI_CRS_IRQ_RES_NUM,
+};
+
+static struct pwrap_dev_ctrl dev_ctrl;
+
+/* Getter for static pwrap_dev_ctrl */
+struct pwrap_dev_ctrl *pwrap_get_dev_ctrl(void)
+{
+	return &dev_ctrl;
+}
+
+/**
+ * Query dev_config by device path.
+ * Return pointer to struct pwrap_dev_config as void*, NULL otherwise.
+ */
+void *pwrap_query_dev_config(const char *dev_path)
+{
+	struct pwrap_dev_ctrl *ctrl = pwrap_get_dev_ctrl();
+
+	if (!dev_path)
+		return NULL;
+
+	//pr_info("%s: search dev_path \"%s\"\n",
+	//	__func__, dev_path);
+
+	if (!ctrl || !ctrl->configs)
+		return NULL;
+
+	for (int i = 0; i < ctrl->count; ++i) {
+		char *cfg_path = ctrl->configs[i].device_path;
+		//pr_info("%s: device configs[%d] path %s\n",
+		//	__func__, i, ctrl->configs[i].device_path);
+		if (cfg_path && strcmp(dev_path, cfg_path) == 0)
+			return (void *) &ctrl->configs[i];
+	}
+	return NULL;
+}
+
+/*
+ * Common SCMI dispatch helper.
+ * Logs the raw payload, then calls sspm_ci_set() with the provided composite
+ * word as DATA_00 and the remaining three data words from the action slot.
+ * Returns the sspm_ci_set() return value, or -EINVAL if control_type is not
+ * CTRL_BY_SCMI.
+ */
+static int pwrap_scmi_dispatch(struct pwrap_dev_config *cfg,
+				   u8 action_idx, u32 composite,
+				   const char *action_name)
+{
+	if (cfg->control_type != CTRL_BY_SCMI) {
+		pr_warn("%s: control type 0x%x is not scmi for dev %s\n",
+			action_name, cfg->control_type, cfg->device_path);
+		return -EINVAL;
+	}
+
+	pr_debug("%s: scmi payload: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n",
+		action_name,
+		cfg->scmi_config.feat_id,
+		cfg->scmi_config.dev_id,
+		composite,
+		cfg->scmi_config.data[action_idx][SCMI_DATA_01],
+		cfg->scmi_config.data[action_idx][SCMI_DATA_02],
+		cfg->scmi_config.data[action_idx][SCMI_DATA_03]);
+
+	return sspm_ci_set(cfg->scmi_config.feat_id,
+			   cfg->scmi_config.dev_id,
+			   composite,
+			   cfg->scmi_config.data[action_idx][SCMI_DATA_01],
+			   cfg->scmi_config.data[action_idx][SCMI_DATA_02],
+			   cfg->scmi_config.data[action_idx][SCMI_DATA_03]);
+}
+
+int mtk_pwrap_dev_request(void *dev_cfg)
+{
+	struct pwrap_dev_config *cfg = (struct pwrap_dev_config *)dev_cfg;
+
+	if (!cfg)
+		return -ENODEV;
+	return pwrap_scmi_dispatch(cfg, SCMI_DEV_REQUEST,
+				   cfg->scmi_config.data[SCMI_DEV_REQUEST][SCMI_DATA_00],
+				   __func__);
+}
+EXPORT_SYMBOL_GPL(mtk_pwrap_dev_request);
+
+int mtk_pwrap_dev_remove(void *dev_cfg)
+{
+	struct pwrap_dev_config *cfg = (struct pwrap_dev_config *)dev_cfg;
+
+	if (!cfg)
+		return -ENODEV;
+	return pwrap_scmi_dispatch(cfg, SCMI_DEV_ADANDON,
+				   cfg->scmi_config.data[SCMI_DEV_ADANDON][SCMI_DATA_00],
+				   __func__);
+}
+EXPORT_SYMBOL_GPL(mtk_pwrap_dev_remove);
+
+int mtk_pwrap_dev_suspend(void *dev_cfg, u8 sys_trans)
+{
+	struct pwrap_dev_config *cfg = (struct pwrap_dev_config *)dev_cfg;
+	u32 composite;
+
+	if (!cfg)
+		return -ENODEV;
+	composite = PWRAP_SCMI_DEV_ACT_PAYLOAD(
+		cfg->scmi_config.data[SCMI_DEV_STATE][SCMI_DATA_00], DEV_STA_D3, 1, sys_trans);
+	return pwrap_scmi_dispatch(cfg, SCMI_DEV_STATE, composite, __func__);
+}
+EXPORT_SYMBOL_GPL(mtk_pwrap_dev_suspend);
+
+int mtk_pwrap_dev_resume(void *dev_cfg, u8 sys_trans)
+{
+	struct pwrap_dev_config *cfg = (struct pwrap_dev_config *)dev_cfg;
+	u32 composite;
+
+	if (!cfg)
+		return -ENODEV;
+	composite = PWRAP_SCMI_DEV_ACT_PAYLOAD(
+		cfg->scmi_config.data[SCMI_DEV_STATE][SCMI_DATA_00], DEV_STA_D0, 0, sys_trans);
+	return pwrap_scmi_dispatch(cfg, SCMI_DEV_STATE, composite, __func__);
+}
+EXPORT_SYMBOL_GPL(mtk_pwrap_dev_resume);
+
+int mtk_pwrap_com_idle(void *dev_cfg, u8 com_idx)
+{
+	struct pwrap_dev_config *cfg = (struct pwrap_dev_config *)dev_cfg;
+	u32 composite;
+
+	if (!cfg)
+		return -ENODEV;
+	composite = PWRAP_SCMI_DEV_ACT_PAYLOAD(
+		cfg->scmi_config.data[SCMI_COM_IDLE][SCMI_DATA_00], com_idx, COM_STA_L1, 1);
+	return pwrap_scmi_dispatch(cfg, SCMI_COM_IDLE, composite, __func__);
+}
+EXPORT_SYMBOL_GPL(mtk_pwrap_com_idle);
+
+int mtk_pwrap_com_active(void *dev_cfg, u8 com_idx)
+{
+	struct pwrap_dev_config *cfg = (struct pwrap_dev_config *)dev_cfg;
+	u32 composite;
+
+	if (!cfg)
+		return -ENODEV;
+	composite = PWRAP_SCMI_DEV_ACT_PAYLOAD(
+		cfg->scmi_config.data[SCMI_COM_IDLE][SCMI_DATA_00], com_idx, COM_STA_L0, 0);
+	return pwrap_scmi_dispatch(cfg, SCMI_COM_IDLE, composite, __func__);
+}
+EXPORT_SYMBOL_GPL(mtk_pwrap_com_active);
+
+/**
+ * Probe dev_config by ACPI path, with SCMI log if needed.
+ * Return pointer to struct pwrap_dev_config as void*, NULL otherwise.
+ */
+void *mtk_pwrap_dev_probe(const char *acpi_path)
+{
+	int ret = 0;
+	struct pwrap_dev_config *cfg =
+		(struct pwrap_dev_config *) pwrap_query_dev_config(acpi_path);
+
+	if (!cfg)
+		return NULL;
+
+	pr_info("%s: Device found at path %s\n", __func__, cfg->device_path);
+
+	if (cfg->control_type == CTRL_BY_SCMI) {
+		pr_info("%s: control type is scmi, payload: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n",
+			__func__,
+			cfg->scmi_config.feat_id,
+			cfg->scmi_config.dev_id,
+			cfg->scmi_config.data[SCMI_DEV_PROBE][SCMI_DATA_00],
+			cfg->scmi_config.data[SCMI_DEV_PROBE][SCMI_DATA_01],
+			cfg->scmi_config.data[SCMI_DEV_PROBE][SCMI_DATA_02],
+			cfg->scmi_config.data[SCMI_DEV_PROBE][SCMI_DATA_03]);
+
+		ret = sspm_ci_set(
+			cfg->scmi_config.feat_id,
+			cfg->scmi_config.dev_id,
+			cfg->scmi_config.data[SCMI_DEV_PROBE][SCMI_DATA_00],
+			cfg->scmi_config.data[SCMI_DEV_PROBE][SCMI_DATA_01],
+			cfg->scmi_config.data[SCMI_DEV_PROBE][SCMI_DATA_02],
+			cfg->scmi_config.data[SCMI_DEV_PROBE][SCMI_DATA_03]);
+
+		if (ret) {
+			pr_warn("%s: scmi ret = %d for device \"%s\"\n",
+					__func__, ret, acpi_path);
+			cfg = NULL;
+		}
+	}
+	return (void *) cfg;
+}
+EXPORT_SYMBOL_GPL(mtk_pwrap_dev_probe);
+
+static int pwrap_config_resource(struct platform_device *pdev, kernel_ulong_t driver_data)
+{
+	enum mtk_pwrap_type type;
+	struct resource *res;
+	int irq;
+
+	if (!pdev)
+		return -ENODEV;
+
+	type = (enum mtk_pwrap_type)driver_data;
+	switch (type) {
+	case NVDA6210:
+		res = platform_get_resource(pdev, IORESOURCE_MEM, ACPI_CRS_MEM_RES0);
+		if (!res) {
+			dev_err(&pdev->dev, "no memory resource for index: 0x%x\n",
+				ACPI_CRS_MEM_RES0);
+			return -ENOMEM;
+		}
+		dev_info(&pdev->dev, "ACPI MEM index 0x%x: start = 0x%llx, size = 0x%llx\n",
+			 ACPI_CRS_MEM_RES0,
+			 (unsigned long long)res->start,
+			 (unsigned long long)resource_size(res));
+
+		irq = platform_get_irq(pdev, ACPI_CRS_IRQ_RES0);
+		if (irq < 0) {
+			dev_err(&pdev->dev, "no IRQ resource for index: 0x%x, error: %d\n",
+				ACPI_CRS_IRQ_RES0, irq);
+			return irq;
+		}
+		dev_info(&pdev->dev, "ACPI IRQ index 0x%x: number = %d\n",
+			 ACPI_CRS_IRQ_RES0, irq);
+		break;
+	default:
+		dev_err(&pdev->dev, "not support memory resource for type: 0x%x\n", type);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int pwrap_acpi_config_init(struct device *dev)
+{
+	struct pwrap_dev_ctrl *ctrl = pwrap_get_dev_ctrl();
+	int err;
+
+	if (!dev)
+		return -ENODEV;
+
+	if (!ctrl)
+		return -EINVAL;
+
+	dev_info(dev, "Config dev ctrl info from ACPI data\n");
+
+	/*
+	 * Parse the full DPMT (UUID 64B66B51, func 1) into ctrl: device path,
+	 * type, constraints, control_type, and - for SCMI devices - the
+	 * per-device dev_id via GDSC(). Implemented in acpiutil.c.
+	 */
+	err = pwrap_acpi_fetch_dpm_config(dev, ctrl);
+	if (err) {
+		dev_err(dev, "Failed to fetch DPM config from ACPI: %d\n", err);
+		memset(ctrl, 0, sizeof(struct pwrap_dev_ctrl));
+	}
+
+	return err;
+}
+
+/**
+ * pwrap_probe_init_resources() - Set up drvdata, ACPI path, and device configs
+ * @priv: driver private data (pdev/dev already set by caller)
+ * @adev: ACPI companion device
+ * @id:   matched ACPI device id (carries driver_data for resource config)
+ *
+ * Resolves the ACPI device path, configures the platform resources (MEM/IRQ),
+ * initializes the device control config from either ACPI _DSM or the static
+ * table, and then runs the initial SCMI device probe against the populated
+ * config table. The device config init is non-fatal (logged as a warning);
+ * ACPI path resolution and resource config failures are fatal.
+ *
+ * Return: 0 on success, negative errno on a fatal resource/ACPI failure.
+ */
+static int pwrap_probe_init_resources(struct pwrap_driver_data *priv,
+					  struct acpi_device *adev,
+					  const struct acpi_device_id *id)
+{
+	struct platform_device *pdev = priv->pdev;
+	struct device *dev = priv->dev;
+	acpi_status status;
+	int ret;
+
+	priv->acpi_path.length = ACPI_ALLOCATE_BUFFER;
+	priv->acpi_path.pointer = NULL;
+	status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &priv->acpi_path);
+	if (ACPI_FAILURE(status)) {
+		dev_err(&pdev->dev, "Failed to get ACPI device path\n");
+		return -EINVAL;
+	}
+
+	ret = pwrap_config_resource(pdev, id->driver_data);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to setup resource for type: 0x%x with error: 0x%x\n",
+			(enum mtk_pwrap_type)id->driver_data, ret);
+		return ret;
+	}
+
+	ret = pwrap_acpi_config_init(dev);
+	if (ret)
+		dev_warn(&pdev->dev,
+			 "Device config init failed: %d (SCMI device control disabled)\n",
+			 ret);
+
+	/*
+	 * Run the initial SCMI device probe only after the device-config table
+	 * has been populated by pwrap_acpi_config_init(); otherwise the lookup
+	 * walks an empty table and the boot-time SCMI probe is silently skipped.
+	 */
+	if (!mtk_pwrap_dev_probe((char *)priv->acpi_path.pointer))
+		dev_err(&pdev->dev, "Not find device config data\n");
+
+	return 0;
+}
+
+static int mtk_pwrap_probe(struct platform_device *pdev)
+{
+	const struct acpi_device_id	*id;
+	struct device *dev = &pdev->dev;
+	struct acpi_device *adev = ACPI_COMPANION(dev);
+	int ret;
+	struct pwrap_driver_data *priv;
+
+	if (!adev)
+		return -ENODEV;
+
+	id = acpi_match_device(dev->driver->acpi_match_table, dev);
+	if (!id)
+		return -ENODEV;
+
+	dev_info(&pdev->dev, "device probe for \"%s\"\n", id->id);
+
+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	platform_set_drvdata(pdev, priv);
+	priv->pdev = pdev;
+	priv->dev = dev;
+
+	/* Resolve ACPI path, configure resources, init device configs */
+	ret = pwrap_probe_init_resources(priv, adev, id);
+	if (ret)
+		return ret;
+
+	/*
+	 * The sysfs nodes are debug/test hooks. Their creation must not fail
+	 * probe or disable the driver, so log a warning and continue if the
+	 * attribute group could not be added.
+	 */
+	ret = pwrap_create_sys_files(pdev);
+	if (ret)
+		dev_warn(&pdev->dev,
+			 "failed to create sysfs nodes: %d (continuing)\n", ret);
+
+	return 0;
+}
+
+static void mtk_pwrap_remove(struct platform_device *pdev)
+{
+	struct pwrap_driver_data *priv = platform_get_drvdata(pdev);
+
+	if (priv) {
+		/*
+		 * The dev_ctrl configs[] array and its device_path/
+		 * device_type strings are heap-allocated by
+		 * pwrap_acpi_fetch_dpm_config(); free them here.
+		 */
+		pwrap_acpi_dpm_config_free(pwrap_get_dev_ctrl());
+
+		ACPI_FREE(priv->acpi_path.pointer);
+	}
+}
+
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id mtk_pwrap_acpi_ids[] = {
+	{ .id = "NVDA6210", .driver_data = NVDA6210 },
+	{ /* sentinel */ },
+};
+MODULE_DEVICE_TABLE(acpi, mtk_pwrap_acpi_ids);
+#endif /* CONFIG_ACPI */
+
+static struct platform_driver mtk_pwrap_driver = {
+	.driver = {
+		.name = "mtk_pwrap",
+#ifdef CONFIG_ACPI
+		.acpi_match_table = mtk_pwrap_acpi_ids,
+#endif /* CONFIG_ACPI */
+		/*
+		 * mtk_pwrap_dev_probe() hands consumers raw pointers into the
+		 * dev_ctrl configs[] table that remove() frees. Suppress the
+		 * sysfs bind/unbind attributes so userspace cannot unbind the
+		 * driver (freeing that table) while a consumer still holds a
+		 * pointer into it.
+		 */
+		.suppress_bind_attrs = true,
+	},
+	.probe = mtk_pwrap_probe,
+	.remove = mtk_pwrap_remove,
+};
+
+static int __init power_wrap_init(void)
+{
+	int ret = 0;
+
+	ret = platform_driver_register(&mtk_pwrap_driver);
+
+	pr_info("%s driver register: %d\n", __func__, ret);
+
+	return ret;
+}
+
+/*
+ * This driver is built-in (obj-y) and bound for the lifetime of the system;
+ * it provides no module_exit()/remove path beyond the platform .remove above.
+ */
+subsys_initcall(power_wrap_init);
+MODULE_LICENSE("GPL");
