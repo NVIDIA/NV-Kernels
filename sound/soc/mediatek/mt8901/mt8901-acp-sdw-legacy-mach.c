@@ -9,6 +9,7 @@
 
 #include <linux/device.h>
 #include <linux/module.h>
+#include <linux/property.h>
 #include <sound/soc.h>
 #include <sound/soc-acpi.h>
 #include <sound/soc_sdw_utils.h>
@@ -21,13 +22,115 @@ MODULE_PARM_DESC(quirk, "Board-specific quirk override");
 #define MT8901_SDW_MAX_LINKS 2
 #define PCM_STREAM_NUM (SNDRV_PCM_STREAM_LAST + 1)
 
+/*
+ * The AFE playback interconnect is fixed in hardware: PDI2/PDI3/PDI4 are
+ * only reachable from the speaker memifs (DL0/DL_24CH) and PDI5/PDI6 only
+ * from the headphone memif (DL1) - see the O150..O159 mixer inputs in
+ * mt8901-dai-soundwire.c. Data port DP<n> is hard-wired to PDI<n>, so the
+ * jack stream must sit on DP5 (or DP6) or DL1 has no path to it.
+ */
+#define MT8901_SDW_JACK_PLAYBACK_DP 5
+
 static struct snd_soc_dai_link_component afe_platform_component[] = {
 	{ .name = "NVDA9022:00" }
 };
 
 struct mtk_mc_ctx {
 	unsigned int sdw_pin_index[MT8901_SDW_MAX_LINKS][PCM_STREAM_NUM];
+	/* firmware DP allocation per link (acpi-scd-dp-allocation) */
+	unsigned int sdw_src_base[MT8901_SDW_MAX_LINKS];
+	unsigned int sdw_src_num[MT8901_SDW_MAX_LINKS];
 };
+
+/*
+ * Pin (DAI index) reserved for the jack playback stream on this link, or
+ * -1 when the firmware DP allocation is unknown or does not cover DP5.
+ */
+static int mt8901_sdw_jack_pin(struct mtk_mc_ctx *mtk_ctx, int link)
+{
+	unsigned int base = mtk_ctx->sdw_src_base[link];
+	unsigned int num = mtk_ctx->sdw_src_num[link];
+
+	if (!num)
+		return -1;
+	if (base > MT8901_SDW_JACK_PLAYBACK_DP ||
+	    base + num <= MT8901_SDW_JACK_PLAYBACK_DP)
+		return -1;
+	return MT8901_SDW_JACK_PLAYBACK_DP - base;
+}
+
+/*
+ * Historically pins were handed out sequentially in endpoint order. On
+ * two-link boards (amps on link0, jack codec on link1) that works out
+ * because the firmware allocates link1's DPs starting at DP5. On
+ * single-link boards (all codecs on link1, DPs from DP2) the sequential
+ * order gave the jack DP2, which DL1 cannot reach, so opening the jack
+ * PCM failed with EINVAL. Reserve the DP5 pin for the jack stream and
+ * let everything else allocate around it.
+ */
+static unsigned int mt8901_sdw_alloc_pin(struct mtk_mc_ctx *mtk_ctx,
+					 int link, int stream, int dai_type)
+{
+	int jack_pin = -1;
+	unsigned int pin;
+
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+		jack_pin = mt8901_sdw_jack_pin(mtk_ctx, link);
+
+	if (jack_pin >= 0 && dai_type == SOC_SDW_DAI_TYPE_JACK) {
+		/*
+		 * Burn the sequential slot the jack would have taken so
+		 * every other stream keeps the pin (and therefore the DP)
+		 * it had before this reservation existed: UCM profiles
+		 * written for the sequential order stay valid for all
+		 * non-jack paths. Skip the burn when the sequence has
+		 * already stepped over the jack pin (jack endpoint
+		 * processed late): the skip below consumed the slot
+		 * already, and burning again would leave a pin gap and
+		 * push later streams past the firmware DP window.
+		 */
+		if (mtk_ctx->sdw_pin_index[link][stream] <= (unsigned int)jack_pin)
+			mtk_ctx->sdw_pin_index[link][stream]++;
+		return jack_pin;
+	}
+
+	pin = mtk_ctx->sdw_pin_index[link][stream]++;
+	if ((int)pin == jack_pin)
+		pin = mtk_ctx->sdw_pin_index[link][stream]++;
+	return pin;
+}
+
+static void mt8901_sdw_parse_dp_allocation(struct device *dev,
+					   struct mtk_mc_ctx *mtk_ctx)
+{
+	/* the machine device is a child of the SoundWire controller */
+	struct device *sdw_dev = dev->parent;
+	int i;
+
+	if (!sdw_dev)
+		return;
+
+	for (i = 0; i < MT8901_SDW_MAX_LINKS; i++) {
+		struct fwnode_handle *node;
+		char key[32];
+		u32 dp[4];
+
+		snprintf(key, sizeof(key), "acpi-scd-%d-subproperties", i);
+		node = device_get_named_child_node(sdw_dev, key);
+		if (!node)
+			continue;
+
+		if (!fwnode_property_read_u32_array(node,
+						    "acpi-scd-dp-allocation",
+						    dp, ARRAY_SIZE(dp))) {
+			mtk_ctx->sdw_src_base[i] = dp[0];
+			mtk_ctx->sdw_src_num[i] = dp[1];
+			dev_dbg(dev, "link %d playback DPs %u..%u\n", i,
+				dp[0], dp[0] + dp[1] - 1);
+		}
+		fwnode_handle_put(node);
+	}
+}
 
 static void log_quirks(struct device *dev)
 {
@@ -261,7 +364,8 @@ static int create_sdw_dailink(struct snd_soc_card *card,
 					return -EINVAL;
 				}
 
-				pin = mtk_ctx->sdw_pin_index[link][stream]++;
+				pin = mt8901_sdw_alloc_pin(mtk_ctx, link, stream,
+							   soc_end->dai_info->dai_type);
 
 				cur_link = soc_end->link_mask;
 				if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -480,6 +584,9 @@ static int mt8901_card_probe(struct platform_device *pdev)
 
 	ctx->mc_quirk = soc_sdw_quirk;
 	dev_dbg(card->dev, "legacy quirk 0x%lx\n", ctx->mc_quirk);
+
+	mt8901_sdw_parse_dp_allocation(&pdev->dev, mtk_ctx);
+
 	/* reset amp_num to ensure amp_num++ starts from 0 in each probe */
 	for (i = 0; i < ctx->codec_info_list_count; i++)
 		codec_info_list[i].amp_num = 0;
