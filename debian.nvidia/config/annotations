@@ -198,6 +198,9 @@ CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablem
 CONFIG_SENSORS_AAEON                            policy<{'amd64': '-'}>
 CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM drivers'>
 
+CONFIG_SND_SOC_MT8901                           policy<{'arm64': 'n'}>
+CONFIG_SND_SOC_MT8901                           note<'MediaTek MT8901 AFE platform driver (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
+
 CONFIG_SOUNDWIRE_MTK                            policy<{'arm64': 'n'}>
 CONFIG_SOUNDWIRE_MTK                            note<'MediaTek SoundWire manager (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
 
