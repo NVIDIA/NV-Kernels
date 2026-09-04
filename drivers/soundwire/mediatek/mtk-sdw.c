@@ -8,6 +8,7 @@
 
 #include <linux/acpi.h>
 #include <linux/bitops.h>
+#include <linux/debugfs.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -975,6 +976,109 @@ static int mtk_sdw_register_machine(struct mtk_sdw *mst)
 	return 0;
 }
 
+/*
+ * debugfs: echo <link index> > .../bus_reset re-issues the cold-boot
+ * command reset on that link (all peripherals drop to Dev0 and
+ * re-enumerate together) and kicks the status work. Debug/recovery aid
+ * for links wedged by failed enumeration.
+ */
+static ssize_t mtk_sdw_bus_reset_write(struct file *file,
+				       const char __user *ubuf,
+				       size_t count, loff_t *ppos)
+{
+	struct mtk_sdw *mst = file->private_data;
+	struct mtk_sdw_core *core;
+	unsigned int link;
+	int ret;
+
+	ret = kstrtouint_from_user(ubuf, count, 0, &link);
+	if (ret)
+		return ret;
+
+	/*
+	 * <link>      = hardware bus reset (MCP_CONTROL HW_BUS_RST)
+	 * 10 + <link> = deep reset: gate the link clock so peripherals
+	 *               lose sync entirely and reset their bus interface
+	 *               state machines, then re-init the core. Closest
+	 *               commanded equivalent to a power cycle.
+	 */
+	if (link >= 10) {
+		link -= 10;
+		if (link >= mst->num_links)
+			return -EINVAL;
+
+		core = &mst->links[link].core;
+
+		dev_info(mst->dev, "IP%u: deep reset (clock cycle)\n", link);
+
+		/*
+		 * Zero the recovery counters only after enable_irq(false) has
+		 * cancelled the status work; a still-running work could write
+		 * them back otherwise.
+		 */
+		mtk_sdw_enable_irq(core, false);
+		core->bus_reset_count = 0;
+		core->dev0_repoll_count = 0;
+
+		ret = mtk_sdw_disable_top_clock(mst, link);
+		if (ret)
+			goto err_reenable;
+
+		msleep(200);
+
+		ret = mtk_sdw_enable_top_clock(mst, link);
+		if (ret)
+			goto err_reenable;
+
+		ret = mtk_sdw_core_hw_init(core);
+		if (ret)
+			goto err_reenable;
+
+		mtk_sdw_enable_irq(core, true);
+		schedule_delayed_work(&core->status_work, msecs_to_jiffies(100));
+
+		return count;
+
+err_reenable:
+		mtk_sdw_enable_irq(core, true);
+		return ret;
+	}
+
+	if (link >= mst->num_links)
+		return -EINVAL;
+
+	core = &mst->links[link].core;
+
+	/*
+	 * Quiesce interrupt handling and the status work (enable_irq(false)
+	 * cancels it) so the reset does not race concurrent register access.
+	 * Zero the recovery counters only after the cancellation, so a
+	 * still-running work cannot write them back.
+	 */
+	mtk_sdw_enable_irq(core, false);
+	core->bus_reset_count = 0;
+	ret = mtk_sdw_core_bus_reset(core);
+	mtk_sdw_enable_irq(core, true);
+	if (ret)
+		return ret;
+
+	schedule_delayed_work(&core->status_work, msecs_to_jiffies(100));
+
+	return count;
+}
+
+static const struct file_operations mtk_sdw_bus_reset_fops = {
+	.open = simple_open,
+	.write = mtk_sdw_bus_reset_write,
+};
+
+static void mtk_sdw_debugfs_init(struct mtk_sdw *mst)
+{
+	mst->debugfs = debugfs_create_dir(dev_name(mst->dev), NULL);
+	debugfs_create_file("bus_reset", 0200, mst->debugfs, mst,
+			    &mtk_sdw_bus_reset_fops);
+}
+
 static int mtk_sdw_probe_controller(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -1135,6 +1239,8 @@ static int mtk_sdw_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	mtk_sdw_debugfs_init(mst);
+
 	return 0;
 }
 
@@ -1143,6 +1249,7 @@ static void mtk_sdw_remove(struct platform_device *pdev)
 	struct mtk_sdw *mst = platform_get_drvdata(pdev);
 	int i;
 
+	debugfs_remove_recursive(mst->debugfs);
 	if (mst->mach_dev)
 		platform_device_unregister(mst->mach_dev);
 	for (i = mst->num_links - 1; i >= 0; i--)
