@@ -99,7 +99,7 @@ static __cpuidle int __psci_enter_domain_idle_state(struct cpuidle_device *dev,
 
 	/* Correct domain-idlestate statistics if we failed to enter. */
 	if (ret == -1 && ds->state)
-		pm_genpd_inc_rejected(ds->pd, ds->state_idx);
+		pm_genpd_inc_rejected(ds->pd, ds->state_idx, s2idle);
 
 	/* Clear the domain state to start fresh when back from idle. */
 	psci_clear_domain_state();
