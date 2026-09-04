@@ -592,8 +592,11 @@ static int mt8901_card_probe(struct platform_device *pdev)
 		codec_info_list[i].amp_num = 0;
 
 	ret = soc_card_dai_links_create(card);
-	if (ret < 0)
-		return ret;
+	if (ret < 0) {
+		dev_err_probe(card->dev, ret,
+			      "soc_card_dai_links_create failed %d\n", ret);
+		goto err_ret;
+	}
 
 	/*
 	 * the default amp_num is zero for each codec and
@@ -605,15 +608,20 @@ static int mt8901_card_probe(struct platform_device *pdev)
 
 	card->components = devm_kasprintf(card->dev, GFP_KERNEL,
 					  "cfg-amp:%d", amp_num);
-	if (!card->components)
-		return -ENOMEM;
+	if (!card->components) {
+		ret = -ENOMEM;
+		goto err_ret;
+	}
+
 	if (mach && mach->mach_params.dmic_num) {
 		card->components = devm_kasprintf(card->dev, GFP_KERNEL,
 						  "%s mic:dmic cfg-mics:%d",
 						  card->components,
 						  mach->mach_params.dmic_num);
-		if (!card->components)
-			return -ENOMEM;
+		if (!card->components) {
+			ret = -ENOMEM;
+			goto err_ret;
+		}
 	}
 
 	/* Register the card */
@@ -621,12 +629,15 @@ static int mt8901_card_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err_probe(card->dev, ret,
 			      "snd_soc_register_card failed %d\n", ret);
-		asoc_sdw_mc_dailink_exit_loop(card);
-		return ret;
+		goto err_ret;
 	}
 
 	platform_set_drvdata(pdev, card);
 
+	return 0;
+
+err_ret:
+	asoc_sdw_mc_dailink_exit_loop(card);
 	return ret;
 }
 
