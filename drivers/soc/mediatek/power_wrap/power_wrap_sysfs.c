@@ -372,6 +372,153 @@ static ssize_t pwrap_dev_config_query_store(struct device *dev,
 }
 DEVICE_ATTR_RW(pwrap_dev_config_query);
 
+/*
+ * pwrap_power_ctrl_req_store - Exercise the mtk_send_power_control_req() client API
+ *
+ * Test/debug trigger for the public power control request entry point that
+ * external consumer drivers (e.g. xhci-mtk-v2) call. It drives the real API
+ * path end to end: resolve an ACPI path to its acpi_device, find its bound
+ * physical device, and hand that to mtk_send_power_control_req() (whose
+ * ACPI_COMPANION() then resolves it back to the ACPI node), which looks up
+ * the per-device CTRL_BY_SCMI config and issues sspm_ci_set(). This lets the
+ * client API be validated without needing the consumer driver to suspend.
+ *
+ * Input: "<acpi_path> [requestId] [customdata0] [customdata1] [customdata2]"
+ *        requestId/customdata are optional hex values (default 0). requestId
+ *        is OR'd into the SCMI_DATA_00 (action) word; customdata into the
+ *        three following words, exactly as a real client request would be.
+ *
+ * Usage:
+ *   echo '\_SB.USB0 0x02'      > /sys/bus/platform/devices/<dev>/pwrap_power_ctrl_req
+ *   echo '\_SB.USB0 0x1 0 0 0' > /sys/bus/platform/devices/<dev>/pwrap_power_ctrl_req
+ */
+static ssize_t pwrap_power_ctrl_req_store(struct device *dev,
+						  struct device_attribute *attr,
+						  const char *buf, size_t count)
+{
+	char kbuf[SYSFS_BUF_SIZE];
+	char path[SYSFS_BUF_SIZE];
+	u8 reqid = 0;
+	u32 cdata[POWER_WRAP_SCMI_DATA_MAX_INDEX] = { 0 };
+	struct power_cntl_scmi_data scmidata;
+	struct _power_cntrl_request req;
+	struct acpi_device *adev;
+	struct device *phys_dev;
+	acpi_handle handle;
+	acpi_status status;
+	char *p, *tok;
+	int i, ret;
+
+	if (count >= SYSFS_BUF_SIZE)
+		return -EINVAL;
+
+	memcpy(kbuf, buf, count);
+	kbuf[count] = '\0';
+
+	/*
+	 * Strict tokenized parse of "<acpi_path> [reqId] [c0] [c1] [c2]".
+	 * The path is mandatory; reqId and the customdata words are optional
+	 * hex values. Any unparseable field or extra trailing token is
+	 * rejected so malformed input is never silently accepted. reqId is
+	 * parsed with kstrtou8() so a value > 0xff is an error rather than
+	 * being silently truncated to a u8.
+	 */
+	p = kbuf;
+
+	/* Mandatory first token: the ACPI path. */
+	do {
+		tok = strsep(&p, " \t\n");
+	} while (tok && *tok == '\0');
+	if (!tok || *tok == '\0')
+		return -EINVAL;
+	if (strscpy(path, tok, sizeof(path)) < 0)
+		return -EINVAL;
+
+	/* Optional numeric tokens: reqId, then up to 3 customdata words. */
+	for (i = 0; i <= POWER_WRAP_SCMI_DATA_MAX_INDEX; i++) {
+		do {
+			tok = strsep(&p, " \t\n");
+		} while (tok && *tok == '\0');
+		if (!tok)
+			break;
+
+		if (i == 0) {
+			if (kstrtou8(tok, 16, &reqid))
+				return -EINVAL;
+		} else if (kstrtou32(tok, 16, &cdata[i - 1])) {
+			return -EINVAL;
+		}
+	}
+
+	/* Reject any leftover tokens beyond the expected fields. */
+	while (p) {
+		tok = strsep(&p, " \t\n");
+		if (tok && *tok != '\0')
+			return -EINVAL;
+	}
+
+	/* Resolve the ACPI path to a device we can hand to the client API. */
+	status = acpi_get_handle(NULL, path, &handle);
+	if (ACPI_FAILURE(status)) {
+		pr_warn("power_wrap sysfs: cannot resolve ACPI path %s\n", path);
+		return -ENODEV;
+	}
+
+	adev = acpi_get_acpi_dev(handle);
+	if (!adev) {
+		pr_warn("power_wrap sysfs: no acpi_device for %s\n", path);
+		return -ENODEV;
+	}
+
+	/*
+	 * mtk_send_power_control_req() resolves the ACPI companion via
+	 * ACPI_COMPANION(dev), which reads dev->fwnode. An acpi_device's own
+	 * embedded struct device does NOT have its fwnode set back to the ACPI
+	 * node, so &adev->dev would yield a NULL companion. The bound physical
+	 * device (e.g. the xhci-plat platform_device for \_SB.USB0) is the one
+	 * whose dev->fwnode is the ACPI companion — and it's exactly the dev a
+	 * real consumer driver passes. Use it.
+	 *
+	 * acpi_get_first_physical_node() returns a weak device pointer, so take
+	 * a device reference before dropping the acpi_device reference acquired
+	 * by acpi_get_acpi_dev().
+	 */
+	phys_dev = get_device(acpi_get_first_physical_node(adev));
+	acpi_dev_put(adev);
+
+	if (!phys_dev) {
+		pr_warn("power_wrap sysfs: no bound physical device for %s (driver not bound?)\n",
+			path);
+		return -ENODEV;
+	}
+
+	scmidata.requestId = reqid;
+	scmidata.customdata[0] = cdata[0];
+	scmidata.customdata[1] = cdata[1];
+	scmidata.customdata[2] = cdata[2];
+
+	req.dev = phys_dev;
+	req.InBuffer = &scmidata;
+	req.InBufferSize = sizeof(scmidata);
+	req.OutBuffer = NULL;
+	req.OutBufferSize = 0;
+	req.BytesReturned = 0;
+
+	pr_info("power_wrap sysfs: power_ctrl_req path=%s reqId=0x%x custom=[0x%x,0x%x,0x%x]\n",
+		path, reqid, cdata[0], cdata[1], cdata[2]);
+
+	ret = mtk_send_power_control_req(&req);
+	put_device(phys_dev);
+
+	if (ret) {
+		pr_warn("power_wrap sysfs: power_ctrl_req failed: %d\n", ret);
+		return ret;
+	}
+
+	return count;
+}
+DEVICE_ATTR_WO(pwrap_power_ctrl_req);
+
 static struct attribute *pwrap_attrs[] = {
 	&dev_attr_pwrap_dev_probe.attr,
 	&dev_attr_pwrap_dev_remove.attr,
@@ -381,6 +528,7 @@ static struct attribute *pwrap_attrs[] = {
 	&dev_attr_pwrap_com_idle.attr,
 	&dev_attr_pwrap_com_active.attr,
 	&dev_attr_pwrap_dev_config_query.attr,
+	&dev_attr_pwrap_power_ctrl_req.attr,
 	NULL,
 };
 
