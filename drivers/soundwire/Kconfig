@@ -67,6 +67,15 @@ config SOUNDWIRE_MTK
 	  enable this config option to get the SoundWire support for that
 	  device.
 
+config SOUNDWIRE_MTK_MT8901_CLK
+	bool "MediaTek MT8901 clock control for SoundWire"
+	depends on SOUNDWIRE_MTK
+	help
+	  This enables the MT8901 clock and power control for the MediaTek
+	  SoundWire Master driver.
+	  This symbol is normally selected automatically by the MT8901
+	  SoundWire machine driver and does not need to be chosen directly.
+
 config SOUNDWIRE_GENERIC_ALLOCATION
 	tristate
 

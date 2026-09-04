@@ -56,6 +56,61 @@ static int mtk_sdw_parse_dp_allocation(struct mtk_sdw *mst, int idx)
 	return 0;
 }
 
+static int mtk_sdw_init_clock(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mst->clk_ops->init_clock(mst);
+	if (ret)
+		dev_err(mst->dev, "failed to init clock, ret %d\n", ret);
+
+	return ret;
+}
+
+static int mtk_sdw_enable_top_clock(struct mtk_sdw *mst, int link)
+{
+	int ret;
+
+	ret = mst->clk_ops->enable_link_clock(mst, link);
+	if (ret)
+		dev_err(mst->dev, "failed to enable top clock, ret %d\n", ret);
+
+	return ret;
+}
+
+static int mtk_sdw_disable_top_clock(struct mtk_sdw *mst, int link)
+{
+	int ret;
+
+	ret = mst->clk_ops->disable_link_clock(mst, link);
+	if (ret)
+		dev_err(mst->dev, "failed to disable top clock, ret %d\n", ret);
+
+	return ret;
+}
+
+static int mtk_sdw_enable_reg_clock(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mst->clk_ops->enable_reg_rw_clk(mst);
+	if (ret)
+		dev_err(mst->dev, "failed to enable reg clock, ret %d\n", ret);
+
+	return ret;
+}
+
+static int mtk_sdw_disable_reg_clock(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mst->clk_ops->disable_reg_rw_clk(mst);
+	if (ret)
+		dev_err(mst->dev, "failed to disable reg clock, ret %d\n", ret);
+
+	return ret;
+}
+
 /* =======================================================================
  * ASoC DAI layer  (ALSA <-> SoundWire stream binding)
  * =======================================================================
@@ -725,12 +780,19 @@ static int mtk_sdw_link_init(struct mtk_sdw *mst, int idx)
 	if (ret)
 		return ret;
 
+	ret = mtk_sdw_enable_top_clock(mst, idx);
+	if (ret) {
+		dev_err(mst->dev, "IP%d: enable top clock failed: %d\n",
+			idx, ret);
+		return ret;
+	}
+
 	core->bus.dev = mst->dev;
 	ret = sdw_bus_master_add(&core->bus, mst->dev, mst->dev->fwnode);
 	if (ret) {
 		dev_err(mst->dev, "IP%d: bus_master_add failed: %d\n",
 			idx, ret);
-		return ret;
+		goto err_disable_top_clock;
 	}
 
 	//property ready here.
@@ -747,12 +809,16 @@ static int mtk_sdw_link_init(struct mtk_sdw *mst, int idx)
 	ret = mtk_sdw_core_hw_init(core);
 	if (ret) {
 		sdw_bus_master_delete(&core->bus);
-		return ret;
+		goto err_disable_top_clock;
 	}
 
 	mtk_sdw_enable_irq(core, true);
 	dev_info(mst->dev, "IP%d: SoundWire bus ready\n", idx);
 	return 0;
+
+err_disable_top_clock:
+	mtk_sdw_disable_top_clock(mst, idx);
+	return ret;
 }
 
 static void mtk_sdw_link_deinit(struct mtk_sdw *mst, int idx)
@@ -771,9 +837,9 @@ static void mtk_init_sdw_master(struct mtk_sdw *mst)
 	mst->tzd_inverse = 0;
 	mst->phy_delay = 2;
 	mst->phy_double_delay = 0;
-	mst->num_links = SDW_MAX_HWIP_NUM;
+	mst->num_links = MTK_SDW_CONTROLLE_NUM;
 
-	for (i = 0; i < SDW_MAX_HWIP_NUM; i++)
+	for (i = 0; i < MTK_SDW_CONTROLLE_NUM; i++)
 		mst->controller_en_list |= (1UL << i);
 }
 
@@ -807,6 +873,7 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 	u32 hw_ver = MTK_SDW_HW_VER_MT8901;
 	u32 mmio[2];
 	int i, ret;
+	bool clk_on;
 
 	mst = devm_kzalloc(dev, sizeof(*mst), GFP_KERNEL);
 	if (!mst)
@@ -816,6 +883,7 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 
 	mst->dev = dev;
 	mutex_init(&mst->group_lock);
+	mutex_init(&mst->afe_lock);
 	platform_set_drvdata(pdev, mst);
 
 	ret = device_property_read_u32_array(dev, "afe-base", mmio, 2);
@@ -841,6 +909,10 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	ret = mtk_sdw_clk_ops_select(mst, mst->hw_ver);
+	if (ret)
+		return ret;
+
 	/* Timing delays from ACPI _DSD. */
 	device_property_read_u32(dev, "acpi-scd-tzd-delay", &mst->tzd_delay);
 	device_property_read_u32(dev, "acpi-scd-phy-delay", &mst->phy_delay);
@@ -852,6 +924,16 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 			mst->phy_delay);
 		return -EINVAL;
 	}
+
+	ret = mtk_sdw_init_clock(mst);
+	if (ret)
+		return ret;
+
+	ret = mtk_sdw_enable_reg_clock(mst);
+	if (ret)
+		return ret;
+
+	clk_on = true;
 
 	mtk_sdw_top_init_settings(mst);
 	mtk_sdw_top_configure_delays(mst);
@@ -889,6 +971,11 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 			goto err;
 	}
 
+	ret = mtk_sdw_disable_reg_clock(mst);
+	if (ret)
+		goto err;
+	clk_on = false;
+
 	ret = mtk_sdw_register_dais(mst);
 	if (ret) {
 		dev_err(dev, "failed to register DAIs: %d\n", ret);
@@ -903,6 +990,9 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 err:
 	while (--i >= 0)
 		mtk_sdw_link_deinit(mst, i);
+
+	if (clk_on)
+		mtk_sdw_disable_reg_clock(mst);
 
 	return ret;
 }

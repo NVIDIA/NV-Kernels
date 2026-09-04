@@ -12,7 +12,7 @@
 #include <linux/soundwire/sdw.h>
 #include <linux/soundwire/sdw_registers.h>
 
-#include "bus.h"
+#include "../bus.h"
 #include "mtk-sdw-core.h"
 
 /* ---- register helpers ---- */
