@@ -397,6 +397,16 @@ static int mtk_pwrap_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	/*
+	 * The sysfs nodes are debug/test hooks. Their creation must not fail
+	 * probe or disable the driver, so log a warning and continue if the
+	 * attribute group could not be added.
+	 */
+	ret = pwrap_create_sys_files(pdev);
+	if (ret)
+		dev_warn(&pdev->dev,
+			 "failed to create sysfs nodes: %d (continuing)\n", ret);
+
 	return 0;
 }
 
