@@ -89,4 +89,13 @@ config MTK_SOCINFO
 	  information about the SoC to the userspace including the
 	  manufacturer name, marketing name and soc name.
 
+config MTK_SSPM_CI
+	bool "MediaTek SSPM control interface"
+	depends on ACPI && ARM64
+	help
+	  Say yes here to enable the MediaTek SSPM control interface used
+	  by platform firmware communication helpers.
+
+	  If unsure, say N.
+
 endmenu
