@@ -205,6 +205,18 @@ mtk_sdw_xfer_msg(struct sdw_bus *bus, struct sdw_msg *msg)
 			return SDW_CMD_IGNORED;
 		}
 
+		/*
+		 * All-zeros / all-ones reads back stably (bus keepers hold
+		 * the lines) but is not a DevId; nothing real was driving.
+		 */
+		if (memchr_inv(msg->buf, 0x00, msg->len) == NULL ||
+		    memchr_inv(msg->buf, 0xff, msg->len) == NULL) {
+			dev_dbg(core->dev,
+				"Dev0 DevId reads as keeper-held %02x, deferring\n",
+				msg->buf[0]);
+			return SDW_CMD_IGNORED;
+		}
+
 		return SDW_CMD_OK;
 	}
 
@@ -581,6 +593,69 @@ static int mtk_init_control_setting(struct mtk_sdw_core *core)
 	return mtk_do_config_update(core);
 }
 
+/*
+ * Re-issue the command reset that hw_init performs once at cold boot:
+ * every peripheral drops to Dev0 and re-synchronizes together, which is
+ * the one enumeration scenario known to work reliably. Used as recovery
+ * when the link is wedged (peripherals stuck contending at Dev0, or
+ * carrying stale state across a warm reboot).
+ */
+/*
+ * Reference driver restart choreography: soft-reset
+ * the IP and drop to the quiesce operation mode (clock held LOW, data
+ * released, bus keepers holding) in one config update, dwell so the
+ * peripherals see a defined quiet bus, then run the full hw re-init which
+ * ends by switching back to normal mode - the clock restarts cleanly into
+ * the new frame configuration and peripherals re-synchronize from a known
+ * state. Re-initializing while the bus keeps running in normal mode (the
+ * previous behaviour) leaves peripherals unable to regain frame sync.
+ */
+int mtk_sdw_core_bus_reset(struct mtk_sdw_core *core)
+{
+	int ret;
+
+	dev_info(core->dev, "[%u] bus restart (soft reset + quiesce)\n",
+		 core->bus.link_id);
+
+	/*
+	 * Hold the bus message lock so the reset cannot overlap an
+	 * sdw_transfer() issued by a peripheral driver on another CPU.
+	 */
+	mutex_lock(&core->bus.msg_lock);
+
+	core->dev0_repoll_count = 0;
+
+	core_updatel(core, MCP_CONTROL, MCP_CONTROL_SOFT_RST,
+		     MCP_CONTROL_SOFT_RST);
+	core_updatel(core, MCP_CONFIG, MCP_CONFIG_OP_MODE,
+		     FIELD_PREP(MCP_CONFIG_OP_MODE,
+				MCP_OP_MODE_CLK_LOW_DATA_OFF_KEEPER_ON));
+	ret = mtk_do_config_update(core);
+	if (ret)
+		goto out;
+
+	msleep(20);
+
+	ret = mtk_sdw_core_hw_init(core);
+	if (ret)
+		goto out;
+
+	/*
+	 * SOFT_RST clears the per-device slave interrupt masks. Callers that
+	 * quiesced interrupts around the reset get them back from their
+	 * enable_irq(true); the status work cannot use that helper (it would
+	 * cancel itself), so restore the masks here when interrupts are live.
+	 */
+	if (core->interrupt_enabled) {
+		core_writel(core, MCP_SLAVEINTMASK0, MCP_SLAVE_INTMASK0_MASK);
+		core_writel(core, MCP_SLAVEINTMASK1, MCP_SLAVE_INTMASK1_MASK);
+	}
+
+out:
+	mutex_unlock(&core->bus.msg_lock);
+	return ret;
+}
+
 static int mtk_init_config_setting(struct mtk_sdw_core *core)
 {
 	u32 val;
@@ -619,7 +694,7 @@ void mtk_sdw_enable_irq(struct mtk_sdw_core *core, bool enable)
 	core->interrupt_enabled = enable;
 
 	if (!enable)
-		cancel_delayed_work_sync(&core->work);
+		cancel_delayed_work_sync(&core->status_work);
 
 	core_updatel(core, MCP_INTMASK, MCP_INT_IRQ,
 		     enable ? MCP_INT_IRQ : 0);
@@ -715,11 +790,13 @@ static int mtk_sdw_update_slave_status(struct mtk_sdw_core *core,
 #define MTK_SDW_DEV0_REPOLL_DELAY_MS	20
 #define MTK_SDW_DEV0_SETTLE_MS		30
 #define MTK_SDW_DEV0_SETTLE_ROUNDS	4
+#define MTK_SDW_BUS_RESET_MAX		3
+#define MTK_SDW_BUS_RESET_SETTLE_MS	100
 
 static void mtk_sdw_slave_status_work(struct work_struct *work)
 {
 	struct mtk_sdw_core *core =
-		container_of(work, struct mtk_sdw_core, work.work);
+		container_of(work, struct mtk_sdw_core, status_work.work);
 	u32 stat0;
 	u32 stat1;
 	u32 dev0_stat;
@@ -799,16 +876,32 @@ static void mtk_sdw_slave_status_work(struct work_struct *work)
 			dev_dbg(core->dev,
 				"[%u] Dev0 still attached, re-polling (%u)\n",
 				core->bus.link_id, core->dev0_repoll_count);
-			schedule_delayed_work(&core->work,
+			schedule_delayed_work(&core->status_work,
 				msecs_to_jiffies(MTK_SDW_DEV0_REPOLL_DELAY_MS));
+		} else if (core->bus_reset_count < MTK_SDW_BUS_RESET_MAX) {
+			core->bus_reset_count++;
+			dev_warn(core->dev,
+				 "[%u] Dev0 attach unresolved after %u re-polls, bus reset %u/%u\n",
+				 core->bus.link_id, core->dev0_repoll_count,
+				 core->bus_reset_count, MTK_SDW_BUS_RESET_MAX);
+			core->dev0_repoll_count = 0;
+			if (mtk_sdw_core_bus_reset(core))
+				dev_err(core->dev,
+					"[%u] bus reset failed, not re-polling\n",
+					core->bus.link_id);
+			else
+				schedule_delayed_work(&core->status_work,
+					msecs_to_jiffies(MTK_SDW_BUS_RESET_SETTLE_MS));
 		} else {
 			dev_warn(core->dev,
-				 "[%u] Dev0 attach unresolved after %u re-polls, giving up\n",
-				 core->bus.link_id, core->dev0_repoll_count);
+				 "[%u] Dev0 attach unresolved after %u re-polls and %u bus resets, giving up\n",
+				 core->bus.link_id, core->dev0_repoll_count,
+				 core->bus_reset_count);
 			core->dev0_repoll_count = 0;
 		}
 	} else {
 		core->dev0_repoll_count = 0;
+		core->bus_reset_count = 0;
 	}
 
 	mtk_sdw_enable_slave_irq(core, true);
@@ -872,8 +965,9 @@ int mtk_sdw_core_init(struct mtk_sdw_core *core)
 	core->bus.ops            = &mtk_sdw_core_ops;
 	core->bus.port_ops       = &mtk_sdw_core_port_ops;
 	core->bus.compute_params = mtk_sdw_compute_params;
+	mutex_init(&core->reset_lock);
 
-	INIT_DELAYED_WORK(&core->work, mtk_sdw_slave_status_work);
+	INIT_DELAYED_WORK(&core->status_work, mtk_sdw_slave_status_work);
 	return 0;
 }
 
@@ -949,7 +1043,7 @@ irqreturn_t mtk_sdw_core_irq(int irq, void *data)
 			 * transitions are then lost).
 			 */
 			mtk_sdw_enable_slave_irq(core, false);
-			schedule_delayed_work(&core->work, 0);
+			schedule_delayed_work(&core->status_work, 0);
 			clearstat &= ~MCP_INT_SLV_MASK;
 		}
 	}

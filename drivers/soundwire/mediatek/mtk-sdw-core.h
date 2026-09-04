@@ -76,6 +76,7 @@
 #define MCP_CONFIG_OP_MODE          GENMASK(2, 0)
 #define MCP_CONFIG_MCR              GENMASK(27, 24)
 #define MCP_OP_MODE_NORMAL          0
+#define MCP_OP_MODE_CLK_LOW_DATA_OFF_KEEPER_ON 5
 
 /* MCP_CONTROL */
 #define MCP_CONTROL_CMD_ACCEPT_MODE BIT(1)
@@ -184,13 +185,22 @@
 struct mtk_sdw_core {
 	struct sdw_bus bus;
 	struct device *dev;
+	/*
+	 * reset_lock: serializes every quiesce -> reset (or clock cycle)
+	 * -> restore sequence on the link so one sequence cannot re-enable
+	 * interrupt processing in the middle of another. The status work's
+	 * own recovery reset does not take it: every holder quiesces that
+	 * work first (enable_irq(false) cancels it synchronously).
+	 */
+	struct mutex reset_lock;
 	void __iomem *regs;
 	unsigned int curr_clk_freq;
 	bool interrupt_enabled;
 	u16 attached_slaves;
 	void *priv;
-	struct delayed_work work;
+	struct delayed_work status_work;
 	unsigned int dev0_repoll_count;
+	unsigned int bus_reset_count;
 };
 
 struct mtk_sdw_pdi_params {
@@ -219,6 +229,7 @@ extern const struct sdw_master_port_ops mtk_sdw_core_port_ops;
 
 int  mtk_sdw_core_init(struct mtk_sdw_core *core);
 int mtk_sdw_core_hw_init(struct mtk_sdw_core *core);
+int mtk_sdw_core_bus_reset(struct mtk_sdw_core *core);
 void mtk_sdw_enable_irq(struct mtk_sdw_core *core, bool enable);
 void mtk_sdw_enable_slave_irq(struct mtk_sdw_core *core, bool enable);
 irqreturn_t mtk_sdw_core_irq(int irq, void *data);
