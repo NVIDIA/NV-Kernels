@@ -64,6 +64,21 @@ static struct pwrap_dev_ctrl dev_ctrl;
 #define PWRAP_DVFSRC_FLAG_ADDR	0x12FC00
 #define PWRAP_DVFSRC_FLAG_LEN	0x4
 #define PWRAP_DVFSRC_FLAG_VAL	0x1
+/*
+ * BestPerf performance setting register.
+ *
+ * A single 32-bit MMIO register that selects the SoC performance profile.
+ * Writing PWRAP_BEST_PERF_VAL puts the platform into its highest-performance
+ * operating point. The address/length/value are fixed platform constants, so
+ * they are hardcoded here.
+ *
+ * ioremap(ADDR, LEN) maps the register and writel(VAL) performs one 32-bit
+ * write; LEN is the size of the mapped window (4 bytes = one 32-bit register),
+ * NOT the value being written.
+ */
+#define PWRAP_PERF_SETTING_ADDR 0x1C871E00
+#define PWRAP_PERF_SETTING_LEN  0x4
+#define PWRAP_BEST_PERF_VAL     0x4
 
 /* Getter for static pwrap_dev_ctrl */
 struct pwrap_dev_ctrl *pwrap_get_dev_ctrl(void)
@@ -514,6 +529,41 @@ static void pwrap_write_dvfsrc_flag(struct device *dev)
 	iounmap(vaddr);
 }
 
+/**
+ * pwrap_write_bestperf_flag() - Select the highest SoC performance profile
+ * @dev: device (used for logging)
+ *
+ * Writes PWRAP_BEST_PERF_VAL to the BestPerf setting register so the platform
+ * comes up in its highest-performance operating point. The register address,
+ * length, and value are fixed platform constants (see PWRAP_PERF_SETTING_*
+ * above).
+ *
+ *
+ * Failure to map the register is non-fatal: the driver continues so the SCMI
+ * device-control path stays functional.
+ */
+static void pwrap_write_bestperf_flag(struct device *dev)
+{
+	void __iomem *vaddr;
+
+	vaddr = ioremap(PWRAP_PERF_SETTING_ADDR, PWRAP_PERF_SETTING_LEN);
+	if (!vaddr) {
+		dev_warn(dev,
+			 "Perf: failed to map physical address 0x%x\n",
+			 PWRAP_PERF_SETTING_ADDR);
+		return;
+	}
+
+	writel(PWRAP_BEST_PERF_VAL, vaddr);
+
+	dev_info(dev,
+		 "BestPerf Mode enabled via address phys=0x%x len=0x%x val=0x%x\n",
+		 PWRAP_PERF_SETTING_ADDR, PWRAP_PERF_SETTING_LEN,
+		 PWRAP_BEST_PERF_VAL);
+
+	iounmap(vaddr);
+}
+
 static int mtk_pwrap_probe(struct platform_device *pdev)
 {
 	const struct acpi_device_id	*id;
@@ -569,6 +619,15 @@ static int mtk_pwrap_probe(struct platform_device *pdev)
 		pwrap_write_dvfsrc_flag(dev);
 	else
 		dev_info(dev, "platform id 0x%llx is not MT8901, DVFSRC flag not written\n",
+			 priv->plid);
+
+	/*
+	 * Set performance mode to BestPerf setting by default on driver probe
+	 */
+	if (priv->plid == PWRAP_PLID_MT8901)
+		pwrap_write_bestperf_flag(dev);
+	else
+		dev_info(dev, "platform id 0x%llx is not MT8901, BestPerf not requested\n",
 			 priv->plid);
 
 	/*
