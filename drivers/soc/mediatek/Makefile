@@ -10,3 +10,4 @@ obj-$(CONFIG_MTK_MMSYS) += mtk-mutex.o
 obj-$(CONFIG_MTK_SVS) += mtk-svs.o
 obj-$(CONFIG_MTK_SOCINFO) += mtk-socinfo.o
 obj-$(CONFIG_MTK_SSPM_CI)	+= sspm_ci/
+obj-$(CONFIG_MTK_POWER_WRAP)	+= power_wrap/
