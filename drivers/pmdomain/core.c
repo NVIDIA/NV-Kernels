@@ -808,6 +808,7 @@ EXPORT_SYMBOL_GPL(dev_pm_genpd_is_on);
  *
  * @genpd: The PM domain the idle-state belongs to.
  * @state_idx: The index of the idle-state that failed.
+ * @s2idle: Whether the failed attempt was made for suspend-to-idle.
  *
  * In some special cases the ->power_off() callback is asynchronously powering
  * off the PM domain, leading to that it may return zero to indicate success,
@@ -819,11 +820,18 @@ EXPORT_SYMBOL_GPL(dev_pm_genpd_is_on);
  * while this routine is getting called.
  */
 void pm_genpd_inc_rejected(struct generic_pm_domain *genpd,
-			   unsigned int state_idx)
+			   unsigned int state_idx, bool s2idle)
 {
 	genpd_lock(genpd);
-	genpd->states[genpd->state_idx].rejected++;
-	genpd->states[genpd->state_idx].usage--;
+	if (WARN_ON_ONCE(state_idx >= genpd->state_count))
+		goto out;
+
+	genpd->states[state_idx].rejected++;
+	genpd->states[state_idx].usage--;
+	if (s2idle && genpd->gov && genpd->gov->system_power_down_ok)
+		genpd->states[state_idx].usage_s2idle--;
+
+out:
 	genpd_unlock(genpd);
 }
 EXPORT_SYMBOL_GPL(pm_genpd_inc_rejected);
