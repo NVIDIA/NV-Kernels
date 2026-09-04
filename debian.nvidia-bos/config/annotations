@@ -216,6 +216,12 @@ CONFIG_MTD                                      note<'Essential for boot on ARM6
 CONFIG_MTK_PCIE_HOTPLUG                         policy<{'arm64': 'm'}>
 CONFIG_MTK_PCIE_HOTPLUG                         note<'CX7 PCIe hotplug driver for NVIDIA DGX Spark systems with GB10 SoC.'>
 
+CONFIG_MTK_POWER_WRAP                           policy<{'arm64': 'y'}>
+CONFIG_MTK_POWER_WRAP                           note<'MediaTek Power Wrap device-control (SCMI) driver.'>
+
+CONFIG_MTK_SSPM_CI                              policy<{'arm64': 'y'}>
+CONFIG_MTK_SSPM_CI                              note<'MediaTek SSPM control interface used by the Power Wrap SCMI device-control path.'>
+
 CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_NOUVEAU_DEBUG                            note<'Disable nouveau for NVIDIA kernels'>
 
@@ -272,6 +278,7 @@ CONFIG_SENSORS_AAEON                            note<'Disable all Ubuntu ODM dri
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 CONFIG_SENSORS_SPD5118                          policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_SENSORS_SPD5118                          note<'Enable SPD5118 temperature sensor support for DDR5 memory modules'>
 
@@ -288,6 +295,24 @@ CONFIG_SND_SOC_MT8901                           policy<{'arm64': 'n'}>
 CONFIG_SND_SOC_MT8901                           note<'MediaTek MT8901 AFE platform driver (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
 
 =======
+CONFIG_SND_SOC_MT8901                           policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_MT8901_LEGACY_SDW_MACH           policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_MT8901_LEGACY_SDW_MACH           note<'MT8901 SoundWire machine driver (N1x audio).'>
+
+CONFIG_SND_SOC_MTK_SDCA                         policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_SDCA                             policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_SND_SOC_SDCA_CLASS                       policy<{'amd64': 'm', 'arm64': 'n'}>
+CONFIG_SND_SOC_SDCA_FDL                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_SND_SOC_SDCA_HID                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_SND_SOC_SDCA_IRQ                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_SND_SOC_SDCA_IRQ                         note<'Derived symbols pulled in by SND_SOC_MTK_SDCA selecting the SDCA framework.'>
+CONFIG_SND_SOC_SDW_UTILS                        policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_SND_SOC_TAS2783_SDW                      policy<{'amd64': 'm', 'arm64': 'n'}>
+CONFIG_SOUNDWIRE_MTK                            policy<{'arm64': 'm'}>
+CONFIG_SOUNDWIRE_MTK_MT8901_CLK                 policy<{'arm64': 'y'}>
+CONFIG_SOUNDWIRE_MTK_MT8901_CLK                 note<'MT8901 SoundWire clock/power control; selected by the machine driver.'>
+
+
 CONFIG_SND_SOC_MTK_SDCA                         policy<{'arm64': 'n'}>
 CONFIG_SND_SOC_MTK_SDCA                         note<'SDCA support for codecs on the MediaTek SoundWire master (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
 >>>>>>> NVIDIA: SAUCE: UBUNTU: [Config] annotation for CONFIG_SND_SOC_MTK_SDCA (introduced disabled)
@@ -297,12 +322,38 @@ CONFIG_SND_SOC_MTK_SDCA                         note<'SDCA support for codecs on
 
 
 CONFIG_SOUNDWIRE_MTK                            policy<{'arm64': 'n'}>
+=======
+CONFIG_SND_SOC_MT8901                           policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_MT8901                           note<'MediaTek MT8901 AFE platform driver (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
+
+CONFIG_SND_SOC_MT8901_LEGACY_SDW_MACH           policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_MT8901_LEGACY_SDW_MACH           note<'MT8901 SoundWire machine driver (N1x audio).'>
+
+CONFIG_SND_SOC_MTK_SDCA                         policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_SDCA                             policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_SND_SOC_SDCA_CLASS                       policy<{'amd64': 'm', 'arm64': 'n'}>
+CONFIG_SND_SOC_SDCA_FDL                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_SND_SOC_SDCA_HID                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_SND_SOC_SDCA_IRQ                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_SND_SOC_SDCA_IRQ                         note<'Derived symbols pulled in by SND_SOC_MTK_SDCA selecting the SDCA framework.'>
+CONFIG_SND_SOC_SDW_UTILS                        policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_SND_SOC_SOF_MT8901                       policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_SOF_MT8901                       note<'MediaTek MT8901 ACPI DSP power-management support.'>
+
+CONFIG_SND_SOC_TAS2783_SDW                      policy<{'amd64': 'm', 'arm64': 'n'}>
+CONFIG_SND_SOC_MTK_SDCA                         note<'SDCA support for codecs on the MediaTek SoundWire master (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
+
+CONFIG_SOUNDWIRE_MTK                            policy<{'arm64': 'm'}>
+>>>>>>> NVIDIA: SAUCE: UBUNTU: [Config] Enable MT8901 audio and ADSP drivers
 CONFIG_SOUNDWIRE_MTK                            note<'MediaTek SoundWire manager (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
 >>>>>>> NVIDIA: SAUCE: UBUNTU: [Config] annotation for CONFIG_SOUNDWIRE_MTK (introduced disabled)
 
 CONFIG_SOUNDWIRE_MTK                            policy<{'arm64': 'n'}>
 CONFIG_SOUNDWIRE_MTK                            note<'MediaTek SoundWire manager (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
 
+
+CONFIG_SOUNDWIRE_MTK_MT8901_CLK                 policy<{'arm64': 'y'}>
+CONFIG_SOUNDWIRE_MTK_MT8901_CLK                 note<'MT8901 SoundWire clock/power control; selected by the machine driver.'>
 
 CONFIG_SPI_TEGRA210_QUAD                        policy<{'arm64': 'y'}>
 CONFIG_SPI_TEGRA210_QUAD                        note<'Ensures the TPM is available before the IMA driver initializes'>
