@@ -42,6 +42,28 @@ enum acpi_crs_irq_res {
 
 static struct pwrap_dev_ctrl dev_ctrl;
 
+/*
+ * DVFSRC enable flag in SPM SYSRAM.
+ *
+ * The Windows PEP driver (ppmnotify.c, PepPpmLpiSupported()) writes a DVFSRC
+ * enable flag into SPM SYSRAM so the firmware enables DVFSRC for the
+ * suspend/resume low-power flow. On Windows the address/length/value are
+ * seeded into the registry by nvpep.inx (AddReg) and read back at runtime;
+ * they are fixed platform constants, so we hardcode them here.
+ *
+ * Windows source values (nvpep.inx):
+ *   HKR,Parameters\DVFSRC,Offset,%REG_DWORD%,0x12FC00
+ *   HKR,Parameters\DVFSRC,Length,%REG_DWORD%,0x4
+ *   HKR,Parameters\DVFSRC,Value, %REG_DWORD%,0x1
+ *
+ * 0x12FC00 is an absolute physical address (not an offset into any base):
+ * Windows maps it directly via MmMapIoSpaceEx(), so the Linux equivalent is
+ * ioremap(0x12FC00, 4) + writel(0x1).
+ */
+#define PWRAP_DVFSRC_FLAG_ADDR	0x12FC00
+#define PWRAP_DVFSRC_FLAG_LEN	0x4
+#define PWRAP_DVFSRC_FLAG_VAL	0x1
+
 /* Getter for static pwrap_dev_ctrl */
 struct pwrap_dev_ctrl *pwrap_get_dev_ctrl(void)
 {
@@ -444,6 +466,44 @@ static int pwrap_probe_init_resources(struct pwrap_driver_data *priv,
 	return 0;
 }
 
+/**
+ * pwrap_write_dvfsrc_flag() - Enable DVFSRC via the SPM SYSRAM flag
+ * @dev: device (used for logging)
+ *
+ * Writes the DVFSRC enable flag into SPM SYSRAM so the firmware enables
+ * DVFSRC for the suspend/resume low-power flow. The flag address, length,
+ * and value are fixed platform constants (see PWRAP_DVFSRC_FLAG_* above).
+ *
+ * The flag is written once at probe. This mirrors the initial write done by
+ * the Windows PEP driver in PepPpmLpiSupported() (ppmnotify.c). SYSRAM
+ * contents are assumed to persist across the platform sleep states used on
+ * this target, so no resume-time re-write is performed.
+ *
+ * Failure to map the SYSRAM region is non-fatal: the driver continues so the
+ * SCMI device-control path stays functional.
+ */
+static void pwrap_write_dvfsrc_flag(struct device *dev)
+{
+	void __iomem *vaddr;
+
+	vaddr = ioremap(PWRAP_DVFSRC_FLAG_ADDR, PWRAP_DVFSRC_FLAG_LEN);
+	if (!vaddr) {
+		dev_warn(dev,
+			 "DVFSRC: failed to map SYSRAM flag at 0x%x (DVFSRC not enabled)\n",
+			 PWRAP_DVFSRC_FLAG_ADDR);
+		return;
+	}
+
+	writel(PWRAP_DVFSRC_FLAG_VAL, vaddr);
+
+	dev_info(dev,
+		 "DVFSRC: enabled via SYSRAM flag phys=0x%x len=0x%x val=0x%x\n",
+		 PWRAP_DVFSRC_FLAG_ADDR, PWRAP_DVFSRC_FLAG_LEN,
+		 PWRAP_DVFSRC_FLAG_VAL);
+
+	iounmap(vaddr);
+}
+
 static int mtk_pwrap_probe(struct platform_device *pdev)
 {
 	const struct acpi_device_id	*id;
@@ -473,6 +533,12 @@ static int mtk_pwrap_probe(struct platform_device *pdev)
 	ret = pwrap_probe_init_resources(priv, adev, id);
 	if (ret)
 		return ret;
+
+	/*
+	 * Enable DVFSRC by writing the SPM SYSRAM flag. Ported from the
+	 * Windows PEP driver (PepPpmLpiSupported() in ppmnotify.c). Non-fatal.
+	 */
+	pwrap_write_dvfsrc_flag(dev);
 
 	/*
 	 * The sysfs nodes are debug/test hooks. Their creation must not fail
