@@ -298,62 +298,66 @@ static void test_percent_to_max_rounding(struct kunit *test)
 
 static void test_num_assignable_counters(struct kunit *test)
 {
-	unsigned int orig_l3_num_allocated_mbwu = l3_num_allocated_mbwu;
-	u32 orig_mpam_partid_max = mpam_partid_max;
-	u32 orig_mpam_pmg_max = mpam_pmg_max;
+	struct mpam_resctrl_mon *mon =
+		&mpam_resctrl_counters[QOS_L3_MBM_TOTAL_EVENT_ID];
+	struct mpam_resctrl_res *res =
+		&mpam_resctrl_controls[RDT_RESOURCE_L3];
+	struct rdt_resource *r = &res->resctrl_res;
+	struct mpam_class fake_class = {};
+	struct mpam_class *orig_res_class = res->class;
+	struct mpam_class *orig_mon_class = mon->class;
+	int *orig_assigned_counters = mon->assigned_counters;
+	u32 orig_num_mbm_cntrs = r->mon.num_mbm_cntrs;
+	bool orig_mbm_cntr_assignable = r->mon.mbm_cntr_assignable;
+	bool orig_mbm_assign_on_mkdir = r->mon.mbm_assign_on_mkdir;
 	bool orig_cdp_enabled = cdp_enabled;
-	struct rdt_resource fake_l3;
+	int fake_counter;
 
-	/* Force there to be some PARTID/PMG */
-	mpam_partid_max = 3;
-	mpam_pmg_max = 1;
-
+	res->class = &fake_class;
+	mon->class = &fake_class;
+	mon->assigned_counters = &fake_counter;
+	r->mon.mbm_cntr_assignable = true;
+	r->mon.mbm_assign_on_mkdir = true;
 	cdp_enabled = false;
 
-	/* ABMC off, CDP off */
-	l3_num_allocated_mbwu = resctrl_arch_system_num_rmid_idx();
-	mpam_resctrl_monitor_sync_abmc_vals(&fake_l3);
-	KUNIT_EXPECT_EQ(test, fake_l3.mon.num_mbm_cntrs, resctrl_arch_system_num_rmid_idx());
-	KUNIT_EXPECT_FALSE(test, fake_l3.mon.mbm_cntr_assignable);
-	KUNIT_EXPECT_FALSE(test, fake_l3.mon.mbm_assign_on_mkdir);
-
-	/* ABMC on, CDP off */
-	l3_num_allocated_mbwu = 4;
-	mpam_resctrl_monitor_sync_abmc_vals(&fake_l3);
-	KUNIT_EXPECT_EQ(test, fake_l3.mon.num_mbm_cntrs, 4);
-	KUNIT_EXPECT_TRUE(test, fake_l3.mon.mbm_cntr_assignable);
-	KUNIT_EXPECT_TRUE(test, fake_l3.mon.mbm_assign_on_mkdir);
+	/* ABMC v5 takes the counter count from the selected MPAM class. */
+	fake_class.props.num_mbwu_mon = 4;
+	mpam_resctrl_monitor_sync_abmc_vals(r);
+	KUNIT_EXPECT_EQ(test, r->mon.num_mbm_cntrs, 4);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_cntr_assignable);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_assign_on_mkdir);
 
 	cdp_enabled = true;
 
-	/* ABMC off, CDP on */
-	l3_num_allocated_mbwu = resctrl_arch_system_num_rmid_idx();
-	mpam_resctrl_monitor_sync_abmc_vals(&fake_l3);
+	/* CDP splits the available counters between code and data. */
+	mpam_resctrl_monitor_sync_abmc_vals(r);
+	KUNIT_EXPECT_EQ(test, r->mon.num_mbm_cntrs, 2);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_cntr_assignable);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_assign_on_mkdir);
 
-	/* (value not consumed by resctrl) */
-	KUNIT_EXPECT_EQ(test, fake_l3.mon.num_mbm_cntrs, resctrl_arch_system_num_rmid_idx() / 2);
+	/*
+	 * ABMC v5 remains in mbm_event mode even when CDP leaves no counters
+	 * available, avoiding contradictory mode information from resctrl.
+	 */
+	fake_class.props.num_mbwu_mon = 1;
+	mpam_resctrl_monitor_sync_abmc_vals(r);
+	KUNIT_EXPECT_EQ(test, r->mon.num_mbm_cntrs, 0);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_cntr_assignable);
+	KUNIT_EXPECT_TRUE(test, r->mon.mbm_assign_on_mkdir);
 
-	KUNIT_EXPECT_FALSE(test, fake_l3.mon.mbm_cntr_assignable);
-	KUNIT_EXPECT_FALSE(test, fake_l3.mon.mbm_assign_on_mkdir);
-
-	/* ABMC on, CDP on */
-	l3_num_allocated_mbwu = 4;
-	mpam_resctrl_monitor_sync_abmc_vals(&fake_l3);
-	KUNIT_EXPECT_EQ(test, fake_l3.mon.num_mbm_cntrs, 2);
-	KUNIT_EXPECT_TRUE(test, fake_l3.mon.mbm_cntr_assignable);
-	KUNIT_EXPECT_TRUE(test, fake_l3.mon.mbm_assign_on_mkdir);
-
-	/* ABMC 'on', CDP on - but not enough counters */
-	l3_num_allocated_mbwu = 1;
-	mpam_resctrl_monitor_sync_abmc_vals(&fake_l3);
-	KUNIT_EXPECT_EQ(test, fake_l3.mon.num_mbm_cntrs, 0);
-	KUNIT_EXPECT_FALSE(test, fake_l3.mon.mbm_cntr_assignable);
-	KUNIT_EXPECT_FALSE(test, fake_l3.mon.mbm_assign_on_mkdir);
+	/* Synchronization is deferred until assignable counters are allocated. */
+	mon->assigned_counters = NULL;
+	r->mon.num_mbm_cntrs = 3;
+	mpam_resctrl_monitor_sync_abmc_vals(r);
+	KUNIT_EXPECT_EQ(test, r->mon.num_mbm_cntrs, 3);
 
 	/* Restore global variables that were messed with */
-	l3_num_allocated_mbwu = orig_l3_num_allocated_mbwu;
-	mpam_partid_max = orig_mpam_partid_max;
-	mpam_pmg_max = orig_mpam_pmg_max;
+	res->class = orig_res_class;
+	mon->class = orig_mon_class;
+	mon->assigned_counters = orig_assigned_counters;
+	r->mon.num_mbm_cntrs = orig_num_mbm_cntrs;
+	r->mon.mbm_cntr_assignable = orig_mbm_cntr_assignable;
+	r->mon.mbm_assign_on_mkdir = orig_mbm_assign_on_mkdir;
 	cdp_enabled = orig_cdp_enabled;
 }
 

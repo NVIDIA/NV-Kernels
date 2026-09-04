@@ -307,13 +307,15 @@ enum resctrl_schema_fmt {
 
 /**
  * struct resctrl_mon - Monitoring related data of a resctrl resource.
- * @num_rmid:		Number of RMIDs available.
- * @mbm_cfg_mask:	Memory transactions that can be tracked when bandwidth
- *			monitoring events can be configured.
- * @num_mbm_cntrs:	Number of assignable counters.
- * @mbm_cntr_assignable:Is system capable of supporting counter assignment?
- * @mbm_assign_on_mkdir:True if counters should automatically be assigned to MBM
- *			events of monitor groups created via mkdir.
+ * @num_rmid:			Number of RMIDs available.
+ * @mbm_cfg_mask:		Memory transactions that can be tracked when
+ *				bandwidth monitoring events can be configured.
+ * @num_mbm_cntrs:		Number of assignable counters.
+ * @mbm_cntr_assignable:	Is system capable of supporting counter assignment?
+ * @mbm_assign_on_mkdir:	True if counters should automatically be assigned to MBM
+ *				events of monitor groups created via mkdir.
+ * @mbm_cntr_configurable:	True if assignable counters are configurable.
+ * @mbm_cntr_assign_fixed:	True if the counter assignment mode is fixed.
  */
 struct resctrl_mon {
 	u32			num_rmid;
@@ -321,6 +323,8 @@ struct resctrl_mon {
 	int			num_mbm_cntrs;
 	bool			mbm_cntr_assignable;
 	bool			mbm_assign_on_mkdir;
+	bool			mbm_cntr_configurable;
+	bool			mbm_cntr_assign_fixed;
 };
 
 /**
@@ -778,29 +782,16 @@ static inline int resctrl_arch_measure_l2_residency(void *_plr) { return 0; }
 static inline int resctrl_arch_measure_l3_residency(void *_plr) { return 0; }
 #endif /* CONFIG_RESCTRL_FS_PSEUDO_LOCK */
 
-/* When supported, the architecture must implement these */
-#ifdef CONFIG_RESCTRL_IOMMU
+/*
+ * When supported, the architecture must implement these. The definitions
+ * handle CONFIG_RESCTRL_IOMMU=n internally, so they are declared
+ * unconditionally; on architectures that never implement them all callers
+ * sit behind IS_ENABLED(CONFIG_RESCTRL_IOMMU) checks and are removed as
+ * dead code.
+ */
 int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group, u32 closid,
 				       u32 rmid);
 bool resctrl_arch_match_iommu_closid(struct iommu_group *group, u32 closid);
 bool resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group, u32 closid,
 					  u32 rmid);
-#else
-static inline int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group,
-						     u32 closid, u32 rmid)
-{
-	return -EOPNOTSUPP;
-}
-static inline bool resctrl_arch_match_iommu_closid(struct iommu_group *group,
-						   u32 closid)
-{
-	return false;
-}
-static inline bool
-resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group,
-				     u32 closid, u32 rmid)
-{
-	return false;
-}
-#endif /* CONFIG_RESCTRL_IOMMU */
 #endif /* _RESCTRL_H */

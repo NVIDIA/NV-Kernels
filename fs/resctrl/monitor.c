@@ -182,6 +182,7 @@ void __check_limbo(struct rdt_l3_mon_domain *d, bool force_free)
 		entry = __rmid_entry(idx);
 		if (!entry)
 			break;
+
 		if (!force_free) {
 			if (resctrl_arch_rmid_read(r, &d->hdr, entry->closid,
 						   entry->rmid, QOS_L3_OCCUP_EVENT_ID,
@@ -1008,7 +1009,8 @@ void free_rmid_lru_list(void)
  */
 struct mon_evt mon_event_all[QOS_NUM_EVENTS] = {
 	MON_EVENT(QOS_L3_OCCUP_EVENT_ID,		"llc_occupancy",	RDT_RESOURCE_L3,	false),
-	MON_EVENT(QOS_L3_MBM_TOTAL_EVENT_ID,		"mbm_total_bytes",	RDT_RESOURCE_MBA,	false),
+	MON_EVENT(QOS_L3_MBM_TOTAL_EVENT_ID,		"mbm_total_bytes",
+		  RDT_RESOURCE_MBA,	false),
 	MON_EVENT(QOS_L3_MBM_LOCAL_EVENT_ID,		"mbm_local_bytes",	RDT_RESOURCE_L3,	false),
 	MON_EVENT(PMT_EVENT_ENERGY,			"core_energy",		RDT_RESOURCE_PERF_PKG,	true),
 	MON_EVENT(PMT_EVENT_ACTIVITY,			"activity",		RDT_RESOURCE_PERF_PKG,	true),
@@ -1243,9 +1245,10 @@ static int rdtgroup_alloc_assign_cntr(struct rdt_resource *r, struct rdt_l3_mon_
  * NULL; otherwise, assign the counter to the specified domain @d.
  *
  * If all counters in a domain are already in use, rdtgroup_alloc_assign_cntr()
- * will fail. The assignment process will abort at the first failure encountered
- * during domain traversal, which may result in the event being only partially
- * assigned.
+ * will fail. When attempting to assign counters to all domains, carry on trying
+ * to assign counters after a failure since only some domains may have counters
+ * and the goal is to assign counters where possible. If any counter assignment
+ * fails, return the error from the last failing assignment.
  *
  * Return:
  * 0 on success, < 0 on failure.
@@ -1258,9 +1261,11 @@ static int rdtgroup_assign_cntr_event(struct rdt_l3_mon_domain *d, struct rdtgro
 
 	if (!d) {
 		list_for_each_entry(d, &r->mon_domains, hdr.list) {
-			ret = rdtgroup_alloc_assign_cntr(r, d, rdtgrp, mevt);
-			if (ret)
-				return ret;
+			int err;
+
+			err = rdtgroup_alloc_assign_cntr(r, d, rdtgrp, mevt);
+			if (err)
+				ret = err;
 		}
 	} else {
 		ret = rdtgroup_alloc_assign_cntr(r, d, rdtgrp, mevt);
@@ -1281,19 +1286,23 @@ static int rdtgroup_assign_cntr_event(struct rdt_l3_mon_domain *d, struct rdtgro
  */
 void rdtgroup_assign_cntrs(struct rdtgroup *rdtgrp)
 {
-	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_L3);
+	enum resctrl_event_id eventid;
+	struct rdt_resource *r;
+	struct mon_evt *mevt;
 
-	if (!r->mon_capable || !resctrl_arch_mbm_cntr_assign_enabled(r) ||
-	    !r->mon.mbm_assign_on_mkdir)
-		return;
+	for_each_mbm_event_id(eventid) {
+		if (!resctrl_is_mon_event_enabled(eventid))
+			continue;
 
-	if (resctrl_is_mon_event_enabled(QOS_L3_MBM_TOTAL_EVENT_ID))
-		rdtgroup_assign_cntr_event(NULL, rdtgrp,
-					   &mon_event_all[QOS_L3_MBM_TOTAL_EVENT_ID]);
+		mevt = &mon_event_all[eventid];
+		r = resctrl_arch_get_resource(mevt->rid);
 
-	if (resctrl_is_mon_event_enabled(QOS_L3_MBM_LOCAL_EVENT_ID))
-		rdtgroup_assign_cntr_event(NULL, rdtgrp,
-					   &mon_event_all[QOS_L3_MBM_LOCAL_EVENT_ID]);
+		if (!r->mon_capable || !resctrl_arch_mbm_cntr_assign_enabled(r) ||
+		    !r->mon.mbm_assign_on_mkdir)
+			continue;
+
+		rdtgroup_assign_cntr_event(NULL, rdtgrp, mevt);
+	}
 }
 
 /*
@@ -1340,18 +1349,22 @@ static void rdtgroup_unassign_cntr_event(struct rdt_l3_mon_domain *d, struct rdt
  */
 void rdtgroup_unassign_cntrs(struct rdtgroup *rdtgrp)
 {
-	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_L3);
+	enum resctrl_event_id eventid;
+	struct rdt_resource *r;
+	struct mon_evt *mevt;
 
-	if (!r->mon_capable || !resctrl_arch_mbm_cntr_assign_enabled(r))
-		return;
+	for_each_mbm_event_id(eventid) {
+		if (!resctrl_is_mon_event_enabled(eventid))
+			continue;
 
-	if (resctrl_is_mon_event_enabled(QOS_L3_MBM_TOTAL_EVENT_ID))
-		rdtgroup_unassign_cntr_event(NULL, rdtgrp,
-					     &mon_event_all[QOS_L3_MBM_TOTAL_EVENT_ID]);
+		mevt = &mon_event_all[eventid];
+		r = resctrl_arch_get_resource(mevt->rid);
 
-	if (resctrl_is_mon_event_enabled(QOS_L3_MBM_LOCAL_EVENT_ID))
-		rdtgroup_unassign_cntr_event(NULL, rdtgrp,
-					     &mon_event_all[QOS_L3_MBM_LOCAL_EVENT_ID]);
+		if (!r->mon_capable || !resctrl_arch_mbm_cntr_assign_enabled(r))
+			continue;
+
+		rdtgroup_unassign_cntr_event(NULL, rdtgrp, mevt);
+	}
 }
 
 static int resctrl_parse_mem_transactions(char *tok, u32 *val)
@@ -1454,6 +1467,11 @@ ssize_t event_filter_write(struct kernfs_open_file *of, char *buf, size_t nbytes
 		ret = -EINVAL;
 		goto out_unlock;
 	}
+	if (!r->mon.mbm_cntr_configurable) {
+		rdt_last_cmd_puts("event_filter is not configurable\n");
+		ret = -EPERM;
+		goto out_unlock;
+	}
 
 	ret = resctrl_parse_mem_transactions(buf, &evt_cfg);
 	if (!ret && mevt->evt_cfg != evt_cfg) {
@@ -1483,7 +1501,7 @@ int resctrl_mbm_assign_mode_show(struct kernfs_open_file *of,
 		else
 			seq_puts(s, "[default]\n");
 
-		if (!IS_ENABLED(CONFIG_RESCTRL_ASSIGN_FIXED)) {
+		if (!r->mon.mbm_cntr_assign_fixed) {
 			if (enabled)
 				seq_puts(s, "default\n");
 			else
@@ -1534,6 +1552,12 @@ ssize_t resctrl_mbm_assign_mode_write(struct kernfs_open_file *of, char *buf,
 	}
 
 	if (enable != resctrl_arch_mbm_cntr_assign_enabled(r)) {
+		if (r->mon.mbm_cntr_assign_fixed) {
+			ret = -EINVAL;
+			rdt_last_cmd_puts("Counter assignment mode is not configurable\n");
+			goto out_unlock;
+		}
+
 		ret = resctrl_arch_mbm_cntr_assign_set(r, enable);
 		if (ret)
 			goto out_unlock;
@@ -1906,7 +1930,7 @@ static void resctrl_mon_resource_init(struct rdt_resource *r)
 {
 	unsigned long fflags;
 
-	fflags = (r->rid == RDT_RESOURCE_MBA) ? RFTYPE_RES_MB :RFTYPE_RES_CACHE;
+	fflags = (r->rid == RDT_RESOURCE_MBA) ? RFTYPE_RES_MB : RFTYPE_RES_CACHE;
 
 	if (resctrl_arch_is_evt_configurable(QOS_L3_MBM_TOTAL_EVENT_ID)) {
 		mon_event_all[QOS_L3_MBM_TOTAL_EVENT_ID].configurable = true;
@@ -1938,6 +1962,8 @@ static void resctrl_mon_resource_init(struct rdt_resource *r)
 		resctrl_file_fflags_init("available_mbm_cntrs",
 					 RFTYPE_MON_INFO | fflags);
 		resctrl_file_fflags_init("event_filter", RFTYPE_ASSIGN_CONFIG);
+		if (r->mon.mbm_cntr_configurable)
+			resctrl_file_mode_init("event_filter", 0644);
 		resctrl_file_fflags_init("mbm_assign_on_mkdir", RFTYPE_MON_INFO |
 					 fflags);
 		if (r->rid == RDT_RESOURCE_MBA)

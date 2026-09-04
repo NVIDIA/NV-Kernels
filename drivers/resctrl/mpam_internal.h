@@ -12,6 +12,7 @@
 #include <linux/io.h>
 #include <linux/jump_label.h>
 #include <linux/llist.h>
+#include <linux/mailbox_client.h>
 #include <linux/mutex.h>
 #include <linux/resctrl.h>
 #include <linux/spinlock.h>
@@ -55,7 +56,17 @@ struct mpam_garbage {
 	struct llist_node	llist;
 
 	void			*to_free;
+	void			(*release)(void *to_free);
 	struct platform_device	*pdev;
+};
+
+struct mpam_pcc_chan {
+	struct list_head	pcc_chans;
+	struct mbox_client	pcc_cl;
+	struct pcc_mbox_chan	*pcc_chan;
+	struct mutex		pcc_chan_lock; /* only one message at a time */
+	struct kref		refcount;
+	int			subspace_id;
 };
 
 struct mpam_msc {
@@ -67,6 +78,7 @@ struct mpam_msc {
 
 	/* Not modified after mpam_is_enabled() becomes true */
 	enum mpam_msc_iface	iface;
+	struct mpam_pcc_chan	*pcc_chan;
 	u32			nrdy_usec;
 	u64			nrdy_retry_count;
 	cpumask_t		accessibility;
@@ -118,20 +130,17 @@ struct mpam_msc {
 	/*
 	 * mon_sel_lock protects access to the MSC hardware registers that are
 	 * affected by MPAMCFG_MON_SEL, and the mbwu_state.
-	 * Both the 'inner' and 'outer' must be taken.
-	 * For real MMIO MSC, the outer lock is unnecessary - but keeps the
-	 * code common with:
-	 * Firmware backed MSC need to sleep when accessing the MSC, which
-	 * means some code-paths will always fail. For these MSC the outer
-	 * lock is providing the protection, and the inner lock fails to
-	 * be taken if the task is unable to sleep.
-	 *
+	 * Access to mon_sel is needed from both process and interrupt contexts,
+	 * but is complicated by firmware-backed platforms that can't make any
+	 * access unless they can sleep.
+	 * Always use the mpam_mon_sel_lock() helpers.
+	 * Accesses to mon_sel need to be able to fail if they occur in the wrong
+	 * context.
 	 * If needed, take msc->probe_lock first.
 	 */
-	struct mutex		outer_mon_sel_lock;
-	bool			outer_lock_held;
-	raw_spinlock_t		inner_mon_sel_lock;
-	unsigned long		inner_mon_sel_flags;
+	raw_spinlock_t		_mon_sel_lock;
+	unsigned long		_mon_sel_flags;
+	struct mutex		mon_sel_mutex;
 
 	void __iomem		*mapped_hwpage;
 	size_t			mapped_hwpage_sz;
@@ -144,57 +153,58 @@ struct mpam_msc {
 	struct mpam_garbage	garbage;
 };
 
-static inline bool __must_check mpam_mon_sel_inner_lock(struct mpam_msc *msc)
+/* Returning false here means accesses to mon_sel must fail and report an error. */
+static inline bool __must_check mpam_mon_sel_lock(struct mpam_msc *msc)
 {
-	/*
-	 * The outer lock may be taken by a CPU that then issues an IPI to run
-	 * a helper that takes the inner lock. lockdep can't help us here.
-	 */
-	WARN_ON_ONCE(!READ_ONCE(msc->outer_lock_held));
-
 	if (msc->iface == MPAM_IFACE_MMIO) {
-		raw_spin_lock_irqsave(&msc->inner_mon_sel_lock, msc->inner_mon_sel_flags);
+		raw_spin_lock_irqsave(&msc->_mon_sel_lock, msc->_mon_sel_flags);
+
 		return true;
 	}
 
-	/* Accesses must fail if we are not pre-emptible */
-	return !!preemptible();
+	if (!preemptible())
+		return false;
+
+	mutex_lock(&msc->mon_sel_mutex);
+
+	return true;
 }
 
-static inline void mpam_mon_sel_inner_unlock(struct mpam_msc *msc)
+static inline void mpam_mon_sel_unlock(struct mpam_msc *msc)
 {
-	WARN_ON_ONCE(!READ_ONCE(msc->outer_lock_held));
+	if (msc->iface == MPAM_IFACE_MMIO) {
+		raw_spin_unlock_irqrestore(&msc->_mon_sel_lock,
+					   msc->_mon_sel_flags);
 
-	if (msc->iface == MPAM_IFACE_MMIO)
-		raw_spin_unlock_irqrestore(&msc->inner_mon_sel_lock, msc->inner_mon_sel_flags);
-}
+		return;
+	}
 
-static inline void mpam_mon_sel_outer_lock(struct mpam_msc *msc)
-{
-	mutex_lock(&msc->outer_mon_sel_lock);
-	msc->outer_lock_held = true;
-}
-
-static inline void mpam_mon_sel_outer_unlock(struct mpam_msc *msc)
-{
-	msc->outer_lock_held = false;
-	mutex_unlock(&msc->outer_mon_sel_lock);
+	mutex_unlock(&msc->mon_sel_mutex);
 }
 
 static inline void mpam_mon_sel_lock_held(struct mpam_msc *msc)
 {
-	WARN_ON_ONCE(!READ_ONCE(msc->outer_lock_held));
 	if (msc->iface == MPAM_IFACE_MMIO)
-		lockdep_assert_held_once(&msc->inner_mon_sel_lock);
+		lockdep_assert_held_once(&msc->_mon_sel_lock);
 	else
-		lockdep_assert_preemption_enabled();
+		lockdep_assert_held_once(&msc->mon_sel_mutex);
 }
 
-static inline void mpam_mon_sel_lock_init(struct mpam_msc *msc)
+static inline int mpam_mon_sel_lock_init(struct device *dev,
+					 struct mpam_msc *msc)
 {
-	raw_spin_lock_init(&msc->inner_mon_sel_lock);
-	mutex_init(&msc->outer_mon_sel_lock);
+	if (msc->iface == MPAM_IFACE_MMIO) {
+		raw_spin_lock_init(&msc->_mon_sel_lock);
+
+		return 0;
+	}
+
+	return devm_mutex_init(dev, &msc->mon_sel_mutex);
 }
+
+DEFINE_GUARD(mon_sel, struct mpam_msc *,
+	     mpam_mon_sel_lock(_T), mpam_mon_sel_unlock(_T));
+DEFINE_GUARD_COND(mon_sel, _lock, mpam_mon_sel_lock(_T), _RET);
 
 /* Bits for mpam features bitmaps */
 enum mpam_device_features {
@@ -460,19 +470,10 @@ struct mpam_resctrl_res {
 struct mpam_resctrl_mon {
 	struct mpam_class	*class;
 
-	/*
-	 * Array of allocated MBWU monitors, indexed by (closid, rmid).
-	 * When ABMC is not in use, this array directly maps (closid, rmid)
-	 * to the allocated monitor. Otherwise this array is sparse, and
-	 * un-assigned (closid, rmid) are -1.
-	 */
+	/* Array of allocated MBWU monitors, indexed by (closid, rmid). */
 	int			*mbwu_idx_to_mon;
 
-	/*
-	 * Array of assigned MBWU monitors, indexed by idx argument.
-	 * When ABMC is not in use, this array can be NULL. Otherwise
-	 * it maps idx to the allocated monitor.
-	 */
+	/* Array of assigned MBWU monitors, indexed by resctrl's cntr_id. */
 	int			*assigned_counters;
 };
 
@@ -520,6 +521,9 @@ extern u8 mpam_pmg_max;
 void mpam_enable(struct work_struct *work);
 void mpam_disable(struct work_struct *work);
 
+/* helper function to call from outside mpam_devices.c */
+void mpam_fb_disable_mpam(int err, int mpam_fb_err);
+
 /* Reset all the RIS in a class under cpus_read_lock() */
 void mpam_reset_class_locked(struct mpam_class *class);
 
@@ -548,6 +552,12 @@ static inline int mpam_resctrl_online_cpu(unsigned int cpu) { return 0; }
 static inline void mpam_resctrl_offline_cpu(unsigned int cpu) { }
 static inline void mpam_resctrl_teardown_class(struct mpam_class *class) { }
 #endif /* CONFIG_RESCTRL_FS */
+
+/* MPAM-Fb Firmware-backed protocol wrappers */
+int mpam_fb_send_read_request(struct mpam_msc *msc, u16 reg, u32 *result);
+int mpam_fb_send_write_request(struct mpam_msc *msc, u16 reg, u32 value);
+int mpam_fb_check_protocol_version(struct mpam_msc *msc);
+int mpam_fb_check_shared_buffer_size(struct mpam_msc *msc);
 
 /*
  * MPAM MSCs have the following register layout. See:

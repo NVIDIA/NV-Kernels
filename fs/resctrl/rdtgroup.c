@@ -770,8 +770,7 @@ static int rdtgroup_move_task(pid_t pid, struct rdtgroup *rdtgrp,
 	return ret;
 }
 
-static int rdtgroup_move_iommu(int iommu_group_id, struct rdtgroup *rdtgrp,
-			       struct kernfs_open_file *of)
+static int rdtgroup_move_iommu(int iommu_group_id, struct rdtgroup *rdtgrp)
 {
 	const struct cred *cred = current_cred();
 	struct iommu_group *iommu_group;
@@ -852,26 +851,32 @@ static ssize_t rdtgroup_tasks_write(struct kernfs_open_file *of,
 
 		is_iommu = string_is_iommu_group(pid_str, &iommu_group_id);
 		if (is_iommu) {
-			ret = rdtgroup_move_iommu(iommu_group_id, rdtgrp, of);
-			if (ret)
+			ret = rdtgroup_move_iommu(iommu_group_id, rdtgrp);
+			if (ret) {
+				rdt_last_cmd_printf("Error while processing iommu_group %d\n",
+						     iommu_group_id);
 				break;
-			continue;
-		} else if (kstrtoint(pid_str, 0, &pid)) {
-			rdt_last_cmd_printf("Task list parsing error pid %s\n", pid_str);
-			ret = -EINVAL;
-			break;
-		}
+			}
+		} else {
+			if (kstrtoint(pid_str, 0, &pid)) {
+				rdt_last_cmd_printf("Task list parsing error pid %s\n",
+						     pid_str);
+				ret = -EINVAL;
+				break;
+			}
 
-		if (pid < 0) {
-			rdt_last_cmd_printf("Invalid pid %d\n", pid);
-			ret = -EINVAL;
-			break;
-		}
+			if (pid < 0) {
+				rdt_last_cmd_printf("Invalid pid %d\n", pid);
+				ret = -EINVAL;
+				break;
+			}
 
-		ret = rdtgroup_move_task(pid, rdtgrp, of);
-		if (ret) {
-			rdt_last_cmd_printf("Error while processing task %d\n", pid);
-			break;
+			ret = rdtgroup_move_task(pid, rdtgrp, of);
+			if (ret) {
+				rdt_last_cmd_printf("Error while processing task %d\n",
+						     pid);
+				break;
+			}
 		}
 	}
 
@@ -2197,7 +2202,7 @@ static struct rftype res_common_files[] = {
 	},
 	{
 		.name		= "event_filter",
-		.mode		= 0644,
+		.mode		= 0444,
 		.kf_ops		= &rdtgroup_kf_single_ops,
 		.seq_show	= event_filter_show,
 		.write		= event_filter_write,
@@ -2416,6 +2421,15 @@ void resctrl_file_fflags_init(const char *config, unsigned long fflags)
 		rft->fflags = fflags;
 }
 
+void resctrl_file_mode_init(const char *config, umode_t mode)
+{
+	struct rftype *rft;
+
+	rft = rdtgroup_get_rftype_by_name(config);
+	if (rft)
+		rft->mode = mode;
+}
+
 /**
  * rdtgroup_kn_mode_restrict - Restrict user access to named resctrl file
  * @r: The resource group with which the file is associated.
@@ -2532,22 +2546,19 @@ static int resctrl_mkdir_event_configs(struct rdt_resource *r, struct kernfs_nod
 			continue;
 
 		kn_subdir2 = kernfs_create_dir(kn_subdir, mevt->name, kn_subdir->mode, mevt);
-		if (IS_ERR(kn_subdir2)) {
-			ret = PTR_ERR(kn_subdir2);
-			goto out;
-		}
+		if (IS_ERR(kn_subdir2))
+			return PTR_ERR(kn_subdir2);
 
 		ret = rdtgroup_kn_set_ugid(kn_subdir2);
 		if (ret)
-			goto out;
+			return ret;
 
 		ret = rdtgroup_add_files(kn_subdir2, RFTYPE_ASSIGN_CONFIG);
 		if (ret)
-			break;
+			return ret;
 	}
 
-out:
-	return ret;
+	return 0;
 }
 
 static int rdtgroup_mkdir_info_resdir(void *priv, char *name,
@@ -2742,10 +2753,13 @@ static void mba_sc_domain_destroy(struct rdt_resource *r,
 }
 
 /*
- * MBA software controller is supported only if
- * MBM is supported and MBA is in linear scale,
- * and the MBM monitor scope is the same as MBA
- * control scope.
+ * The MBA software controller is supported only if MBM is supported and MBA is
+ * in linear scale, and the MBM monitor scope is the same as MBA control scope.
+ *
+ * The software controller cannot be supported when the MBM counters are
+ * assignable.  There is no guarantee that MBM counters are assigned to the
+ * event backing the software controller in all monitoring domains of all
+ * monitoring groups.
  */
 static bool supports_mba_mbps(void)
 {
@@ -2754,7 +2768,8 @@ static bool supports_mba_mbps(void)
 
 	return (resctrl_is_mbm_enabled() &&
 		r->alloc_capable && is_mba_linear() &&
-		r->ctrl_scope == rmbm->mon_scope);
+		r->ctrl_scope == rmbm->mon_scope &&
+		!rmbm->mon.mbm_cntr_assignable);
 }
 
 /*
@@ -3238,7 +3253,7 @@ static int rdt_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		ctx->enable_cdpl2 = true;
 		return 0;
 	case Opt_mba_mbps:
-		msg = "mba_MBps requires MBM and linear scale MBA at L3 scope";
+		msg = "mba_MBps requires MBM (mbm_event mode not supported) and linear scale MBA at L3 scope";
 		if (!supports_mba_mbps())
 			return invalfc(fc, msg);
 		ctx->enable_mba_mbps = true;
@@ -3327,6 +3342,44 @@ static void rdt_move_group_tasks(struct rdtgroup *from, struct rdtgroup *to,
 	read_unlock(&tasklist_lock);
 }
 
+static int rdt_move_group_iommus(struct rdtgroup *from, struct rdtgroup *to)
+{
+	struct kset *iommu_groups;
+	struct iommu_group *group;
+	int err, ret = 0, iommu_group_id;
+	struct kobject *group_kobj = NULL;
+
+	if (!IS_ENABLED(CONFIG_RESCTRL_IOMMU))
+		return 0;
+
+	if (from == to)
+		return 0;
+
+	iommu_groups = iommu_get_group_kset();
+
+	while ((group_kobj = kset_get_next_obj(iommu_groups, group_kobj))) {
+		/* iommu_group_get_from_kobj() wants to drop a reference */
+		kobject_get(group_kobj);
+
+		group = iommu_group_get_from_kobj(group_kobj);
+		if (!group)
+			continue;
+
+		if (!from || iommu_matches_rdtgroup(group, from)) {
+			err = kstrtoint(group_kobj->name, 0, &iommu_group_id);
+			if (!err)
+				err = rdtgroup_move_iommu(iommu_group_id, to);
+			if (err && !ret)
+				ret = err;
+		}
+
+		iommu_group_put(group);
+	}
+
+	kset_put(iommu_groups);
+	return ret;
+}
+
 static void free_all_child_rdtgrp(struct rdtgroup *rdtgrp)
 {
 	struct rdtgroup *sentry, *stmp;
@@ -3354,6 +3407,9 @@ static void rmdir_all_sub(void)
 
 	/* Move all tasks to the default resource group */
 	rdt_move_group_tasks(NULL, &rdtgroup_default, NULL);
+
+	/* Move all iommu_groups to the default resource group */
+	rdt_move_group_iommus(NULL, &rdtgroup_default);
 
 	list_for_each_entry_safe(rdtgrp, tmp, &rdt_all_groups, rdtgroup_list) {
 		/* Free any child rmids */
@@ -4286,6 +4342,9 @@ static int rdtgroup_rmdir_mon(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 	/* Give any tasks back to the parent group */
 	rdt_move_group_tasks(rdtgrp, prdtgrp, tmpmask);
 
+	/* Give any iommu_groups back to the parent group */
+	rdt_move_group_iommus(rdtgrp, prdtgrp);
+
 	/*
 	 * Update per cpu closid/rmid of the moved CPUs first.
 	 * Note: the closid will not change, but the arch code still needs it.
@@ -4335,6 +4394,9 @@ static int rdtgroup_rmdir_ctrl(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 
 	/* Give any tasks back to the default group */
 	rdt_move_group_tasks(rdtgrp, &rdtgroup_default, tmpmask);
+
+	/* Give any iommu_groups back to the default group */
+	rdt_move_group_iommus(rdtgrp, &rdtgroup_default);
 
 	/* Give any CPUs back to the default group */
 	cpumask_or(&rdtgroup_default.cpu_mask,
