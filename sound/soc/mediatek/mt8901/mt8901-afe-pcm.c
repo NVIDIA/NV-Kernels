@@ -1906,12 +1906,32 @@ static int mt8901_afe_pcm_dev_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	/* always on clock */
-	mt8901_afe_enable_main_clock(afe);
+	ret = mt8901_afe_init_clock(afe);
+	if (ret) {
+		dev_err(dev, "afe init clock failed: %d\n", ret);
+		return ret;
+	}
+
+	/* ToDo: check if we need to enable clock here */
+	ret = mt8901_afe_enable_main_clock(afe);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_enable_main_clock failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = mt8901_afe_enable_apll_top_con_cg(afe);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_enable_apll_top_con_cg failed: %d\n",
+			ret);
+		mt8901_afe_disable_main_clock(afe);
+		return ret;
+	}
 
 	ret = mt8901_afe_init_regs(afe);
 	if (ret) {
 		dev_err(dev, "afe init regs failed: %d\n", ret);
+		mt8901_afe_disable_apll_top_con_cg(afe);
+		mt8901_afe_disable_main_clock(afe);
 		return ret;
 	}
 
@@ -1937,8 +1957,11 @@ static int mt8901_afe_pcm_dev_probe(struct platform_device *pdev)
 	ret = devm_snd_soc_register_component(dev, &mtk_afe_pcm_platform,
 					      afe->dai_drivers,
 					      afe->num_dai_drivers);
-	if (ret)
+	if (ret) {
+		mt8901_afe_disable_apll_top_con_cg(afe);
+		mt8901_afe_disable_main_clock(afe);
 		return dev_err_probe(dev, ret, "err_platform\n");
+	}
 
 	return 0;
 }
