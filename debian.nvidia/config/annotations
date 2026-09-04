@@ -159,6 +159,12 @@ CONFIG_MTD                                      note<'Essential for boot on ARM6
 CONFIG_MTK_PCIE_HOTPLUG                         policy<{'arm64': 'm'}>
 CONFIG_MTK_PCIE_HOTPLUG                         note<'CX7 PCIe hotplug driver for NVIDIA DGX Spark systems with GB10 SoC.'>
 
+CONFIG_MTK_POWER_WRAP                           policy<{'arm64': 'y'}>
+CONFIG_MTK_POWER_WRAP                           note<'MediaTek Power Wrap device-control (SCMI) driver.'>
+
+CONFIG_MTK_SSPM_CI                              policy<{'arm64': 'y'}>
+CONFIG_MTK_SSPM_CI                              note<'MediaTek SSPM control interface used by the Power Wrap SCMI device-control path.'>
+
 CONFIG_NOUVEAU_DEBUG                            policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_NOUVEAU_DEBUG                            note<'Disable nouveau for NVIDIA kernels'>
 
