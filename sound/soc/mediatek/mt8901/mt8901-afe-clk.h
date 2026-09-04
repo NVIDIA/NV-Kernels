@@ -11,8 +11,170 @@
 #define _MT8901_AFE_CLK_H_
 
 struct mtk_base_afe;
+struct device;
 
+enum sspm_aud_cmd {
+	SSPM_AUD_CMD_MTCMOS = 0,
+	SSPM_AUD_CMD_CG,
+	SSPM_AUD_CMD_VLP_SYS_CLK_MUX,
+	SSPM_AUD_CMD_VLP_SYS_CLK_SET_RATE,
+	SSPM_AUD_CMD_VLP_SYS_CLK_SET_PARENT,
+	SSPM_AUD_CMD_AFE_SPM_CTRL,
+	SSPM_AUD_CMD_PWR_CTRL_SCENE,
+	SSPM_AUD_CMD_CLK_CG_DEINIT,
+	SSPM_AUD_CMD_NUM,
+};
+
+enum audio_mtcmos_pd_id {
+	AUDIO_VADSYS_PD_AO = 0,
+	AUDIO_VADSYS_PD_INFRA,
+	AUDIO_PD,
+	AUDIO_PD_NUM,
+};
+
+enum afe_pwr_scene {
+	AUDIO_PWR_SCEN_NORMAL = 0,
+	AUDIO_PWR_SCEN_BY_DSTATE,
+	AUDIO_PWR_SCEN_AON,
+	AUDIO_PWR_SCEN_NUM,
+};
+
+enum afe_spm_ctrl_req_type {
+	AFE_SPM_CTRL_VCORE_REQ = 0,
+	AFE_SPM_CTRL_PMIC_REQ,
+	AFE_SPM_CTRL_SRCCLKENA_REQ,
+	AFE_SPM_CTRL_APSRC_REQ,
+	AFE_SPM_CTRL_VRF18_REQ,
+	AFE_SPM_CTRL_INFRA_REQ,
+	AFE_SPM_CTRL_DDREN_REQ,
+	AFE_SPM_CTRL_REQ_NUMS,
+};
+
+enum audio_top_con_cg_type {
+	AUD_CG_ASD_BEGIN,
+	/* AUDIO_TOP_CON0 (0x0000) */
+	AUD_CG_HW_GAIN01 = AUD_CG_ASD_BEGIN,
+	AUD_CG_HW_GAIN23,
+	AUD_CG_CM0,
+	AUD_CG_CM1,
+	AUD_CG_CM2,
+	/* AUDIO_TOP_CON1 (0x0004) */
+	AUD_CG_HW_GAIN_DL0_DL1,
+	AUD_CG_HW_GAIN_DL2_DL3,
+	AUD_CG_HW_GAIN_DL4_DL5,
+	AUD_CG_HW_GAIN_DL24CH,
+	AUD_CG_UL0_ADC,
+	AUD_CG_UL0_TML,
+	AUD_CG_UL0_ADC_HIRES,
+	AUD_CG_UL0_ADC_HIRES_TML,
+	AUD_CG_UL1_ADC,
+	AUD_CG_UL1_TML,
+	AUD_CG_UL1_ADC_HIRES,
+	AUD_CG_UL1_ADC_HIRES_TML,
+	/* AUDIO_TOP_CON2 (0x0008) */
+	AUD_CG_ETDM_OUT0,
+	AUD_CG_ETDM_OUT5,
+	AUD_CG_ETDM_IN0,
+	AUD_CG_ETDM_IN5,
+	/* AUDIO_TOP_CON3 (0x0008) */
+	AUD_CG_GENERAL0_ASRC,
+	AUD_CG_GENERAL1_ASRC,
+	AUD_CG_GENERAL2_ASRC,
+	AUD_CG_GENERAL3_ASRC,
+	AUD_CG_GENERAL4_ASRC,
+	AUD_CG_GENERAL5_ASRC,
+	AUD_CG_GENERAL6_ASRC,
+	AUD_CG_GENERAL7_ASRC,
+	/* AUDIO_TOP_CON4 (0x0010) */
+	AUD_CG_APLL_TUNER1,
+	AUD_CG_APLL_TUNER2,
+	AUD_CG_H208M_CK,
+	AUD_CG_APLL2_CK,
+	AUD_CG_APLL1_CK,
+	AUD_CG_SDW_BEGIN,
+	AUD_CG_AUDIO_F26M_CK = AUD_CG_SDW_BEGIN,
+	AUD_CG_AUDIO_HOPPING_CK,
+	AUD_CG_ASD_END = AUD_CG_AUDIO_HOPPING_CK,
+	/* AUDIO_TOP_CON5 (0x0070) - SoundWire (owned by dai-soundwire.c) */
+	AUD_CG_SOUNDWIRE_DMIC0_ADC,
+	AUD_CG_SOUNDWIRE_DMIC0_TML,
+	AUD_CG_SOUNDWIRE_DMIC1_ADC,
+	AUD_CG_SOUNDWIRE_DMIC1_TML,
+	AUD_CG_SOUNDWIRE_DMIC2_ADC,
+	AUD_CG_SOUNDWIRE_DMIC2_TML,
+	AUD_CG_SOUNDWIRE_DMIC3_ADC,
+	AUD_CG_SOUNDWIRE_DMIC3_TML,
+	AUD_CG_SOUNDWIRE_DMIC4_ADC,
+	AUD_CG_SOUNDWIRE_DMIC4_TML,
+	AUD_CG_SOUNDWIRE_DMIC5_ADC,
+	AUD_CG_SOUNDWIRE_DMIC5_TML,
+	AUD_CG_SOUNDWIRE_DMIC6_ADC,
+	AUD_CG_SOUNDWIRE_DMIC6_TML,
+	AUD_CG_SOUNDWIRE_DMIC7_ADC,
+	AUD_CG_SOUNDWIRE_DMIC7_TML,
+	AUD_CG_SOUNDWIRE1,
+	AUD_CG_SOUNDWIRE0,
+	AUD_CG_SDW_END = AUD_CG_SOUNDWIRE0,
+	AUD_CG_NUMS,
+};
+
+enum afe_clk_mux_type {
+	AFE_CLK_VLP_CKSYS_TOP_AUDIO_H_SEL = 0,
+	AFE_CLK_VLP_CKSYS_TOP_AUD_ENGEN1_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_AUD_ENGEN2_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_AUD_SOUNDWIRE0_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_AUD_SOUNDWIRE1_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_AUD_SOUNDWIRE0_PHY_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_AUD_SOUNDWIRE1_PHY_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_AUD_INTBUS_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_AUD_1_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_AUD_2_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_APLL_I2S1_MCK_SEL,
+	AFE_CLK_VLP_CKSYS_TOP_VADSP_SEL,
+	AFE_CLK_NUMS,
+};
+
+/* Clock parent names, per audio_clock_interface.h (SSPM firmware header) */
+#define CLK_PARENT_TCX_26M_MX9_CK_NAME	"tcx_26m_mx9_ck"
+#define CLK_PARENT_OSC_D20_NAME		"osc_d20"
+#define CLK_PARENT_OSC_D12_NAME		"osc_d12"
+#define CLK_PARENT_OSC_D10_NAME		"osc_d10"
+#define CLK_PARENT_OSC_D6_NAME		"osc_d6"
+#define CLK_PARENT_OSC_D5_NAME		"osc_d5"
+#define CLK_PARENT_OSC_D2_NAME		"osc_d2"
+#define CLK_PARENT_AD_OSC_NAME		"ad_osc_ck"
+#define CLK_PARENT_APLL1_D2_NAME	"apll1_d2"
+#define CLK_PARENT_APLL2_D2_NAME	"apll2_d2"
+#define CLK_PARENT_APLL1_D8_NAME	"apll1_d8"
+#define CLK_PARENT_APLL1_D4_NAME	"apll1_d4"
+#define CLK_PARENT_APLL2_D8_NAME	"apll2_d8"
+#define CLK_PARENT_APLL2_D4_NAME	"apll2_d4"
+#define CLK_PARENT_APLL1_NAME		"apll1"
+#define CLK_PARENT_APLL2_NAME		"apll2"
+#define CLK_PARENT_MAINPLL2_D7_D4_NAME	"mainpll2_d7_d4"
+#define CLK_PARENT_MAINPLL2_D4_D4_NAME	"mainpll2_d4_d4"
+#define CLK_PARENT_UNIVPLL2_D4_NAME	"univpll2_d4"
+#define CLK_PARENT_UNIVPLL2_D4_D2_NAME	"univpll2_d4_d2"
+#define CLK_PARENT_ADSPPLL_NAME	"adsppll_ck"
+#define CLK_PARENT_ADSPPLL_D2_NAME	"adsppll_d2"
+
+/* SSPM-managed clock/MTCMOS control (via power_wrap SCMI requests) */
+int mt8901_afe_init_clock(struct mtk_base_afe *afe);
+int mt8901_afe_disable_default_on_clk_and_top_cg(struct mtk_base_afe *afe);
+int mt8901_afe_enable_top_cg(struct mtk_base_afe *afe, unsigned int cg);
+int mt8901_afe_disable_top_cg(struct mtk_base_afe *afe, unsigned int cg);
+int mt8901_afe_enable_mtcmos(struct mtk_base_afe *afe, unsigned int mtcmos);
+int mt8901_afe_disable_mtcmos(struct mtk_base_afe *afe, unsigned int mtcmos);
+int mt8901_afe_send_spm_req(struct mtk_base_afe *afe, unsigned int req,
+			    bool enable);
 int mt8901_afe_enable_main_clock(struct mtk_base_afe *afe);
 int mt8901_afe_disable_main_clock(struct mtk_base_afe *afe);
+int mt8901_afe_enable_reg_rw_clk(struct mtk_base_afe *afe);
+int mt8901_afe_disable_reg_rw_clk(struct mtk_base_afe *afe);
+int mt8901_afe_set_clock_parent(struct mtk_base_afe *afe,
+				unsigned int mux, const char *parent_name);
+int mt8901_afe_enable_apll_top_con_cg(struct mtk_base_afe *afe);
+int mt8901_afe_disable_apll_top_con_cg(struct mtk_base_afe *afe);
+int mt8901_afe_set_idle_clock_parent(struct mtk_base_afe *afe, bool idle);
 
 #endif
