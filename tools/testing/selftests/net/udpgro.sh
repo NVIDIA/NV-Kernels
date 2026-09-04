@@ -36,7 +36,7 @@ cfg_veth() {
 	ip -netns "${PEER_NS}" addr add dev veth1 192.168.1.1/24
 	ip -netns "${PEER_NS}" addr add dev veth1 2001:db8::1/64 nodad
 	ip -netns "${PEER_NS}" link set dev veth1 up
-	ip -n "${PEER_NS}" link set veth1 xdp object ../bpf/xdp_dummy.o section xdp
+	ip netns exec "${PEER_NS}" ethtool -K veth1 gro on
 }
 
 run_one() {
@@ -203,11 +203,6 @@ run_all() {
 	check_err $?
 	return $ret
 }
-
-if [ ! -f ../bpf/xdp_dummy.o ]; then
-	echo "Missing xdp_dummy helper. Build bpf selftest first"
-	exit -1
-fi
 
 if [[ $# -eq 0 ]]; then
 	run_all
