@@ -7,6 +7,8 @@
 #include <linux/io.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
+#include <linux/notifier.h>
 #include <linux/platform_device.h>
 #include <linux/printk.h>
 #include <linux/slab.h>
@@ -64,6 +66,75 @@ static struct pwrap_dev_ctrl dev_ctrl;
 #define PWRAP_DVFSRC_FLAG_ADDR	0x12FC00
 #define PWRAP_DVFSRC_FLAG_LEN	0x4
 #define PWRAP_DVFSRC_FLAG_VAL	0x1
+
+/*
+ * USB4 resource-release hook.
+ *
+ * The bootloader leaves the USB4 hardware resources powered on when USB4 is
+ * not used. A single SCMI trigger to the SSPM (feature id 15, no params) tells
+ * the firmware to release them. This was previously a standalone one-call
+ * driver (usb4_hook.c / CONFIG_MTK_USB4_HOOK); it is folded into power_wrap
+ * here to avoid the overhead of a separate driver for a single API call.
+ *
+ * The release must run after the xHCI driver that owns the USB4 domain has
+ * probed: issued earlier, xHCI re-powers the domain and blocks the deepest
+ * suspend state. The xHCI driver can be a module that loads long after
+ * power_wrap (which is built in), so ordering by initcall level is not
+ * enough. Instead probe collects the xHCI controllers present in the ACPI
+ * namespace (PNP0D10/PNP0D15 platform devices) that have no driver yet and
+ * listens on the platform bus for their BUS_NOTIFY_BOUND_DRIVER events; the
+ * release is issued once the last of them has bound (immediately if none is
+ * pending). Controllers that never bind keep the release pending, which is
+ * the same outcome as before this driver existed, and a late_initcall logs
+ * that state once so it is visible in dmesg.
+ *
+ * The release is restricted to MT8901. The feature-id 15 trigger encodes
+ * an MT8901 USB4 resource-layout assumption, so gating on the platform id lets
+ * other platforms (e.g. MT8992) boot and be tested without reverting this
+ * change. The platform id is read from the PLID method on the power_wrap ACPI
+ * device (NVDA6210), mirroring the Windows PEP driver's AcpiGetPlatformId();
+ * the value matches the PEP PLAT_IDENTIFIER enum (SOC_MT8901 == 0x2).
+ */
+#define PWRAP_USB4_HOOK_FEATURE_ID	15	/* SSPM SCMI_USB4_HOOK */
+
+/* xHCI-compliant USB controllers as enumerated through ACPI. */
+static const struct acpi_device_id pwrap_usb4_xhci_ids[] = {
+	{ "PNP0D10", },
+	{ "PNP0D15", },
+	{ }
+};
+
+/*
+ * USB4-release state: the power_wrap device and the xHCI controllers still to
+ * bind, tracked by identity (with a device reference each).
+ *
+ * Lock order: the driver core sends BUS_NOTIFY_BOUND_DRIVER with the bound
+ * device's lock held and the notifier then takes pwrap_usb4_lock, so
+ * pwrap_usb4_lock is never held while a device lock is taken. The collection
+ * pass therefore runs without pwrap_usb4_lock: it takes each controller's
+ * device lock to read device_is_bound(), as the driver core requires, and
+ * only afterwards takes pwrap_usb4_lock to commit the list. A controller
+ * that binds between the notifier registration and that commit is recorded
+ * by the notifier in pwrap_usb4_early_bound[] and dropped from the list at
+ * commit time, so it is neither missed nor counted twice.
+ */
+#define PWRAP_USB4_MAX_XHCI	8
+static DEFINE_MUTEX(pwrap_usb4_lock);
+static struct device *pwrap_usb4_dev;
+static struct device *pwrap_usb4_pending[PWRAP_USB4_MAX_XHCI];
+static unsigned int pwrap_usb4_npending;
+static struct device *pwrap_usb4_early_bound[PWRAP_USB4_MAX_XHCI];
+static unsigned int pwrap_usb4_nearly;
+static bool pwrap_usb4_tracking;
+static bool pwrap_usb4_done;
+static struct notifier_block pwrap_usb4_nb;
+
+/* Controllers found unbound by the collection pass, before commit. */
+struct pwrap_usb4_scan {
+	struct device *dev[PWRAP_USB4_MAX_XHCI];
+	unsigned int n;
+};
+
 /*
  * BestPerf performance setting register.
  *
@@ -564,6 +635,203 @@ static void pwrap_write_bestperf_flag(struct device *dev)
 	iounmap(vaddr);
 }
 
+/*
+ * pwrap_release_usb4_resources() - release USB4 hardware resources via SSPM
+ *
+ * Sends a single SCMI trigger (feature id 15, no params) telling the firmware
+ * to release the USB4 resources the bootloader leaves powered on. Called with
+ * pwrap_usb4_lock held, once, when the last xHCI controller has bound (see
+ * the USB4 hook note above). Best-effort: a release failure is logged but not
+ * escalated, and the hook is not re-armed.
+ */
+static void pwrap_release_usb4_resources(struct device *dev)
+{
+	int ret;
+
+	lockdep_assert_held(&pwrap_usb4_lock);
+
+	if (pwrap_usb4_done)
+		return;
+	pwrap_usb4_done = true;
+
+	ret = sspm_ci_set(PWRAP_USB4_HOOK_FEATURE_ID, 0, 0, 0, 0, 0);
+	if (ret)
+		dev_err(dev, "USB4: sspm_ci_set failed to release resources (%d)\n",
+			ret);
+	else
+		dev_info(dev, "USB4: SSPM released usb4 resources\n");
+}
+
+static bool pwrap_usb4_is_xhci(struct device *dev)
+{
+	return dev->bus == &platform_bus_type &&
+	       acpi_match_device(pwrap_usb4_xhci_ids, dev);
+}
+
+/*
+ * Collects the xHCI controllers that have no driver bound yet. Runs without
+ * pwrap_usb4_lock and takes each device's lock for device_is_bound(), as the
+ * driver core requires (see the lock order note above).
+ */
+static int pwrap_usb4_collect_unbound(struct device *dev, void *data)
+{
+	struct pwrap_usb4_scan *scan = data;
+	bool bound;
+
+	if (!pwrap_usb4_is_xhci(dev))
+		return 0;
+
+	device_lock(dev);
+	bound = device_is_bound(dev);
+	device_unlock(dev);
+	if (bound)
+		return 0;
+
+	if (scan->n >= PWRAP_USB4_MAX_XHCI) {
+		dev_warn(pwrap_usb4_dev,
+			 "USB4: more than %u xHCI controllers, not waiting for %s\n",
+			 PWRAP_USB4_MAX_XHCI, dev_name(dev));
+		return 0;
+	}
+
+	scan->dev[scan->n++] = get_device(dev);
+
+	return 0;
+}
+
+/* Drops @dev from an array of device references; true if it was there. */
+static bool pwrap_usb4_remove(struct device **arr, unsigned int *n,
+			      struct device *dev)
+{
+	unsigned int i;
+
+	for (i = 0; i < *n; i++) {
+		if (arr[i] != dev)
+			continue;
+		put_device(dev);
+		arr[i] = arr[--(*n)];
+		arr[*n] = NULL;
+		return true;
+	}
+
+	return false;
+}
+
+static int pwrap_usb4_bus_notify(struct notifier_block *nb,
+				 unsigned long action, void *data)
+{
+	struct device *dev = data;
+
+	if (action != BUS_NOTIFY_BOUND_DRIVER || !pwrap_usb4_is_xhci(dev))
+		return NOTIFY_DONE;
+
+	mutex_lock(&pwrap_usb4_lock);
+	if (pwrap_usb4_done) {
+		/* Nothing left to do. */
+	} else if (!pwrap_usb4_tracking) {
+		/*
+		 * Bound while the collection pass is still running: remember
+		 * it so the commit can drop it from whatever the pass found.
+		 */
+		if (pwrap_usb4_nearly < PWRAP_USB4_MAX_XHCI)
+			pwrap_usb4_early_bound[pwrap_usb4_nearly++] = get_device(dev);
+		else
+			dev_warn(pwrap_usb4_dev,
+				 "USB4: early bind of %s not recorded, release may wait on it\n",
+				 dev_name(dev));
+	} else if (pwrap_usb4_remove(pwrap_usb4_pending, &pwrap_usb4_npending,
+				     dev)) {
+		dev_dbg(pwrap_usb4_dev, "USB4: xHCI %s bound, %u pending\n",
+			dev_name(dev), pwrap_usb4_npending);
+		if (!pwrap_usb4_npending)
+			pwrap_release_usb4_resources(pwrap_usb4_dev);
+	}
+	mutex_unlock(&pwrap_usb4_lock);
+
+	return NOTIFY_OK;
+}
+
+/*
+ * pwrap_usb4_arm_release() - arm the USB4 release for when xHCI has bound
+ * @dev: the power_wrap device
+ *
+ * Restricted to MT8901 via the PLID platform id: on any other platform, or if
+ * PLID is not available, nothing is armed so the platform is unaffected.
+ * Three steps, none of them holding pwrap_usb4_lock together with a device
+ * lock: register the notifier; collect the unbound controllers under their
+ * device locks; then, under pwrap_usb4_lock, drop the ones the notifier saw
+ * bind in the meantime and commit the rest. The notifier stays registered:
+ * the driver is built in and never removed, and a completed release makes
+ * it a no-op.
+ */
+static void pwrap_usb4_arm_release(struct device *dev)
+{
+	struct pwrap_usb4_scan scan = { .n = 0 };
+	unsigned long long plid;
+	acpi_status status;
+	unsigned int i;
+	int ret;
+
+	status = acpi_evaluate_integer(ACPI_HANDLE(dev), "PLID", NULL, &plid);
+	if (ACPI_FAILURE(status)) {
+		dev_info(dev, "USB4: PLID unavailable (%s), skipping release\n",
+			 acpi_format_exception(status));
+		return;
+	}
+
+	if (plid != PWRAP_PLID_MT8901) {
+		dev_info(dev, "USB4: platform id 0x%llx is not MT8901, skipping release\n",
+			 plid);
+		return;
+	}
+
+	mutex_lock(&pwrap_usb4_lock);
+	pwrap_usb4_dev = dev;
+	pwrap_usb4_nb.notifier_call = pwrap_usb4_bus_notify;
+	ret = bus_register_notifier(&platform_bus_type, &pwrap_usb4_nb);
+	mutex_unlock(&pwrap_usb4_lock);
+	if (ret) {
+		dev_err(dev, "USB4: cannot register bus notifier (%d), release not armed\n",
+			ret);
+		return;
+	}
+
+	bus_for_each_dev(&platform_bus_type, NULL, &scan,
+			 pwrap_usb4_collect_unbound);
+
+	mutex_lock(&pwrap_usb4_lock);
+	for (i = 0; i < scan.n; i++) {
+		if (pwrap_usb4_remove(pwrap_usb4_early_bound, &pwrap_usb4_nearly,
+				      scan.dev[i]))
+			put_device(scan.dev[i]);	/* bound during the pass */
+		else
+			pwrap_usb4_pending[pwrap_usb4_npending++] = scan.dev[i];
+	}
+	while (pwrap_usb4_nearly)
+		put_device(pwrap_usb4_early_bound[--pwrap_usb4_nearly]);
+	pwrap_usb4_tracking = true;
+
+	if (pwrap_usb4_npending)
+		dev_info(dev, "USB4: release armed, waiting for %u xHCI controller(s) to bind\n",
+			 pwrap_usb4_npending);
+	else
+		pwrap_release_usb4_resources(dev);
+	mutex_unlock(&pwrap_usb4_lock);
+}
+
+/* Make a release that is still waiting on xHCI visible once boot settles. */
+static int __init pwrap_usb4_report_pending(void)
+{
+	mutex_lock(&pwrap_usb4_lock);
+	if (pwrap_usb4_tracking && !pwrap_usb4_done)
+		dev_info(pwrap_usb4_dev, "USB4: release still waiting for %u xHCI controller(s)\n",
+			 pwrap_usb4_npending);
+	mutex_unlock(&pwrap_usb4_lock);
+
+	return 0;
+}
+late_initcall(pwrap_usb4_report_pending);
+
 static int mtk_pwrap_probe(struct platform_device *pdev)
 {
 	const struct acpi_device_id	*id;
@@ -639,6 +907,9 @@ static int mtk_pwrap_probe(struct platform_device *pdev)
 	if (ret)
 		dev_warn(&pdev->dev,
 			 "failed to create sysfs nodes: %d (continuing)\n", ret);
+
+	/* Release the USB4 resources once xHCI has bound (see the hook note). */
+	pwrap_usb4_arm_release(dev);
 
 	return 0;
 }
