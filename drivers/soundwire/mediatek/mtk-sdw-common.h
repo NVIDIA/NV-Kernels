@@ -72,6 +72,7 @@ int mtk_sdw_clk_ops_select(struct mtk_sdw *mst, int hw_ver);
 
 struct mtk_sdw {
 	struct device *dev;
+	struct dentry *debugfs;
 	void __iomem *base; /* full AFE MMIO */
 	struct mtk_sdw_link links[MTK_SDW_CONTROLLE_NUM];
 	int num_links;
