@@ -920,6 +920,7 @@ static void mtk_sdw_link_deinit(struct mtk_sdw *mst, int idx)
 {
 	struct mtk_sdw_core *core = &mst->links[idx].core;
 
+	cancel_delayed_work_sync(&core->attach_check_work);
 	mtk_sdw_enable_irq(core, false);
 	sdw_bus_master_delete(&core->bus);
 }
@@ -1273,6 +1274,16 @@ static int mtk_sdw_probe(struct platform_device *pdev)
 	}
 
 	mtk_sdw_debugfs_init(mst);
+
+	/*
+	 * Arm the post-init attach check on every link: if the ACPI-declared
+	 * peripherals raise no attach event (re-init with the bus already
+	 * running, see mtk_sdw_attach_check_work()), restart the bus so they
+	 * re-enumerate.
+	 */
+	for (i = 0; i < mst->num_links; i++)
+		schedule_delayed_work(&mst->links[i].core.attach_check_work,
+				      msecs_to_jiffies(MTK_SDW_ATTACH_CHECK_DELAY_MS));
 
 	return 0;
 }
