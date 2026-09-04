@@ -47,9 +47,15 @@
 		       SNDRV_PCM_RATE_352800 |\
 		       SNDRV_PCM_RATE_384000)
 
+/*
+ * The AFE data path is 24-bit internally: S16 and S24 (24 valid bits in
+ * a 32-bit container) play clean, but true 32-bit memif mode produces
+ * distorted output on hardware regardless of the HD/align settings, so
+ * S32 is deliberately not offered (matches the reference driver, which
+ * only uses the 16/24-bit memif modes).
+ */
 #define MTK_PCM_FORMATS (SNDRV_PCM_FMTBIT_S16_LE |\
-			 SNDRV_PCM_FMTBIT_S24_LE |\
-			 SNDRV_PCM_FMTBIT_S32_LE)
+			 SNDRV_PCM_FMTBIT_S24_LE)
 
 struct mtk_dai_memif_priv {
 	unsigned int fs_timing;
@@ -64,8 +70,7 @@ static const struct snd_pcm_hardware mt8901_afe_hardware = {
 		SNDRV_PCM_INFO_MMAP_VALID |
 		SNDRV_PCM_INFO_NO_PERIOD_WAKEUP,
 	.formats = SNDRV_PCM_FMTBIT_S16_LE |
-		   SNDRV_PCM_FMTBIT_S24_LE |
-		   SNDRV_PCM_FMTBIT_S32_LE,
+		   SNDRV_PCM_FMTBIT_S24_LE,
 	.period_bytes_min = 64,
 	.period_bytes_max = 256 * 1024,
 	.periods_min = 2,

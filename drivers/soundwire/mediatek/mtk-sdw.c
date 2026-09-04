@@ -803,9 +803,9 @@ static int mtk_sdw_init_dai(struct mtk_sdw *mst, struct snd_soc_dai_driver *drv,
 	stream->channels_max = 8;
 	stream->rates = SNDRV_PCM_RATE_48000;
 	stream->rates = SNDRV_PCM_RATE_8000_384000;
+	/* S32 dropped: the AFE path is 24-bit internally, see MTK_PCM_FORMATS */
 	stream->formats = SNDRV_PCM_FMTBIT_S16_LE |
-			  SNDRV_PCM_FMTBIT_S24_LE |
-			  SNDRV_PCM_FMTBIT_S32_LE;
+			  SNDRV_PCM_FMTBIT_S24_LE;
 
 	stream->stream_name = drv->name;
 
