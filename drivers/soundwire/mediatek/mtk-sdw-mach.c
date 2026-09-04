@@ -190,10 +190,80 @@ static const struct snd_soc_acpi_link_adr mtk_sdw_cs35l56_l0_cs42l43_l1[] = {
 	{}
 };
 
+/*
+ * Config 2: SDW0 = 2x RT1321 (amps, aggregated), SDW1 = RT713 (jack codec).
+ * Topology: uids 0x30/0x31 on link0, 0x30
+ * on link1. RT1321/RT713 are handled by the rt1320-sdw/rt712-sdca drivers;
+ * name prefixes follow the driver family so the control names match the
+ * RT1320/RT712 configuration.
+ */
+static const struct snd_soc_acpi_adr_device rt1321_l0_adr[] = {
+	{
+		.adr = 0x000030025D132101ull,
+		.num_endpoints = 1,
+		.endpoints = &rt1320_endpoints[0],
+		.name_prefix = "rt1320-1",
+	},
+	{
+		.adr = 0x000031025D132101ull,
+		.num_endpoints = 1,
+		.endpoints = &rt1320_endpoints[1],
+		.name_prefix = "rt1320-2",
+	},
+};
+
+/*
+ * RT713 exposes two DAIs (0 = jack, 1 = DMIC), unlike RT712 whose DMIC
+ * DAI sits at index 2 behind the amp DAI, so it needs its own endpoint
+ * list rather than reusing rt712_endpoints.
+ */
+static const struct snd_soc_acpi_endpoint rt713_endpoints[] = {
+	{
+		.num = 0,
+		.aggregated = 0,
+		.group_position = 0,
+		.group_id = 0,
+	},
+	{
+		.num = 1,
+		.aggregated = 0,
+		.group_position = 0,
+		.group_id = 0,
+	},
+};
+
+static const struct snd_soc_acpi_adr_device rt713_l1_adr[] = {
+	{
+		.adr = 0x000130025D071301ull,
+		.num_endpoints = ARRAY_SIZE(rt713_endpoints),
+		.endpoints = rt713_endpoints,
+		.name_prefix = "rt713",
+	},
+};
+
+static const struct snd_soc_acpi_link_adr mtk_sdw_rt1321_l0_rt713_l1[] = {
+	{
+		.mask = BIT(0),
+		.num_adr = ARRAY_SIZE(rt1321_l0_adr),
+		.adr_d = rt1321_l0_adr,
+	},
+	{
+		.mask = BIT(1),
+		.num_adr = ARRAY_SIZE(rt713_l1_adr),
+		.adr_d = rt713_l1_adr,
+	},
+	{}
+};
+
 static struct snd_soc_acpi_mach mtk_sdw_machines[] = {
 	{
 		.link_mask = BIT(0) | BIT(1),
 		.links     = mtk_sdw_rt1320_l0_rt712_l1,
+		.drv_name  = "mtk_sdw_mc",
+	},
+	{
+		.link_mask = BIT(0) | BIT(1),
+		.links     = mtk_sdw_rt1321_l0_rt713_l1,
 		.drv_name  = "mtk_sdw_mc",
 	},
 	{
