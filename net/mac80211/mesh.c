@@ -1242,6 +1242,14 @@ void ieee80211_stop_mesh(struct ieee80211_sub_if_data *sdata)
 
 	netif_carrier_off(sdata->dev);
 
+	/* abort any running channel switch */
+	sdata->vif.bss_conf.csa_active = false;
+	if (sdata->deflink.csa_block_tx) {
+		ieee80211_wake_vif_queues(local, sdata,
+					  IEEE80211_QUEUE_STOP_REASON_CSA);
+		sdata->deflink.csa_block_tx = false;
+	}
+
 	/* flush STAs and mpaths on this iface */
 	sta_info_flush(sdata);
 	ieee80211_free_keys(sdata, true);
