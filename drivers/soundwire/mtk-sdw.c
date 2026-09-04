@@ -19,6 +19,7 @@
 #include <sound/soc-acpi.h>
 #include <sound/soc-dai.h>
 #include "mtk-sdw.h"
+#include "mtk-sdw-mach.h"
 #include "mtk-sdw-top.h"
 
 static int mtk_sdw_parse_dp_allocation(struct mtk_sdw *mst, int idx)
@@ -776,6 +777,29 @@ static void mtk_init_sdw_master(struct mtk_sdw *mst)
 		mst->controller_en_list |= (1UL << i);
 }
 
+static int mtk_sdw_register_machine(struct mtk_sdw *mst)
+{
+	struct snd_soc_acpi_mach *mach;
+
+	mach = mtk_sdw_machine_select(mst);
+	if (!mach) {
+		dev_info(mst->dev, "no card from this controller\n");
+		return 0;   /* no card from this controller; not an error */
+	}
+
+	mst->mach_dev = platform_device_register_data(mst->dev, mach->drv_name,
+						      PLATFORM_DEVID_NONE,
+						      mach, sizeof(*mach));
+	if (IS_ERR(mst->mach_dev)) {
+		dev_err(mst->dev, "failed to register machine %s\n",
+			mach->drv_name);
+		return PTR_ERR(mst->mach_dev);
+	}
+
+	dev_info(mst->dev, "registered SoundWire machine %s\n", mach->drv_name);
+	return 0;
+}
+
 static int mtk_sdw_probe_controller(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -886,11 +910,22 @@ err:
 static int mtk_sdw_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	int ret;
+	struct mtk_sdw *mst;
+	int i, ret;
 
 	ret = mtk_sdw_probe_controller(pdev);
 	if (ret) {
 		dev_err(dev, "failed to probe_controller %d\n", ret);
+		return ret;
+	}
+
+	mst = platform_get_drvdata(pdev);
+
+	ret = mtk_sdw_register_machine(mst);
+	if (ret) {
+		for (i = mst->num_links - 1; i >= 0; i--)
+			mtk_sdw_link_deinit(mst, i);
+
 		return ret;
 	}
 
@@ -902,6 +937,8 @@ static void mtk_sdw_remove(struct platform_device *pdev)
 	struct mtk_sdw *mst = platform_get_drvdata(pdev);
 	int i;
 
+	if (mst->mach_dev)
+		platform_device_unregister(mst->mach_dev);
 	for (i = mst->num_links - 1; i >= 0; i--)
 		mtk_sdw_link_deinit(mst, i);
 }
