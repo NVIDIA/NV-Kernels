@@ -47,6 +47,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/platform_device.h>
+#include <linux/suspend.h>
 #include <linux/uaccess.h>
 #include <linux/watchdog.h>
 #include <asm/arch_timer.h>
@@ -88,6 +89,7 @@
  *			indicate whether to adjust wdd->timeout to avoid a race with WS0
  * @refresh_base:	Virtual address of the watchdog refresh frame
  * @control_base:	Virtual address of the watchdog control frame
+ * @pm_nb:		PM notifier stopping the watchdog across system sleep
  */
 struct sbsa_gwdt {
 	struct watchdog_device	wdd;
@@ -96,6 +98,7 @@ struct sbsa_gwdt {
 	bool			need_ws0_race_workaround;
 	void __iomem		*refresh_base;
 	void __iomem		*control_base;
+	struct notifier_block	pm_nb;
 };
 
 #define DEFAULT_TIMEOUT		10 /* seconds */
@@ -294,6 +297,43 @@ static const struct watchdog_ops sbsa_gwdt_ops = {
 	.get_timeleft	= sbsa_gwdt_get_timeleft,
 };
 
+/*
+ * The dev_pm_ops below only stop the watchdog once this device itself is
+ * suspended, which is one of the last steps of suspend entry. A watchdog
+ * running from boot (early_enable) is therefore armed, with nobody
+ * refreshing it, through task freezing and every other device's suspend
+ * callback; any of them stalling past the watchdog timeout resets the
+ * system in the middle of suspend entry. Stop the watchdog before the
+ * transition starts and restart it only after everything has resumed.
+ */
+static int sbsa_gwdt_pm_notify(struct notifier_block *nb, unsigned long mode,
+			       void *data)
+{
+	struct sbsa_gwdt *gwdt = container_of(nb, struct sbsa_gwdt, pm_nb);
+
+	switch (mode) {
+	case PM_SUSPEND_PREPARE:
+	case PM_HIBERNATION_PREPARE:
+	case PM_RESTORE_PREPARE:
+		if (watchdog_hw_running(&gwdt->wdd))
+			sbsa_gwdt_stop(&gwdt->wdd);
+		break;
+	case PM_POST_SUSPEND:
+	case PM_POST_HIBERNATION:
+	case PM_POST_RESTORE:
+		if (watchdog_hw_running(&gwdt->wdd))
+			sbsa_gwdt_start(&gwdt->wdd);
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static void sbsa_gwdt_unregister_pm_notifier(void *data)
+{
+	unregister_pm_notifier(data);
+}
+
 static int sbsa_gwdt_probe(struct platform_device *pdev)
 {
 	void __iomem *rf_base, *cf_base;
@@ -406,6 +446,15 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 			sbsa_gwdt_stop(wdd);
 		return ret;
 	}
+
+	gwdt->pm_nb.notifier_call = sbsa_gwdt_pm_notify;
+	ret = register_pm_notifier(&gwdt->pm_nb);
+	if (!ret)
+		ret = devm_add_action_or_reset(dev,
+					       sbsa_gwdt_unregister_pm_notifier,
+					       &gwdt->pm_nb);
+	if (ret)
+		dev_warn(dev, "Failed to register PM notifier: %d\n", ret);
 
 	dev_info(dev, "Initialized with %ds timeout @ %u Hz, action=%d.%s\n",
 		 wdd->timeout, gwdt->clk, action,
