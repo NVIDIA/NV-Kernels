@@ -24,6 +24,17 @@
 #include "mtk-sdw-mach.h"
 #include "mtk-sdw-top.h"
 
+/*
+ * Restart (SOFT_RST + quiesce + re-init) every link at probe instead of
+ * adopting the POST-enumerated bus, matching the reference stack's
+ * ResetAndReInitMaster-on-every-init behavior. Clears defective
+ * persistent peripheral state that survives reboots on the always-on
+ * codec rail. Boot-time cost is one restart dwell per link.
+ */
+static bool restart_on_probe = true;
+module_param(restart_on_probe, bool, 0444);
+MODULE_PARM_DESC(restart_on_probe, "Restart each SoundWire link at probe instead of adopting the POST-enumerated bus (default: on)");
+
 static acpi_status mtk_sdw_apply_pin_bias_cb(struct acpi_resource *res,
 					     void *context)
 {
@@ -922,7 +933,35 @@ static int mtk_sdw_link_init(struct mtk_sdw *mst, int idx)
 		goto err_disable_top_clock;
 	}
 
+	/*
+	 * Restart the bus unconditionally before enabling interrupts, the
+	 * way the reference stack runs ResetAndReInitMaster on every init.
+	 * POST leaves the peripherals enumerated and running; adopting that
+	 * state preserves whatever internal state the peripherals hold,
+	 * which has been observed to include defective persistent state
+	 * that register-level reconfiguration cannot clear (a codec's rail
+	 * never drops while the battery is connected, so such state
+	 * survives reboots indefinitely). The restart drops every
+	 * peripheral to Dev0 and re-enumerates it from a known-clean
+	 * state. Interrupt enabling AFTER the restart arms the slave
+	 * interrupt masks that SOFT_RST clears, so the attach transitions
+	 * are processed normally; the post-init attach check remains as a
+	 * backstop.
+	 */
+	if (restart_on_probe) {
+		ret = mtk_sdw_core_bus_reset(core);
+		if (ret) {
+			sdw_bus_master_delete(&core->bus);
+			goto err_disable_top_clock;
+		}
+	}
+
 	mtk_sdw_enable_irq(core, true);
+
+	if (restart_on_probe)
+		schedule_delayed_work(&core->status_work,
+				      msecs_to_jiffies(100));
+
 	dev_info(mst->dev, "IP%d: SoundWire bus ready\n", idx);
 	return 0;
 
