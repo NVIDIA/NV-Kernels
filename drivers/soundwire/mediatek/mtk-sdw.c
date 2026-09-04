@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
+#include <linux/soc/mediatek/mtk-pinctrl.h>
 #include <linux/soundwire/sdw.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -21,6 +22,90 @@
 #include "mtk-sdw.h"
 #include "mtk-sdw-mach.h"
 #include "mtk-sdw-top.h"
+
+static acpi_status mtk_sdw_apply_pin_bias_cb(struct acpi_resource *res,
+					     void *context)
+{
+	struct mtk_sdw_acpi_cb_context *ctx = context;
+	struct device *dev = ctx->dev;
+	struct acpi_resource_pin_function *pf;
+	u32 pullup;
+	int i, err;
+
+	if (res->type != ACPI_RESOURCE_TYPE_PIN_FUNCTION)
+		return AE_OK;
+
+	pf = &res->data.pin_function;
+
+	switch (pf->pin_config) {
+	case MTK_SDW_PIN_CFG_BUS_HOLD:
+		pullup = MTK_PIN_BUS_HOLD;
+		break;
+	case MTK_SDW_PIN_CFG_PD:
+		pullup = MTK_PIN_PULLDOWN;
+		break;
+	default:
+		dev_dbg(dev,
+			"SDW _CRS PinFunction pin_cfg=0x%02x - leaving default bias\n",
+			pf->pin_config);
+		return AE_OK;
+	}
+
+	for (i = 0; i < pf->pin_table_length; i++) {
+		unsigned int pin = pf->pin_table[i];
+
+		err = mtk_pinctrl_program_bias_by_gpio(pin, pullup,
+						       MTK_PIN_ENABLE);
+		if (err == -EPROBE_DEFER || err == -ENODEV) {
+			/*
+			 * No registered pinctrl owns the pin yet: the MT8901
+			 * pinctrl this driver depends on has not probed. The
+			 * bias is required for enumeration, so retry later.
+			 */
+			ctx->err = -EPROBE_DEFER;
+			return AE_CTRL_TERMINATE;
+		} else if (err) {
+			dev_err(dev,
+				"SDW pin %u: bias program failed (pin_cfg=0x%02x, err=%d)\n",
+				pin, pf->pin_config, err);
+			ctx->err = err;
+			return AE_CTRL_TERMINATE;
+		}
+
+		dev_dbg(dev, "SDW pin %u: pin_cfg=0x%02x -> pullup=%u applied\n",
+			pin, pf->pin_config, pullup);
+	}
+
+	return AE_OK;
+}
+
+static int mtk_sdw_apply_pin_config(struct device *dev)
+{
+	acpi_handle handle = ACPI_HANDLE(dev);
+	acpi_status status;
+	struct mtk_sdw_acpi_cb_context ctx = {
+		.dev = dev,
+		.err = 0,
+	};
+
+	if (!handle) {
+		dev_info(dev, "No ACPI handle\n");
+		return 0;
+	}
+
+	/* pin bias */
+	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+				     mtk_sdw_apply_pin_bias_cb, &ctx);
+
+	if (ACPI_FAILURE(status)) {
+		dev_warn(dev,
+			 "SDW _CRS walk failed (0x%x) - pin bias not programmed from DSDT\n",
+			 status);
+		return -EIO;
+	}
+
+	return ctx.err;
+}
 
 static int mtk_sdw_parse_dp_allocation(struct mtk_sdw *mst, int idx)
 {
@@ -887,6 +972,10 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 	mst = devm_kzalloc(dev, sizeof(*mst), GFP_KERNEL);
 	if (!mst)
 		return -ENOMEM;
+
+	ret = mtk_sdw_apply_pin_config(dev);
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to apply pin bias\n");
 
 	mtk_init_sdw_master(mst);
 

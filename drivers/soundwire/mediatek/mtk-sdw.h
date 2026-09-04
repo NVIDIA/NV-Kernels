@@ -82,4 +82,9 @@ enum mt8901_afe_fs_mode {
 #define MTK_SDW_MAX_DAIS \
 	((MTK_SDW_DP_SOURCE_NUM) + (MTK_SDW_DP_SINK_NUM)) /* BRA not included */
 
+struct mtk_sdw_acpi_cb_context {
+	struct device *dev;
+	int err;
+};
+
 #endif /* __MTK_SDW_H */
