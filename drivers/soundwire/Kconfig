@@ -57,6 +57,16 @@ config SOUNDWIRE_QCOM
 	  enable this config option to get the SoundWire support for that
 	  device
 
+config SOUNDWIRE_MTK
+	tristate "MediaTek SoundWire Master driver"
+	select SOUNDWIRE_GENERIC_ALLOCATION
+	depends on SND_SOC && ACPI
+	help
+	  SoundWire MediaTek Master driver.
+	  If you have an MediaTek platform which has a SoundWire Master then
+	  enable this config option to get the SoundWire support for that
+	  device.
+
 config SOUNDWIRE_GENERIC_ALLOCATION
 	tristate
 
