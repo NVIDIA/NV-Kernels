@@ -282,9 +282,18 @@ CONFIG_SFC_CXL                                  note<'Solarflare SFC9100-family 
 CONFIG_SND_SOC_MT8901                           policy<{'arm64': 'n'}>
 CONFIG_SND_SOC_MT8901                           note<'MediaTek MT8901 AFE platform driver (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
 
+<<<<<<< HEAD
 >>>>>>> NVIDIA: SAUCE: UBUNTU: [Config] annotation for CONFIG_SND_SOC_MT8901 (introduced disabled)
 CONFIG_SND_SOC_MT8901                           policy<{'arm64': 'n'}>
 CONFIG_SND_SOC_MT8901                           note<'MediaTek MT8901 AFE platform driver (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
+
+=======
+CONFIG_SND_SOC_MTK_SDCA                         policy<{'arm64': 'n'}>
+CONFIG_SND_SOC_MTK_SDCA                         note<'SDCA support for codecs on the MediaTek SoundWire master (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
+>>>>>>> NVIDIA: SAUCE: UBUNTU: [Config] annotation for CONFIG_SND_SOC_MTK_SDCA (introduced disabled)
+
+CONFIG_SND_SOC_MTK_SDCA                         policy<{'arm64': 'n'}>
+CONFIG_SND_SOC_MTK_SDCA                         note<'SDCA support for codecs on the MediaTek SoundWire master (N1x audio). Introduced disabled; enabled by the audio config change once the power_wrap client API lands.'>
 
 
 CONFIG_SOUNDWIRE_MTK                            policy<{'arm64': 'n'}>
