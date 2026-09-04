@@ -191,6 +191,7 @@ struct mtk_sdw_core {
 	u16 attached_slaves;
 	void *priv;
 	struct delayed_work status_work;
+	struct delayed_work attach_check_work;
 	unsigned int dev0_repoll_count;
 	unsigned int bus_reset_count;
 };
@@ -218,6 +219,15 @@ static inline struct mtk_sdw_core *bus_to_core(struct sdw_bus *bus)
  */
 extern const struct sdw_master_ops      mtk_sdw_core_ops;
 extern const struct sdw_master_port_ops mtk_sdw_core_port_ops;
+
+/*
+ * Delay before the one-shot post-init attach check. Peripherals that are
+ * going to attach do so within tens of ms of the link coming up; 2 s is
+ * far past that but still inside the 5 s the codec drivers wait for
+ * re-attach at probe, so a restart triggered here lets them recover
+ * without a rebind.
+ */
+#define MTK_SDW_ATTACH_CHECK_DELAY_MS	2000
 
 int  mtk_sdw_core_init(struct mtk_sdw_core *core);
 int mtk_sdw_core_hw_init(struct mtk_sdw_core *core);
