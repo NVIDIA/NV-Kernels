@@ -1813,6 +1813,72 @@ static int mt8901_afe_init_regs(struct mtk_base_afe *afe)
 				      init_regs, ARRAY_SIZE(init_regs));
 }
 
+static int __maybe_unused mt8901_afe_suspend(struct device *dev)
+{
+	struct mtk_base_afe *afe = dev_get_drvdata(dev);
+	int ret;
+
+	ret = mt8901_afe_disable_apll_top_con_cg(afe);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_disable_apll_top_con_cg failed: %d\n",
+			ret);
+		return ret;
+	}
+
+	ret = mt8901_afe_disable_main_clock(afe);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_disable_main_clock failed: %d\n", ret);
+		goto err_enable_apll_cg;
+	}
+
+	ret = mt8901_afe_disable_mtcmos(afe, AUDIO_PD);
+	if (ret) {
+		dev_err(dev, "disable MTCMOS failed\n");
+		goto err_enable_main_clock;
+	}
+
+	return 0;
+
+err_enable_main_clock:
+	mt8901_afe_enable_main_clock(afe);
+err_enable_apll_cg:
+	mt8901_afe_enable_apll_top_con_cg(afe);
+	return ret;
+}
+
+static int __maybe_unused mt8901_afe_resume(struct device *dev)
+{
+	struct mtk_base_afe *afe = dev_get_drvdata(dev);
+	int ret;
+
+	ret = mt8901_afe_enable_mtcmos(afe, AUDIO_PD);
+	if (ret) {
+		dev_err(dev, "enable MTCMOS failed\n");
+		return ret;
+	}
+
+	ret = mt8901_afe_enable_main_clock(afe);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_enable_main_clock failed: %d\n", ret);
+		goto err_disable_mtcmos;
+	}
+
+	ret = mt8901_afe_enable_apll_top_con_cg(afe);
+	if (ret) {
+		dev_err(dev, "mt8901_afe_enable_apll_top_con_cg failed: %d\n",
+			ret);
+		goto err_disable_main_clock;
+	}
+
+	return 0;
+
+err_disable_main_clock:
+	mt8901_afe_disable_main_clock(afe);
+err_disable_mtcmos:
+	mt8901_afe_disable_mtcmos(afe, AUDIO_PD);
+	return ret;
+}
+
 static int mt8901_afe_pcm_dev_probe(struct platform_device *pdev)
 {
 	struct mtk_base_afe *afe;
@@ -1973,10 +2039,15 @@ static const struct acpi_device_id mt8901_afe_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, mt8901_afe_acpi_match);
 
+static const struct dev_pm_ops mt8901_afe_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(mt8901_afe_suspend, mt8901_afe_resume)
+};
+
 static struct platform_driver mt8901_afe_pcm_driver = {
 	.driver = {
 		   .name = "mt8901-audio",
 		   .acpi_match_table = ACPI_PTR(mt8901_afe_acpi_match),
+		   .pm = &mt8901_afe_pm_ops,
 	},
 	.probe = mt8901_afe_pcm_dev_probe,
 };
