@@ -158,7 +158,7 @@ int slab_unmergeable(struct kmem_cache *s)
 	return 0;
 }
 
-struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
+static struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 		slab_flags_t flags, const char *name, void (*ctor)(void *))
 {
 	struct kmem_cache *s;
@@ -239,6 +239,30 @@ out_free_cache:
 	kmem_cache_free(kmem_cache, s);
 out:
 	return ERR_PTR(err);
+}
+
+static struct kmem_cache *
+__kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
+		   slab_flags_t flags, void (*ctor)(void *))
+{
+	struct kmem_cache *s;
+
+	s = find_mergeable(size, align, flags, name, ctor);
+	if (s) {
+		if (sysfs_slab_alias(s, name))
+			return NULL;
+
+		s->refcount++;
+
+		/*
+		 * Adjust the object sizes so that we clear
+		 * the complete object on kzalloc.
+		 */
+		s->object_size = max(s->object_size, size);
+		s->inuse = max(s->inuse, ALIGN(size, sizeof(void *)));
+	}
+
+	return s;
 }
 
 /**
@@ -1286,4 +1310,3 @@ EXPORT_TRACEPOINT_SYMBOL(kmalloc);
 EXPORT_TRACEPOINT_SYMBOL(kmem_cache_alloc);
 EXPORT_TRACEPOINT_SYMBOL(kfree);
 EXPORT_TRACEPOINT_SYMBOL(kmem_cache_free);
-
