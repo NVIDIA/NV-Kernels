@@ -78,6 +78,7 @@ struct mtk_dai_memif_irq_priv {
 struct mt8901_afe_private {
 	u32 hw_ver;               /* acpi-asd-hw-ver from _DSD */
 	struct mtk_dai_memif_irq_priv irq_priv[MT8901_AFE_IRQ_NUM];
+	int pm_runtime_bypass_reg_ctl;
 
 	/* dai */
 	void *dai_priv[MT8901_DAI_NUM];
