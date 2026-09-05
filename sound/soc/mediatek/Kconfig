@@ -215,6 +215,16 @@ config SND_SOC_MTK_BTCVSD
 	  Select Y if you have such device.
 	  If unsure select "N".
 
+config SND_SOC_MTK_SDCA
+	tristate "SDCA support for Mediatek chip"
+	depends on ACPI
+	select SND_SOC_SDCA
+	help
+	  This enables SDCA support for codecs connecting with the
+	  MediaTek SoundWire master.
+	  Select Y if you use SDCA device.
+	  If unsure select "N".
+
 config SND_SOC_MT8188
 	tristate "ASoC support for MediaTek MT8188 chip"
 	depends on ARCH_MEDIATEK || COMPILE_TEST
@@ -350,6 +360,31 @@ config SND_SOC_MT8365_MT6357
 	help
 	  This adds support for ASoC machine driver for MediaTek MT8365
 	  boards with the MT6357 PMIC codec.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
+config SND_SOC_MT8901
+	tristate "ASoC support for MediaTek MT8901 chip"
+	depends on ARCH_MEDIATEK && ACPI
+	select SND_SOC_MEDIATEK
+	help
+	  This adds ASoC platform driver support for MediaTek MT8901 chip
+	  that can be used with other codecs.
+	  Select Y if you have such device.
+	  If unsure select "N".
+
+config SND_SOC_MT8901_LEGACY_SDW_MACH
+	tristate "ASoC Audio driver for MT8901 SoundWire machine"
+	depends on SND_SOC_MT8901 && ACPI
+	depends on SOUNDWIRE_MTK
+	select SOUNDWIRE_MTK_MT8901_CLK
+	select SND_SOC_SDW_UTILS
+	select SND_SOC_RT712_SDCA_SDW
+	select SND_SOC_RT712_SDCA_DMIC_SDW
+	select SND_SOC_RT1320_SDW
+	help
+	  This adds support for Legacy(No DSP) sound card for MediaTek
+	  MT8901 boards.
 	  Select Y if you have such device.
 	  If unsure select "N".
 
