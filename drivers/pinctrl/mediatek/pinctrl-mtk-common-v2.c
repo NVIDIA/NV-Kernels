@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
+#include <linux/soc/mediatek/mtk-pinctrl.h>
 
 #include "mtk-eint.h"
 #include "pinctrl-mtk-common-v2.h"
@@ -434,6 +435,8 @@ int mtk_build_eint(struct mtk_pinctrl *hw, struct platform_device *pdev)
 	hw->eint->hw = hw->soc->eint_hw;
 	hw->eint->pctl = hw;
 	hw->eint->gpio_xlate = &mtk_eint_xt;
+	hw->eint->event_pins = hw->soc->eint_event;
+	hw->eint->num_event_pins = hw->soc->total_wake_eints;
 
 	ret = mtk_eint_do_init(hw->eint, hw->soc->eint_pin);
 	if (ret)
@@ -624,10 +627,15 @@ static int mtk_pinconf_bias_set_pu_pd(struct mtk_pinctrl *hw,
 	if (arg == MTK_DISABLE) {
 		pu = 0;
 		pd = 0;
-	} else if ((arg == MTK_ENABLE) && pullup) {
+	} else if (arg == MTK_ENABLE && pullup == MTK_BUS_HOLD) {
+		if (pd_only)
+			return -EINVAL; /*bus-hold need pu and pd both*/
+		pu = 1;
+		pd = 1;
+	} else if ((arg == MTK_ENABLE) && pullup == 1) {
 		pu = 1;
 		pd = 0;
-	} else if ((arg == MTK_ENABLE) && !pullup) {
+	} else if ((arg == MTK_ENABLE) && pullup == 0) {
 		pu = 0;
 		pd = 1;
 	} else {
@@ -648,6 +656,12 @@ static int mtk_pinconf_bias_set_pullsel_pullen(struct mtk_pinctrl *hw,
 				u32 pullup, u32 arg)
 {
 	int err, enable;
+
+	/* Bus-hold is not supported for RSEL path; reject explicitly */
+	if (pullup == MTK_BUS_HOLD) {
+		err = -EINVAL;
+		goto out;
+	}
 
 	if (arg == MTK_DISABLE)
 		enable = 0;
@@ -673,6 +687,12 @@ static int mtk_pinconf_bias_set_pupd_r1_r0(struct mtk_pinctrl *hw,
 				u32 pullup, u32 arg)
 {
 	int err, r0, r1;
+
+	/* Bus-hold is not supported for R1R0 path; reject explicitly */
+	if (pullup == MTK_BUS_HOLD) {
+		err = -EINVAL;
+		goto out;
+	}
 
 	if ((arg == MTK_DISABLE) || (arg == MTK_PUPD_SET_R1R0_00)) {
 		pullup = 0;
@@ -794,10 +814,18 @@ int mtk_pinconf_bias_set_combo(struct mtk_pinctrl *hw,
 	else
 		try_all_type = MTK_PULL_TYPE_MASK;
 
+	/*
+	 * Explicitly handle bus-hold for RSEL type: skip the RSEL path when
+	 * MTK_BUS_HOLD is requested.
+	 */
 	if (try_all_type & MTK_PULL_RSEL_TYPE) {
-		err = mtk_pinconf_bias_set_pu_pd_rsel(hw, desc, pullup, arg);
-		if (!err)
-			return 0;
+		if (pullup == MTK_BUS_HOLD) {
+			/* Bus-hold not supported for RSEL */
+		} else {
+			err = mtk_pinconf_bias_set_pu_pd_rsel(hw, desc, pullup, arg);
+			if (!err)
+				return 0;
+		}
 	}
 
 	if (try_all_type & MTK_PULL_PD_TYPE) {
@@ -828,6 +856,106 @@ int mtk_pinconf_bias_set_combo(struct mtk_pinctrl *hw,
 	return err;
 }
 EXPORT_SYMBOL_GPL(mtk_pinconf_bias_set_combo);
+
+/*
+ * Registry of active mtk_pinctrl instances so that client drivers
+ * (see mtk_pinctrl_program_bias_by_gpio) can resolve an absolute SoC
+ * pin number to the owning controller without having a device handle.
+ * Number of live controllers per system is small (typically 1-2), so a
+ * flat list guarded by a mutex is sufficient.
+ */
+static LIST_HEAD(mtk_pinctrl_instances);
+static DEFINE_MUTEX(mtk_pinctrl_instances_lock);
+
+void mtk_pinctrl_register_instance(struct mtk_pinctrl *hw)
+{
+	mutex_lock(&mtk_pinctrl_instances_lock);
+	list_add_tail(&hw->instance_node, &mtk_pinctrl_instances);
+	mutex_unlock(&mtk_pinctrl_instances_lock);
+}
+EXPORT_SYMBOL_GPL(mtk_pinctrl_register_instance);
+
+void mtk_pinctrl_unregister_instance(struct mtk_pinctrl *hw)
+{
+	mutex_lock(&mtk_pinctrl_instances_lock);
+	list_del(&hw->instance_node);
+	mutex_unlock(&mtk_pinctrl_instances_lock);
+}
+EXPORT_SYMBOL_GPL(mtk_pinctrl_unregister_instance);
+
+/*
+ * Translate the public API's constants to the pinctrl-internal ones.
+ * Kept explicit rather than assumed-equal so the two can evolve
+ * independently (client drivers do not include pinctrl-mtk-common-v2.h).
+ */
+static int mtk_pinctrl_public_pullup_to_internal(u32 pub, u32 *out)
+{
+	switch (pub) {
+	case MTK_PIN_PULLDOWN:
+		*out = MTK_PULLDOWN;
+		return 0;
+	case MTK_PIN_PULLUP:
+		*out = MTK_PULLUP;
+		return 0;
+	case MTK_PIN_BUS_HOLD:
+		*out = MTK_BUS_HOLD;
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
+static int mtk_pinctrl_public_arg_to_internal(u32 pub, u32 *out)
+{
+	switch (pub) {
+	case MTK_PIN_ENABLE:
+		*out = MTK_ENABLE;
+		return 0;
+	case MTK_PIN_DISABLE:
+		*out = MTK_DISABLE;
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
+int mtk_pinctrl_program_bias_by_gpio(unsigned int gpio, u32 pullup, u32 arg)
+{
+	struct mtk_pinctrl *hw;
+	const struct mtk_pin_desc *desc;
+	u32 int_pullup, int_arg;
+	int err;
+
+	err = mtk_pinctrl_public_pullup_to_internal(pullup, &int_pullup);
+	if (err)
+		return err;
+	err = mtk_pinctrl_public_arg_to_internal(arg, &int_arg);
+	if (err)
+		return err;
+
+	err = -ENODEV;
+	mutex_lock(&mtk_pinctrl_instances_lock);
+	list_for_each_entry(hw, &mtk_pinctrl_instances, instance_node) {
+		if (gpio >= hw->soc->npins)
+			continue;
+
+		desc = &hw->soc->pins[gpio];
+		if (desc->number != gpio)
+			continue;
+
+		if (!hw->soc->bias_set_combo) {
+			err = -EOPNOTSUPP;
+			break;
+		}
+
+		err = hw->soc->bias_set_combo(hw, desc, int_pullup, int_arg);
+		break;
+	}
+	mutex_unlock(&mtk_pinctrl_instances_lock);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(mtk_pinctrl_program_bias_by_gpio);
 
 static int mtk_rsel_get_si_unit(struct mtk_pinctrl *hw,
 				const struct mtk_pin_desc *desc,
@@ -887,6 +1015,13 @@ static int mtk_pinconf_bias_get_pu_pd_rsel(struct mtk_pinctrl *hw,
 			mtk_rsel_get_si_unit(hw, desc, *pullup, rsel, enable);
 		else
 			*enable = rsel + MTK_PULL_SET_RSEL_000;
+	} else if (pu == 1 && pd == 1) {
+		/* Keeper (bus-hold) reports pull-up resistance via up-RSEL lookup */
+		*pullup = MTK_BUS_HOLD;
+		if (hw->rsel_si_unit)
+			mtk_rsel_get_si_unit(hw, desc, *pullup, rsel, enable);
+		else
+			*enable = rsel + MTK_PULL_SET_RSEL_000;
 	} else {
 		err = -EINVAL;
 		goto out;
@@ -919,8 +1054,12 @@ static int mtk_pinconf_bias_get_pu_pd(struct mtk_pinctrl *hw,
 	} else if (pu == 0 && pd == 1) {
 		*pullup = 0;
 		*enable = MTK_ENABLE;
-	} else
+	} else if (pu == 1 && pd == 1) {
+		*pullup = MTK_BUS_HOLD;
+		*enable = MTK_ENABLE;
+	} else {
 		err = -EINVAL;
+	}
 
 out:
 	return err;
