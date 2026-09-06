@@ -3579,7 +3579,6 @@ CONFIG_CRYPTO_DEV_STM32_CRYP                    policy<{'arm64': 'm'}>
 CONFIG_CRYPTO_DEV_STM32_HASH                    policy<{'arm64': 'm'}>
 CONFIG_CRYPTO_DEV_SUN4I_SS                      policy<{'arm64': 'm', 'armhf': '-', 'riscv64': 'm'}>
 CONFIG_CRYPTO_DEV_SUN4I_SS_DEBUG                policy<{'arm64': 'n', 'armhf': '-', 'riscv64': 'n'}>
-CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG                 policy<{'arm64': 'y', 'armhf': '-', 'riscv64': 'y'}>
 CONFIG_CRYPTO_DEV_SUN8I_CE                      policy<{'arm64': 'm', 'armhf': '-', 'riscv64': 'm'}>
 CONFIG_CRYPTO_DEV_SUN8I_CE_DEBUG                policy<{'arm64': 'n', 'armhf': '-', 'riscv64': 'n'}>
 CONFIG_CRYPTO_DEV_SUN8I_CE_HASH                 policy<{'arm64': 'y', 'armhf': '-', 'riscv64': 'y'}>
