@@ -1084,7 +1084,7 @@ static int defrag_collect_targets(struct btrfs_inode *inode,
 
 add:
 		last_is_target = true;
-		range_len = min(extent_map_end(em), start + len) - cur;
+		range_len = min(btrfs_extent_map_end(em), start + len) - cur;
 		/*
 		 * This one is a good target, check if it can be merged into
 		 * last range of the target list.
@@ -1115,7 +1115,7 @@ add:
 		list_add_tail(&new->list, target_list);
 
 next:
-		cur = extent_map_end(em);
+		cur = btrfs_extent_map_end(em);
 		btrfs_free_extent_map(em);
 	}
 	if (ret < 0) {

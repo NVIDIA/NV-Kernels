@@ -507,7 +507,7 @@ static noinline int add_ra_bio_pages(struct inode *inode,
 		 * to this compressed extent on disk.
 		 */
 		if (!em || cur < em->start ||
-		    (cur + fs_info->sectorsize > extent_map_end(em)) ||
+		    (cur + fs_info->sectorsize > btrfs_extent_map_end(em)) ||
 		    (em->block_start >> SECTOR_SHIFT) != orig_bio->bi_iter.bi_sector) {
 			btrfs_free_extent_map(em);
 			btrfs_unlock_extent(tree, cur, page_end, NULL);

@@ -1005,8 +1005,8 @@ __get_extent_map(struct inode *inode, struct page *page, size_t pg_offset,
 
 	if (em_cached && *em_cached) {
 		em = *em_cached;
-		if (extent_map_in_tree(em) && start >= em->start &&
-		    start < extent_map_end(em)) {
+		if (btrfs_extent_map_in_tree(em) && start >= em->start &&
+		    start < btrfs_extent_map_end(em)) {
 			refcount_inc(&em->refs);
 			return em;
 		}
@@ -1103,12 +1103,12 @@ static int btrfs_do_readpage(struct page *page, struct extent_map **em_cached,
 			return PTR_ERR(em);
 		}
 		extent_offset = cur - em->start;
-		BUG_ON(extent_map_end(em) <= cur);
+		BUG_ON(btrfs_extent_map_end(em) <= cur);
 		BUG_ON(end < cur);
 
 		compress_type = extent_map_compression(em);
 
-		iosize = min(extent_map_end(em) - cur, end - cur + 1);
+		iosize = min(btrfs_extent_map_end(em) - cur, end - cur + 1);
 		iosize = ALIGN(iosize, blocksize);
 
 		/*
@@ -1464,7 +1464,7 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 		}
 
 		extent_offset = cur - em->start;
-		em_end = extent_map_end(em);
+		em_end = btrfs_extent_map_end(em);
 		ASSERT(cur <= em_end);
 		ASSERT(cur < end);
 		ASSERT(IS_ALIGNED(em->start, fs_info->sectorsize));
@@ -1478,7 +1478,7 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 		ASSERT(block_start != EXTENT_MAP_INLINE);
 
 		/*
-		 * Note that em_end from extent_map_end() and dirty_range_end from
+		 * Note that em_end from btrfs_extent_map_end() and dirty_range_end from
 		 * find_next_dirty_byte() are all exclusive.
 		 */
 		iosize = min(min(em_end, end + 1), dirty_range_end) - cur;
@@ -2496,7 +2496,7 @@ int try_release_extent_mapping(struct page *page, gfp_t mask)
 				break;
 			}
 			if (test_range_bit_exists(tree, em->start,
-						  extent_map_end(em) - 1,
+						  btrfs_extent_map_end(em) - 1,
 						  EXTENT_LOCKED))
 				goto next;
 			/*
@@ -2534,7 +2534,7 @@ remove_em:
 			/* once for the rb tree */
 			btrfs_free_extent_map(em);
 next:
-			start = extent_map_end(em);
+			start = btrfs_extent_map_end(em);
 			write_unlock(&map->lock);
 
 			/* once for us */

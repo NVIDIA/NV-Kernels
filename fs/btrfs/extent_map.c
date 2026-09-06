@@ -64,7 +64,7 @@ void btrfs_free_extent_map(struct extent_map *em)
 	if (!em)
 		return;
 	if (refcount_dec_and_test(&em->refs)) {
-		WARN_ON(extent_map_in_tree(em));
+		WARN_ON(btrfs_extent_map_in_tree(em));
 		WARN_ON(!list_empty(&em->list));
 		kmem_cache_free(extent_map_cache, em);
 	}
@@ -93,7 +93,7 @@ static int tree_insert(struct rb_root_cached *root, struct extent_map *em)
 
 		if (em->start < entry->start) {
 			p = &(*p)->rb_left;
-		} else if (em->start >= extent_map_end(entry)) {
+		} else if (em->start >= btrfs_extent_map_end(entry)) {
 			p = &(*p)->rb_right;
 			leftmost = false;
 		} else {
@@ -102,12 +102,12 @@ static int tree_insert(struct rb_root_cached *root, struct extent_map *em)
 	}
 
 	orig_parent = parent;
-	while (parent && em->start >= extent_map_end(entry)) {
+	while (parent && em->start >= btrfs_extent_map_end(entry)) {
 		parent = rb_next(parent);
 		entry = rb_entry(parent, struct extent_map, rb_node);
 	}
 	if (parent)
-		if (end > entry->start && em->start < extent_map_end(entry))
+		if (end > entry->start && em->start < btrfs_extent_map_end(entry))
 			return -EEXIST;
 
 	parent = orig_parent;
@@ -117,7 +117,7 @@ static int tree_insert(struct rb_root_cached *root, struct extent_map *em)
 		entry = rb_entry(parent, struct extent_map, rb_node);
 	}
 	if (parent)
-		if (end > entry->start && em->start < extent_map_end(entry))
+		if (end > entry->start && em->start < btrfs_extent_map_end(entry))
 			return -EEXIST;
 
 	rb_link_node(&em->rb_node, orig_parent, p);
@@ -147,14 +147,14 @@ static struct rb_node *__tree_search(struct rb_root *root, u64 offset,
 
 		if (offset < entry->start)
 			n = n->rb_left;
-		else if (offset >= extent_map_end(entry))
+		else if (offset >= btrfs_extent_map_end(entry))
 			n = n->rb_right;
 		else
 			return n;
 	}
 
 	orig_prev = prev;
-	while (prev && offset >= extent_map_end(prev_entry)) {
+	while (prev && offset >= btrfs_extent_map_end(prev_entry)) {
 		prev = rb_next(prev);
 		prev_entry = rb_entry(prev, struct extent_map, rb_node);
 	}
@@ -212,7 +212,7 @@ static bool can_merge_extent_map(const struct extent_map *em)
 /* Check to see if two extent_map structs are adjacent and safe to merge. */
 static bool mergeable_maps(const struct extent_map *prev, const struct extent_map *next)
 {
-	if (extent_map_end(prev) != next->start)
+	if (btrfs_extent_map_end(prev) != next->start)
 		return false;
 
 	/*
@@ -359,7 +359,7 @@ void clear_em_logging(struct extent_map_tree *tree, struct extent_map *em)
 	lockdep_assert_held_write(&tree->lock);
 
 	em->flags &= ~EXTENT_FLAG_LOGGING;
-	if (extent_map_in_tree(em))
+	if (btrfs_extent_map_in_tree(em))
 		try_merge_map(tree, em);
 }
 
@@ -427,7 +427,7 @@ __lookup_extent_mapping(struct extent_map_tree *tree,
 
 	em = rb_entry(rb_node, struct extent_map, rb_node);
 
-	if (strict && !(end > em->start && start < extent_map_end(em)))
+	if (strict && !(end > em->start && start < btrfs_extent_map_end(em)))
 		return NULL;
 
 	refcount_inc(&em->refs);
@@ -498,7 +498,7 @@ static void replace_extent_mapping(struct extent_map_tree *tree,
 	lockdep_assert_held_write(&tree->lock);
 
 	WARN_ON(cur->flags & EXTENT_FLAG_PINNED);
-	ASSERT(extent_map_in_tree(cur));
+	ASSERT(btrfs_extent_map_in_tree(cur));
 	if (!(cur->flags & EXTENT_FLAG_LOGGING))
 		list_del_init(&cur->list);
 	rb_replace_node_cached(&cur->rb_node, &new->rb_node, &tree->map);
@@ -544,7 +544,7 @@ static noinline int merge_extent_mapping(struct extent_map_tree *em_tree,
 	u64 end;
 	u64 start_diff;
 
-	BUG_ON(map_start < em->start || map_start >= extent_map_end(em));
+	BUG_ON(map_start < em->start || map_start >= btrfs_extent_map_end(em));
 
 	if (existing->start > map_start) {
 		next = existing;
@@ -554,10 +554,10 @@ static noinline int merge_extent_mapping(struct extent_map_tree *em_tree,
 		next = next_extent_map(prev);
 	}
 
-	start = prev ? extent_map_end(prev) : em->start;
+	start = prev ? btrfs_extent_map_end(prev) : em->start;
 	start = max_t(u64, start, em->start);
-	end = next ? next->start : extent_map_end(em);
-	end = min_t(u64, end, extent_map_end(em));
+	end = next ? next->start : btrfs_extent_map_end(em);
+	end = min_t(u64, end, btrfs_extent_map_end(em));
 	start_diff = start - em->start;
 	em->start = start;
 	em->len = end - start;
@@ -621,7 +621,7 @@ int btrfs_add_extent_mapping(struct btrfs_fs_info *fs_info,
 		 * extent causing the -EEXIST.
 		 */
 		if (start >= existing->start &&
-		    start < extent_map_end(existing)) {
+		    start < btrfs_extent_map_end(existing)) {
 			btrfs_free_extent_map(em);
 			*em_in = existing;
 			ret = 0;
@@ -723,8 +723,8 @@ void btrfs_drop_extent_map_range(struct btrfs_inode *inode, u64 start, u64 end,
 	em = lookup_extent_mapping(em_tree, start, len);
 
 	while (em) {
-		/* extent_map_end() returns exclusive value (last byte + 1). */
-		const u64 em_end = extent_map_end(em);
+		/* btrfs_extent_map_end() returns exclusive value (last byte + 1). */
+		const u64 em_end = btrfs_extent_map_end(em);
 		struct extent_map *next_em = NULL;
 		u64 gen;
 		unsigned long flags;
@@ -836,7 +836,7 @@ void btrfs_drop_extent_map_range(struct btrfs_inode *inode, u64 start, u64 end,
 				split->orig_block_len = 0;
 			}
 
-			if (extent_map_in_tree(em)) {
+			if (btrfs_extent_map_in_tree(em)) {
 				replace_extent_mapping(em_tree, em, split,
 						       modified);
 			} else {
@@ -853,7 +853,7 @@ void btrfs_drop_extent_map_range(struct btrfs_inode *inode, u64 start, u64 end,
 			split = NULL;
 		}
 remove_em:
-		if (extent_map_in_tree(em)) {
+		if (btrfs_extent_map_in_tree(em)) {
 			/*
 			 * If the extent map is still in the tree it means that
 			 * either of the following is true:
@@ -920,7 +920,7 @@ int btrfs_replace_extent_map_range(struct btrfs_inode *inode,
 	struct extent_map_tree *tree = &inode->extent_tree;
 	int ret;
 
-	ASSERT(!extent_map_in_tree(new_em));
+	ASSERT(!btrfs_extent_map_in_tree(new_em));
 
 	/*
 	 * The caller has locked an appropriate file range in the inode's io

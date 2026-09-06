@@ -3250,8 +3250,8 @@ static long btrfs_fallocate(struct file *file, int mode,
 			ret = PTR_ERR(em);
 			break;
 		}
-		last_byte = min(extent_map_end(em), alloc_end);
-		actual_end = min_t(u64, extent_map_end(em), offset + len);
+		last_byte = min(btrfs_extent_map_end(em), alloc_end);
+		actual_end = min_t(u64, btrfs_extent_map_end(em), offset + len);
 		last_byte = ALIGN(last_byte, blocksize);
 		if (em->block_start == EXTENT_MAP_HOLE ||
 		    (cur_offset >= inode->i_size &&
