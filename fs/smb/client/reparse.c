@@ -389,6 +389,7 @@ bool cifs_reparse_point_to_fattr(struct cifs_sb_info *cifs_sb,
 		goto out;
 	}
 
+	fattr->cf_mode &= ~S_IFMT;
 	switch (tag) {
 	case IO_REPARSE_TAG_INTERNAL:
 		if (!(fattr->cf_cifsattrs & ATTR_DIRECTORY))
