@@ -1834,7 +1834,7 @@ int clear_record_extent_bits(struct extent_io_tree *tree, u64 start, u64 end,
 	return __clear_extent_bit(tree, start, end, bits, NULL, changeset);
 }
 
-int try_lock_extent(struct extent_io_tree *tree, u64 start, u64 end,
+int btrfs_try_lock_extent(struct extent_io_tree *tree, u64 start, u64 end,
 		    struct extent_state **cached)
 {
 	int err;
@@ -1855,7 +1855,7 @@ int try_lock_extent(struct extent_io_tree *tree, u64 start, u64 end,
  * Either insert or lock state struct between start and end use mask to tell
  * us if waiting is desired.
  */
-int lock_extent(struct extent_io_tree *tree, u64 start, u64 end,
+int btrfs_lock_extent(struct extent_io_tree *tree, u64 start, u64 end,
 		struct extent_state **cached_state)
 {
 	struct extent_state *failed_state = NULL;

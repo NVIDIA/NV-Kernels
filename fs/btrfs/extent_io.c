@@ -419,13 +419,13 @@ again:
 	}
 
 	/* step three, lock the state bits for the whole range */
-	lock_extent(tree, delalloc_start, delalloc_end, &cached_state);
+	btrfs_lock_extent(tree, delalloc_start, delalloc_end, &cached_state);
 
 	/* then test to make sure it is all still delalloc */
 	ret = test_range_bit(tree, delalloc_start, delalloc_end,
 			     EXTENT_DELALLOC, cached_state);
 	if (!ret) {
-		unlock_extent(tree, delalloc_start, delalloc_end,
+		btrfs_unlock_extent(tree, delalloc_start, delalloc_end,
 			      &cached_state);
 		__unlock_for_delalloc(inode, locked_page,
 			      delalloc_start, delalloc_end);
@@ -588,7 +588,7 @@ static void endio_readpage_release_extent(struct processed_extent *processed,
 	 * Now we don't have range contiguous to the processed range, release
 	 * the processed range now.
 	 */
-	unlock_extent(tree, processed->start, processed->end, &cached);
+	btrfs_unlock_extent(tree, processed->start, processed->end, &cached);
 
 update:
 	/* Update processed to current range */
@@ -1011,7 +1011,7 @@ __get_extent_map(struct inode *inode, struct page *page, size_t pg_offset,
 			return em;
 		}
 
-		free_extent_map(em);
+		btrfs_free_extent_map(em);
 		*em_cached = NULL;
 	}
 
@@ -1067,7 +1067,7 @@ static int btrfs_do_readpage(struct page *page, struct extent_map **em_cached,
 
 	ret = set_page_extent_mapped(page);
 	if (ret < 0) {
-		unlock_extent(tree, start, end, NULL);
+		btrfs_unlock_extent(tree, start, end, NULL);
 		unlock_page(page);
 		return ret;
 	}
@@ -1091,14 +1091,14 @@ static int btrfs_do_readpage(struct page *page, struct extent_map **em_cached,
 		if (cur >= last_byte) {
 			iosize = PAGE_SIZE - pg_offset;
 			memzero_page(page, pg_offset, iosize);
-			unlock_extent(tree, cur, cur + iosize - 1, NULL);
+			btrfs_unlock_extent(tree, cur, cur + iosize - 1, NULL);
 			end_page_read(page, true, cur, iosize);
 			break;
 		}
 		em = __get_extent_map(inode, page, pg_offset, cur,
 				      end - cur + 1, em_cached);
 		if (IS_ERR(em)) {
-			unlock_extent(tree, cur, end, NULL);
+			btrfs_unlock_extent(tree, cur, end, NULL);
 			end_page_read(page, false, cur, end + 1 - cur);
 			return PTR_ERR(em);
 		}
@@ -1170,14 +1170,14 @@ static int btrfs_do_readpage(struct page *page, struct extent_map **em_cached,
 
 		bio_ctrl->last_em_start = em->start;
 
-		free_extent_map(em);
+		btrfs_free_extent_map(em);
 		em = NULL;
 
 		/* we've found a hole, just zero and go on */
 		if (block_start == EXTENT_MAP_HOLE) {
 			memzero_page(page, pg_offset, iosize);
 
-			unlock_extent(tree, cur, cur + iosize - 1, NULL);
+			btrfs_unlock_extent(tree, cur, cur + iosize - 1, NULL);
 			end_page_read(page, true, cur, iosize);
 			cur = cur + iosize;
 			pg_offset += iosize;
@@ -1185,7 +1185,7 @@ static int btrfs_do_readpage(struct page *page, struct extent_map **em_cached,
 		}
 		/* the get_extent function already copied into the page */
 		if (block_start == EXTENT_MAP_INLINE) {
-			unlock_extent(tree, cur, cur + iosize - 1, NULL);
+			btrfs_unlock_extent(tree, cur, cur + iosize - 1, NULL);
 			end_page_read(page, true, cur, iosize);
 			cur = cur + iosize;
 			pg_offset += iosize;
@@ -1482,7 +1482,7 @@ static noinline_for_stack int __extent_writepage_io(struct btrfs_inode *inode,
 		 * find_next_dirty_byte() are all exclusive.
 		 */
 		iosize = min(min(em_end, end + 1), dirty_range_end) - cur;
-		free_extent_map(em);
+		btrfs_free_extent_map(em);
 		em = NULL;
 
 		/*
@@ -2387,7 +2387,7 @@ void extent_readahead(struct readahead_control *rac)
 	}
 
 	if (em_cached)
-		free_extent_map(em_cached);
+		btrfs_free_extent_map(em_cached);
 	submit_one_bio(&bio_ctrl);
 }
 
@@ -2411,7 +2411,7 @@ int extent_invalidate_folio(struct extent_io_tree *tree,
 	if (start > end)
 		return 0;
 
-	lock_extent(tree, start, end, &cached_state);
+	btrfs_lock_extent(tree, start, end, &cached_state);
 	folio_wait_writeback(folio);
 
 	/*
@@ -2419,7 +2419,7 @@ int extent_invalidate_folio(struct extent_io_tree *tree,
 	 * so here we only need to unlock the extent range to free any
 	 * existing extent state.
 	 */
-	unlock_extent(tree, start, end, &cached_state);
+	btrfs_unlock_extent(tree, start, end, &cached_state);
 	return 0;
 }
 
@@ -2492,7 +2492,7 @@ int try_release_extent_mapping(struct page *page, gfp_t mask)
 			if ((em->flags & EXTENT_FLAG_PINNED) ||
 			    em->start != start) {
 				write_unlock(&map->lock);
-				free_extent_map(em);
+				btrfs_free_extent_map(em);
 				break;
 			}
 			if (test_range_bit_exists(tree, em->start,
@@ -2532,13 +2532,13 @@ remove_em:
 			 */
 			remove_extent_mapping(map, em);
 			/* once for the rb tree */
-			free_extent_map(em);
+			btrfs_free_extent_map(em);
 next:
 			start = extent_map_end(em);
 			write_unlock(&map->lock);
 
 			/* once for us */
-			free_extent_map(em);
+			btrfs_free_extent_map(em);
 
 			cond_resched(); /* Allow large-extent preemption. */
 		}
@@ -3178,7 +3178,7 @@ restart:
 	range_end = round_up(start + len, sectorsize);
 	prev_extent_end = range_start;
 
-	lock_extent(&inode->io_tree, range_start, range_end, &cached_state);
+	btrfs_lock_extent(&inode->io_tree, range_start, range_end, &cached_state);
 
 	ret = fiemap_find_last_extent_offset(inode, path, &last_extent_end);
 	if (ret < 0)
@@ -3358,7 +3358,7 @@ check_eof_delalloc:
 	}
 
 out_unlock:
-	unlock_extent(&inode->io_tree, range_start, range_end, &cached_state);
+	btrfs_unlock_extent(&inode->io_tree, range_start, range_end, &cached_state);
 
 	if (ret == BTRFS_FIEMAP_FLUSH_CACHE) {
 		btrfs_release_path(path);

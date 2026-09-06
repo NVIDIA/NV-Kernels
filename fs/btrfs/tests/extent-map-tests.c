@@ -32,7 +32,7 @@ static void free_extent_map_tree(struct extent_map_tree *em_tree)
 			refcount_set(&em->refs, 1);
 		}
 #endif
-		free_extent_map(em);
+		btrfs_free_extent_map(em);
 	}
 	write_unlock(&em_tree->lock);
 }
@@ -79,7 +79,7 @@ static int test_case_1(struct btrfs_fs_info *fs_info,
 		test_err("cannot add extent range [0, 16K)");
 		goto out;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	/* Add [16K, 20K) following [0, 16K)  */
 	em = alloc_extent_map();
@@ -100,7 +100,7 @@ static int test_case_1(struct btrfs_fs_info *fs_info,
 		test_err("cannot add extent range [16K, 20K)");
 		goto out;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	em = alloc_extent_map();
 	if (!em) {
@@ -135,7 +135,7 @@ static int test_case_1(struct btrfs_fs_info *fs_info,
 			 em->block_start, em->block_len);
 		ret = -EINVAL;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 out:
 	free_extent_map_tree(em_tree);
 
@@ -172,7 +172,7 @@ static int test_case_2(struct btrfs_fs_info *fs_info,
 		test_err("cannot add extent range [0, 1K)");
 		goto out;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	/* Add [4K, 8K) following [0, 1K)  */
 	em = alloc_extent_map();
@@ -193,7 +193,7 @@ static int test_case_2(struct btrfs_fs_info *fs_info,
 		test_err("cannot add extent range [4K, 8K)");
 		goto out;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	em = alloc_extent_map();
 	if (!em) {
@@ -227,7 +227,7 @@ static int test_case_2(struct btrfs_fs_info *fs_info,
 			 em->block_len);
 		ret = -EINVAL;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 out:
 	free_extent_map_tree(em_tree);
 
@@ -259,7 +259,7 @@ static int __test_case_3(struct btrfs_fs_info *fs_info,
 		test_err("cannot add extent range [4K, 8K)");
 		goto out;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	em = alloc_extent_map();
 	if (!em) {
@@ -299,7 +299,7 @@ static int __test_case_3(struct btrfs_fs_info *fs_info,
 			 em->block_start, em->block_len);
 		ret = -EINVAL;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 out:
 	free_extent_map_tree(em_tree);
 
@@ -363,7 +363,7 @@ static int __test_case_4(struct btrfs_fs_info *fs_info,
 		test_err("cannot add extent range [0, 8K)");
 		goto out;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	em = alloc_extent_map();
 	if (!em) {
@@ -384,7 +384,7 @@ static int __test_case_4(struct btrfs_fs_info *fs_info,
 		test_err("cannot add extent range [8K, 32K)");
 		goto out;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	em = alloc_extent_map();
 	if (!em) {
@@ -418,7 +418,7 @@ static int __test_case_4(struct btrfs_fs_info *fs_info,
 			 em->block_len);
 		ret = -EINVAL;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 out:
 	free_extent_map_tree(em_tree);
 
@@ -484,7 +484,7 @@ static int add_compressed_extent(struct btrfs_fs_info *fs_info,
 	write_lock(&em_tree->lock);
 	ret = btrfs_add_extent_mapping(fs_info, em_tree, &em, em->start, em->len);
 	write_unlock(&em_tree->lock);
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 	if (ret < 0) {
 		test_err("cannot add extent map [%llu, %llu)", start, start + len);
 		return ret;
@@ -724,7 +724,7 @@ static int test_case_6(struct btrfs_fs_info *fs_info, struct extent_map_tree *em
 	}
 	ret = 0;
 out:
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 	free_extent_map_tree(em_tree);
 	return ret;
 }
@@ -771,7 +771,7 @@ static int test_case_7(struct btrfs_fs_info *fs_info)
 		test_err("couldn't add extent map");
 		goto out;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	em = alloc_extent_map();
 	if (!em) {
@@ -792,7 +792,7 @@ static int test_case_7(struct btrfs_fs_info *fs_info)
 		test_err("couldn't add extent map");
 		goto out;
 	}
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	/*
 	 * Drop [0, 36K) This should skip the [0, 4K) extent and then split the
@@ -819,7 +819,7 @@ static int test_case_7(struct btrfs_fs_info *fs_info)
 		goto out;
 	}
 
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	read_lock(&em_tree->lock);
 	em = lookup_extent_mapping(em_tree, SZ_16K, SZ_16K);
@@ -852,7 +852,7 @@ static int test_case_7(struct btrfs_fs_info *fs_info)
 		goto out;
 	}
 
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	read_lock(&em_tree->lock);
 	em = lookup_extent_mapping(em_tree, 48 * SZ_1K, (u64)-1);
@@ -864,7 +864,7 @@ static int test_case_7(struct btrfs_fs_info *fs_info)
 
 	ret = 0;
 out:
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 	iput(inode);
 	return ret;
 }

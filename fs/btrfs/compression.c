@@ -496,7 +496,7 @@ static noinline int add_ra_bio_pages(struct inode *inode,
 		}
 
 		page_end = (pg_index << PAGE_SHIFT) + PAGE_SIZE - 1;
-		lock_extent(tree, cur, page_end, NULL);
+		btrfs_lock_extent(tree, cur, page_end, NULL);
 		read_lock(&em_tree->lock);
 		em = lookup_extent_mapping(em_tree, cur, page_end + 1 - cur);
 		read_unlock(&em_tree->lock);
@@ -509,14 +509,14 @@ static noinline int add_ra_bio_pages(struct inode *inode,
 		if (!em || cur < em->start ||
 		    (cur + fs_info->sectorsize > extent_map_end(em)) ||
 		    (em->block_start >> SECTOR_SHIFT) != orig_bio->bi_iter.bi_sector) {
-			free_extent_map(em);
-			unlock_extent(tree, cur, page_end, NULL);
+			btrfs_free_extent_map(em);
+			btrfs_unlock_extent(tree, cur, page_end, NULL);
 			unlock_page(page);
 			put_page(page);
 			break;
 		}
 		add_size = min(em->start + em->len, page_end + 1) - cur;
-		free_extent_map(em);
+		btrfs_free_extent_map(em);
 
 		if (page->index == end_index) {
 			size_t zero_offset = offset_in_page(isize);
@@ -530,7 +530,7 @@ static noinline int add_ra_bio_pages(struct inode *inode,
 
 		ret = bio_add_page(orig_bio, page, add_size, offset_in_page(cur));
 		if (ret != add_size) {
-			unlock_extent(tree, cur, page_end, NULL);
+			btrfs_unlock_extent(tree, cur, page_end, NULL);
 			unlock_page(page);
 			put_page(page);
 			break;
@@ -600,7 +600,7 @@ void btrfs_submit_compressed_read(struct btrfs_bio *bbio)
 	cb->compress_type = extent_map_compression(em);
 	cb->orig_bbio = bbio;
 
-	free_extent_map(em);
+	btrfs_free_extent_map(em);
 
 	cb->nr_pages = DIV_ROUND_UP(compressed_len, PAGE_SIZE);
 	cb->compressed_pages = kcalloc(cb->nr_pages, sizeof(struct page *), GFP_NOFS);

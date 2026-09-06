@@ -128,10 +128,10 @@ void extent_io_tree_init(struct btrfs_fs_info *fs_info,
 			 struct extent_io_tree *tree, unsigned int owner);
 void extent_io_tree_release(struct extent_io_tree *tree);
 
-int lock_extent(struct extent_io_tree *tree, u64 start, u64 end,
+int btrfs_lock_extent(struct extent_io_tree *tree, u64 start, u64 end,
 		struct extent_state **cached);
 
-int try_lock_extent(struct extent_io_tree *tree, u64 start, u64 end,
+int btrfs_try_lock_extent(struct extent_io_tree *tree, u64 start, u64 end,
 		    struct extent_state **cached);
 
 int __init extent_state_init_cachep(void);
@@ -159,7 +159,7 @@ static inline int clear_extent_bit(struct extent_io_tree *tree, u64 start,
 	return __clear_extent_bit(tree, start, end, bits, cached, NULL);
 }
 
-static inline int unlock_extent(struct extent_io_tree *tree, u64 start, u64 end,
+static inline int btrfs_unlock_extent(struct extent_io_tree *tree, u64 start, u64 end,
 				struct extent_state **cached)
 {
 	return __clear_extent_bit(tree, start, end, EXTENT_LOCKED, cached, NULL);
