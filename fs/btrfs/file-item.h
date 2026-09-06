@@ -3,6 +3,8 @@
 #ifndef BTRFS_FILE_ITEM_H
 #define BTRFS_FILE_ITEM_H
 
+#include <linux/blk_types.h>
+#include "ctree.h"
 #include "accessors.h"
 
 #define BTRFS_FILE_EXTENT_INLINE_DATA_START		\

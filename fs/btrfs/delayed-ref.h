@@ -7,6 +7,8 @@
 #define BTRFS_DELAYED_REF_H
 
 #include <linux/refcount.h>
+#include "fs.h"
+#include "messages.h"
 
 /* these are the possible values of struct btrfs_delayed_ref_node->action */
 enum btrfs_delayed_ref_action {

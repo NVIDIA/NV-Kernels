@@ -5,6 +5,8 @@
 
 #include <linux/kobject.h>
 
+struct block_device;
+
 enum btrfs_feature_set {
 	FEAT_COMPAT,
 	FEAT_COMPAT_RO,

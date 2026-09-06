@@ -13,6 +13,10 @@
 #include "delayed-ref.h"
 #include "misc.h"
 
+struct btrfs_transaction;
+struct btrfs_block_group;
+struct btrfs_qgroup_swapped_blocks;
+
 /*
  * Btrfs qgroup overview
  *

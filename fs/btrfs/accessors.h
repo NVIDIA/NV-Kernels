@@ -5,6 +5,7 @@
 
 #include <linux/stddef.h>
 #include <asm/unaligned.h>
+#include "extent_io.h"
 
 struct btrfs_map_token {
 	struct extent_buffer *eb;

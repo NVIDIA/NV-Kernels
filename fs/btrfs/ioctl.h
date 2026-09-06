@@ -3,6 +3,9 @@
 #ifndef BTRFS_IOCTL_H
 #define BTRFS_IOCTL_H
 
+struct inode;
+struct io_uring_cmd;
+
 long btrfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 long btrfs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 int btrfs_fileattr_get(struct dentry *dentry, struct fileattr *fa);

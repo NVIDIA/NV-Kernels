@@ -3,6 +3,8 @@
 #ifndef BTRFS_ACL_H
 #define BTRFS_ACL_H
 
+#include <linux/types.h>
+
 #ifdef CONFIG_BTRFS_FS_POSIX_ACL
 
 struct posix_acl *btrfs_get_acl(struct inode *inode, int type, bool rcu);

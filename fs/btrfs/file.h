@@ -3,6 +3,9 @@
 #ifndef BTRFS_FILE_H
 #define BTRFS_FILE_H
 
+struct inode;
+struct folio;
+
 extern const struct file_operations btrfs_file_operations;
 
 int btrfs_sync_file(struct file *file, loff_t start, loff_t end, int datasync);

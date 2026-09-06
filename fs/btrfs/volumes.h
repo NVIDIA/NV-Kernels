@@ -6,12 +6,18 @@
 #ifndef BTRFS_VOLUMES_H
 #define BTRFS_VOLUMES_H
 
+#include <linux/blk_types.h>
+#include <linux/blkdev.h>
 #include <linux/sort.h>
 #include <linux/btrfs.h>
+#include <uapi/linux/btrfs_tree.h>
 #include "async-thread.h"
 #include "messages.h"
 #include "tree-checker.h"
 #include "rcu-string.h"
+#include "extent-io-tree.h"
+
+struct btrfs_transaction;
 
 #define BTRFS_MAX_DATA_CHUNK_SIZE	(10ULL * SZ_1G)
 
