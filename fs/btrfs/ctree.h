@@ -6,7 +6,6 @@
 #ifndef BTRFS_CTREE_H
 #define BTRFS_CTREE_H
 
-#include <linux/pagemap.h>
 #include "locking.h"
 #include "fs.h"
 #include "accessors.h"
@@ -480,11 +479,6 @@ static inline u32 BTRFS_NODEPTRS_PER_BLOCK(const struct btrfs_fs_info *info)
 static inline u32 BTRFS_MAX_XATTR_SIZE(const struct btrfs_fs_info *info)
 {
 	return BTRFS_MAX_ITEM_SIZE(info) - sizeof(struct btrfs_dir_item);
-}
-
-static inline gfp_t btrfs_alloc_write_mask(struct address_space *mapping)
-{
-	return mapping_gfp_constraint(mapping, ~__GFP_FS);
 }
 
 int btrfs_error_unpin_extent_range(struct btrfs_fs_info *fs_info,
