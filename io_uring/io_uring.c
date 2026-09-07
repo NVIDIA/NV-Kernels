@@ -9137,12 +9137,21 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 	}
 
 	ubuf = (unsigned long) iov->iov_base;
-	end = (ubuf + iov->iov_len + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	start = ubuf >> PAGE_SHIFT;
-	nr_pages = end - start;
 
 	*pimu = NULL;
 	ret = -ENOMEM;
+
+	if (check_add_overflow(ubuf, iov->iov_len, &end)) {
+		ret = -EOVERFLOW;
+		goto done;
+	}
+	if (check_add_overflow(end, PAGE_SIZE - 1, &end)) {
+		ret = -EOVERFLOW;
+		goto done;
+	}
+	end = end >> PAGE_SHIFT;
+	start = ubuf >> PAGE_SHIFT;
+	nr_pages = end - start;
 
 	pages = kvmalloc_array(nr_pages, sizeof(struct page *), GFP_KERNEL);
 	if (!pages)
