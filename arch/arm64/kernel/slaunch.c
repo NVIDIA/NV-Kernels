@@ -91,6 +91,10 @@ static void __init sl_hash_data(const void *data, size_t size, u8 *out)
 static struct drtm_mem_region *dcrtm_regions;
 static u32 dcrtm_num_regions;
 
+/* DTB address and size validated by slaunch_early_init(). */
+static phys_addr_t sl_dtb_pa __initdata;
+static u32 sl_dtb_size __initdata;
+
 /*
  * DLME data extent saved at slaunch_setup() time so that
  * slaunch_measure_post_efi() can re-reserve the region after efi_init()'s
@@ -551,6 +555,9 @@ void __init slaunch_early_init(void)
 		panic("slaunch: DTB range [0x%llx - 0x%llx] extends outside D-CRTM NORMAL region\n",
 		      (u64)dtb_pa, (u64)(dtb_pa + fdt_size));
 
+	sl_dtb_pa = dtb_pa;
+	sl_dtb_size = fdt_size;
+
 	pr_info("slaunch: DTB validated: magic=0x%08x, size=%u bytes, in NORMAL region\n",
 		fdt_magic, fdt_size);
 }
@@ -638,7 +645,7 @@ static const struct sl_cfgtbl_size_entry sl_cfgtbl_sizes[] __initconst = {
 	{ SMBIOS3_TABLE_GUID,			24 },	/* SMBIOS3 entry point */
 	{ EFI_RT_PROPERTIES_TABLE_GUID,		8  },	/* version + flags */
 	{ LINUX_EFI_MEMRESERVE_TABLE_GUID,	32 },	/* header struct */
-	{ LINUX_EFI_RANDOM_SEED_TABLE_GUID,	32 },	/* header struct */
+	{ LINUX_EFI_RANDOM_SEED_TABLE_GUID, sizeof(struct linux_efi_random_seed) },
 };
 
 #define SL_CFGTBL_UNKNOWN_BOUND		EFI_PAGE_SIZE
@@ -659,6 +666,62 @@ static bool __init slaunch_ranges_overlap(u64 a_start, u64 a_size,
 					  u64 b_start, u64 b_size);
 
 /*
+ * Validate that an EFI ConfigurationTable payload is within NORMAL memory
+ * and does not overlap the DLME region, DTB, or the raw EFI memory map.
+ */
+static void __init validate_efi_table_range(const char *name, u64 pa, u64 size)
+{
+	u64 dlme_size = (sl_dlme_data_pa + sl_dlme_data_size) -
+			sl_dlme_region_pa;
+
+	if (!dcrtm_range_in_normal(pa, size))
+		panic("slaunch: %s [0x%llx+%llu] NOT in NORMAL region\n",
+		      name, pa, size);
+
+	if (slaunch_ranges_overlap(pa, size, sl_dlme_region_pa, dlme_size))
+		panic("slaunch: %s [0x%llx+%llu] overlaps DLME region [0x%llx+%llu]\n",
+		      name, pa, size, (u64)sl_dlme_region_pa, dlme_size);
+
+	if (slaunch_ranges_overlap(pa, size, sl_dtb_pa, sl_dtb_size))
+		panic("slaunch: %s [0x%llx+%llu] overlaps DTB [0x%llx+%llu]\n",
+		      name, pa, size, (u64)sl_dtb_pa, (u64)sl_dtb_size);
+
+	if (sl_efi_mmap_size &&
+	    slaunch_ranges_overlap(pa, size, sl_efi_mmap_pa, sl_efi_mmap_size))
+		panic("slaunch: %s [0x%llx+%llu] overlaps raw EFI mmap [0x%llx+%llu]\n",
+		      name, pa, size, (u64)sl_efi_mmap_pa, sl_efi_mmap_size);
+}
+
+static void __init validate_rng_seed(u64 seed_pa, const efi_guid_t *guid)
+{
+	efi_guid_t rng_guid = LINUX_EFI_RANDOM_SEED_TABLE_GUID;
+	struct linux_efi_random_seed *seed;
+	u64 total_size;
+	u32 seed_size;
+
+	if (efi_guidcmp(*guid, rng_guid) != 0)
+		return;
+
+	/*
+	 * The ConfigurationTable walk already established that the header is in
+	 * NORMAL memory, so it's safe to read the seed size before validating
+	 * the table range.
+	 */
+	seed = early_memremap_ro(seed_pa, sizeof(*seed));
+	if (!seed)
+		panic("slaunch: EFI RNG seed header remap failed at 0x%llx\n",
+		      seed_pa);
+	seed_size = min_t(u32, seed->size, EFI_RANDOM_SEED_MAX_SIZE);
+	early_memunmap(seed, sizeof(*seed));
+
+	total_size = sizeof(*seed) + seed_size;
+	validate_efi_table_range("EFI RNG seed", seed_pa, total_size);
+
+	pr_info("slaunch: EFI RNG seed validated: PA 0x%llx, %llu B\n",
+		seed_pa, total_size);
+}
+
+/*
  * Validate a UEFI SRTM TPM event log Configuration Table entry against
  * the D-CRTM address map: cover the full header+body extent and reject
  * overlap with DLME/DTB/mmap so firmware cannot alias an input. The log
@@ -673,9 +736,6 @@ static void __init slaunch_validate_srtm_log(u64 log_pa,
 	size_t hdr_size;
 	u64 body_size;
 	u64 total_size;
-	u64 dlme_size;
-	u64 fdt_size = 0;
-	phys_addr_t dtb_pa = __fdt_pointer;
 	bool is_main = (efi_guidcmp(*guid, main_guid) == 0);
 	bool is_final = (efi_guidcmp(*guid, final_guid) == 0);
 
@@ -688,41 +748,11 @@ static void __init slaunch_validate_srtm_log(u64 log_pa,
 	hdr_size = is_main ? sizeof(struct linux_efi_tpm_eventlog)
 			   : sizeof(struct efi_tcg2_final_events_table);
 
-	/* Header extent must be in NORMAL before we can read the size
-	 * field. dcrtm_range_in_normal rejects size==0 and u64 wrap. */
-	if (!dcrtm_range_in_normal(log_pa, hdr_size))
-		panic("slaunch: SRTM log PA 0x%llx (header %zu B) NOT in NORMAL region\n",
-		      log_pa, hdr_size);
-
-	/* Header extent must not alias the DLME region, DTB, or raw EFI
-	 * mmap buffer (an attacker could otherwise coerce the validator
-	 * into mis-interpreting attestation-critical bytes). */
-	dlme_size = (sl_dlme_data_pa + sl_dlme_data_size) - sl_dlme_region_pa;
-	if (slaunch_ranges_overlap(log_pa, hdr_size,
-				   sl_dlme_region_pa, dlme_size))
-		panic("slaunch: SRTM log header [0x%llx+%zu] overlaps DLME region [0x%llx+%llu]\n",
-		      log_pa, hdr_size, (u64)sl_dlme_region_pa, dlme_size);
-
-	if (dtb_pa) {
-		/* Read fdt_totalsize from the (already-validated) DTB. */
-		__be32 *p = early_memremap(dtb_pa, sizeof(u32) * 2);
-
-		if (p) {
-			fdt_size = be32_to_cpu(p[1]);
-			early_memunmap(p, sizeof(u32) * 2);
-		}
-	}
-	if (fdt_size && slaunch_ranges_overlap(log_pa, hdr_size,
-					       dtb_pa, fdt_size))
-		panic("slaunch: SRTM log header [0x%llx+%zu] overlaps DTB [0x%llx+%llu]\n",
-		      log_pa, hdr_size, (u64)dtb_pa, fdt_size);
-
-	if (sl_efi_mmap_size &&
-	    slaunch_ranges_overlap(log_pa, hdr_size,
-				   sl_efi_mmap_pa, sl_efi_mmap_size))
-		panic("slaunch: SRTM log header [0x%llx+%zu] overlaps raw EFI mmap [0x%llx+%llu]\n",
-		      log_pa, hdr_size, (u64)sl_efi_mmap_pa,
-		      sl_efi_mmap_size);
+	/*
+	 * Validate the header, as an alias could make the validator
+	 * misinterpret attestation-critical bytes.
+	 */
+	validate_efi_table_range("SRTM log header", log_pa, hdr_size);
 
 	/* Read the firmware-published body size from the header. */
 	if (is_main) {
@@ -761,25 +791,7 @@ static void __init slaunch_validate_srtm_log(u64 log_pa,
 		      log_pa, hdr_size, body_size);
 
 	total_size = (u64)hdr_size + body_size;
-
-	if (!dcrtm_range_in_normal(log_pa, total_size))
-		panic("slaunch: SRTM log [0x%llx+%llu] NOT in NORMAL region (full extent)\n",
-		      log_pa, total_size);
-
-	if (slaunch_ranges_overlap(log_pa, total_size,
-				   sl_dlme_region_pa, dlme_size))
-		panic("slaunch: SRTM log [0x%llx+%llu] overlaps DLME region [0x%llx+%llu]\n",
-		      log_pa, total_size, (u64)sl_dlme_region_pa, dlme_size);
-	if (fdt_size &&
-	    slaunch_ranges_overlap(log_pa, total_size, dtb_pa, fdt_size))
-		panic("slaunch: SRTM log [0x%llx+%llu] overlaps DTB [0x%llx+%llu]\n",
-		      log_pa, total_size, (u64)dtb_pa, fdt_size);
-	if (sl_efi_mmap_size &&
-	    slaunch_ranges_overlap(log_pa, total_size,
-				   sl_efi_mmap_pa, sl_efi_mmap_size))
-		panic("slaunch: SRTM log [0x%llx+%llu] overlaps raw EFI mmap [0x%llx+%llu]\n",
-		      log_pa, total_size, (u64)sl_efi_mmap_pa,
-		      sl_efi_mmap_size);
+	validate_efi_table_range("SRTM log", log_pa, total_size);
 
 	/* Last writer wins when both GUIDs are present — both are
 	 * structurally validated above; the main TPM event log is the
@@ -851,6 +863,7 @@ static void __init slaunch_validate_raw_systab(u64 systab_pa)
 		if (!dcrtm_range_in_normal(tbl_ptr, size))
 			panic("slaunch: EFI ConfigurationTable[%lu] 0x%lx [size %u] NOT in NORMAL region\n",
 			      j, tbl_ptr, size);
+		validate_rng_seed((u64)tbl_ptr, &cfgtbl[j].guid);
 		/* If the entry advertises an SRTM TPM event log (header
 		 * + variable-length body), extend the structural check to
 		 * cover the full body extent (validate-only; the log is a
