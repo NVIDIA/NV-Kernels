@@ -132,44 +132,51 @@ static int dsa_switch_bridge_leave(struct dsa_switch *ds,
 						info->sw_index, info->port,
 						info->br);
 
-	if (ds->needs_standalone_vlan_filtering && !br_vlan_enabled(info->br)) {
-		change_vlan_filtering = true;
-		vlan_filtering = true;
-	} else if (!ds->needs_standalone_vlan_filtering &&
-		   br_vlan_enabled(info->br)) {
-		change_vlan_filtering = true;
-		vlan_filtering = false;
-	}
-
-	/* If the bridge was vlan_filtering, the bridge core doesn't trigger an
-	 * event for changing vlan_filtering setting upon slave ports leaving
-	 * it. That is a good thing, because that lets us handle it and also
-	 * handle the case where the switch's vlan_filtering setting is global
-	 * (not per port). When that happens, the correct moment to trigger the
-	 * vlan_filtering callback is only when the last port leaves the last
-	 * VLAN-aware bridge.
+	/* Changes to VLAN filtering are not applicable to cross-chip
+	 * notifications.
 	 */
-	if (change_vlan_filtering && ds->vlan_filtering_is_global) {
-		for (port = 0; port < ds->num_ports; port++) {
-			struct net_device *bridge_dev;
+	if (dst->index == info->tree_index && ds->index == info->sw_index) {
+		if (ds->needs_standalone_vlan_filtering &&
+		    !br_vlan_enabled(info->br)) {
+			change_vlan_filtering = true;
+			vlan_filtering = true;
+		} else if (!ds->needs_standalone_vlan_filtering &&
+			   br_vlan_enabled(info->br)) {
+			change_vlan_filtering = true;
+			vlan_filtering = false;
+		}
 
-			bridge_dev = dsa_to_port(ds, port)->bridge_dev;
+		/* If the bridge was vlan_filtering, the bridge core doesn't
+		 * trigger an event for changing vlan_filtering setting upon
+		 * slave ports leaving it. That is a good thing, because that
+		 * lets us handle it and also handle the case where the switch's
+		 * vlan_filtering setting is global (not per port). When that
+		 * happens, the correct moment to trigger the vlan_filtering
+		 * callback is only when the last port leaves the last VLAN-aware
+		 * bridge.
+		 */
+		if (change_vlan_filtering && ds->vlan_filtering_is_global) {
+			for (port = 0; port < ds->num_ports; port++) {
+				struct net_device *bridge_dev;
 
-			if (bridge_dev && br_vlan_enabled(bridge_dev)) {
-				change_vlan_filtering = false;
-				break;
+				bridge_dev = dsa_to_port(ds, port)->bridge_dev;
+
+				if (bridge_dev && br_vlan_enabled(bridge_dev)) {
+					change_vlan_filtering = false;
+					break;
+				}
 			}
 		}
-	}
 
-	if (change_vlan_filtering) {
-		err = dsa_port_vlan_filtering(dsa_to_port(ds, info->port),
-					      vlan_filtering, &extack);
-		if (extack._msg)
-			dev_err(ds->dev, "port %d: %s\n", info->port,
-				extack._msg);
-		if (err && err != -EOPNOTSUPP)
-			return err;
+		if (change_vlan_filtering) {
+			err = dsa_port_vlan_filtering(dsa_to_port(ds, info->port),
+						      vlan_filtering, &extack);
+			if (extack._msg)
+				dev_err(ds->dev, "port %d: %s\n", info->port,
+					extack._msg);
+			if (err && err != -EOPNOTSUPP)
+				return err;
+		}
 	}
 
 	return dsa_tag_8021q_bridge_leave(ds, info);
