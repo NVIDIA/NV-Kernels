@@ -76,6 +76,7 @@ struct pmic_glink_ucsi {
 	spinlock_t state_lock;
 	bool ucsi_registered;
 	bool pd_running;
+	bool shutting_down;
 
 	u8 read_buf[UCSI_BUF_SIZE];
 };
@@ -300,6 +301,7 @@ static void pmic_glink_ucsi_callback(const void *data, size_t len, void *priv)
 {
 	struct pmic_glink_ucsi *ucsi = priv;
 	const struct pmic_glink_hdr *hdr = data;
+	unsigned long flags;
 
 	switch (le32_to_cpu(hdr->opcode)) {
 	case UC_UCSI_READ_BUF_REQ:
@@ -309,7 +311,10 @@ static void pmic_glink_ucsi_callback(const void *data, size_t len, void *priv)
 		pmic_glink_ucsi_write_ack(ucsi, data, len);
 		break;
 	case UC_UCSI_USBC_NOTIFY_IND:
-		schedule_work(&ucsi->notify_work);
+		spin_lock_irqsave(&ucsi->state_lock, flags);
+		if (!ucsi->shutting_down)
+			schedule_work(&ucsi->notify_work);
+		spin_unlock_irqrestore(&ucsi->state_lock, flags);
 		break;
 	};
 }
@@ -321,13 +326,18 @@ static void pmic_glink_ucsi_pdr_notify(void *priv, int state)
 
 	spin_lock_irqsave(&ucsi->state_lock, flags);
 	ucsi->pd_running = (state == SERVREG_SERVICE_STATE_UP);
+	if (!ucsi->shutting_down)
+		schedule_work(&ucsi->register_work);
 	spin_unlock_irqrestore(&ucsi->state_lock, flags);
-	schedule_work(&ucsi->register_work);
 }
 
 static void pmic_glink_ucsi_destroy(void *data)
 {
 	struct pmic_glink_ucsi *ucsi = data;
+
+	/* Drain the work items before ucsi_destroy() frees the ucsi instance */
+	cancel_work_sync(&ucsi->notify_work);
+	cancel_work_sync(&ucsi->register_work);
 
 	/* Protect to make sure we're not in a middle of a transaction from a glink callback */
 	mutex_lock(&ucsi->lock);
@@ -435,9 +445,20 @@ static int pmic_glink_ucsi_probe(struct auxiliary_device *adev,
 static void pmic_glink_ucsi_remove(struct auxiliary_device *adev)
 {
 	struct pmic_glink_ucsi *ucsi = dev_get_drvdata(&adev->dev);
+	unsigned long flags;
 
-	/* Unregister first to stop having read & writes */
-	ucsi_unregister(ucsi->ucsi);
+	/* Callbacks can queue work until devres releases the client */
+	spin_lock_irqsave(&ucsi->state_lock, flags);
+	ucsi->shutting_down = true;
+	spin_unlock_irqrestore(&ucsi->state_lock, flags);
+	cancel_work_sync(&ucsi->notify_work);
+	cancel_work_sync(&ucsi->register_work);
+
+	/* register_work may have unregistered the instance already */
+	if (ucsi->ucsi_registered) {
+		ucsi->ucsi_registered = false;
+		ucsi_unregister(ucsi->ucsi);
+	}
 }
 
 static const struct auxiliary_device_id pmic_glink_ucsi_id_table[] = {
