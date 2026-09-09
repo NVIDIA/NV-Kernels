@@ -46,6 +46,7 @@ static DEFINE_IDA(iommu_global_pasid_ida);
 static unsigned int iommu_def_domain_type __read_mostly;
 static bool iommu_dma_strict __read_mostly = IS_ENABLED(CONFIG_IOMMU_DEFAULT_DMA_STRICT);
 static u32 iommu_cmd_line __read_mostly;
+static bool iommu_dma_isolation __read_mostly;
 
 /* Tags used with xa_tag_pointer() in group->pasid_array */
 enum { IOMMU_PASID_ARRAY_DOMAIN = 0, IOMMU_PASID_ARRAY_HANDLE = 1 };
@@ -227,9 +228,14 @@ static const char *iommu_domain_type_str(unsigned int t)
 
 static int __init iommu_subsys_init(void)
 {
+	bool dma_isolation = iommu_dma_isolation_enabled();
+	const char *domain_type_note = "";
 	struct notifier_block *nb;
 
-	if (!(iommu_cmd_line & IOMMU_CMD_LINE_DMA_API)) {
+	if (dma_isolation) {
+		iommu_set_default_translated(false);
+		iommu_set_dma_strict();
+	} else if (!(iommu_cmd_line & IOMMU_CMD_LINE_DMA_API)) {
 		if (IS_ENABLED(CONFIG_IOMMU_DEFAULT_PASSTHROUGH))
 			iommu_set_default_passthrough(false);
 		else
@@ -244,10 +250,14 @@ static int __init iommu_subsys_init(void)
 	if (!iommu_default_passthrough() && !iommu_dma_strict)
 		iommu_def_domain_type = IOMMU_DOMAIN_DMA_FQ;
 
+	if (dma_isolation)
+		domain_type_note = " (DMA isolation enabled)";
+	else if (iommu_cmd_line & IOMMU_CMD_LINE_DMA_API)
+		domain_type_note = " (set via kernel command line)";
+
 	pr_info("Default domain type: %s%s\n",
 		iommu_domain_type_str(iommu_def_domain_type),
-		(iommu_cmd_line & IOMMU_CMD_LINE_DMA_API) ?
-			" (set via kernel command line)" : "");
+		domain_type_note);
 
 	if (!iommu_default_passthrough())
 		pr_info("DMA domain TLB invalidation policy: %s mode%s\n",
@@ -578,9 +588,12 @@ static void iommu_deinit_device(struct device *dev)
 		/*
 		 * If the device requires direct mappings then it should not
 		 * be parked on a BLOCKED domain during release as that would
-		 * break the direct mappings.
+		 * break the direct mappings. Using the identity mapping
+		 * would violate DMA isolation though, so prefer blocking the
+		 * device when isolation is enabled.
 		 */
-		if (dev->iommu->require_direct && ops->identity_domain &&
+		if (!iommu_dma_isolation_enabled() &&
+		    dev->iommu->require_direct && ops->identity_domain &&
 		    release_domain == ops->blocked_domain)
 			release_domain = ops->identity_domain;
 
@@ -1936,6 +1949,21 @@ static int iommu_get_default_domain_type(struct iommu_group *group,
 		driver_type = IOMMU_DOMAIN_DMA;
 	}
 
+	if (iommu_dma_isolation_enabled()) {
+		if (driver_type == IOMMU_DOMAIN_IDENTITY) {
+			pr_err("IOMMU driver requires an identity default domain while DMA isolation is enforced\n");
+			return -1;
+		}
+		if (target_type == IOMMU_DOMAIN_IDENTITY) {
+			pr_err("Identity domain requested while DMA isolation is enabled\n");
+			return -1;
+		}
+		if (target_type == IOMMU_DOMAIN_DMA_FQ) {
+			pr_err("Lazy DMA domain requested while DMA isolation is enabled\n");
+			return -1;
+		}
+	}
+
 	if (target_type) {
 		if (driver_type && target_type != driver_type)
 			return -1;
@@ -2401,6 +2429,19 @@ static int __iommu_device_set_domain(struct iommu_group *group,
 				     unsigned int flags)
 {
 	int ret;
+
+	if (iommu_dma_isolation_enabled() &&
+	    (new_domain->type == IOMMU_DOMAIN_IDENTITY ||
+	     new_domain->type == IOMMU_DOMAIN_PLATFORM)) {
+		dev_err(dev, "%s domain is not permitted while DMA isolation is enforced\n",
+			iommu_domain_type_str(new_domain->type));
+		return -EPERM;
+	}
+	if (iommu_dma_isolation_enabled() &&
+	    new_domain->type == IOMMU_DOMAIN_DMA_FQ) {
+		dev_err(dev, "Lazy DMA domain is not permitted while DMA isolation is enforced\n");
+		return -EPERM;
+	}
 
 	/*
 	 * If the device requires IOMMU_RESV_DIRECT then we cannot allow
@@ -3032,6 +3073,11 @@ EXPORT_SYMBOL_GPL(iommu_alloc_resv_region);
 
 void iommu_set_default_passthrough(bool cmd_line)
 {
+	if (iommu_dma_isolation_enabled()) {
+		pr_warn("Ignoring request for default passthrough while DMA isolation is enabled\n");
+		return;
+	}
+
 	if (cmd_line)
 		iommu_cmd_line |= IOMMU_CMD_LINE_DMA_API;
 	iommu_def_domain_type = IOMMU_DOMAIN_IDENTITY;
@@ -3049,6 +3095,36 @@ bool iommu_default_passthrough(void)
 	return iommu_def_domain_type == IOMMU_DOMAIN_IDENTITY;
 }
 EXPORT_SYMBOL_GPL(iommu_default_passthrough);
+
+/**
+ * iommu_enable_dma_isolation - require translated, strict DMA domains
+ *
+ * Force DMA API users into translated domains with strict TLB invalidation
+ * and prevent later use of domain types which bypass DMA isolation.
+ */
+void __init iommu_enable_dma_isolation(void)
+{
+	if ((iommu_cmd_line & IOMMU_CMD_LINE_DMA_API) &&
+	    iommu_default_passthrough())
+		pr_warn("DMA isolation overrides iommu.passthrough=1\n");
+	if ((iommu_cmd_line & IOMMU_CMD_LINE_STRICT) && !iommu_dma_strict)
+		pr_warn("DMA isolation overrides iommu.strict=0\n");
+
+	iommu_dma_isolation = true;
+	iommu_set_default_translated(false);
+	iommu_set_dma_strict();
+}
+
+/**
+ * iommu_dma_isolation_enabled - check for required DMA isolation
+ *
+ * Return: true if DMA isolation is enabled.
+ */
+bool iommu_dma_isolation_enabled(void)
+{
+	return iommu_dma_isolation;
+}
+EXPORT_SYMBOL_GPL(iommu_dma_isolation_enabled);
 
 static const struct iommu_device *iommu_from_fwnode(const struct fwnode_handle *fwnode)
 {

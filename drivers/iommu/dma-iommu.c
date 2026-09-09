@@ -334,6 +334,9 @@ int iommu_dma_init_fq(struct iommu_domain *domain)
 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
 	int rc;
 
+	if (iommu_dma_isolation_enabled())
+		return -EPERM;
+
 	if (cookie->fq_domain)
 		return 0;
 

@@ -937,6 +937,8 @@ extern void iommu_put_resv_regions(struct device *dev, struct list_head *list);
 extern void iommu_set_default_passthrough(bool cmd_line);
 extern void iommu_set_default_translated(bool cmd_line);
 extern bool iommu_default_passthrough(void);
+void __init iommu_enable_dma_isolation(void);
+bool iommu_dma_isolation_enabled(void);
 extern struct iommu_resv_region *
 iommu_alloc_resv_region(phys_addr_t start, size_t length, int prot,
 			enum iommu_resv_type type, gfp_t gfp);
@@ -1314,6 +1316,15 @@ static inline void iommu_set_default_translated(bool cmd_line)
 static inline bool iommu_default_passthrough(void)
 {
 	return true;
+}
+
+static inline void iommu_enable_dma_isolation(void)
+{
+}
+
+static inline bool iommu_dma_isolation_enabled(void)
+{
+	return false;
 }
 
 static inline int iommu_attach_group(struct iommu_domain *domain,
