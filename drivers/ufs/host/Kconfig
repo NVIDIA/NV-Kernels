@@ -167,3 +167,16 @@ config SCSI_UFS_AMD_VERSAL2
 
 	  Select this if you have UFS controller on AMD Versal Gen 2 SoC.
 	  If unsure, say N.
+
+config SCSI_UFS_TEGRA
+	tristate "NVIDIA Tegra264 UFS controller platform driver"
+	depends on SCSI_UFSHCD_PLATFORM && (ARCH_TEGRA_264_SOC || COMPILE_TEST)
+	select PHY_TEGRA_MPHY
+	help
+	  Enable support for the UFS host controller on NVIDIA Tegra264
+	  SoCs. The driver relies on the Tegra264 M-PHY driver
+	  (PHY_TEGRA_MPHY) for the two data lanes and implements the
+	  vendor register programming required for HS-mode transitions
+	  and system suspend/resume.
+
+	  If unsure, say N.
