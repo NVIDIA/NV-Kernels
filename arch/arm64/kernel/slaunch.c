@@ -2376,6 +2376,8 @@ static int __init slaunch_unprotect_memory(void)
 	if (!sl_dlme_region_pa)
 		return 0;
 
+	wait_for_initramfs();
+
 	ret = iommu_check_dma_isolation();
 	if (ret)
 		panic("slaunch: DMA isolation validation failed: %d\n", ret);
