@@ -5983,11 +5983,11 @@ static inline void schedule_debug(struct task_struct *prev, bool preempt)
 	schedstat_inc(this_rq()->sched_count);
 }
 
-static void put_prev_task_balance(struct rq *rq, struct task_struct *prev,
-				  struct rq_flags *rf)
+static void put_prev_task_balance(struct rq *rq, struct rq_flags *rf)
 {
 #ifdef CONFIG_SMP
 	const struct sched_class *class;
+	const struct sched_class *start_class = rq->donor->sched_class;
 	/*
 	 * We must do the balancing pass before put_prev_task(), such
 	 * that when we release the rq->lock the task is in the same
@@ -5996,48 +5996,48 @@ static void put_prev_task_balance(struct rq *rq, struct task_struct *prev,
 	 * We can terminate the balance pass as soon as we know there is
 	 * a runnable task of @class priority or higher.
 	 */
-	for_class_range(class, prev->sched_class, &idle_sched_class) {
-		if (class->balance(rq, prev, rf))
+	for_class_range(class, start_class, &idle_sched_class) {
+		if (class->balance(rq, rq->donor, rf))
 			break;
 	}
 #endif
 
-	put_prev_task(rq, prev);
+	put_prev_task(rq, rq->donor);
 
 	/*
 	 * We've updated @prev and no longer need the server link, clear it.
 	 * Must be done before ->pick_next_task() because that can (re)set
 	 * ->dl_server.
 	 */
-	if (prev->dl_server)
-		prev->dl_server = NULL;
+	if (rq->donor->dl_server)
+		rq->donor->dl_server = NULL;
 }
 
 /*
  * Pick up the highest-prio task:
  */
 static inline struct task_struct *
-__pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
+__pick_next_task(struct rq *rq, struct rq_flags *rf)
 {
 	const struct sched_class *class;
 	struct task_struct *p;
 
 	/*
 	 * Optimization: we know that if all tasks are in the fair class we can
-	 * call that function directly, but only if the @prev task wasn't of a
+	 * call that function directly, but only if the current task wasn't of a
 	 * higher scheduling class, because otherwise those lose the
 	 * opportunity to pull in more work from other CPUs.
 	 */
-	if (likely(!sched_class_above(prev->sched_class, &fair_sched_class) &&
+	if (likely(!sched_class_above(rq->donor->sched_class, &fair_sched_class) &&
 		   rq->nr_running == rq->cfs.h_nr_running)) {
 
-		p = pick_next_task_fair(rq, prev, rf);
+		p = pick_next_task_fair(rq, rq->donor, rf);
 		if (unlikely(p == RETRY_TASK))
 			goto restart;
 
 		/* Assume the next prioritized class is idle_sched_class */
 		if (!p) {
-			put_prev_task(rq, prev);
+			put_prev_task(rq, rq->donor);
 			p = pick_next_task_idle(rq);
 		}
 
@@ -6045,8 +6045,8 @@ __pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		 * This is a normal CFS pick, but the previous could be a DL pick.
 		 * Clear it as previous is no longer picked.
 		 */
-		if (prev->dl_server)
-			prev->dl_server = NULL;
+		if (rq->donor->dl_server)
+			rq->donor->dl_server = NULL;
 
 		/*
 		 * This is the fast path; it cannot be a DL server pick;
@@ -6059,7 +6059,7 @@ __pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	}
 
 restart:
-	put_prev_task_balance(rq, prev, rf);
+	put_prev_task_balance(rq, rf);
 
 	for_each_class(class) {
 		p = class->pick_next_task(rq);
@@ -6108,7 +6108,7 @@ extern void task_vruntime_update(struct rq *rq, struct task_struct *p, bool in_f
 static void queue_core_balance(struct rq *rq);
 
 static struct task_struct *
-pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
+pick_next_task(struct rq *rq, struct rq_flags *rf)
 {
 	struct task_struct *next, *p, *max = NULL;
 	const struct cpumask *smt_mask;
@@ -6120,7 +6120,7 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	bool need_sync;
 
 	if (!sched_core_enabled(rq))
-		return __pick_next_task(rq, prev, rf);
+		return __pick_next_task(rq, rf);
 
 	cpu = cpu_of(rq);
 
@@ -6132,7 +6132,7 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		 * another cpu during offline.
 		 */
 		rq->core_pick = NULL;
-		return __pick_next_task(rq, prev, rf);
+		return __pick_next_task(rq, rf);
 	}
 
 	/*
@@ -6150,8 +6150,8 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		WRITE_ONCE(rq->core_sched_seq, rq->core->core_pick_seq);
 
 		next = rq->core_pick;
-		if (next != prev) {
-			put_prev_task(rq, prev);
+		if (next != rq->donor) {
+			put_prev_task(rq, rq->donor);
 			set_next_task(rq, next);
 		}
 
@@ -6159,7 +6159,7 @@ pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		goto out;
 	}
 
-	put_prev_task_balance(rq, prev, rf);
+	put_prev_task_balance(rq, rf);
 
 	smt_mask = cpu_smt_mask(cpu);
 	need_sync = !!rq->core->core_cookie;
@@ -6552,9 +6552,9 @@ static inline void sched_core_cpu_deactivate(unsigned int cpu) {}
 static inline void sched_core_cpu_dying(unsigned int cpu) {}
 
 static struct task_struct *
-pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
+pick_next_task(struct rq *rq, struct rq_flags *rf)
 {
-	return __pick_next_task(rq, prev, rf);
+	return __pick_next_task(rq, rf);
 }
 
 #endif /* CONFIG_SCHED_CORE */
@@ -6700,7 +6700,7 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 		switch_count = &prev->nvcsw;
 	}
 
-	next = pick_next_task(rq, prev, &rf);
+	next = pick_next_task(rq, &rf);
 	clear_tsk_need_resched(prev);
 	clear_preempt_need_resched();
 #ifdef CONFIG_SCHED_DEBUG

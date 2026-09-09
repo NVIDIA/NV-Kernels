@@ -1029,7 +1029,11 @@ struct rq {
 	 */
 	unsigned long 		nr_uninterruptible;
 
-	struct task_struct __rcu	*curr;
+	/* Scheduling and execution contexts coincide without proxy execution. */
+	union {
+		struct task_struct __rcu *donor;
+		struct task_struct __rcu *curr;
+	};
 	struct task_struct	*idle;
 	struct task_struct	*stop;
 	unsigned long		next_balance;
