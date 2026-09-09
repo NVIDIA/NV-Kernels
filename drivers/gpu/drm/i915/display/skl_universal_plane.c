@@ -632,7 +632,8 @@ static void icl_plane_disable_sel_fetch_arm(struct intel_plane *plane,
 	struct drm_i915_private *i915 = to_i915(plane->base.dev);
 	enum pipe pipe = plane->pipe;
 
-	if (!crtc_state->enable_psr2_sel_fetch)
+	if (!crtc_state->enable_psr2_sel_fetch &&
+	    !crtc_state->clear_psr2_sel_fetch)
 		return;
 
 	intel_de_write_fw(i915, PLANE_SEL_FETCH_CTL(pipe, plane->id), 0);
@@ -1330,8 +1331,10 @@ static void icl_plane_update_sel_fetch_arm(struct intel_plane *plane,
 	struct drm_i915_private *i915 = to_i915(plane->base.dev);
 	enum pipe pipe = plane->pipe;
 
-	if (!crtc_state->enable_psr2_sel_fetch)
+	if (!crtc_state->enable_psr2_sel_fetch) {
+		icl_plane_disable_sel_fetch_arm(plane, crtc_state);
 		return;
+	}
 
 	if (drm_rect_height(&plane_state->psr2_sel_fetch_area) > 0)
 		intel_de_write_fw(i915, PLANE_SEL_FETCH_CTL(pipe, plane->id),
