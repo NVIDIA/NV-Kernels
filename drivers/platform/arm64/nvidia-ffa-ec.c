@@ -1001,6 +1001,9 @@ static struct ffa_driver nvidia_ffa_ec_service_driver = {
 	.probe = nvidia_ffa_ec_service_probe,
 	.remove = nvidia_ffa_ec_service_remove,
 	.id_table = nvidia_ffa_ec_service_ids,
+	.driver = {
+		.suppress_bind_attrs = true,
+	},
 };
 
 /*
@@ -1061,6 +1064,9 @@ static struct ffa_driver nvidia_ffa_control_service_driver = {
 	.probe = nvidia_ffa_control_service_probe,
 	.remove = nvidia_ffa_control_service_remove,
 	.id_table = nvidia_ffa_control_service_ids,
+	.driver = {
+		.suppress_bind_attrs = true,
+	},
 };
 
 static const struct acpi_device_id nvidia_ffa_device_ids[] = {
@@ -1142,6 +1148,7 @@ static struct platform_driver nvidia_ffa_driver = {
 	.driver = {
 		.name = "nvidia-ffa",
 		.acpi_match_table = nvidia_ffa_device_ids,
+		.suppress_bind_attrs = true,
 	},
 };
 
