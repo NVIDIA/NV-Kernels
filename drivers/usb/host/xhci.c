@@ -1125,6 +1125,13 @@ int xhci_resume(struct xhci_hcd *xhci, bool power_lost, bool is_auto_resume)
 		xhci_restore_registers(xhci);
 		/* step 2: initialize command ring buffer */
 		xhci_set_cmd_ring_deq(xhci);
+		if (xhci->quirks & XHCI_DELAY_BEFORE_CRS) {
+			/*
+			 * Allow DRAM reads triggered by register restoration to
+			 * complete before setting CRS.
+			 */
+			mdelay(2);
+		}
 		/* step 3: restore state and start state*/
 		/* step 3: set CRS flag */
 		command = readl(&xhci->op_regs->command);

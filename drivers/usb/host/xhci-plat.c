@@ -720,6 +720,7 @@ EXPORT_SYMBOL_GPL(xhci_plat_pm_ops);
 #ifdef CONFIG_ACPI
 #if IS_ENABLED(CONFIG_USB_XHCI_MTK_V2)
 static const struct xhci_plat_priv xhci_plat_mtk_v2 = {
+	.quirks = XHCI_DELAY_BEFORE_CRS,
 	.is_mtk_v2 = 1,
 };
 #endif
