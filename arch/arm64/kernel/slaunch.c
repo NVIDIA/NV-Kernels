@@ -15,6 +15,7 @@
 #include <linux/arm-smccc.h>
 #include <linux/overflow.h>
 #include <linux/initrd.h>
+#include <linux/iommu.h>
 #include <linux/security.h>
 #include <crypto/sha2.h>
 
@@ -1042,6 +1043,7 @@ void __init slaunch_setup(void)
 		return;
 
 	pr_info("slaunch: DRTM Secure Launch detected\n");
+	iommu_enable_dma_isolation();
 
 	/* Map DLME data header for reservation */
 	dlme_data_pa = sl_dlme_region_pa + sl_dlme_data_offset;
@@ -2369,9 +2371,14 @@ late_initcall(slaunch_securityfs_init);
 static int __init slaunch_unprotect_memory(void)
 {
 	struct arm_smccc_res res;
+	int ret;
 
 	if (!sl_dlme_region_pa)
 		return 0;
+
+	ret = iommu_check_dma_isolation();
+	if (ret)
+		panic("slaunch: DMA isolation validation failed: %d\n", ret);
 
 	pr_info("slaunch: Calling DRTM_UNPROTECT_MEMORY\n");
 	arm_smccc_smc(DRTM_SMC_UNPROTECT_MEMORY, 0, 0, 0, 0, 0, 0, 0, &res);
@@ -2384,4 +2391,4 @@ static int __init slaunch_unprotect_memory(void)
 	pr_info("slaunch: DMA protection released\n");
 	return 0;
 }
-late_initcall(slaunch_unprotect_memory);
+late_initcall_sync(slaunch_unprotect_memory);
