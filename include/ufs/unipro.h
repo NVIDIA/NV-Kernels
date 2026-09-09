@@ -6,6 +6,8 @@
 #ifndef _UNIPRO_H_
 #define _UNIPRO_H_
 
+#include <linux/bits.h>
+
 /*
  * M-TX Configuration Attributes
  */
@@ -179,7 +181,11 @@
 #define VS_POWERSTATE		0xD083
 #define VS_MPHYCFGUPDT		0xD085
 #define VS_DEBUGOMC		0xD09E
+#define VS_DEBUGSAVECONFIGTIME	0xD0A0
 #define VS_MPHYDISABLE		0xD0C1
+
+#define VS_DEBUGSAVECONFIGTIME_TREF	GENMASK(4, 2)
+#define VS_DEBUGSAVECONFIGTIME_SCT	GENMASK(1, 0)
 
 #define PA_GRANULARITY_MIN_VAL	1
 #define PA_GRANULARITY_MAX_VAL	6
