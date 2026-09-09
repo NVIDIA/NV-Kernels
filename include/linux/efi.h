@@ -1222,6 +1222,7 @@ static inline void efi_check_for_embedded_firmwares(void) { }
 })
 
 #define EFI_RANDOM_SEED_SIZE		32U // BLAKE2S_HASH_SIZE
+#define EFI_RANDOM_SEED_MAX_SIZE	1024U
 
 struct linux_efi_random_seed {
 	u32	size;
