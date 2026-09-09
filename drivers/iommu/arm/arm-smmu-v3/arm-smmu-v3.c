@@ -5305,8 +5305,12 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	/* Record our private device structure */
 	platform_set_drvdata(pdev, smmu);
 
-	/* Check for RMRs and install bypass STEs if any */
-	arm_smmu_rmr_install_bypass_ste(smmu);
+	/*
+	 * Keep RMR streams blocked until their reserved mappings are installed
+	 * in a translated domain when DMA isolation is enforced.
+	 */
+	if (!iommu_dma_isolation_enabled())
+		arm_smmu_rmr_install_bypass_ste(smmu);
 
 	/* Reset the device */
 	ret = arm_smmu_device_reset(smmu);
