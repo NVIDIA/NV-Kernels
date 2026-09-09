@@ -3126,6 +3126,23 @@ bool iommu_dma_isolation_enabled(void)
 }
 EXPORT_SYMBOL_GPL(iommu_dma_isolation_enabled);
 
+/**
+ * iommu_check_dma_isolation - check the DMA isolation policy
+ *
+ * Verify that DMA isolation is configured with translated default domains and
+ * strict invalidation.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
+int iommu_check_dma_isolation(void)
+{
+	if (!iommu_dma_isolation_enabled())
+		return -EINVAL;
+	if (iommu_def_domain_type != IOMMU_DOMAIN_DMA || !iommu_dma_strict)
+		return -EPERM;
+	return 0;
+}
+
 static const struct iommu_device *iommu_from_fwnode(const struct fwnode_handle *fwnode)
 {
 	const struct iommu_device *iommu, *ret = NULL;
