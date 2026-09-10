@@ -38,5 +38,4 @@ soundwire-qcom-y :=	qcom.o
 obj-$(CONFIG_SOUNDWIRE_QCOM) += soundwire-qcom.o
 
 #MediaTek driver
-soundwire-mtk-y := mtk-sdw.o mtk-sdw-top.o mtk-sdw-core.o mtk-sdw-mach.o
-obj-$(CONFIG_SOUNDWIRE_MTK) += soundwire-mtk.o
+obj-$(CONFIG_SOUNDWIRE_MTK) += mediatek/
