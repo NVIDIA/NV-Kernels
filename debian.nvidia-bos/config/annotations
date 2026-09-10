@@ -279,6 +279,27 @@ CONFIG_SENSORS_SPD5118                          note<'Enable SPD5118 temperature
 CONFIG_SFC_CXL                                  policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_SFC_CXL                                  note<'Solarflare SFC9100-family CXL Type-2 device support; not needed for NVIDIA platforms'>
 
+CONFIG_SND_SOC_MT8901                           policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_MT8901                           note<'MediaTek MT8901 AFE platform driver (MT8901 audio).'>
+
+CONFIG_SND_SOC_MT8901_LEGACY_SDW_MACH           policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_MT8901_LEGACY_SDW_MACH           note<'MT8901 SoundWire machine driver (MT8901 audio).'>
+
+CONFIG_SND_SOC_MTK_SDCA                         policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_MTK_SDCA                         note<'SDCA support for codecs on the MediaTek SoundWire master (MT8901 audio).'>
+
+CONFIG_SND_SOC_SDCA                             policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_SND_SOC_SDCA                             note<'SDCA framework, selected by SND_SOC_MTK_SDCA; the SDCA_* and SDW_UTILS lines below are its derived symbols.'>
+
+CONFIG_SND_SOC_SOF_MT8901                       policy<{'arm64': 'm'}>
+CONFIG_SND_SOC_SOF_MT8901                       note<'MediaTek MT8901 ACPI ADSP power-management driver (MT8901 audio).'>
+
+CONFIG_SOUNDWIRE_MTK                            policy<{'arm64': 'm'}>
+CONFIG_SOUNDWIRE_MTK                            note<'MediaTek SoundWire manager (MT8901 audio).'>
+
+CONFIG_SOUNDWIRE_MTK_MT8901_CLK                 policy<{'arm64': 'y'}>
+CONFIG_SOUNDWIRE_MTK_MT8901_CLK                 note<'MT8901 SoundWire clock/power control backend; selected by SOUNDWIRE_MTK.'>
+
 CONFIG_SPI_TEGRA210_QUAD                        policy<{'arm64': 'y'}>
 CONFIG_SPI_TEGRA210_QUAD                        note<'Ensures the TPM is available before the IMA driver initializes'>
 
@@ -306,7 +327,6 @@ CONFIG_VFIO_CXL_CORE                            note<'Enable VFIO CXL core for C
 CONFIG_VFIO_IOMMU_TYPE1                         policy<{'amd64': 'm', 'arm64': '-'}>
 CONFIG_VFIO_IOMMU_TYPE1                         note<'LP: #2095028'>
 
-
 # ---- Annotations without notes ----
 
 CONFIG_ARCH_HAS_CPU_RESCTRL                     policy<{'amd64': 'y', 'arm64': 'y'}>
@@ -317,3 +337,9 @@ CONFIG_MTD_NAND_CORE                            policy<{'amd64': 'm', 'arm64': '
 CONFIG_PROC_CPU_RESCTRL                         policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_RESCTRL_IOMMU                            policy<{'arm64': 'y'}>
 CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID           policy<{'arm64': 'y'}>
+CONFIG_SND_SOC_SDCA_CLASS                       policy<{'amd64': 'm', 'arm64': 'n'}>
+CONFIG_SND_SOC_SDCA_FDL                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_SND_SOC_SDCA_HID                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_SND_SOC_SDCA_IRQ                         policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_SND_SOC_SDW_UTILS                        policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_SND_SOC_TAS2783_SDW                      policy<{'amd64': 'm', 'arm64': 'n'}>
