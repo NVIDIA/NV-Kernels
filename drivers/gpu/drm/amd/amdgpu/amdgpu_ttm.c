@@ -2037,9 +2037,6 @@ static int amdgpu_ttm_buffer_entity_init(struct amdgpu_ttm_buffer_entity *entity
 
 	mutex_init(&entity->lock);
 
-	if (ARRAY_SIZE(entity->gart_window_offs) < num_gart_windows)
-		return starting_gart_window;
-
 	for (i = 0; i < num_gart_windows; i++) {
 		entity->gart_window_offs[i] =
 			(u64)starting_gart_window * AMDGPU_GTT_MAX_TRANSFER_SIZE *
@@ -2354,6 +2351,9 @@ void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 	if (enable) {
 		struct amdgpu_ring *ring;
 		struct drm_gpu_scheduler *sched;
+
+		if (ARRAY_SIZE(adev->mman.move_entity.gart_window_offs) < 2)
+			return;
 
 		ring = adev->mman.buffer_funcs_ring;
 		sched = &ring->sched;
