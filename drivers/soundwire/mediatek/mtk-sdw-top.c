@@ -14,6 +14,33 @@
 #include <linux/mutex.h>
 #include "mtk-sdw-top.h"
 
+/* these two arrays cover everything written by top_init and configure_pdi */
+static const unsigned int mtk_sdw_top_con_backup_regs[] = {
+	SDW_TOP_CON0,
+	SDW_TOP_CON1,
+};
+
+static const unsigned int mtk_sdw_top_pdi_backup_regs[] = {
+	SDW_TOP_PDIN_CON0(0),
+	SDW_TOP_PDIN_CON0(1),
+	SDW_TOP_PDIN_CON0(2),
+	SDW_TOP_PDIN_CON0(3),
+	SDW_TOP_PDIN_CON0(4),
+	SDW_TOP_PDIN_CON0(5),
+	SDW_TOP_PDIN_CON0(6),
+	SDW_TOP_PDIN_CON0(7),
+	SDW_TOP_PDIN_CON0(8),
+	SDW_TOP_PDIN_CON0(9),
+	SDW_TOP_PDIN_CON0(10),
+	SDW_TOP_PDIN_CON0(11),
+	SDW_TOP_PDIN_CON0(12),
+	SDW_TOP_PDIN_CON0(13),
+	SDW_TOP_PDIN_CON0(14),
+	SDW_TOP_PDIN_CON0(15),
+	SDW_TOP_PDIN_CON0(16),
+	SDW_TOP_PDIN_CON0(17),
+};
+
 static const struct mtk_sdw_top_cfg mtk_sdw_top_cfgs[MTK_SDW_TOP_VER_MAX] = {
 	[MTK_SDW_TOP_VER_0] = {
 		.name     = "hw_8901",
@@ -90,13 +117,13 @@ int mtk_sdw_top_config_select(struct mtk_sdw *mst, int hw_ver)
 	return 0;
 }
 
-void mtk_sdw_top_init_settings(struct mtk_sdw *mst)
+static void mtk_sdw_top_init_settings(struct mtk_sdw *mst)
 {
 	topcon_updatel(mst, SDW_TOP_CON0, SDW_TOP_CON0_GSYNC_DIR_CTRL,
 		       SDW_TOP_CON0_GSYNC_DIR_CTRL);
 }
 
-void mtk_sdw_top_configure_delays(struct mtk_sdw *mst)
+static void mtk_sdw_top_configure_delays(struct mtk_sdw *mst)
 {
 	u32 val = 0;
 	u32 mask;
@@ -118,6 +145,33 @@ void mtk_sdw_top_configure_delays(struct mtk_sdw *mst)
 			   mst->phy_double_delay);
 
 	topcon_updatel(mst, top_reg->phy_delay_reg, mask, val);
+}
+
+int mtk_sdw_top_init(struct mtk_sdw *mst)
+{
+	struct device *dev = mst->dev;
+
+	mst->top_pdi_reg_backup_num = ARRAY_SIZE(mtk_sdw_top_pdi_backup_regs);
+	mst->top_con_reg_backup_num = ARRAY_SIZE(mtk_sdw_top_con_backup_regs);
+
+	mst->top_pdi_reg_backup =
+		devm_kcalloc(dev, mst->top_pdi_reg_backup_num,
+			     sizeof(*mst->top_pdi_reg_backup),
+			     GFP_KERNEL);
+	if (!mst->top_pdi_reg_backup)
+		return -ENOMEM;
+
+	mst->top_con_reg_backup =
+		devm_kcalloc(dev, mst->top_con_reg_backup_num,
+			     sizeof(*mst->top_con_reg_backup),
+			     GFP_KERNEL);
+	if (!mst->top_con_reg_backup)
+		return -ENOMEM;
+
+	mtk_sdw_top_init_settings(mst);
+	mtk_sdw_top_configure_delays(mst);
+
+	return 0;
 }
 
 void mtk_sdw_top_configure_pdi(struct mtk_sdw *mst, u32 pdi,
@@ -298,4 +352,30 @@ int mtk_sdw_top_disable_stream(struct mtk_sdw *mst, int dai_id)
 	}
 
 	return 0;
+}
+
+void mtk_sdw_top_backup_regs(struct mtk_sdw *mst)
+{
+	int i;
+
+	for (i = 0; i < mst->top_con_reg_backup_num; i++)
+		mst->top_con_reg_backup[i] =
+			topcon_readl(mst, mtk_sdw_top_con_backup_regs[i]);
+
+	for (i = 0; i < mst->top_pdi_reg_backup_num; i++)
+		mst->top_pdi_reg_backup[i] =
+			toppdi_readl(mst, mtk_sdw_top_pdi_backup_regs[i]);
+}
+
+void mtk_sdw_top_restore_regs(struct mtk_sdw *mst)
+{
+	int i;
+
+	for (i = 0; i < mst->top_con_reg_backup_num; i++)
+		topcon_writel(mst, mtk_sdw_top_con_backup_regs[i],
+			      mst->top_con_reg_backup[i]);
+
+	for (i = 0; i < mst->top_pdi_reg_backup_num; i++)
+		toppdi_writel(mst, mtk_sdw_top_pdi_backup_regs[i],
+			      mst->top_pdi_reg_backup[i]);
 }
