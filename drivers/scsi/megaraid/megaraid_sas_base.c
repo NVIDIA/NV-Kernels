@@ -5912,6 +5912,9 @@ megasas_set_high_iops_queue_affinity_hint(struct megasas_instance *instance)
 	if (instance->perf_mode == MR_BALANCED_PERF_MODE) {
 		local_numa_node = dev_to_node(&instance->pdev->dev);
 
+		if (local_numa_node == NUMA_NO_NODE)
+			local_numa_node = 0;
+
 		for (i = 0; i < instance->low_latency_index_start; i++)
 			irq_set_affinity_hint(pci_irq_vector(instance->pdev, i),
 				cpumask_of_node(local_numa_node));
