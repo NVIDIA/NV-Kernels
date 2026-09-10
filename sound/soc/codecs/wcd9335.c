@@ -5021,6 +5021,13 @@ static const struct regmap_irq_chip wcd9335_regmap_irq1_chip = {
 	.num_irqs = ARRAY_SIZE(wcd9335_codec_irqs),
 };
 
+static void wcd9335_disable_supplies(void *data)
+{
+	struct wcd9335_codec *wcd = data;
+
+	regulator_bulk_disable(WCD9335_MAX_SUPPLY, wcd->supplies);
+}
+
 static int wcd9335_parse_dt(struct wcd9335_codec *wcd)
 {
 	struct device *dev = wcd->dev;
@@ -5051,26 +5058,23 @@ static int wcd9335_parse_dt(struct wcd9335_codec *wcd)
 	wcd->supplies[3].supply = "vdd-rx";
 	wcd->supplies[4].supply = "vdd-io";
 
-	ret = regulator_bulk_get(dev, WCD9335_MAX_SUPPLY, wcd->supplies);
-	if (ret) {
-		dev_err(dev, "Failed to get supplies: err = %d\n", ret);
+	ret = devm_regulator_bulk_get(dev, WCD9335_MAX_SUPPLY, wcd->supplies);
+	if (ret)
+		return dev_err_probe(dev, ret, "Failed to get supplies\n");
+
+	ret = regulator_bulk_enable(WCD9335_MAX_SUPPLY, wcd->supplies);
+	if (ret)
+		return dev_err_probe(dev, ret, "Failed to enable supplies\n");
+
+	ret = devm_add_action_or_reset(dev, wcd9335_disable_supplies, wcd);
+	if (ret)
 		return ret;
-	}
 
 	return 0;
 }
 
 static int wcd9335_power_on_reset(struct wcd9335_codec *wcd)
 {
-	struct device *dev = wcd->dev;
-	int ret;
-
-	ret = regulator_bulk_enable(WCD9335_MAX_SUPPLY, wcd->supplies);
-	if (ret) {
-		dev_err(dev, "Failed to get supplies: err = %d\n", ret);
-		return ret;
-	}
-
 	/*
 	 * For WCD9335, it takes about 600us for the Vout_A and
 	 * Vout_D to be ready after BUCK_SIDO is powered up.
