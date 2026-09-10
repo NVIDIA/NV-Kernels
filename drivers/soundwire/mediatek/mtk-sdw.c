@@ -9,6 +9,7 @@
 #include <linux/acpi.h>
 #include <linux/bitops.h>
 #include <linux/debugfs.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -23,6 +24,7 @@
 #include "mtk-sdw.h"
 #include "mtk-sdw-mach.h"
 #include "mtk-sdw-top.h"
+#include "bus.h"
 
 /*
  * Restart (SOFT_RST + quiesce + re-init) every link at probe instead of
@@ -182,7 +184,8 @@ static int mtk_sdw_enable_top_clock(struct mtk_sdw *mst, int link)
 
 	ret = mst->clk_ops->enable_link_clock(mst, link);
 	if (ret)
-		dev_err(mst->dev, "failed to enable top clock, ret %d\n", ret);
+		dev_err(mst->dev, "[%d]failed to enable top clock, ret %d\n",
+			link, ret);
 
 	return ret;
 }
@@ -193,7 +196,8 @@ static int mtk_sdw_disable_top_clock(struct mtk_sdw *mst, int link)
 
 	ret = mst->clk_ops->disable_link_clock(mst, link);
 	if (ret)
-		dev_err(mst->dev, "failed to disable top clock, ret %d\n", ret);
+		dev_err(mst->dev, "[%d]failed to disable top clock, ret %d\n",
+			link, ret);
 
 	return ret;
 }
@@ -216,6 +220,52 @@ static int mtk_sdw_disable_reg_clock(struct mtk_sdw *mst)
 	ret = mst->clk_ops->disable_reg_rw_clk(mst);
 	if (ret)
 		dev_err(mst->dev, "failed to disable reg clock, ret %d\n", ret);
+
+	return ret;
+}
+
+static int mtk_sdw_enable_power(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mst->clk_ops->enable_power_domain(mst);
+	if (ret)
+		dev_err(mst->dev, "failed to enable power, ret %d\n", ret);
+
+	return ret;
+}
+
+static int mtk_sdw_disable_power(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mst->clk_ops->disable_power_domain(mst);
+	if (ret)
+		dev_err(mst->dev, "failed to disable power, ret %d\n", ret);
+
+	return ret;
+}
+
+static int mtk_sdw_enable_spm_request(struct mtk_sdw *mst, int link)
+{
+	int ret;
+
+	ret = mst->clk_ops->enable_spm_request(mst, link);
+	if (ret)
+		dev_err(mst->dev, "[%d]failed to enable spm reqest, ret %d\n",
+			link, ret);
+
+	return ret;
+}
+
+static int mtk_sdw_disable_spm_request(struct mtk_sdw *mst, int link)
+{
+	int ret;
+
+	ret = mst->clk_ops->disable_spm_request(mst, link);
+	if (ret)
+		dev_err(mst->dev, "[%d]failed to disable spm request, ret %d\n",
+			link, ret);
 
 	return ret;
 }
@@ -339,6 +389,7 @@ static int mtk_sdw_dai_hw_params(struct snd_pcm_substream *substream,
 	unsigned int pdi_begin;
 	unsigned int last_pdi;
 
+	mdai->suspended = false;
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		dir = SDW_DATA_DIR_RX;
 	else
@@ -478,8 +529,45 @@ static int mtk_sdw_dai_hw_free(struct snd_pcm_substream *substream,
 		dev_err(dai->dev, "remove manager from stream %s failed: %d\n",
 			mdai->sruntime->name, ret);
 
+	mdai->suspended = false;
 	mtk_sdw_dai_release_params(mst, mdai);
 	return ret;
+}
+
+/*
+ * If we need to recover an active stream, the settings for TOP_PDI and TOP_CON
+ * are managed in the restore_regs function, while the others are managed in
+ * the prepare callback.
+ */
+static int mtk_sdw_dai_prepare(struct snd_pcm_substream *substream,
+			       struct snd_soc_dai *dai)
+{
+	struct mtk_sdw *mst = snd_soc_dai_get_drvdata(dai);
+	struct mtk_sdw_dai *mdai = &mst->dais[dai->id];
+	struct mtk_sdw_port_params mtk_port_param = { 0 };
+	int i, dir;
+
+	if (!mdai->suspended)
+		return 0;
+
+	mdai->suspended = false;
+
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		dir = SDW_DATA_DIR_RX;
+	else
+		dir = SDW_DATA_DIR_TX;
+
+	mtk_port_param.port_num = mdai->port_num;
+	mtk_port_param.bpt_payload_type = 0;
+	mtk_port_param.bpt_en = true;
+	mtk_sdw_configure_port_params(&mdai->link->core, &mtk_port_param, dir);
+
+	for (i = 0; i < mdai->pdi_count; i++) {
+		mtk_sdw_configure_pdi_params(&mdai->link->core,
+					     &mdai->pdi_params[i]);
+	}
+
+	return 0;
 }
 
 /* configure top stream here, it can be called before dai_link ops */
@@ -497,8 +585,10 @@ static int mtk_sdw_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		return mtk_sdw_top_enable_stream(mst, dai->id);
-	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
+		mdai->suspended = true;
+		fallthrough;
+	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		return mtk_sdw_top_disable_stream(mst, dai->id);
 	default:
@@ -509,6 +599,7 @@ static int mtk_sdw_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 static const struct snd_soc_dai_ops mtk_sdw_dai_ops = {
 	.hw_params = mtk_sdw_dai_hw_params,
 	.hw_free = mtk_sdw_dai_hw_free,
+	.prepare = mtk_sdw_dai_prepare,
 	.trigger = mtk_sdw_dai_trigger,
 	.set_stream = mtk_sdw_set_sdw_stream,
 	.get_stream = mtk_sdw_get_sdw_stream,
@@ -898,24 +989,25 @@ static int mtk_sdw_link_init(struct mtk_sdw *mst, int idx)
 	core->bus.prop.mclk_freq = SDW_DEFAULT_MCLK_CLK_FREQ;
 
 	ret = mtk_sdw_enable_top_clock(mst, idx);
-	if (ret) {
-		dev_err(mst->dev, "IP%d: enable top clock failed: %d\n",
-			idx, ret);
+	if (ret)
 		return ret;
-	}
+
+	ret = mtk_sdw_enable_spm_request(mst, idx);
+	if (ret)
+		goto err_spm;
 
 	core->bus.dev = mst->dev;
 	ret = sdw_bus_master_add(&core->bus, mst->dev, mst->dev->fwnode);
 	if (ret) {
 		dev_err(mst->dev, "IP%d: bus_master_add failed: %d\n",
 			idx, ret);
-		goto err_disable_top_clock;
+		goto err_bus;
 	}
 
 	ret = mtk_sdw_core_hw_init(core);
 	if (ret) {
 		sdw_bus_master_delete(&core->bus);
-		goto err_disable_top_clock;
+		goto err_bus;
 	}
 
 	/*
@@ -937,7 +1029,7 @@ static int mtk_sdw_link_init(struct mtk_sdw *mst, int idx)
 		ret = mtk_sdw_core_bus_reset(core);
 		if (ret) {
 			sdw_bus_master_delete(&core->bus);
-			goto err_disable_top_clock;
+			goto err_bus;
 		}
 	}
 
@@ -950,8 +1042,11 @@ static int mtk_sdw_link_init(struct mtk_sdw *mst, int idx)
 	dev_info(mst->dev, "IP%d: SoundWire bus ready\n", idx);
 	return 0;
 
-err_disable_top_clock:
+err_bus:
+	mtk_sdw_disable_spm_request(mst, idx);
+err_spm:
 	mtk_sdw_disable_top_clock(mst, idx);
+
 	return ret;
 }
 
@@ -962,6 +1057,8 @@ static void mtk_sdw_link_deinit(struct mtk_sdw *mst, int idx)
 	cancel_delayed_work_sync(&core->attach_check_work);
 	mtk_sdw_enable_irq(core, false);
 	sdw_bus_master_delete(&core->bus);
+	mtk_sdw_disable_spm_request(mst, idx);
+	mtk_sdw_disable_top_clock(mst, idx);
 }
 
 static void mtk_init_sdw_master(struct mtk_sdw *mst)
@@ -1152,7 +1249,8 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 	struct mtk_sdw *mst;
 	u32 hw_ver = MTK_SDW_HW_VER_MT8901;
 	u32 mmio[2];
-	int i, ret;
+	int i = 0;
+	int ret;
 	bool clk_on;
 
 	mst = devm_kzalloc(dev, sizeof(*mst), GFP_KERNEL);
@@ -1219,8 +1317,11 @@ static int mtk_sdw_probe_controller(struct platform_device *pdev)
 
 	clk_on = true;
 
-	mtk_sdw_top_init_settings(mst);
-	mtk_sdw_top_configure_delays(mst);
+	ret = mtk_sdw_top_init(mst);
+	if (ret) {
+		dev_err(dev, "failed to init sdw top, ret %d\n", ret);
+		goto err;
+	}
 
 	for (i = 0; i < mst->num_links; i++) {
 		int irq = platform_get_irq(pdev, i);
@@ -1339,11 +1440,231 @@ static void mtk_sdw_remove(struct platform_device *pdev)
 		mtk_sdw_link_deinit(mst, i);
 }
 
+static int mtk_sdw_enter_low_power_mode(struct mtk_sdw *mst, int idx)
+{
+	struct mtk_sdw_link *link = &mst->links[idx];
+	struct mtk_sdw_core *core = &link->core;
+	int ret;
+
+	/*
+	 * Cancel the attach check before taking reset_lock (its work takes
+	 * the lock too), then hold the lock across quiesce, shutdown and
+	 * power-down so no other reset initiator can restart the link
+	 * halfway through.
+	 */
+	cancel_delayed_work_sync(&core->attach_check_work);
+	mutex_lock(&core->reset_lock);
+	mtk_sdw_enable_irq(core, false);
+
+	ret = mtk_sdw_shutdown_master(core);
+	if (ret) {
+		dev_err(mst->dev, "shutdown master failed, ret = %d\n", ret);
+		/*
+		 * The config update may have applied SOFT_RST and ALL_OFF even
+		 * though it timed out: rebuild the controller while its clocks
+		 * and power votes are still held (reinit re-enables the IRQs).
+		 */
+		goto err_spm;
+	}
+
+	ret = mtk_sdw_disable_spm_request(mst, idx);
+	if (ret)
+		goto err_spm;
+
+	ret = mtk_sdw_disable_top_clock(mst, idx);
+	if (ret)
+		goto err_top;
+
+	mutex_unlock(&core->reset_lock);
+	return 0;
+
+err_top:
+	if (mtk_sdw_enable_spm_request(mst, idx))
+		dev_err(mst->dev, "[%d]failed to restore SPM on error path",
+			idx);
+err_spm:
+	if (mtk_sdw_reinit_master(core))
+		dev_err(mst->dev, "[%d]failed to reinit master on error path",
+			idx);
+
+	mutex_unlock(&core->reset_lock);
+	return ret;
+}
+
+static int mtk_sdw_exit_low_power_mode(struct mtk_sdw *mst, int idx)
+{
+	struct mtk_sdw_link *link = &mst->links[idx];
+	struct mtk_sdw_core *core = &link->core;
+	int ret;
+
+	/* Same lock as the suspend side: the restore is one sequence too. */
+	mutex_lock(&core->reset_lock);
+
+	ret = mtk_sdw_enable_top_clock(mst, idx);
+	if (ret)
+		goto out;
+
+	ret = mtk_sdw_enable_spm_request(mst, idx);
+	if (ret) {
+		mtk_sdw_disable_top_clock(mst, idx);
+		goto out;
+	}
+
+	sdw_clear_slave_status(&core->bus, SDW_UNATTACH_REQUEST_MASTER_RESET);
+
+	ret = mtk_sdw_reinit_master(core);
+	if (ret) {
+		dev_err(mst->dev, "mtk_sdw_reinit_master failed: %d\n", ret);
+		mtk_sdw_disable_spm_request(mst, idx);
+		mtk_sdw_disable_top_clock(mst, idx);
+	}
+
+out:
+	mutex_unlock(&core->reset_lock);
+	return ret;
+}
+
+static int mtk_sdw_backup_hw_settings(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mtk_sdw_enable_reg_clock(mst);
+	if (ret)
+		return ret;
+
+	mtk_sdw_top_backup_regs(mst);
+
+	ret = mtk_sdw_disable_reg_clock(mst);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int mtk_sdw_restore_hw_settings(struct mtk_sdw *mst)
+{
+	int ret;
+
+	ret = mtk_sdw_enable_reg_clock(mst);
+	if (ret)
+		return ret;
+
+	mtk_sdw_top_restore_regs(mst);
+
+	ret = mtk_sdw_disable_reg_clock(mst);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int mtk_sdw_suspend(struct device *dev)
+{
+	struct mtk_sdw *mst = dev_get_drvdata(dev);
+	int i, ret;
+
+	/* 1. backup setting */
+	ret = mtk_sdw_backup_hw_settings(mst);
+	if (ret) {
+		dev_err(dev, "backup hw settings failed: %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * The controller shutdown below wipes every configured port and PDI.
+	 * Only running streams get TRIGGER_SUSPEND; a stream that is prepared
+	 * but idle does not, so flag every configured DAI here and let the
+	 * prepare callback rebuild its port state on the next start.
+	 */
+	for (i = 0; i < mst->num_dais; i++)
+		if (mst->dais[i].pdi_count)
+			mst->dais[i].suspended = true;
+
+	/* 2. enter low power per link */
+	for (i = 0; i < mst->num_links; i++) {
+		ret = mtk_sdw_enter_low_power_mode(mst, i);
+		if (ret) {
+			dev_err(dev, "[%d] enter low power mode failed: %d\n",
+				i, ret);
+			while (--i >= 0)
+				mtk_sdw_exit_low_power_mode(mst, i);
+			return ret;
+		}
+	}
+
+	/*
+	 * 3. disable mtcmos per link: the SSPM power refcount is one vote
+	 * per link (the firmware initializes it to the link count, and the
+	 * reference driver relinquishes once per SoundWire IP), so vote per
+	 * link, not per master, or the count never reaches zero and the
+	 * SoC cannot enter PPS7/PPS8.
+	 */
+	for (i = 0; i < mst->num_links; i++) {
+		ret = mtk_sdw_disable_power(mst);
+		if (ret) {
+			while (--i >= 0)
+				mtk_sdw_enable_power(mst);
+
+			for (i = 0; i < mst->num_links; i++)
+				mtk_sdw_exit_low_power_mode(mst, i);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int mtk_sdw_resume(struct device *dev)
+{
+	struct mtk_sdw *mst = dev_get_drvdata(dev);
+	int i, ret;
+
+	/* 1. enable mtcmos per link */
+	for (i = 0; i < mst->num_links; i++) {
+		ret = mtk_sdw_enable_power(mst);
+		if (ret) {
+			while (--i >= 0)
+				mtk_sdw_disable_power(mst);
+			return ret;
+		}
+	}
+
+	/* 2. restore setting */
+	ret = mtk_sdw_restore_hw_settings(mst);
+	if (ret) {
+		dev_err(dev, "restore hw settings failed: %d\n", ret);
+		goto err_power;
+	}
+
+	/* 3. exit low power per link */
+	for (i = 0; i < mst->num_links; i++) {
+		ret = mtk_sdw_exit_low_power_mode(mst, i);
+		if (ret) {
+			dev_err(dev, "[%d] exit low power mode failed: %d\n",
+				i, ret);
+			while (--i >= 0)
+				mtk_sdw_enter_low_power_mode(mst, i);
+			goto err_power;
+		}
+	}
+
+	return 0;
+err_power:
+	for (i = 0; i < mst->num_links; i++)
+		mtk_sdw_disable_power(mst);
+
+	return ret;
+}
+
 static const struct acpi_device_id mtk_sdw_acpi_match[] = {
 	{ "NVDA9100", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, mtk_sdw_acpi_match);
+
+static const struct dev_pm_ops mtk_sdw_pm_ops = {
+	SYSTEM_SLEEP_PM_OPS(mtk_sdw_suspend, mtk_sdw_resume)
+};
 
 static struct platform_driver mtk_sdw_driver = {
 	.probe  = mtk_sdw_probe,
@@ -1351,6 +1672,7 @@ static struct platform_driver mtk_sdw_driver = {
 	.driver = {
 		.name             = "mtk-soundwire",
 		.acpi_match_table = mtk_sdw_acpi_match,
+		.pm = &mtk_sdw_pm_ops,
 	},
 };
 module_platform_driver(mtk_sdw_driver);
