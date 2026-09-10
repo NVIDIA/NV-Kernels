@@ -136,6 +136,8 @@ struct cxl_hdm_decoder_state;
  * @hdm_offset: HDM decoder register offset relative to @hdm_bar
  * @hdm_size: HDM decoder register resource size
  * @global_ctrl: cached HDM decoder global control register
+ * @dvsec_ctrl: cached CXL Device DVSEC control register
+ * @dvsec_ctrl_valid: @dvsec_ctrl contains valid state
  * @decoder_state: cached raw per-decoder register state
  * @settings: cached per-decoder programming state
  */
@@ -145,6 +147,8 @@ struct cxl_hdm_info {
 	resource_size_t hdm_offset;
 	resource_size_t hdm_size;
 	u32 global_ctrl;
+	u16 dvsec_ctrl;
+	bool dvsec_ctrl_valid;
 	struct cxl_hdm_decoder_state *decoder_state;
 	struct cxl_decoder_settings settings[CXL_HDM_DECODER_MAX_COUNT];
 };
