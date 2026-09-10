@@ -395,6 +395,7 @@ static int __pci_cxl_hdm_init(struct pci_dev *pdev)
 	bool restore_command = false;
 	bool allocated_info = false;
 	int decoder_count;
+	int dvsec;
 	u16 command;
 	int rc;
 
@@ -428,6 +429,21 @@ static int __pci_cxl_hdm_init(struct pci_dev *pdev)
 			goto err_nomem;
 		allocated_info = true;
 	}
+
+	dvsec = pci_find_dvsec_capability(pdev, PCI_VENDOR_ID_CXL,
+					  PCI_DVSEC_CXL_DEVICE);
+	if (!dvsec) {
+		rc = -ENOTTY;
+		goto out_restore_command;
+	}
+
+	rc = pci_read_config_word(pdev, dvsec + PCI_DVSEC_CXL_CTRL,
+				  &info->dvsec_ctrl);
+	if (rc) {
+		rc = pcibios_err_to_errno(rc);
+		goto out_restore_command;
+	}
+	info->dvsec_ctrl_valid = true;
 
 	rc = cxl_find_regblock(pdev, CXL_REGLOC_RBI_COMPONENT, &map);
 	if (rc)
@@ -586,6 +602,31 @@ static void cxl_restore_hdm_decoder_state(struct cxl_hdm_decoder_state *state,
 	writel(ctrl, hdm + CXL_HDM_DECODER0_CTRL_OFFSET(id));
 }
 
+static int cxl_restore_dvsec_ctrl(struct pci_dev *pdev, u16 saved_ctrl)
+{
+	u16 mask = CXL_DVSEC_CTRL_CACHE_ENABLE |
+		   CXL_DVSEC_CTRL_MEM_ENABLE;
+	u16 ctrl;
+	int dvsec;
+	int rc;
+
+	dvsec = pci_find_dvsec_capability(pdev, PCI_VENDOR_ID_CXL,
+					  PCI_DVSEC_CXL_DEVICE);
+	if (!dvsec)
+		return -ENOTTY;
+
+	rc = pci_read_config_word(pdev, dvsec + PCI_DVSEC_CXL_CTRL, &ctrl);
+	if (rc)
+		return pcibios_err_to_errno(rc);
+
+	ctrl = (ctrl & ~mask) | (saved_ctrl & mask);
+	rc = pci_write_config_word(pdev, dvsec + PCI_DVSEC_CXL_CTRL, ctrl);
+	if (rc)
+		return pcibios_err_to_errno(rc);
+
+	return 0;
+}
+
 static int cxl_restore_hdm_decoder(struct pci_dev *pdev,
 				   struct cxl_hdm_decoder_state *state,
 				   struct cxl_decoder_settings *settings,
@@ -625,6 +666,8 @@ static int cxl_restore_hdm(struct pci_dev *pdev)
 	int decoder_count;
 	int first_rc = 0;
 	u32 global_ctrl;
+	u16 dvsec_ctrl;
+	bool dvsec_ctrl_valid;
 	bool restore_command = false;
 	u16 command;
 	int hdm_bar;
@@ -640,6 +683,8 @@ static int cxl_restore_hdm(struct pci_dev *pdev)
 		hdm_offset = info->hdm_offset;
 		hdm_size = info->hdm_size;
 		global_ctrl = info->global_ctrl;
+		dvsec_ctrl = info->dvsec_ctrl;
+		dvsec_ctrl_valid = info->dvsec_ctrl_valid;
 		settings = kmemdup_array(info->settings, decoder_count,
 					 sizeof(*settings), GFP_KERNEL);
 		if (!settings)
@@ -679,6 +724,11 @@ static int cxl_restore_hdm(struct pci_dev *pdev)
 	}
 
 	iounmap(hdm);
+	if (!first_rc && dvsec_ctrl_valid) {
+		rc = cxl_restore_dvsec_ctrl(pdev, dvsec_ctrl);
+		if (rc)
+			first_rc = rc;
+	}
 out_restore_command:
 	if (restore_command) {
 		rc = cxl_hdm_restore_command(pdev, command);
