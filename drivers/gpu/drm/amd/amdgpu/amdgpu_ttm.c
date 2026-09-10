@@ -2395,8 +2395,11 @@ void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 		used_windows = amdgpu_ttm_buffer_entity_init(&adev->mman.clear_entity,
 							     used_windows, 1);
 	} else {
+		mutex_destroy(&adev->mman.default_entity.lock);
 		drm_sched_entity_destroy(&adev->mman.default_entity.base);
+		mutex_destroy(&adev->mman.clear_entity.lock);
 		drm_sched_entity_destroy(&adev->mman.clear_entity.base);
+		mutex_destroy(&adev->mman.move_entity.lock);
 		drm_sched_entity_destroy(&adev->mman.move_entity.base);
 		/* Drop all the old fences since re-creating the scheduler entities
 		 * will allocate new contexts.
