@@ -92,8 +92,7 @@ struct mtk_sdw_top_cfg {
 };
 
 int mtk_sdw_top_config_select(struct mtk_sdw *mst, int hw_ver);
-void mtk_sdw_top_init_settings(struct mtk_sdw *mst);
-void mtk_sdw_top_configure_delays(struct mtk_sdw *mst);
+int mtk_sdw_top_init(struct mtk_sdw *mst);
 void mtk_sdw_top_configure_pdi(struct mtk_sdw *mst, u32 pdi,
 			       struct mtk_sdw_top_pdi_params *param);
 int mtk_sdw_top_group_sync_config_get(struct mtk_sdw *mst, u8 id, u32 *cfg);
@@ -101,5 +100,7 @@ int mtk_sdw_top_group_sync_acquire(struct mtk_sdw *mst, bool is_tx);
 void mtk_sdw_top_group_sync_release(struct mtk_sdw *mst, u8 id);
 int mtk_sdw_top_enable_stream(struct mtk_sdw *mst, int dai_id);
 int mtk_sdw_top_disable_stream(struct mtk_sdw *mst, int dai_id);
+void mtk_sdw_top_backup_regs(struct mtk_sdw *mst);
+void mtk_sdw_top_restore_regs(struct mtk_sdw *mst);
 
 #endif /* __MTK_SDW_TOP_H */
