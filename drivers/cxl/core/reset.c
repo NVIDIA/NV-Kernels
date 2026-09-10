@@ -1192,8 +1192,9 @@ static int cxl_reset_dvsec(struct pci_dev *pdev)
 	if (rc)
 		return pcibios_err_to_errno(rc);
 
-	/* Offer CXL Reset only when CXL.mem is enabled, not merely capable. */
-	if (!(ctrl & PCI_DVSEC_CXL_MEM_ENABLE))
+	/* Offer CXL Reset only when CXL.cache and CXL.mem are enabled. */
+	if (!(ctrl & CXL_DVSEC_CTRL_CACHE_ENABLE) ||
+	    !(ctrl & CXL_DVSEC_CTRL_MEM_ENABLE))
 		return -ENOTTY;
 
 	return dvsec;
