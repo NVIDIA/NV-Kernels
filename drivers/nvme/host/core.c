@@ -1952,7 +1952,7 @@ static void nvme_set_queue_limits(struct nvme_ctrl *ctrl,
 }
 
 static u32 nvme_configure_atomic_write(struct nvme_ctrl *ctrl,
-		struct gendisk *disk, struct nvme_id_ns *id, u32 bs)
+		struct nvme_id_ns *id, u32 bs)
 {
 	u32 atomic_bs;
 
@@ -1975,16 +1975,7 @@ static u32 nvme_configure_atomic_write(struct nvme_ctrl *ctrl,
 		 * no clear language in the specification prohibiting different
 		 * values for different controllers in the subsystem.
 		 */
-		atomic_bs = (1 + ctrl->awupf) * bs;
-	}
-
-	if (!ctrl->subsys->atomic_bs) {
-		ctrl->subsys->atomic_bs = atomic_bs;
-	} else if (ctrl->subsys->atomic_bs != atomic_bs) {
-		dev_err_ratelimited(ctrl->device,
-			"%s: Inconsistent Atomic Write Size, Namespace will not be added: Subsystem=%d bytes, Controller/Namespace=%d bytes\n",
-			disk ? disk->disk_name : "?",
-			ctrl->subsys->atomic_bs, atomic_bs);
+		atomic_bs = (1 + ctrl->subsys->awupf) * bs;
 	}
 
 	return atomic_bs;
@@ -2008,9 +1999,7 @@ static bool nvme_update_disk_info(struct nvme_ctrl *ctrl, struct gendisk *disk,
 	}
 
 	phys_bs = bs;
-	atomic_bs = nvme_configure_atomic_write(ctrl, disk, id, bs);
-	if (!id->nabo && atomic_bs > ctrl->subsys->atomic_bs)
-		return false;
+	atomic_bs = nvme_configure_atomic_write(ctrl, id, bs);
 
 	blk_integrity_unregister(disk);
 
@@ -2902,6 +2891,7 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
 	memcpy(subsys->model, id->mn, sizeof(subsys->model));
 	subsys->vendor_id = le16_to_cpu(id->vid);
 	subsys->cmic = id->cmic;
+	subsys->awupf = le16_to_cpu(id->awupf);
 
 	/* Versions prior to 1.4 don't necessarily report a valid type */
 	if (id->cntrltype == NVME_CTRL_DISC ||
@@ -3224,6 +3214,15 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
 		if (ret)
 			goto out_free;
 	}
+
+	if (le16_to_cpu(id->awupf) != ctrl->subsys->awupf) {
+		dev_err_ratelimited(ctrl->device,
+			"inconsistent AWUPF, controller not added (%u/%u).\n",
+			le16_to_cpu(id->awupf), ctrl->subsys->awupf);
+		ret = -EINVAL;
+		goto out_free;
+	}
+
 	memcpy(ctrl->subsys->firmware_rev, id->fr,
 	       sizeof(ctrl->subsys->firmware_rev));
 
@@ -3315,7 +3314,6 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
 	else if (!ctrl->apst_enabled && prev_apst_enabled)
 		dev_pm_qos_hide_latency_tolerance(ctrl->device);
 
-	ctrl->awupf = le16_to_cpu(id->awupf);
 out_free:
 	kfree(id);
 	return ret;
