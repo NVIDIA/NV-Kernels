@@ -14,6 +14,7 @@
 #include <linux/libfdt.h>
 #include <linux/arm-smccc.h>
 #include <linux/overflow.h>
+#include <linux/unaligned.h>
 #include <linux/initrd.h>
 #include <linux/iommu.h>
 #include <linux/security.h>
@@ -570,12 +571,11 @@ void __init slaunch_early_init(void)
  * efi.memmap, which does not exist yet at this stage.
  */
 struct sl_efi_info {
-	bool present;
 	u64  systab_pa;
 	u64  mmap_pa;
 	u64  mmap_size;
-	u32  desc_size;
-	u32  desc_ver;
+	u64  desc_size;
+	u64  desc_ver;
 };
 
 /* Forward decls — bodies defined later (or stubbed out by #ifdef
@@ -592,42 +592,47 @@ static void __init slaunch_selftest(void);
 static inline void slaunch_selftest(void) { }
 #endif
 
+static u64 __init read_efi_prop(const void *fdt, int node, const char *name)
+{
+	const void *prop;
+	int len;
+
+	prop = fdt_getprop(fdt, node, name, &len);
+	if (!prop)
+		panic("slaunch: required /chosen property '%s' is missing\n",
+		      name);
+
+	if (len == sizeof(__be32))
+		return get_unaligned_be32(prop);
+	if (len == sizeof(__be64))
+		return get_unaligned_be64(prop);
+
+	panic("slaunch: /chosen property '%s' has invalid size %d (expected 4 or 8 bytes)\n",
+	      name, len);
+}
+
+/*
+ * Fail closed if /chosen does not contain a complete, valid set of EFI
+ * properties, as unvalidated EFI inputs can compromise kernel memory
+ * safety.
+ */
 static void __init slaunch_read_chosen_efi(struct sl_efi_info *info)
 {
 	const void *fdt = initial_boot_params;
-	const __be64 *p64;
-	const __be32 *p32;
-	int node, len;
+	int node;
 
-	memset(info, 0, sizeof(*info));
 	if (!fdt)
-		return;
+		panic("slaunch: cannot read EFI properties without a DTB\n");
+
 	node = fdt_path_offset(fdt, "/chosen");
 	if (node < 0)
-		return;
+		panic("slaunch: DTB has no /chosen node for EFI properties\n");
 
-#define _GET64(name, field)							\
-	do {									\
-		p64 = fdt_getprop(fdt, node, name, &len);			\
-		if (!p64 || len < (int)sizeof(__be64))				\
-			return;							\
-		info->field = be64_to_cpu(*p64);				\
-	} while (0)
-#define _GET32(name, field)							\
-	do {									\
-		p32 = fdt_getprop(fdt, node, name, &len);			\
-		if (!p32 || len < (int)sizeof(__be32))				\
-			return;							\
-		info->field = be32_to_cpu(*p32);				\
-	} while (0)
-	_GET64("linux,uefi-system-table",   systab_pa);
-	_GET64("linux,uefi-mmap-start",     mmap_pa);
-	_GET32("linux,uefi-mmap-size",      mmap_size);
-	_GET32("linux,uefi-mmap-desc-size", desc_size);
-	_GET32("linux,uefi-mmap-desc-ver",  desc_ver);
-#undef _GET64
-#undef _GET32
-	info->present = true;
+	info->systab_pa = read_efi_prop(fdt, node, "linux,uefi-system-table");
+	info->mmap_pa = read_efi_prop(fdt, node, "linux,uefi-mmap-start");
+	info->mmap_size = read_efi_prop(fdt, node, "linux,uefi-mmap-size");
+	info->desc_size = read_efi_prop(fdt, node, "linux,uefi-mmap-desc-size");
+	info->desc_ver = read_efi_prop(fdt, node, "linux,uefi-mmap-desc-ver");
 }
 
 /*
@@ -895,14 +900,14 @@ static void __init slaunch_validate_raw_mmap(const struct sl_efi_info *info)
 
 	/* Validate desc-size / desc-ver / mmap-size sanity. */
 	if (info->desc_ver != 1)
-		panic("slaunch: linux,uefi-mmap-desc-ver=%u (expected 1)\n",
+		panic("slaunch: linux,uefi-mmap-desc-ver=%llu (expected 1)\n",
 		      info->desc_ver);
 	if (info->desc_size < sizeof(efi_memory_desc_t) || info->desc_size > 128)
-		panic("slaunch: linux,uefi-mmap-desc-size=%u out of sane range\n",
+		panic("slaunch: linux,uefi-mmap-desc-size=%llu out of sane range\n",
 		      info->desc_size);
 	if (info->mmap_size == 0 ||
 	    info->mmap_size % info->desc_size != 0)
-		panic("slaunch: linux,uefi-mmap-size=%llu not a multiple of desc-size=%u\n",
+		panic("slaunch: linux,uefi-mmap-size=%llu not a multiple of desc-size=%llu\n",
 		      info->mmap_size, info->desc_size);
 
 	/*
@@ -1007,24 +1012,18 @@ static void __init slaunch_validate_raw_mmap(const struct sl_efi_info *info)
 	 * as part of the kernel event-log buffer sizing formula. */
 	sl_efi_mmap_pa        = info->mmap_pa;
 	sl_efi_mmap_size      = info->mmap_size;
-	sl_efi_mmap_desc_size = info->desc_size;
+	sl_efi_mmap_desc_size = (u32)info->desc_size;
 }
 
 static void __init slaunch_validate_efi_early(const struct sl_efi_info *info)
 {
-	if (!info->present) {
-		pr_info("slaunch: /chosen does not have all linux,uefi-* properties — skipping early EFI validation\n");
-		return;
-	}
 	/*
 	 * Stage the raw EFI mmap extent before the systab validator so
 	 * slaunch_validate_srtm_log() can reject an SRTM log PA aliasing it;
 	 * validate_raw_mmap() re-publishes these after its own checks.
-	 * desc_size is pre-staged for the event-log buffer sizing formula.
 	 */
 	sl_efi_mmap_pa        = info->mmap_pa;
 	sl_efi_mmap_size      = info->mmap_size;
-	sl_efi_mmap_desc_size = info->desc_size;
 	slaunch_validate_raw_systab(info->systab_pa);
 	slaunch_validate_raw_mmap(info);
 }
@@ -2094,11 +2093,6 @@ static void __init slaunch_inject_srtm_log(const struct sl_efi_info *info)
 
 static void __init slaunch_inject_fault(struct sl_efi_info *info)
 {
-	if (!info->present) {
-		/* Nothing to inject into. */
-		return;
-	}
-
 	slaunch_inject_srtm_log(info);
 
 	if (sl_cmdline_has("slaunch_inject=mmap_wrap")) {
