@@ -547,25 +547,36 @@ static int mtk_sdw_dai_prepare(struct snd_pcm_substream *substream,
 	struct mtk_sdw_port_params mtk_port_param = { 0 };
 	int i, dir;
 
-	if (!mdai->suspended)
-		return 0;
+	if (mdai->suspended) {
+		mdai->suspended = false;
 
-	mdai->suspended = false;
+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+			dir = SDW_DATA_DIR_RX;
+		else
+			dir = SDW_DATA_DIR_TX;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		dir = SDW_DATA_DIR_RX;
-	else
-		dir = SDW_DATA_DIR_TX;
+		mtk_port_param.port_num = mdai->port_num;
+		mtk_port_param.bpt_payload_type = 0;
+		mtk_port_param.bpt_en = true;
+		mtk_sdw_configure_port_params(&mdai->link->core, &mtk_port_param,
+					      dir);
+	}
 
-	mtk_port_param.port_num = mdai->port_num;
-	mtk_port_param.bpt_payload_type = 0;
-	mtk_port_param.bpt_en = true;
-	mtk_sdw_configure_port_params(&mdai->link->core, &mtk_port_param, dir);
-
-	for (i = 0; i < mdai->pdi_count; i++) {
+	/*
+	 * ASoC runs the STOP triggers in reverse order: this DAI disables the
+	 * PDI engen first and the dai_link trigger then stops the manager port
+	 * (sdw_disable_stream), so whatever was in flight between the two
+	 * stays in the PDI FIFO. On a 2-channel interleaved PDI an odd number
+	 * of stale words shifts the word phase and the next START swaps left
+	 * and right for the rest of the PCM's life. A stop/start cycle on an
+	 * open PCM never passes hw_params/hw_free, so reset every PDI here,
+	 * where the previous STOP has completed on both sides and nothing
+	 * feeds or drains the FIFO. Re-writing the same channel mask and port
+	 * number is harmless.
+	 */
+	for (i = 0; i < mdai->pdi_count; i++)
 		mtk_sdw_configure_pdi_params(&mdai->link->core,
 					     &mdai->pdi_params[i]);
-	}
 
 	return 0;
 }
