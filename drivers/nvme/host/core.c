@@ -1951,6 +1951,45 @@ static void nvme_set_queue_limits(struct nvme_ctrl *ctrl,
 	blk_queue_write_cache(q, vwc, vwc);
 }
 
+static u32 nvme_configure_atomic_write(struct nvme_ctrl *ctrl,
+		struct gendisk *disk, struct nvme_id_ns *id, u32 bs)
+{
+	u32 atomic_bs;
+
+	/*
+	 * We do not support an offset for the atomic boundaries.
+	 */
+	if (id->nabo)
+		return bs;
+
+	if ((id->nsfeat & NVME_NS_FEAT_ATOMICS) && id->nawupf) {
+		/*
+		 * Use the per-namespace atomic write unit when available.
+		 */
+		atomic_bs = (1 + le16_to_cpu(id->nawupf)) * bs;
+	} else {
+		/*
+		 * Use the controller wide atomic write unit.  This sucks
+		 * because the limit is defined in terms of logical blocks while
+		 * namespaces can have different formats, and because there is
+		 * no clear language in the specification prohibiting different
+		 * values for different controllers in the subsystem.
+		 */
+		atomic_bs = (1 + ctrl->awupf) * bs;
+	}
+
+	if (!ctrl->subsys->atomic_bs) {
+		ctrl->subsys->atomic_bs = atomic_bs;
+	} else if (ctrl->subsys->atomic_bs != atomic_bs) {
+		dev_err_ratelimited(ctrl->device,
+			"%s: Inconsistent Atomic Write Size, Namespace will not be added: Subsystem=%d bytes, Controller/Namespace=%d bytes\n",
+			disk ? disk->disk_name : "?",
+			ctrl->subsys->atomic_bs, atomic_bs);
+	}
+
+	return atomic_bs;
+}
+
 static bool nvme_update_disk_info(struct nvme_ctrl *ctrl, struct gendisk *disk,
 		struct nvme_ns_head *head, struct nvme_id_ns *id)
 {
@@ -1968,33 +2007,10 @@ static bool nvme_update_disk_info(struct nvme_ctrl *ctrl, struct gendisk *disk,
 		bs = (1 << 9);
 	}
 
-	atomic_bs = phys_bs = bs;
-	if (id->nabo == 0) {
-		/*
-		 * Bit 1 indicates whether NAWUPF is defined for this namespace
-		 * and whether it should be used instead of AWUPF. If NAWUPF ==
-		 * 0 then AWUPF must be used instead.
-		 */
-		if (id->nsfeat & NVME_NS_FEAT_ATOMICS && id->nawupf)
-			atomic_bs = (1 + le16_to_cpu(id->nawupf)) * bs;
-		else
-			atomic_bs = (1 + ctrl->awupf) * bs;
-
-		/*
-		 * Set subsystem atomic bs.
-		 */
-		if (ctrl->subsys->atomic_bs) {
-			if (atomic_bs != ctrl->subsys->atomic_bs)
-				dev_err_ratelimited(ctrl->device,
-					"%s: Inconsistent Atomic Write Size, Namespace will not be added: Subsystem=%d bytes, Controller/Namespace=%d bytes\n",
-					disk ? disk->disk_name : "?",
-					ctrl->subsys->atomic_bs, atomic_bs);
-			if (atomic_bs > ctrl->subsys->atomic_bs)
-				return false;
-		} else {
-			ctrl->subsys->atomic_bs = atomic_bs;
-		}
-	}
+	phys_bs = bs;
+	atomic_bs = nvme_configure_atomic_write(ctrl, disk, id, bs);
+	if (!id->nabo && atomic_bs > ctrl->subsys->atomic_bs)
+		return false;
 
 	blk_integrity_unregister(disk);
 
