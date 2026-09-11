@@ -28,7 +28,7 @@ static const char dmi_empty_string[] = "";
 static u32 dmi_ver __initdata;
 static u32 dmi_len;
 static u16 dmi_num;
-static u8 smbios_entry_point[32];
+static u8 smbios_entry_point[DMI_ENTRY_POINT_SIZE];
 static int smbios_entry_point_size;
 
 /* DMI system identification string used during boot */
@@ -571,6 +571,31 @@ static void __init dmi_format_ids(char *buf, size_t len)
 			    dmi_get_system_info(DMI_BIOS_DATE));
 }
 
+bool __init dmi_decode_smbios_entry(const u8 *buf,
+				    struct dmi_entry_point *ep)
+{
+	buf += 16;
+	if (memcmp(buf, "_DMI_", 5) || !dmi_checksum(buf, 15))
+		return false;
+
+	ep->table_length = get_unaligned_le16(buf + 6);
+	ep->table_address = get_unaligned_le32(buf + 8);
+	return true;
+}
+
+bool __init dmi_decode_smbios3_entry(const u8 *buf,
+				     struct dmi_entry_point *ep)
+{
+	if (memcmp(buf, "_SM3_", 5) ||
+	    buf[6] < 24 || buf[6] > DMI_ENTRY_POINT_SIZE ||
+	    !dmi_checksum(buf, buf[6]))
+		return false;
+
+	ep->table_length = get_unaligned_le32(buf + 12);
+	ep->table_address = get_unaligned_le64(buf + 16);
+	return true;
+}
+
 /*
  * Check for DMI/SMBIOS headers in the system firmware image.  Any
  * SMBIOS header must start 16 bytes before the DMI header, so take a
@@ -580,6 +605,7 @@ static void __init dmi_format_ids(char *buf, size_t len)
  */
 static int __init dmi_present(const u8 *buf)
 {
+	struct dmi_entry_point ep;
 	u32 smbios_ver;
 
 	/*
@@ -610,17 +636,16 @@ static int __init dmi_present(const u8 *buf)
 		smbios_ver = 0;
 	}
 
-	buf += 16;
-
-	if (memcmp(buf, "_DMI_", 5) == 0 && dmi_checksum(buf, 15)) {
+	if (dmi_decode_smbios_entry(buf, &ep)) {
+		buf += 16;
 		if (smbios_ver)
 			dmi_ver = smbios_ver;
 		else
 			dmi_ver = (buf[14] & 0xF0) << 4 | (buf[14] & 0x0F);
 		dmi_ver <<= 8;
 		dmi_num = get_unaligned_le16(buf + 12);
-		dmi_len = get_unaligned_le16(buf + 6);
-		dmi_base = get_unaligned_le32(buf + 8);
+		dmi_len = ep.table_length;
+		dmi_base = ep.table_address;
 
 		if (dmi_walk_early(dmi_decode) == 0) {
 			if (smbios_ver) {
@@ -648,13 +673,13 @@ static int __init dmi_present(const u8 *buf)
  */
 static int __init dmi_smbios3_present(const u8 *buf)
 {
-	if (memcmp(buf, "_SM3_", 5) == 0 &&
-	    buf[6] >= 24 && buf[6] <= 32 &&
-	    dmi_checksum(buf, buf[6])) {
+	struct dmi_entry_point ep;
+
+	if (dmi_decode_smbios3_entry(buf, &ep)) {
 		dmi_ver = get_unaligned_be24(buf + 7);
 		dmi_num = 0;			/* No longer specified */
-		dmi_len = get_unaligned_le32(buf + 12);
-		dmi_base = get_unaligned_le64(buf + 16);
+		dmi_len = ep.table_length;
+		dmi_base = ep.table_address;
 		smbios_entry_point_size = buf[6];
 		memcpy(smbios_entry_point, buf, smbios_entry_point_size);
 
@@ -673,7 +698,7 @@ static int __init dmi_smbios3_present(const u8 *buf)
 static void __init dmi_scan_machine(void)
 {
 	char __iomem *p, *q;
-	char buf[32];
+	char buf[DMI_ENTRY_POINT_SIZE];
 
 	if (efi_enabled(EFI_CONFIG_TABLES)) {
 		/*
@@ -690,11 +715,12 @@ static void __init dmi_scan_machine(void)
 		 * back to the legacy one (if available)
 		 */
 		if (efi.smbios3 != EFI_INVALID_TABLE_ADDR) {
-			p = dmi_early_remap(efi.smbios3, 32);
+			p = dmi_early_remap(efi.smbios3,
+					    DMI_ENTRY_POINT_SIZE);
 			if (p == NULL)
 				goto error;
-			memcpy_fromio(buf, p, 32);
-			dmi_early_unmap(p, 32);
+			memcpy_fromio(buf, p, DMI_ENTRY_POINT_SIZE);
+			dmi_early_unmap(p, DMI_ENTRY_POINT_SIZE);
 
 			if (!dmi_smbios3_present(buf)) {
 				dmi_available = 1;
@@ -708,11 +734,11 @@ static void __init dmi_scan_machine(void)
 		 * needed during early boot.  This also means we can
 		 * iounmap the space when we're done with it.
 		 */
-		p = dmi_early_remap(efi.smbios, 32);
+		p = dmi_early_remap(efi.smbios, DMI_ENTRY_POINT_SIZE);
 		if (p == NULL)
 			goto error;
-		memcpy_fromio(buf, p, 32);
-		dmi_early_unmap(p, 32);
+		memcpy_fromio(buf, p, DMI_ENTRY_POINT_SIZE);
+		dmi_early_unmap(p, DMI_ENTRY_POINT_SIZE);
 
 		if (!dmi_present(buf)) {
 			dmi_available = 1;

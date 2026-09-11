@@ -6,6 +6,13 @@
 #include <linux/kobject.h>
 #include <linux/mod_devicetable.h>
 
+#define DMI_ENTRY_POINT_SIZE	32
+
+struct dmi_entry_point {
+	u64 table_address;
+	u32 table_length;
+};
+
 /* enum dmi_field is in mod_devicetable.h */
 
 enum dmi_device_type {
@@ -102,6 +109,8 @@ struct dmi_dev_onboard {
 };
 
 extern struct kobject *dmi_kobj;
+bool dmi_decode_smbios_entry(const u8 *buf, struct dmi_entry_point *ep);
+bool dmi_decode_smbios3_entry(const u8 *buf, struct dmi_entry_point *ep);
 extern int dmi_check_system(const struct dmi_system_id *list);
 const struct dmi_system_id *dmi_first_match(const struct dmi_system_id *list);
 extern const char * dmi_get_system_info(int field);
@@ -123,6 +132,17 @@ extern u16 dmi_memdev_handle(int slot);
 
 #else
 
+static inline bool dmi_decode_smbios_entry(const u8 *buf,
+					   struct dmi_entry_point *ep)
+{
+	return false;
+}
+
+static inline bool dmi_decode_smbios3_entry(const u8 *buf,
+					    struct dmi_entry_point *ep)
+{
+	return false;
+}
 static inline int dmi_check_system(const struct dmi_system_id *list) { return 0; }
 static inline const char * dmi_get_system_info(int field) { return NULL; }
 static inline const struct dmi_device * dmi_find_device(int type, const char *name,
