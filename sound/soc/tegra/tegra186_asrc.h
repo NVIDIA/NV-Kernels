@@ -7,6 +7,8 @@
 #ifndef __TEGRA186_ASRC_H__
 #define __TEGRA186_ASRC_H__
 
+#include <linux/mutex.h>
+
 /* ASRC stream related offset */
 #define TEGRA186_ASRC_CFG				0x0
 #define TEGRA186_ASRC_RATIO_INT_PART			0x4
@@ -111,6 +113,8 @@ struct tegra186_asrc {
 	const struct tegra_asrc_soc_data *soc_data;
 	struct tegra186_asrc_lane lane[TEGRA186_ASRC_STREAM_MAX];
 	struct regmap *regmap;
+	/* Serializes ratio source, cache, and paired register updates. */
+	struct mutex ratio_lock;
 };
 
 #endif
