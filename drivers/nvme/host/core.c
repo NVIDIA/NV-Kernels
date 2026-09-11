@@ -2158,9 +2158,18 @@ static int nvme_update_ns_info_block(struct nvme_ns *ns,
 
 	if (ns->head->ids.csi == NVME_CSI_ZNS) {
 		ret = nvme_update_zone_info(ns, lbaf);
-		if (ret) {
+		if (ret < 0) {
 			blk_mq_unfreeze_queue(ns->disk->queue);
 			goto out;
+		}
+		if (ret) {
+			dev_warn(ns->ctrl->device,
+				 "zone info query failed for nsid %u, %s\n",
+				 ns->head->ns_id,
+				 blk_queue_is_zoned(ns->disk->queue) ?
+				 "keeping the previous zone limits" :
+				 "not enabling zoned mode");
+			ret = 0;
 		}
 	}
 
