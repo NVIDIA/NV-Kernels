@@ -99,6 +99,7 @@
 struct tegra186_asrc_lane {
 	unsigned int int_part;
 	unsigned int frac_part;
+	bool ratio_valid;
 	unsigned int ratio_source;
 	unsigned int hwcomp_disable;
 	unsigned int input_thresh;
