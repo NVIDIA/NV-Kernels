@@ -624,6 +624,10 @@ static void __init slaunch_read_chosen_efi(struct sl_efi_info *info)
 	if (!fdt)
 		panic("slaunch: cannot read EFI properties without a DTB\n");
 
+	if (IS_ENABLED(CONFIG_XEN) &&
+	    fdt_path_offset(fdt, "/hypervisor/uefi") >= 0)
+		panic("slaunch: /hypervisor/uefi is not supported during secure launch\n");
+
 	node = fdt_path_offset(fdt, "/chosen");
 	if (node < 0)
 		panic("slaunch: DTB has no /chosen node for EFI properties\n");
