@@ -18,6 +18,7 @@
 #include <linux/initrd.h>
 #include <linux/iommu.h>
 #include <linux/security.h>
+#include <linux/dmi.h>
 #include <crypto/sha2.h>
 
 #include <asm/drtm.h>
@@ -652,7 +653,8 @@ struct sl_cfgtbl_size_entry {
 
 static const struct sl_cfgtbl_size_entry sl_cfgtbl_sizes[] __initconst = {
 	{ ACPI_20_TABLE_GUID,			36 },	/* RSDP v2.0+ */
-	{ SMBIOS3_TABLE_GUID,			24 },	/* SMBIOS3 entry point */
+	{ SMBIOS_TABLE_GUID,			DMI_ENTRY_POINT_SIZE },
+	{ SMBIOS3_TABLE_GUID,			DMI_ENTRY_POINT_SIZE },
 	{ EFI_RT_PROPERTIES_TABLE_GUID,		8  },	/* version + flags */
 	{ LINUX_EFI_MEMRESERVE_TABLE_GUID,	32 },	/* header struct */
 	{ LINUX_EFI_RANDOM_SEED_TABLE_GUID, sizeof(struct linux_efi_random_seed) },
@@ -700,6 +702,53 @@ static void __init validate_efi_table_range(const char *name, u64 pa, u64 size)
 	    slaunch_ranges_overlap(pa, size, sl_efi_mmap_pa, sl_efi_mmap_size))
 		panic("slaunch: %s [0x%llx+%llu] overlaps raw EFI mmap [0x%llx+%llu]\n",
 		      name, pa, size, (u64)sl_efi_mmap_pa, sl_efi_mmap_size);
+}
+
+static void __init validate_smbios(u64 table_pa, const efi_guid_t *guid)
+{
+	struct dmi_entry_point ep;
+	efi_guid_t smbios_guid = SMBIOS_TABLE_GUID;
+	efi_guid_t smbios3_guid = SMBIOS3_TABLE_GUID;
+	const char *entry_name;
+	const char *table_name;
+	bool is_smbios3;
+	bool valid;
+	void *entry;
+
+	if (!IS_ENABLED(CONFIG_DMI))
+		return;
+
+	if (efi_guidcmp(*guid, smbios3_guid) == 0) {
+		is_smbios3 = true;
+		entry_name = "SMBIOS3 entry point";
+		table_name = "SMBIOS3 structure table";
+	} else if (efi_guidcmp(*guid, smbios_guid) == 0) {
+		is_smbios3 = false;
+		entry_name = "SMBIOS entry point";
+		table_name = "SMBIOS structure table";
+	} else {
+		return;
+	}
+
+	validate_efi_table_range(entry_name, table_pa,
+				 DMI_ENTRY_POINT_SIZE);
+
+	entry = early_memremap_ro(table_pa, DMI_ENTRY_POINT_SIZE);
+	if (!entry)
+		panic("slaunch: %s remap failed at 0x%llx\n",
+		      entry_name, table_pa);
+
+	if (is_smbios3)
+		valid = dmi_decode_smbios3_entry(entry, &ep);
+	else
+		valid = dmi_decode_smbios_entry(entry, &ep);
+	early_memunmap(entry, DMI_ENTRY_POINT_SIZE);
+
+	if (!valid)
+		return;
+
+	validate_efi_table_range(table_name, ep.table_address,
+				 ep.table_length);
 }
 
 static void __init validate_rng_seed(u64 seed_pa, const efi_guid_t *guid)
@@ -873,6 +922,7 @@ static void __init slaunch_validate_raw_systab(u64 systab_pa)
 		if (!dcrtm_range_in_normal(tbl_ptr, size))
 			panic("slaunch: EFI ConfigurationTable[%lu] 0x%lx [size %u] NOT in NORMAL region\n",
 			      j, tbl_ptr, size);
+		validate_smbios((u64)tbl_ptr, &cfgtbl[j].guid);
 		validate_rng_seed((u64)tbl_ptr, &cfgtbl[j].guid);
 		/* If the entry advertises an SRTM TPM event log (header
 		 * + variable-length body), extend the structural check to
