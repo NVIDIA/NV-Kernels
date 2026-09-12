@@ -427,6 +427,17 @@ static inline void amdgpu_ring_write_multiple(struct amdgpu_ring *ring,
 	ring->count_dw -= count_dw;
 }
 
+static inline unsigned int amdgpu_ring_get_dw_distance(struct amdgpu_ring *ring,
+						       u64 start_wptr, u64 end_wptr)
+{
+	unsigned int start = start_wptr & ring->buf_mask;
+	unsigned int end = end_wptr & ring->buf_mask;
+
+	if (end < start)
+		end += ring->ring_size >> 2;
+	return end - start;
+}
+
 #define amdgpu_mes_ctx_get_offs_gpu_addr(ring, offset)			\
 	(ring->is_mes_queue && ring->mes_ctx ?				\
 	 (ring->mes_ctx->meta_data_gpu_addr + offset) : 0)
