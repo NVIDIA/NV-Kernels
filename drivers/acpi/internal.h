@@ -181,6 +181,12 @@ void acpi_idle_rescan_dead_smt_siblings(void);
 static inline void acpi_idle_rescan_dead_smt_siblings(void) {}
 #endif
 
+#ifdef CONFIG_ACPI_PROCESSOR_IDLE
+int acpi_processor_idle_bus_init(void);
+void acpi_processor_idle_bus_exit(void);
+void acpi_processor_power_init_complete(void);
+#endif
+
 /* --------------------------------------------------------------------------
                                   Embedded Controller
    -------------------------------------------------------------------------- */

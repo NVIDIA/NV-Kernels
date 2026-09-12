@@ -4,6 +4,8 @@
 
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
+#include <linux/kernel.h>
+#include <linux/overflow.h>
 #include <linux/pm_qos.h>
 #include <linux/printk.h>
 #include <linux/sched.h>
@@ -49,7 +51,7 @@
 #define ACPI_CSTATE_HALT	2
 #define ACPI_CSTATE_INTEGER	3
 
-#define ACPI_CX_DESC_LEN	32
+#define ACPI_CX_DESC_LEN	64
 
 /* Power Management */
 
@@ -84,10 +86,53 @@ struct acpi_lpi_state {
 	u32 res_cnt_freq;
 	u32 enable_parent_state;
 	u64 address;
+	u64 level_id;
 	u8 index;
 	u8 entry_method;
 	char desc[ACPI_CX_DESC_LEN];
 };
+
+/**
+ * acpi_processor_combine_lpi_states - combine local and parent LPI states
+ * @local: local LPI state
+ * @parent: parent LPI state
+ * @result: composite LPI state
+ *
+ * Return: true if @local and @parent can form a composite entry.
+ */
+static inline bool
+acpi_processor_combine_lpi_states(const struct acpi_lpi_state *local,
+				  const struct acpi_lpi_state *parent,
+				  struct acpi_lpi_state *result)
+{
+	memset(result, 0, sizeof(*result));
+
+	if (parent->entry_method == ACPI_CSTATE_INTEGER) {
+		if (check_add_overflow(local->address, parent->address,
+				       &result->address))
+			return false;
+		result->entry_method = local->entry_method;
+	} else {
+		result->address = parent->address;
+		result->entry_method = parent->entry_method;
+	}
+
+	result->min_residency = parent->min_residency;
+	if (check_add_overflow(local->wake_latency, parent->wake_latency,
+			       &result->wake_latency))
+		return false;
+	result->enable_parent_state = parent->enable_parent_state;
+	result->level_id = parent->level_id;
+
+	result->flags = parent->flags;
+	result->arch_flags = parent->arch_flags;
+	result->res_cnt_freq = parent->res_cnt_freq;
+	result->index = parent->index;
+
+	scnprintf(result->desc, ACPI_CX_DESC_LEN, "%s+%s", local->desc,
+		  parent->desc);
+	return true;
+}
 
 struct acpi_processor_power {
 	int count;
@@ -419,13 +464,20 @@ static inline void acpi_processor_throttling_init(void) {}
 /* in processor_idle.c */
 #ifdef CONFIG_ACPI_PROCESSOR_IDLE
 void acpi_processor_power_init(struct acpi_processor *pr);
+void acpi_processor_power_init_abort(struct acpi_processor *pr);
+void acpi_processor_power_rebuild_deferred(struct acpi_processor *pr);
 void acpi_processor_power_exit(struct acpi_processor *pr);
+void acpi_processor_power_work_cancel(void);
 int acpi_processor_power_state_has_changed(struct acpi_processor *pr);
 int acpi_processor_hotplug(struct acpi_processor *pr);
 void acpi_processor_register_idle_driver(void);
 void acpi_processor_unregister_idle_driver(void);
 int acpi_processor_ffh_lpi_probe(unsigned int cpu);
+bool acpi_processor_ffh_lpi_is_wfi(const struct acpi_lpi_state *lpi);
 int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi);
+bool acpi_processor_ffh_lpi_hierarchy_supported(void);
+int acpi_processor_ffh_lpi_set_mode(bool enable);
+int acpi_processor_ffh_lpi_prepare_state(struct acpi_lpi_state *lpi);
 #endif /* CONFIG_ACPI_PROCESSOR_IDLE */
 
 /* in processor_thermal.c */

@@ -300,7 +300,29 @@ int __init acpi_get_madt_revision(void);
 /* Validate the processor object's proc_id */
 bool acpi_duplicate_processor_id(int proc_id);
 /* Processor _CTS control */
+struct acpi_lpi_state;
 struct acpi_processor_power;
+
+/**
+ * typedef acpi_processor_lpi_level_cb - Processor _LPI level callback
+ * @handle: ACPI handle whose _LPI package was evaluated.
+ * @states: _LPI states returned for @handle.
+ * @state_count: Number of entries in @states.
+ * @level: _LPI hierarchy level, where 0 is the processor leaf level.
+ * @data: Caller-supplied callback data.
+ *
+ * Called by acpi_processor_extract_lpi_info_cb() after each processor or
+ * processor-container _LPI package is evaluated. The callback must not modify
+ * @states, which remains valid only for the duration of the callback.
+ *
+ * Return: 0 to continue hierarchy extraction, or a negative error code to
+ * abort extraction.
+ */
+typedef int (*acpi_processor_lpi_level_cb)(acpi_handle handle,
+					   const struct acpi_lpi_state *states,
+					   unsigned int state_count,
+					   unsigned int level,
+					   void *data);
 
 #ifdef CONFIG_ACPI_PROCESSOR_CSTATE
 bool acpi_processor_claim_cst_control(void);
@@ -314,6 +336,33 @@ static inline int acpi_processor_evaluate_cst(acpi_handle handle, u32 cpu,
 	return -ENODEV;
 }
 #endif
+
+#ifdef CONFIG_ACPI_PROCESSOR_IDLE
+int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
+				       struct acpi_processor_power *pr_power,
+				       bool strict,
+				       acpi_processor_lpi_level_cb cb,
+				       void *data);
+#else
+static inline int
+acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
+				   struct acpi_processor_power *pr_power,
+				   bool strict,
+				   acpi_processor_lpi_level_cb cb,
+				   void *data)
+{
+	return -ENODEV;
+}
+#endif
+
+static inline int
+acpi_processor_extract_lpi_info(acpi_handle pr_handle,
+				struct acpi_processor_power *pr_power,
+				bool strict)
+{
+	return acpi_processor_extract_lpi_info_cb(pr_handle, pr_power, strict,
+						  NULL, NULL);
+}
 
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
 /* Arch dependent functions for cpu hotplug support */

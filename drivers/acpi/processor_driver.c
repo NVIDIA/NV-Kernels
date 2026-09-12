@@ -181,13 +181,14 @@ static int __acpi_processor_start(struct acpi_device *device)
 		goto err_thermal_exit;
 	}
 	pr->flags.previously_online = 1;
+	acpi_processor_power_rebuild_deferred(pr);
 
 	return 0;
 
 err_thermal_exit:
 	acpi_processor_thermal_exit(pr, device);
 err_power_exit:
-	acpi_processor_power_exit(pr);
+	acpi_processor_power_init_abort(pr);
 	return result;
 }
 
@@ -199,13 +200,14 @@ static int acpi_processor_stop(struct device *dev)
 	if (!device)
 		return 0;
 
+	pr = acpi_driver_data(device);
+	if (pr)
+		acpi_processor_power_exit(pr);
+
 	acpi_remove_notify_handler(device->handle, ACPI_DEVICE_NOTIFY,
 				   acpi_processor_notify);
-
-	pr = acpi_driver_data(device);
 	if (!pr)
 		return 0;
-	acpi_processor_power_exit(pr);
 
 	acpi_cppc_processor_exit(pr);
 
@@ -252,6 +254,10 @@ static int __init acpi_processor_driver_init(void)
 	if (acpi_disabled)
 		return 0;
 
+	result = acpi_processor_idle_bus_init();
+	if (result)
+		return result;
+
 	if (!cpufreq_register_notifier(&acpi_processor_notifier_block,
 				       CPUFREQ_POLICY_NOTIFIER)) {
 		acpi_processor_cpufreq_init = true;
@@ -282,6 +288,7 @@ static int __init acpi_processor_driver_init(void)
 	acpi_processor_init_invariance_cppc();
 
 	acpi_idle_rescan_dead_smt_siblings();
+	acpi_processor_power_init_complete();
 
 	return 0;
 
@@ -290,6 +297,7 @@ err:
 
 unregister_idle_drv:
 	acpi_processor_unregister_idle_driver();
+	acpi_processor_idle_bus_exit();
 
 	return result;
 }
@@ -307,8 +315,10 @@ static void __exit acpi_processor_driver_exit(void)
 
 	cpuhp_remove_state_nocalls(hp_online);
 	cpuhp_remove_state_nocalls(CPUHP_ACPI_CPUDRV_DEAD);
+	acpi_processor_power_work_cancel();
 	driver_unregister(&acpi_processor_driver);
 	acpi_processor_unregister_idle_driver();
+	acpi_processor_idle_bus_exit();
 }
 
 module_init(acpi_processor_driver_init);

@@ -808,6 +808,7 @@ EXPORT_SYMBOL_GPL(dev_pm_genpd_is_on);
  *
  * @genpd: The PM domain the idle-state belongs to.
  * @state_idx: The index of the idle-state that failed.
+ * @s2idle: Whether the failed attempt was made for suspend-to-idle.
  *
  * In some special cases the ->power_off() callback is asynchronously powering
  * off the PM domain, leading to that it may return zero to indicate success,
@@ -819,11 +820,18 @@ EXPORT_SYMBOL_GPL(dev_pm_genpd_is_on);
  * while this routine is getting called.
  */
 void pm_genpd_inc_rejected(struct generic_pm_domain *genpd,
-			   unsigned int state_idx)
+			   unsigned int state_idx, bool s2idle)
 {
 	genpd_lock(genpd);
-	genpd->states[genpd->state_idx].rejected++;
-	genpd->states[genpd->state_idx].usage--;
+	if (WARN_ON_ONCE(state_idx >= genpd->state_count))
+		goto out;
+
+	genpd->states[state_idx].rejected++;
+	genpd->states[state_idx].usage--;
+	if (s2idle && genpd->gov && genpd->gov->system_power_down_ok)
+		genpd->states[state_idx].usage_s2idle--;
+
+out:
 	genpd_unlock(genpd);
 }
 EXPORT_SYMBOL_GPL(pm_genpd_inc_rejected);
@@ -1438,6 +1446,13 @@ static void genpd_sync_power_off(struct generic_pm_domain *genpd, bool use_lock,
 		return;
 	} else {
 		genpd->states[genpd->state_idx].usage++;
+
+		/*
+		 * The ->system_power_down_ok() callback is currently used only
+		 * for s2idle. Use it to know when to update the usage counter.
+		 */
+		if (genpd->gov && genpd->gov->system_power_down_ok)
+			genpd->states[genpd->state_idx].usage_s2idle++;
 	}
 
 	genpd->status = GENPD_STATE_OFF;
@@ -1962,6 +1977,45 @@ static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
 
 	return ret;
 }
+
+/**
+ * pm_genpd_add_device_with_base - Add a device to an I/O PM domain.
+ * @genpd: PM domain to add the device to.
+ * @dev: Device to be added.
+ * @base_dev: Physical device represented by @dev.
+ *
+ * Add @dev to @genpd while using @base_dev to derive the CPU identity for a
+ * CPU PM domain. For a CPU PM domain, @base_dev must be an actual CPU device.
+ * This is useful for a virtual consumer that represents that CPU in a domain
+ * hierarchy. Callers must keep one such ownership path per CPU through the
+ * hierarchy.
+ *
+ * @base_dev only needs to remain valid for this synchronous call. Genpd stores
+ * the resolved CPU number, not a pointer to @base_dev.
+ *
+ * Context: Sleepable. Takes the internal genpd list lock and the domain lock;
+ * callers must not hold either lock.
+ *
+ * Return: 0 on success, or a negative error code.
+ */
+int pm_genpd_add_device_with_base(struct generic_pm_domain *genpd,
+				  struct device *dev,
+				  struct device *base_dev)
+{
+	int ret;
+
+	if (!genpd || !dev || !base_dev)
+		return -EINVAL;
+	if (genpd_is_cpu_domain(genpd) && genpd_get_cpu(genpd, base_dev) < 0)
+		return -EINVAL;
+
+	mutex_lock(&gpd_list_lock);
+	ret = genpd_add_device(genpd, dev, base_dev);
+	mutex_unlock(&gpd_list_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(pm_genpd_add_device_with_base);
 
 /**
  * pm_genpd_add_device - Add a device to an I/O PM domain.
@@ -3780,7 +3834,7 @@ static int idle_states_show(struct seq_file *s, void *data)
 	if (ret)
 		return -ERESTARTSYS;
 
-	seq_puts(s, "State          Time Spent(ms) Usage      Rejected   Above      Below\n");
+	seq_puts(s, "State          Time Spent(ms) Usage      Rejected   Above      Below      S2idle\n");
 
 	for (i = 0; i < genpd->state_count; i++) {
 		struct genpd_power_state *state = &genpd->states[i];
@@ -3800,10 +3854,10 @@ static int idle_states_show(struct seq_file *s, void *data)
 			snprintf(state_name, ARRAY_SIZE(state_name), "S%-13d", i);
 
 		do_div(idle_time, NSEC_PER_MSEC);
-		seq_printf(s, "%-14s %-14llu %-10llu %-10llu %-10llu %llu\n",
+		seq_printf(s, "%-14s %-14llu %-10llu %-10llu %-10llu %-10llu %llu\n",
 			   state->name ?: state_name, idle_time,
 			   state->usage, state->rejected, state->above,
-			   state->below);
+			   state->below, state->usage_s2idle);
 	}
 
 	genpd_unlock(genpd);
