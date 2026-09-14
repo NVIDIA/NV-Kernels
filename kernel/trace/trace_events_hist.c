@@ -1759,6 +1759,13 @@ static void expr_field_str(struct hist_field *field, char *expr)
 			strcat(expr, flags_str);
 		}
 	}
+
+	if (field->buckets) {
+		char str[HIST_CONST_DIGITS_MAX + 1];
+
+		snprintf(str, sizeof(str), "=%lu", field->buckets);
+		strcat(expr, str);
+	}
 }
 
 static char *expr_str(struct hist_field *field, unsigned int level)
