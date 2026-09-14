@@ -196,6 +196,8 @@ int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
 				       bool strict,
 				       acpi_processor_lpi_level_cb cb,
 				       void *data);
+int acpi_processor_idle_bus_init(void);
+void acpi_processor_idle_bus_exit(void);
 #endif
 
 /* --------------------------------------------------------------------------
