@@ -24,6 +24,7 @@
 #include <linux/mutex.h>
 #include <linux/perf_event.h>
 #include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
 #include <acpi/processor.h>
 #include <linux/context_tracking.h>
 
@@ -46,8 +47,10 @@ struct acpi_lpi_genpd_map_entry {
 	struct list_head node;
 	acpi_handle handle;
 	struct generic_pm_domain *genpd;
+	struct acpi_lpi_genpd_map_entry *parent_map_entry;
 	struct acpi_lpi_state *lpi_states;
 	unsigned int lpi_state_count;
+	unsigned int child_count;
 };
 
 struct acpi_lpi_ffh_state {
@@ -68,8 +71,11 @@ struct acpi_lpi_runtime_state {
 
 struct acpi_idle_data {
 	struct acpi_lpi_genpd_map_entry *base_map_entry;
+	struct device *domain_dev;
 	struct list_head runtime_states;
 	unsigned int leaf_lpi_count;
+	bool runtime_pm_active;
+	bool genpd_suspended;
 };
 
 static unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER;
@@ -124,6 +130,20 @@ static bool acpi_idle_driver_is_registered(unsigned int cpu)
 	struct cpuidle_driver *drv = acpi_idle_driver_for_cpu(cpu);
 
 	return drv && cpuidle_get_cpu_driver(&dev) == drv;
+}
+
+static const struct bus_type acpi_idle_bus_type = {
+	.name		= "acpi_lpi_domain",
+};
+
+int acpi_processor_idle_bus_init(void)
+{
+	return bus_register(&acpi_idle_bus_type);
+}
+
+void acpi_processor_idle_bus_exit(void)
+{
+	bus_unregister(&acpi_idle_bus_type);
 }
 
 #ifdef CONFIG_ACPI_PROCESSOR_CSTATE
@@ -1368,14 +1388,172 @@ acpi_lpi_get_or_create_domain(acpi_handle handle,
 	return 0;
 }
 
+static int acpi_lpi_pd_add_subdomain(struct generic_pm_domain *parent,
+				     struct generic_pm_domain *child)
+{
+	int ret;
+
+	ret = pm_genpd_add_subdomain(parent, child);
+	if (ret) {
+		pr_err("%s: failed to add %s as subdomain of %s: %d\n",
+		       __func__, child->name, parent->name, ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static void acpi_lpi_release_device(struct device *dev)
+{
+	kfree(dev);
+}
+
+static int acpi_lpi_attach_domain_device(struct acpi_processor *pr,
+					 struct acpi_idle_data *data,
+					 struct acpi_lpi_genpd_map_entry *entry)
+{
+	struct device *cpu_dev;
+	struct device *dev;
+	int ret;
+
+	if (data->domain_dev)
+		return data->base_map_entry == entry ? 0 : -EINVAL;
+
+	cpu_dev = get_cpu_device(pr->id);
+	if (!cpu_dev)
+		return -ENODEV;
+
+	dev = kzalloc_obj(*dev);
+	if (!dev)
+		return -ENOMEM;
+
+	dev->bus = &acpi_idle_bus_type;
+	dev->release = acpi_lpi_release_device;
+	ret = dev_set_name(dev, "acpi_lpi:CPU%u", pr->id);
+	if (ret) {
+		kfree(dev);
+		return ret;
+	}
+
+	ret = device_register(dev);
+	if (ret) {
+		put_device(dev);
+		return ret;
+	}
+
+	ret = pm_genpd_add_virtual_cpu_device(entry->genpd, dev, cpu_dev);
+	if (ret) {
+		device_unregister(dev);
+		return ret;
+	}
+
+	if (IS_ENABLED(CONFIG_PREEMPT_RT)) {
+		ret = pm_runtime_set_active(dev);
+		if (ret) {
+			pm_genpd_remove_device(dev);
+			device_unregister(dev);
+			return ret;
+		}
+	}
+	pm_runtime_enable(dev);
+	pm_runtime_irq_safe(dev);
+	data->domain_dev = dev;
+	return 0;
+}
+
+static int acpi_processor_lpi_runtime_get(struct acpi_idle_data *data)
+{
+	int ret;
+
+	if (!data || !data->domain_dev)
+		return -ENODEV;
+	if (data->runtime_pm_active)
+		return 0;
+
+	if (IS_ENABLED(CONFIG_PREEMPT_RT)) {
+		if (data->genpd_suspended) {
+			dev_pm_genpd_resume(data->domain_dev);
+			data->genpd_suspended = false;
+		}
+	} else {
+		ret = pm_runtime_resume_and_get(data->domain_dev);
+		if (ret < 0)
+			return ret;
+	}
+
+	data->runtime_pm_active = true;
+	return 0;
+}
+
+static int acpi_processor_lpi_runtime_put(struct acpi_idle_data *data)
+{
+	int ret;
+
+	if (!data || !data->domain_dev || !data->runtime_pm_active)
+		return 0;
+
+	if (IS_ENABLED(CONFIG_PREEMPT_RT)) {
+		if (!data->genpd_suspended) {
+			dev_pm_genpd_suspend(data->domain_dev);
+			data->genpd_suspended = true;
+		}
+	} else {
+		ret = pm_runtime_put_sync_suspend(data->domain_dev);
+		if (ret < 0) {
+			pm_runtime_get_noresume(data->domain_dev);
+			return ret;
+		}
+	}
+
+	data->runtime_pm_active = false;
+	return 0;
+}
+
+static int acpi_lpi_detach_domain_device(struct acpi_idle_data *data)
+{
+	struct device *dev;
+	bool was_genpd_suspended;
+	int ret;
+
+	if (!data || !data->domain_dev)
+		return 0;
+	if (data->runtime_pm_active)
+		return -EBUSY;
+
+	dev = data->domain_dev;
+	was_genpd_suspended = data->genpd_suspended;
+	if (was_genpd_suspended) {
+		dev_pm_genpd_resume(dev);
+		data->genpd_suspended = false;
+	}
+	pm_runtime_disable(dev);
+	ret = pm_genpd_remove_device(dev);
+	if (ret) {
+		pm_runtime_enable(dev);
+		if (was_genpd_suspended) {
+			dev_pm_genpd_suspend(dev);
+			data->genpd_suspended = true;
+		}
+		return ret;
+	}
+
+	device_unregister(dev);
+	data->domain_dev = NULL;
+	return 0;
+}
+
 static int acpi_lpi_remove_domain(struct acpi_lpi_genpd_map_entry *entry)
 {
-	struct generic_pm_domain *pd = entry->genpd;
+	struct acpi_lpi_genpd_map_entry *parent;
+	struct generic_pm_domain *pd;
 	struct acpi_idle_data *data;
+	int restore_ret;
 	int cpu;
 	int ret;
 
 	lockdep_assert_held(&domain_map_lock);
+	parent = entry->parent_map_entry;
+	pd = entry->genpd;
 
 	for_each_possible_cpu(cpu) {
 		struct acpi_lpi_runtime_state *runtime_state;
@@ -1389,12 +1567,34 @@ static int acpi_lpi_remove_domain(struct acpi_lpi_genpd_map_entry *entry)
 			if (runtime_state->genpd == pd)
 				return -EBUSY;
 	}
-	if (!cpumask_empty(pd->cpus))
+	if (!cpumask_empty(pd->cpus) || entry->child_count)
 		return -EBUSY;
+	if (parent) {
+		ret = pm_genpd_remove_subdomain(parent->genpd, pd);
+		if (ret)
+			return ret;
+	}
 
 	ret = pm_genpd_remove(pd);
-	if (ret)
-		return ret;
+	if (ret) {
+		if (!parent)
+			return ret;
+
+		restore_ret = pm_genpd_add_subdomain(parent->genpd, pd);
+		if (!restore_ret)
+			return ret;
+
+		entry->parent_map_entry = NULL;
+		parent->child_count--;
+		pr_err("%s: failed to restore %s below %s: %d\n", __func__,
+		       pd->name, parent->genpd->name, restore_ret);
+		return restore_ret;
+	}
+
+	if (parent) {
+		entry->parent_map_entry = NULL;
+		parent->child_count--;
+	}
 
 	list_del(&entry->node);
 	kfree(entry->lpi_states);
@@ -1407,29 +1607,42 @@ static int acpi_lpi_remove_domain(struct acpi_lpi_genpd_map_entry *entry)
 static int acpi_lpi_remove_unused_domains(void)
 {
 	struct acpi_lpi_genpd_map_entry *entry, *tmp;
-	int first_ret = 0;
+	bool removed;
+	int pass_ret;
 	int ret;
 
 	mutex_lock(&domain_map_lock);
-	list_for_each_entry_safe(entry, tmp, &domain_map, node) {
-		ret = acpi_lpi_remove_domain(entry);
-		if (ret == -EBUSY)
-			continue;
-		if (ret && !first_ret)
-			first_ret = ret;
-	}
+	do {
+		removed = false;
+		pass_ret = 0;
+		list_for_each_entry_safe(entry, tmp, &domain_map, node) {
+			ret = acpi_lpi_remove_domain(entry);
+			if (ret == -EBUSY)
+				continue;
+			if (!ret) {
+				removed = true;
+				break;
+			}
+			if (!pass_ret)
+				pass_ret = ret;
+		}
+	} while (removed);
 	mutex_unlock(&domain_map_lock);
 
-	return first_ret;
+	return pass_ret;
 }
 
 struct acpi_lpi_pd_txn_entry {
 	struct list_head node;
 	struct acpi_lpi_genpd_map_entry *entry;
+	struct acpi_lpi_genpd_map_entry *child;
+	bool domain_created;
+	bool link_created;
 };
 
 struct acpi_lpi_pd_init_data {
 	struct acpi_idle_data *data;
+	struct acpi_lpi_genpd_map_entry *child_map_entry;
 	struct acpi_lpi_state child_state;
 	struct list_head transaction;
 	bool child_state_valid;
@@ -1456,10 +1669,19 @@ static int acpi_lpi_pd_rollback(struct acpi_lpi_pd_init_data *data)
 	data->data->base_map_entry = NULL;
 	acpi_lpi_free_runtime_states(data->data);
 	list_for_each_entry_safe_reverse(step, tmp, &data->transaction, node) {
-		ret = acpi_lpi_remove_domain(step->entry);
-		if (ret) {
-			acpi_lpi_pd_free_transaction(data);
-			return ret;
+		if (step->link_created) {
+			ret = pm_genpd_remove_subdomain(step->entry->genpd,
+							step->child->genpd);
+			if (ret)
+				goto fail;
+
+			step->child->parent_map_entry = NULL;
+			step->entry->child_count--;
+		}
+		if (step->domain_created) {
+			ret = acpi_lpi_remove_domain(step->entry);
+			if (ret)
+				goto fail;
 		}
 
 		list_del(&step->node);
@@ -1467,6 +1689,10 @@ static int acpi_lpi_pd_rollback(struct acpi_lpi_pd_init_data *data)
 	}
 
 	return 0;
+
+fail:
+	acpi_lpi_pd_free_transaction(data);
+	return ret;
 }
 
 static int acpi_lpi_pd_init_cb(acpi_handle handle,
@@ -1522,11 +1748,30 @@ static int acpi_lpi_pd_init_cb(acpi_handle handle,
 		goto out;
 	}
 
-	if (created) {
-		step->entry = map_entry;
-		list_add_tail(&step->node, &init_data->transaction);
-	} else {
-		kfree(step);
+	step->entry = map_entry;
+	step->domain_created = created;
+	list_add_tail(&step->node, &init_data->transaction);
+
+	if (level == 0) {
+		if (init_data->data->base_map_entry &&
+		    init_data->data->base_map_entry != map_entry) {
+			ret = -EINVAL;
+			goto out;
+		}
+		init_data->data->base_map_entry = map_entry;
+	} else if (!init_data->child_map_entry->parent_map_entry) {
+		ret = acpi_lpi_pd_add_subdomain(map_entry->genpd,
+						init_data->child_map_entry->genpd);
+		if (ret)
+			goto out;
+
+		init_data->child_map_entry->parent_map_entry = map_entry;
+		map_entry->child_count++;
+		step->child = init_data->child_map_entry;
+		step->link_created = true;
+	} else if (init_data->child_map_entry->parent_map_entry != map_entry) {
+		ret = -EINVAL;
+		goto out;
 	}
 
 	ret = acpi_lpi_add_runtime_states(init_data->data, map_entry->genpd,
@@ -1535,8 +1780,7 @@ static int acpi_lpi_pd_init_cb(acpi_handle handle,
 	if (ret)
 		goto out;
 
-	if (level == 0)
-		init_data->data->base_map_entry = map_entry;
+	init_data->child_map_entry = map_entry;
 	init_data->child_state =
 		domain_states.runtime_states[domain_states.count - 1];
 	init_data->child_state_valid = true;
@@ -1544,6 +1788,38 @@ static int acpi_lpi_pd_init_cb(acpi_handle handle,
 out:
 	acpi_lpi_free_domain_states(&domain_states);
 	return ret;
+}
+
+static int acpi_processor_lpi_detach(struct acpi_processor *pr)
+{
+	struct acpi_idle_data *data = per_cpu(acpi_idle_data, pr->id);
+	bool was_active;
+	int pm_ret;
+	int ret;
+
+	if (!data)
+		return 0;
+
+	was_active = data->runtime_pm_active;
+	ret = acpi_processor_lpi_runtime_put(data);
+	if (ret)
+		return ret;
+
+	ret = acpi_lpi_detach_domain_device(data);
+	if (ret) {
+		if (was_active) {
+			pm_ret = acpi_processor_lpi_runtime_get(data);
+			if (pm_ret)
+				pr_warn("%s: failed to restore CPU%u runtime PM: %d\n",
+					__func__, pr->id, pm_ret);
+		}
+		return ret;
+	}
+
+	data->base_map_entry = NULL;
+	acpi_lpi_free_runtime_states(data);
+
+	return acpi_lpi_remove_unused_domains();
 }
 
 static int acpi_processor_free_idle_data(struct acpi_processor *pr)
@@ -1554,9 +1830,7 @@ static int acpi_processor_free_idle_data(struct acpi_processor *pr)
 	if (!data)
 		return 0;
 
-	data->base_map_entry = NULL;
-	acpi_lpi_free_runtime_states(data);
-	ret = acpi_lpi_remove_unused_domains();
+	ret = acpi_processor_lpi_detach(pr);
 	if (ret)
 		return ret;
 
@@ -1586,6 +1860,7 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 {
 	struct acpi_lpi_pd_init_data init_data = {};
 	struct acpi_idle_data *data;
+	int detach_ret;
 	int rollback_ret = 0;
 	int ret;
 
@@ -1629,6 +1904,21 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 		acpi_lpi_pd_free_transaction(&init_data);
 		return acpi_processor_lpi_fallback_flat(pr);
 	}
+
+	/* Attach only after constructing the complete domain path. */
+	ret = acpi_lpi_attach_domain_device(pr, data, data->base_map_entry);
+	if (ret)
+		goto rollback;
+
+	ret = acpi_processor_lpi_runtime_get(data);
+	if (ret) {
+		detach_ret = acpi_lpi_detach_domain_device(data);
+		if (detach_ret) {
+			acpi_lpi_pd_free_transaction(&init_data);
+			return detach_ret;
+		}
+		goto rollback;
+	}
 	acpi_lpi_pd_free_transaction(&init_data);
 
 	/* Tell driver that _LPI is supported. */
@@ -1636,6 +1926,15 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 	pr->flags.power = 1;
 
 	return 0;
+
+rollback:
+	mutex_lock(&domain_map_lock);
+	rollback_ret = acpi_lpi_pd_rollback(&init_data);
+	mutex_unlock(&domain_map_lock);
+	if (rollback_ret)
+		return rollback_ret;
+
+	return acpi_processor_lpi_fallback_flat(pr);
 }
 
 int __weak __cpuidle acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi)

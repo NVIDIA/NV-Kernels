@@ -252,6 +252,10 @@ static int __init acpi_processor_driver_init(void)
 	if (acpi_disabled)
 		return 0;
 
+	result = acpi_processor_idle_bus_init();
+	if (result)
+		return result;
+
 	if (!cpufreq_register_notifier(&acpi_processor_notifier_block,
 				       CPUFREQ_POLICY_NOTIFIER)) {
 		acpi_processor_cpufreq_init = true;
@@ -290,6 +294,7 @@ err:
 
 unregister_idle_drv:
 	acpi_processor_unregister_idle_driver();
+	acpi_processor_idle_bus_exit();
 
 	return result;
 }
@@ -309,6 +314,7 @@ static void __exit acpi_processor_driver_exit(void)
 	cpuhp_remove_state_nocalls(CPUHP_ACPI_CPUDRV_DEAD);
 	driver_unregister(&acpi_processor_driver);
 	acpi_processor_unregister_idle_driver();
+	acpi_processor_idle_bus_exit();
 }
 
 module_init(acpi_processor_driver_init);
