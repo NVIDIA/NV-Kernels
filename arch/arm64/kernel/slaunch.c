@@ -120,23 +120,9 @@ static size_t      sl_srtm_log_size;	/* includes sizeof(linux_efi_tpm_eventlog) 
  * Raw EFI memory map extent saved by slaunch_validate_raw_mmap() and
  * read by slaunch_validate_srtm_log() so the SRTM log extent can be
  * rejected if it overlaps the raw mmap buffer.
- *
- * sl_efi_mmap_desc_size and sl_efi_nr_tables are additionally consumed
- * by slaunch_extend_drtm_event_log() to compute a runtime upper bound
- * for the kernel-side event-log buffer allocation. The bound scales with
- * the firmware-reported UEFI input counts (one event per memory-map
- * descriptor / ConfigurationTable entry in the upper bound), plus a small
- * fixed-event budget for ACPI/CMDLINE/initrd/SRTM.
- *
- * These values come from pre-DRTM untrusted UEFI inputs; an attacker
- * inflating them can only waste memory, not escalate (the kernel image
- * hash covers these statics' writes via the past-_edata placement of
- * EFI-stub writable globals).
  */
 static phys_addr_t sl_efi_mmap_pa;
 static u64         sl_efi_mmap_size;
-static u32         sl_efi_mmap_desc_size;
-static unsigned long sl_efi_nr_tables;
 
 /*
  * Kernel-side DRTM event log buffer (memblock_alloc'd in
@@ -931,12 +917,6 @@ static void __init slaunch_validate_raw_systab(u64 systab_pa)
 		slaunch_validate_srtm_log((u64)tbl_ptr, &cfgtbl[j].guid);
 	}
 	early_memunmap(cfgtbl, tbl_size);
-	/*
-	 * Save validated nr_tables so slaunch_extend_drtm_event_log() can
-	 * scale the kernel event-log buffer allocation by the count of
-	 * ConfigurationTable entries (upper bound on per-entry events).
-	 */
-	sl_efi_nr_tables = nr_tables;
 	pr_info("slaunch: early EFI System Table validation PASSED (%lu entries)\n",
 		nr_tables);
 }
@@ -1061,12 +1041,10 @@ static void __init slaunch_validate_raw_mmap(const struct sl_efi_info *info)
 
 	/* Remember raw mmap extent for later overlap checks (e.g. the SRTM
 	 * TPM event log validator must reject a published log PA that aliases
-	 * the firmware-provided memory map buffer). desc_size is also saved
-	 * so slaunch_extend_drtm_event_log() can compute the descriptor count
-	 * as part of the kernel event-log buffer sizing formula. */
+	 * the firmware-provided memory map buffer).
+	 */
 	sl_efi_mmap_pa        = info->mmap_pa;
 	sl_efi_mmap_size      = info->mmap_size;
-	sl_efi_mmap_desc_size = (u32)info->desc_size;
 }
 
 static void __init slaunch_validate_efi_early(const struct sl_efi_info *info)
@@ -1750,13 +1728,6 @@ static void __init slaunch_measure_initrd(void)
 #define SL_TCG_EVENT2_MAX_BYTES		128
 
 /*
- * Fixed-event budget: events not scaled by efi_nr_tables/efi_mmap_descs
- * (CMDLINE, initrd, SRTM_TPM_LOG) plus headroom. 16 covers the existing
- * 4 with margin.
- */
-#define SL_DLME_FIXED_EVENTS		16
-
-/*
  * Constant headroom for small overhead beyond pure TCG_PCR_EVENT2
  * records (future header prefix or padding); 1 KiB, not a buffer cap.
  */
@@ -1815,7 +1786,6 @@ static void __init slaunch_extend_drtm_event_log(void)
 	size_t evlog_max, evlog_off;
 	u8 *evlog_va;
 	unsigned int i;
-	u64 efi_mmap_descs;
 	size_t kbuf_cap;
 	u64 per_event_budget;
 
@@ -1867,24 +1837,15 @@ static void __init slaunch_extend_drtm_event_log(void)
 		panic("slaunch: DCE-published event log size %llu exceeds DLME-data event_log capacity %zu\n",
 		      evlog_size_initial, evlog_max);
 
-	/*
-	 * Allocate the kernel event-log buffer: dce_evlog_size +
-	 * (efi_nr_tables + efi_mmap_descs + SL_DLME_FIXED_EVENTS) *
-	 * SL_TCG_EVENT2_MAX_BYTES + SL_KEVLOG_HEADROOM. Untrusted UEFI counts
-	 * only bound the size; appended bytes are all validated.
-	 */
-	efi_mmap_descs = sl_efi_mmap_desc_size ?
-			 sl_efi_mmap_size / sl_efi_mmap_desc_size : 0;
-
-	per_event_budget = (u64)sl_efi_nr_tables + efi_mmap_descs +
-			   SL_DLME_FIXED_EVENTS;
+	/* Every DLME-side measurement has now been collected. */
+	per_event_budget = slaunch_measurement_count;
 	/*
 	 * Multiplication guard for per_event_budget * SL_TCG_EVENT2_MAX_BYTES;
 	 * bounded in practice, but check explicitly before use.
 	 */
 	if (per_event_budget > SIZE_MAX / SL_TCG_EVENT2_MAX_BYTES)
-		panic("slaunch: event log capacity formula overflow (nr_tables=%lu mmap_descs=%llu)\n",
-		      sl_efi_nr_tables, efi_mmap_descs);
+		panic("slaunch: event log capacity formula overflow (%llu measurements)\n",
+		      per_event_budget);
 
 	kbuf_cap = (size_t)evlog_size_initial +
 		   (size_t)per_event_budget * SL_TCG_EVENT2_MAX_BYTES +
@@ -1897,10 +1858,9 @@ static void __init slaunch_extend_drtm_event_log(void)
 	sl_kernel_evlog_capacity = kbuf_cap;
 	sl_kernel_evlog_size = 0;
 
-	pr_info("slaunch: kernel event log: VA %p, capacity %zu B (DCE=%llu + (tables=%lu + mmap=%llu + fixed=%u)*%u + headroom=%u)\n",
+	pr_info("slaunch: kernel event log: VA %p, capacity %zu B (DCE=%llu + measurements=%u*%u + headroom=%u)\n",
 		sl_kernel_evlog, kbuf_cap, evlog_size_initial,
-		sl_efi_nr_tables, efi_mmap_descs,
-		SL_DLME_FIXED_EVENTS, SL_TCG_EVENT2_MAX_BYTES,
+		slaunch_measurement_count, SL_TCG_EVENT2_MAX_BYTES,
 		SL_KEVLOG_HEADROOM);
 
 	pr_info("slaunch: DCE event log: PA 0x%llx, DLME-data sub-region capacity %zu B, DCE-published %llu B\n",
