@@ -859,6 +859,27 @@ int __weak acpi_processor_ffh_lpi_probe(unsigned int cpu)
 	return -EOPNOTSUPP;
 }
 
+bool __weak
+acpi_processor_ffh_lpi_is_wfi(const struct acpi_lpi_state *lpi)
+{
+	return false;
+}
+
+bool __weak acpi_processor_ffh_lpi_hierarchy_supported(void)
+{
+	return false;
+}
+
+int __weak acpi_processor_ffh_lpi_set_mode(bool enable)
+{
+	return -EOPNOTSUPP;
+}
+
+int __weak acpi_processor_ffh_lpi_prepare_state(struct acpi_lpi_state *lpi)
+{
+	return -EOPNOTSUPP;
+}
+
 static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 {
 	int ret;
