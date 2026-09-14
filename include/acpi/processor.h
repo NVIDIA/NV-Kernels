@@ -475,7 +475,11 @@ int acpi_processor_hotplug(struct acpi_processor *pr);
 void acpi_processor_register_idle_driver(void);
 void acpi_processor_unregister_idle_driver(void);
 int acpi_processor_ffh_lpi_probe(unsigned int cpu);
+bool acpi_processor_ffh_lpi_is_wfi(const struct acpi_lpi_state *lpi);
 int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi);
+bool acpi_processor_ffh_lpi_hierarchy_supported(void);
+int acpi_processor_ffh_lpi_set_mode(bool enable);
+int acpi_processor_ffh_lpi_prepare_state(struct acpi_lpi_state *lpi);
 #endif /* CONFIG_ACPI_PROCESSOR_IDLE */
 
 /* in processor_thermal.c */
