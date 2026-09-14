@@ -836,6 +836,61 @@ out:
 }
 EXPORT_SYMBOL_GPL(pm_genpd_inc_rejected);
 
+/**
+ * pm_genpd_widen_state_latency() - Widen a genpd state's latency bounds.
+ * @genpd: PM domain containing the state.
+ * @state_idx: Index of the state to update.
+ * @power_off_latency_ns: Minimum power-off latency bound in nanoseconds.
+ * @power_on_latency_ns: Minimum power-on latency bound in nanoseconds.
+ *
+ * Increase the state's latency bounds under the genpd lock and invalidate the
+ * governor's cached decision when either bound changes. Latency bounds are
+ * never reduced, because a concurrent or earlier observation may have already
+ * established a more conservative value.
+ *
+ * The domain must be on while its bounds are changed. This guarantees that no
+ * parent can reuse cached timing for an already-off child. The caller must
+ * prevent concurrent power-off and removal of @genpd for the duration of the
+ * call.
+ *
+ * Return: 0 on success or a negative error code.
+ */
+int pm_genpd_widen_state_latency(struct generic_pm_domain *genpd,
+				 unsigned int state_idx,
+				 s64 power_off_latency_ns,
+				 s64 power_on_latency_ns)
+{
+	struct genpd_power_state *state;
+
+	if (!genpd || power_off_latency_ns < 0 || power_on_latency_ns < 0)
+		return -EINVAL;
+
+	genpd_lock(genpd);
+	if (genpd->status != GENPD_STATE_ON) {
+		genpd_unlock(genpd);
+		return -EBUSY;
+	}
+	if (state_idx >= genpd->state_count) {
+		genpd_unlock(genpd);
+		return -EINVAL;
+	}
+
+	state = &genpd->states[state_idx];
+	if (power_off_latency_ns > state->power_off_latency_ns ||
+	    power_on_latency_ns > state->power_on_latency_ns) {
+		state->power_off_latency_ns =
+			max(state->power_off_latency_ns, power_off_latency_ns);
+		state->power_on_latency_ns =
+			max(state->power_on_latency_ns, power_on_latency_ns);
+		if (genpd->gd)
+			genpd->gd->max_off_time_changed = true;
+	}
+	genpd_unlock(genpd);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pm_genpd_widen_state_latency);
+
 static int _genpd_power_on(struct generic_pm_domain *genpd, bool timed)
 {
 	unsigned int state_idx = genpd->state_idx;
