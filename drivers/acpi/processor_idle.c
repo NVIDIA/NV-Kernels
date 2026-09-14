@@ -14,13 +14,16 @@
 
 #include <linux/module.h>
 #include <linux/acpi.h>
+#include <linux/device.h>
 #include <linux/dmi.h>
 #include <linux/sched.h>       /* need_resched() */
 #include <linux/tick.h>
 #include <linux/cpuidle.h>
 #include <linux/cpu.h>
 #include <linux/minmax.h>
+#include <linux/mutex.h>
 #include <linux/perf_event.h>
+#include <linux/pm_domain.h>
 #include <acpi/processor.h>
 #include <linux/context_tracking.h>
 
@@ -39,6 +42,19 @@
 
 #define ACPI_IDLE_STATE_START	(IS_ENABLED(CONFIG_ARCH_HAS_CPU_RELAX) ? 1 : 0)
 
+struct acpi_lpi_genpd_map_entry {
+	struct list_head node;
+	acpi_handle handle;
+	struct generic_pm_domain *genpd;
+	struct acpi_lpi_state *lpi_states;
+	unsigned int lpi_state_count;
+};
+
+struct acpi_idle_data {
+	struct acpi_lpi_genpd_map_entry *base_map_entry;
+	unsigned int leaf_lpi_count;
+};
+
 static unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER;
 module_param(max_cstate, uint, 0400);
 static bool nocst __read_mostly;
@@ -51,6 +67,18 @@ module_param(latency_factor, uint, 0644);
 
 static DEFINE_PER_CPU(struct cpuidle_device *, acpi_cpuidle_device);
 static DEFINE_MUTEX(acpi_idle_rebuild_lock);
+static DEFINE_PER_CPU(struct acpi_idle_data *, acpi_idle_data);
+
+static LIST_HEAD(domain_map);
+static DEFINE_MUTEX(domain_map_lock);
+
+#define ACPI_LPI_STATE_FLAGS_ENABLED			BIT(0)
+
+#ifdef CONFIG_PM_GENERIC_DOMAINS
+#define ACPI_LPI_GENPD_GOVERNOR			(&pm_domain_cpu_gov)
+#else
+#define ACPI_LPI_GENPD_GOVERNOR			NULL
+#endif
 
 static struct cpuidle_driver acpi_idle_driver = {
 	.name =		"acpi_idle",
@@ -911,18 +939,332 @@ static bool acpi_lpi_can_coordinate(void)
 	       acpi_processor_ffh_lpi_hierarchy_supported();
 }
 
-static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
+static struct acpi_lpi_genpd_map_entry *acpi_lpi_get_domain(acpi_handle handle)
+{
+	struct acpi_lpi_genpd_map_entry *entry;
+
+	list_for_each_entry(entry, &domain_map, node)
+		if (entry->handle == handle)
+			return entry;
+
+	return NULL;
+}
+
+static void acpi_lpi_pd_free_states(struct genpd_power_state *states,
+				    unsigned int state_count)
+{
+	kfree(states);
+}
+
+static bool acpi_lpi_state_enabled(const struct acpi_lpi_state *lpi)
+{
+	return lpi->flags & ACPI_LPI_STATE_FLAGS_ENABLED;
+}
+
+static bool acpi_lpi_is_usable_leaf_state(const struct acpi_lpi_state *lpi)
+{
+	return acpi_lpi_state_enabled(lpi) &&
+	       lpi->entry_method != ACPI_CSTATE_INTEGER;
+}
+
+static int
+acpi_lpi_prepare_leaf_domain_states(const struct acpi_lpi_state *lpi_states,
+				    unsigned int lpi_state_count,
+				    unsigned int *leaf_lpi_count,
+				    struct acpi_lpi_state **domain_states,
+				    unsigned int *domain_state_count)
+{
+	const struct acpi_lpi_state *deepest = NULL;
+	unsigned int i;
+
+	/*
+	 * WFI remains a direct cpuidle state because it does not suspend the
+	 * CPU power domain or compose with parent states. The CPU leaf domain
+	 * contains only the deepest non-WFI local state used to trigger domain
+	 * coordination.
+	 */
+	*leaf_lpi_count = 0;
+	*domain_state_count = 0;
+	for (i = 0; i < lpi_state_count; i++) {
+		const struct acpi_lpi_state *lpi = &lpi_states[i];
+
+		if (!acpi_lpi_is_usable_leaf_state(lpi))
+			continue;
+		if (*leaf_lpi_count >= ACPI_PROCESSOR_MAX_POWER)
+			break;
+
+		(*leaf_lpi_count)++;
+		if (!acpi_processor_ffh_lpi_is_wfi(lpi))
+			deepest = lpi;
+	}
+
+	if (!deepest)
+		return 0;
+
+	*domain_states = kmemdup(deepest, sizeof(*deepest), GFP_KERNEL);
+	if (!*domain_states)
+		return -ENOMEM;
+
+	*domain_state_count = 1;
+	return 0;
+}
+
+static int acpi_lpi_create_domain(acpi_handle handle,
+				  const struct acpi_lpi_state *lpi_states,
+				  unsigned int lpi_state_count,
+				  struct acpi_lpi_genpd_map_entry **map_entry)
+{
+	struct acpi_lpi_genpd_map_entry *entry;
+	struct genpd_power_state *genpd_states;
+	struct generic_pm_domain *pd;
+	struct acpi_device *adev;
+	const char *hid, *name, *uid;
+	unsigned int i;
+	int ret;
+
+	if (acpi_lpi_get_domain(handle))
+		return -EEXIST;
+
+	adev = acpi_fetch_acpi_dev(handle);
+	if (!adev)
+		return -ENODEV;
+
+	pd = kzalloc_obj(*pd);
+	if (!pd)
+		return -ENOMEM;
+
+	genpd_states = kzalloc_objs(*genpd_states, lpi_state_count);
+	if (!genpd_states) {
+		ret = -ENOMEM;
+		goto free_pd;
+	}
+
+	for (i = 0; i < lpi_state_count; i++) {
+		const struct acpi_lpi_state *lpi = &lpi_states[i];
+
+		genpd_states[i].power_on_latency_ns =
+			(u64)lpi->wake_latency * NSEC_PER_USEC;
+		genpd_states[i].residency_ns =
+			(u64)lpi->min_residency * NSEC_PER_USEC;
+		genpd_states[i].fwnode = acpi_fwnode_handle(adev);
+	}
+
+	hid = acpi_device_hid(adev);
+	name = hid;
+	if (!name || !name[0])
+		name = acpi_dev_name(adev);
+	uid = acpi_device_uid(adev);
+	if (!uid || !uid[0])
+		uid = acpi_dev_name(adev);
+
+	pd->name = kasprintf(GFP_KERNEL, "%s:%s", name, uid);
+	if (!pd->name) {
+		ret = -ENOMEM;
+		goto free_states;
+	}
+
+	pd->states = genpd_states;
+	pd->state_count = lpi_state_count;
+	pd->flags = GENPD_FLAG_CPU_DOMAIN | GENPD_FLAG_MIN_RESIDENCY |
+		    GENPD_FLAG_IRQ_SAFE | GENPD_FLAG_ACTIVE_WAKEUP |
+		    GENPD_FLAG_NO_STAY_ON;
+	if (IS_ENABLED(CONFIG_PREEMPT_RT))
+		pd->flags |= GENPD_FLAG_RPM_ALWAYS_ON;
+	pd->free_states = acpi_lpi_pd_free_states;
+
+	entry = kzalloc_obj(*entry);
+	if (!entry) {
+		ret = -ENOMEM;
+		goto free_name;
+	}
+	entry->lpi_states = kmemdup_array(lpi_states, lpi_state_count,
+					  sizeof(*lpi_states), GFP_KERNEL);
+	if (!entry->lpi_states) {
+		ret = -ENOMEM;
+		goto free_entry;
+	}
+	entry->lpi_state_count = lpi_state_count;
+
+	ret = pm_genpd_init(pd, ACPI_LPI_GENPD_GOVERNOR, false);
+	if (ret)
+		goto free_lpi_states;
+
+	entry->handle = handle;
+	entry->genpd = pd;
+	list_add_tail(&entry->node, &domain_map);
+	*map_entry = entry;
+	return 0;
+
+free_lpi_states:
+	kfree(entry->lpi_states);
+free_entry:
+	kfree(entry);
+free_name:
+	kfree(pd->name);
+free_states:
+	kfree(genpd_states);
+free_pd:
+	kfree(pd);
+	return ret;
+}
+
+static int acpi_lpi_remove_domain(struct acpi_lpi_genpd_map_entry *entry)
+{
+	struct generic_pm_domain *pd = entry->genpd;
+	struct acpi_idle_data *data;
+	int cpu;
+	int ret;
+
+	lockdep_assert_held(&domain_map_lock);
+
+	for_each_possible_cpu(cpu) {
+		data = per_cpu(acpi_idle_data, cpu);
+		if (data && data->base_map_entry == entry)
+			return -EBUSY;
+	}
+	if (!cpumask_empty(pd->cpus))
+		return -EBUSY;
+
+	ret = pm_genpd_remove(pd);
+	if (ret)
+		return ret;
+
+	list_del(&entry->node);
+	kfree(entry->lpi_states);
+	kfree(pd->name);
+	kfree(pd);
+	kfree(entry);
+	return 0;
+}
+
+static int acpi_lpi_remove_unused_domains(void)
+{
+	struct acpi_lpi_genpd_map_entry *entry, *tmp;
+	int first_ret = 0;
+	int ret;
+
+	mutex_lock(&domain_map_lock);
+	list_for_each_entry_safe(entry, tmp, &domain_map, node) {
+		ret = acpi_lpi_remove_domain(entry);
+		if (ret == -EBUSY)
+			continue;
+		if (ret && !first_ret)
+			first_ret = ret;
+	}
+	mutex_unlock(&domain_map_lock);
+
+	return first_ret;
+}
+
+struct acpi_lpi_leaf_init_data {
+	struct acpi_idle_data *data;
+};
+
+static int acpi_lpi_leaf_init_cb(acpi_handle handle,
+				 const struct acpi_lpi_state *lpi_states,
+				 unsigned int lpi_state_count,
+				 unsigned int level, void *arg)
+{
+	struct acpi_lpi_leaf_init_data *init_data = arg;
+	struct acpi_lpi_state *domain_states = NULL;
+	unsigned int domain_state_count;
+	int ret;
+
+	if (level)
+		return 0;
+
+	ret = acpi_lpi_prepare_leaf_domain_states(lpi_states, lpi_state_count,
+						  &init_data->data->leaf_lpi_count,
+						  &domain_states,
+						  &domain_state_count);
+	if (ret || !domain_state_count)
+		goto out;
+
+	mutex_lock(&domain_map_lock);
+	ret = acpi_lpi_create_domain(handle, domain_states,
+				     domain_state_count,
+				     &init_data->data->base_map_entry);
+	mutex_unlock(&domain_map_lock);
+
+out:
+	kfree(domain_states);
+	return ret;
+}
+
+static int acpi_processor_free_idle_data(struct acpi_processor *pr)
+{
+	struct acpi_idle_data *data = per_cpu(acpi_idle_data, pr->id);
+	struct acpi_lpi_genpd_map_entry *base;
+	int ret;
+
+	if (!data)
+		return 0;
+
+	base = data->base_map_entry;
+	data->base_map_entry = NULL;
+	ret = acpi_lpi_remove_unused_domains();
+	if (ret) {
+		data->base_map_entry = base;
+		return ret;
+	}
+
+	kfree(data);
+	per_cpu(acpi_idle_data, pr->id) = NULL;
+	return 0;
+}
+
+static int acpi_processor_lpi_fallback_flat(struct acpi_processor *pr)
 {
 	int ret;
+
+	ret = acpi_processor_free_idle_data(pr);
+	if (ret)
+		return ret;
+
+	ret = acpi_processor_extract_lpi_info(pr->handle, &pr->power, false);
+	if (ret)
+		return ret;
+
+	pr->flags.has_lpi = 1;
+	pr->flags.power = 1;
+	return 0;
+}
+
+static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
+{
+	struct acpi_lpi_leaf_init_data init_data;
+	struct acpi_idle_data *data;
+	int ret;
+
+	ret = acpi_processor_free_idle_data(pr);
+	if (ret)
+		return ret;
+
+	pr->flags.has_lpi = 0;
+	pr->flags.power = 0;
 
 	/* make sure our architecture has support */
 	ret = acpi_processor_ffh_lpi_probe(pr->id);
 	if (ret == -EOPNOTSUPP)
 		return ret;
 
-	ret = acpi_processor_extract_lpi_info(pr->handle, &pr->power, false);
+	if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS) ||
+	    !acpi_lpi_can_coordinate())
+		return acpi_processor_lpi_fallback_flat(pr);
+
+	data = kzalloc_obj(*data);
+	if (!data)
+		return -ENOMEM;
+	per_cpu(acpi_idle_data, pr->id) = data;
+	init_data.data = data;
+
+	ret = acpi_processor_extract_lpi_info_cb(pr->handle, &pr->power, false,
+						 acpi_lpi_leaf_init_cb,
+						 &init_data);
 	if (ret)
-		return ret;
+		return acpi_processor_lpi_fallback_flat(pr);
+	if (!data->base_map_entry)
+		return acpi_processor_lpi_fallback_flat(pr);
 
 	/* Tell driver that _LPI is supported. */
 	pr->flags.has_lpi = 1;
@@ -1153,6 +1495,26 @@ out:
 	return ret;
 }
 
+static int acpi_processor_free_all_idle_data(void)
+{
+	struct acpi_processor *pr;
+	int first_ret = 0;
+	int ret;
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		pr = per_cpu(processors, cpu);
+		if (!pr)
+			continue;
+
+		ret = acpi_processor_free_idle_data(pr);
+		if (ret && !first_ret)
+			first_ret = ret;
+	}
+
+	return first_ret;
+}
+
 static void acpi_processor_unregister_cpu_idle_drivers(void)
 {
 	struct cpuidle_driver *drv;
@@ -1177,6 +1539,7 @@ acpi_processor_register_cpu_idle_drivers(struct acpi_processor *first_pr)
 	struct cpuidle_driver *drv;
 	struct acpi_processor *pr;
 	bool found = false;
+	int cleanup_ret;
 	int ret = -ENODEV;
 	int cpu;
 
@@ -1224,13 +1587,14 @@ acpi_processor_register_cpu_idle_drivers(struct acpi_processor *first_pr)
 
 unregister:
 	acpi_processor_unregister_cpu_idle_drivers();
+	cleanup_ret = acpi_processor_free_all_idle_data();
 	for_each_possible_cpu(cpu) {
 		pr = per_cpu(processors, cpu);
 		if (pr)
 			pr->flags.power_setup_done = 0;
 	}
 
-	return ret;
+	return cleanup_ret ?: ret;
 }
 
 void acpi_processor_register_idle_driver(void)
@@ -1289,6 +1653,11 @@ void acpi_processor_register_idle_driver(void)
 
 	ret = cpuidle_register_driver(&acpi_idle_driver);
 	if (ret) {
+		int free_ret = acpi_processor_free_idle_data(pr);
+
+		if (free_ret)
+			pr_warn("failed to clean up CPU%u idle data: %d\n",
+				pr->id, free_ret);
 		pr->flags.power_setup_done = 0;
 		pr_debug("register %s failed.\n", acpi_idle_driver.name);
 		return;
@@ -1299,7 +1668,12 @@ void acpi_processor_register_idle_driver(void)
 void acpi_processor_unregister_idle_driver(void)
 {
 	struct acpi_processor *pr;
+	int ret;
 	int cpu;
+
+	ret = acpi_processor_free_all_idle_data();
+	if (ret)
+		pr_warn("failed to clean up ACPI idle domains: %d\n", ret);
 
 	if (READ_ONCE(acpi_idle_uses_per_cpu_drivers))
 		acpi_processor_unregister_cpu_idle_drivers();
@@ -1331,6 +1705,7 @@ void acpi_processor_power_init(struct acpi_processor *pr)
 
 	ret = acpi_processor_get_power_info(pr);
 	if (ret) {
+		acpi_processor_free_idle_data(pr);
 		pr->flags.power_setup_done = 0;
 		return;
 	}
@@ -1342,8 +1717,11 @@ void acpi_processor_power_init(struct acpi_processor *pr)
 		return;
 
 	dev = kzalloc_obj(*dev);
-	if (!dev)
+	if (!dev) {
+		acpi_processor_free_idle_data(pr);
+		pr->flags.power_setup_done = 0;
 		return;
+	}
 
 	per_cpu(acpi_cpuidle_device, pr->id) = dev;
 
@@ -1356,6 +1734,7 @@ void acpi_processor_power_init(struct acpi_processor *pr)
 	ret = cpuidle_register_device(dev);
 	if (ret) {
 		per_cpu(acpi_cpuidle_device, pr->id) = NULL;
+		acpi_processor_free_idle_data(pr);
 		pr->flags.power_setup_done = 0;
 		kfree(dev);
 	}
@@ -1364,6 +1743,7 @@ void acpi_processor_power_init(struct acpi_processor *pr)
 void acpi_processor_power_exit(struct acpi_processor *pr)
 {
 	struct cpuidle_device *dev = per_cpu(acpi_cpuidle_device, pr->id);
+	int ret;
 
 	if (disabled_by_idle_boot_param())
 		return;
@@ -1373,6 +1753,11 @@ void acpi_processor_power_exit(struct acpi_processor *pr)
 		per_cpu(acpi_cpuidle_device, pr->id) = NULL;
 		kfree(dev);
 	}
+
+	ret = acpi_processor_free_idle_data(pr);
+	if (ret)
+		pr_warn("CPU%u: failed to clean up idle data: %d\n",
+			pr->id, ret);
 
 	pr->flags.power_setup_done = 0;
 }
