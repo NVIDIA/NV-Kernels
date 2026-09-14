@@ -87,8 +87,11 @@ struct acpi_lpi_state {
 	u32 enable_parent_state;
 	u64 address;
 	u64 level_id;
-	u8 index;
+	u32 index;
 	u8 entry_method;
+	u8 bit_width;
+	u8 bit_offset;
+	u8 access_size;
 	char desc[ACPI_CX_DESC_LEN];
 };
 
@@ -112,9 +115,15 @@ acpi_processor_combine_lpi_states(const struct acpi_lpi_state *local,
 				       &result->address))
 			return false;
 		result->entry_method = local->entry_method;
+		result->bit_width = local->bit_width;
+		result->bit_offset = local->bit_offset;
+		result->access_size = local->access_size;
 	} else {
 		result->address = parent->address;
 		result->entry_method = parent->entry_method;
+		result->bit_width = parent->bit_width;
+		result->bit_offset = parent->bit_offset;
+		result->access_size = parent->access_size;
 	}
 
 	/*
