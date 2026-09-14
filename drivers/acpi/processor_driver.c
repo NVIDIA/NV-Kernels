@@ -116,6 +116,7 @@ static int acpi_soft_cpu_online(unsigned int cpu)
 	if (!pr->flags.previously_online) {
 		int ret;
 
+		acpi_processor_power_hotadd_begin();
 		ret = __acpi_processor_start(device);
 		WARN(ret, "Failed to start CPU: %d\n", pr->id);
 	} else {
@@ -181,13 +182,14 @@ static int __acpi_processor_start(struct acpi_device *device)
 		goto err_thermal_exit;
 	}
 	pr->flags.previously_online = 1;
+	acpi_processor_power_rebuild_deferred(pr);
 
 	return 0;
 
 err_thermal_exit:
 	acpi_processor_thermal_exit(pr, device);
 err_power_exit:
-	acpi_processor_power_exit(pr);
+	acpi_processor_power_init_abort(pr);
 	return result;
 }
 
@@ -286,6 +288,7 @@ static int __init acpi_processor_driver_init(void)
 	acpi_processor_init_invariance_cppc();
 
 	acpi_idle_rescan_dead_smt_siblings();
+	acpi_processor_power_init_complete();
 
 	return 0;
 
@@ -312,6 +315,7 @@ static void __exit acpi_processor_driver_exit(void)
 
 	cpuhp_remove_state_nocalls(hp_online);
 	cpuhp_remove_state_nocalls(CPUHP_ACPI_CPUDRV_DEAD);
+	acpi_processor_power_work_cancel();
 	driver_unregister(&acpi_processor_driver);
 	acpi_processor_unregister_idle_driver();
 	acpi_processor_idle_bus_exit();
