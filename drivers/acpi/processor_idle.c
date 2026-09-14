@@ -69,9 +69,11 @@ struct acpi_lpi_runtime_state {
 	struct generic_pm_domain *genpd;
 	unsigned int state_idx;
 	struct acpi_lpi_ffh_state state;
+	bool selected;
 };
 
 struct acpi_idle_data {
+	struct acpi_lpi_runtime_state *domain_state;
 	struct acpi_lpi_genpd_map_entry *base_map_entry;
 	struct device *domain_dev;
 	struct list_head runtime_states;
@@ -96,6 +98,7 @@ static DEFINE_PER_CPU(struct acpi_idle_data *, acpi_idle_data);
 
 static LIST_HEAD(domain_map);
 static DEFINE_MUTEX(domain_map_lock);
+static bool acpi_lpi_coordinated;
 
 enum acpi_lpi_lifecycle_state {
 	ACPI_LPI_BUILDING,
@@ -1049,6 +1052,30 @@ acpi_lpi_find_runtime_state(struct acpi_idle_data *data,
 	return NULL;
 }
 
+static void acpi_lpi_clear_selected_states(struct acpi_idle_data *data)
+{
+	struct acpi_lpi_runtime_state *runtime_state;
+
+	list_for_each_entry(runtime_state, &data->runtime_states, node)
+		runtime_state->selected = false;
+	data->domain_state = NULL;
+}
+
+static void acpi_lpi_reject_selected_states(struct acpi_idle_data *data)
+{
+	struct acpi_lpi_runtime_state *runtime_state;
+
+	list_for_each_entry(runtime_state, &data->runtime_states, node) {
+		if (!runtime_state->selected)
+			continue;
+
+		pm_genpd_inc_rejected(runtime_state->genpd,
+				      runtime_state->state_idx, false);
+	}
+
+	acpi_lpi_clear_selected_states(data);
+}
+
 static int acpi_lpi_add_runtime_states(struct acpi_idle_data *data,
 				       struct generic_pm_domain *genpd,
 				       const struct acpi_lpi_state *lpi_states,
@@ -1089,6 +1116,7 @@ static int acpi_lpi_add_runtime_states(struct acpi_idle_data *data,
 		list_add_tail(&runtime_state->node, &new_states);
 	}
 
+	data->domain_state = NULL;
 	list_for_each_entry_safe(runtime_state, tmp, &data->runtime_states, node) {
 		if (runtime_state->genpd != genpd)
 			continue;
@@ -1157,6 +1185,50 @@ static int acpi_lpi_validate_runtime_states(struct acpi_processor *pr,
 		if (ret)
 			return ret;
 	}
+
+	return 0;
+}
+
+static int acpi_lpi_pd_power_off(struct generic_pm_domain *domain)
+{
+	struct acpi_lpi_runtime_state *runtime_state;
+	struct acpi_idle_data *data;
+	unsigned int cpu = raw_smp_processor_id();
+
+	if (!READ_ONCE(acpi_lpi_coordinated))
+		return 0;
+	if (!cpumask_test_cpu(cpu, domain->cpus))
+		return -EXDEV;
+
+	data = this_cpu_read(acpi_idle_data);
+	if (!data)
+		return -ENODEV;
+
+	runtime_state = acpi_lpi_find_runtime_state(data, domain,
+						    domain->state_idx);
+	if (!runtime_state)
+		return -EXDEV;
+
+	runtime_state->selected = true;
+	data->domain_state = runtime_state;
+	return 0;
+}
+
+static int acpi_lpi_pd_power_on(struct generic_pm_domain *domain)
+{
+	struct acpi_idle_data *data;
+	unsigned int cpu = raw_smp_processor_id();
+
+	if (!READ_ONCE(acpi_lpi_coordinated))
+		return 0;
+	if (!cpumask_test_cpu(cpu, domain->cpus))
+		return 0;
+
+	data = this_cpu_read(acpi_idle_data);
+	if (!data)
+		return -ENODEV;
+	if (!acpi_lpi_find_runtime_state(data, domain, domain->state_idx))
+		return -EXDEV;
 
 	return 0;
 }
@@ -1354,6 +1426,8 @@ static int acpi_lpi_create_domain(acpi_handle handle,
 		    GENPD_FLAG_NO_STAY_ON;
 	if (IS_ENABLED(CONFIG_PREEMPT_RT))
 		pd->flags |= GENPD_FLAG_RPM_ALWAYS_ON;
+	pd->power_off = acpi_lpi_pd_power_off;
+	pd->power_on = acpi_lpi_pd_power_on;
 	pd->free_states = acpi_lpi_pd_free_states;
 
 	entry = kzalloc_obj(*entry);
@@ -1604,6 +1678,7 @@ static int acpi_processor_lpi_runtime_put(struct acpi_idle_data *data)
 	}
 
 	data->runtime_pm_active = false;
+	data->domain_state = NULL;
 	return 0;
 }
 
@@ -1909,6 +1984,7 @@ static int acpi_processor_lpi_detach(struct acpi_processor *pr)
 	}
 
 	data->base_map_entry = NULL;
+	data->domain_state = NULL;
 	acpi_lpi_free_runtime_states(data);
 
 	return acpi_lpi_remove_unused_domains();
@@ -2081,17 +2157,100 @@ acpi_idle_lpi_enter_direct(struct cpuidle_device *dev,
 	return ret < 0 ? ret : index;
 }
 
-static void acpi_processor_setup_lpi_states(struct acpi_processor *pr,
-					    struct cpuidle_driver *drv)
+static int __cpuidle
+acpi_idle_lpi_enter_leaf(struct cpuidle_device *dev,
+			 struct cpuidle_driver *drv, int index)
 {
+	struct acpi_lpi_state lpi;
+	struct acpi_processor *pr;
+	int ret;
+
+	pr = __this_cpu_read(processors);
+	if (unlikely(!pr))
+		return -EINVAL;
+
+	lpi = pr->power.lpi_states[index];
+	if (lpi.entry_method != ACPI_CSTATE_FFH)
+		return -EINVAL;
+
+	ret = acpi_processor_ffh_lpi_prepare_state(&lpi);
+	if (ret)
+		return ret;
+
+	ret = acpi_processor_ffh_lpi_enter(&lpi);
+	return ret < 0 ? ret : index;
+}
+
+static int __cpuidle
+acpi_idle_lpi_enter_domain(struct cpuidle_device *dev,
+			   struct cpuidle_driver *drv, int index)
+{
+	struct acpi_lpi_runtime_state *domain_state;
+	struct acpi_processor *pr;
+	struct acpi_idle_data *data;
+	struct acpi_lpi_state lpi;
+	int resume_ret;
+	int ret;
+
+	pr = __this_cpu_read(processors);
+	data = this_cpu_read(acpi_idle_data);
+	if (unlikely(!pr || !data || !data->domain_dev))
+		return -ENODEV;
+
+	acpi_lpi_clear_selected_states(data);
+	ret = pm_runtime_put_sync_suspend(data->domain_dev);
+	if (ret < 0) {
+		pm_runtime_get_noresume(data->domain_dev);
+		acpi_lpi_clear_selected_states(data);
+		return ret;
+	}
+
+	domain_state = data->domain_state;
+	if (domain_state)
+		acpi_lpi_prepare_ffh_entry_state(&lpi, &domain_state->state);
+	else
+		lpi = pr->power.lpi_states[index];
+
+	if (lpi.entry_method != ACPI_CSTATE_FFH) {
+		ret = -EINVAL;
+	} else {
+		ret = acpi_processor_ffh_lpi_prepare_state(&lpi);
+		if (!ret) {
+			ret = acpi_processor_ffh_lpi_enter(&lpi);
+			if (ret >= 0)
+				ret = index;
+		}
+	}
+	if (ret < 0)
+		acpi_lpi_reject_selected_states(data);
+
+	resume_ret = pm_runtime_resume_and_get(data->domain_dev);
+	if (resume_ret < 0)
+		pm_runtime_get_noresume(data->domain_dev);
+
+	acpi_lpi_clear_selected_states(data);
+	return resume_ret < 0 ? resume_ret : ret;
+}
+
+static void acpi_processor_setup_lpi_states(struct acpi_processor *pr,
+					    struct cpuidle_driver *drv,
+					    bool coordinated)
+{
+	struct acpi_idle_data *data = per_cpu(acpi_idle_data, pr->id);
 	int i;
 	struct acpi_lpi_state *lpi;
 	struct cpuidle_state *state;
+	unsigned int count = pr->power.count;
 
 	if (!pr->flags.has_lpi)
 		return;
+	if (coordinated) {
+		if (!data || !data->base_map_entry)
+			return;
+		count = data->leaf_lpi_count;
+	}
 
-	for (i = 0; i < pr->power.count && i < CPUIDLE_STATE_MAX; i++) {
+	for (i = 0; i < count && i < CPUIDLE_STATE_MAX; i++) {
 		lpi = &pr->power.lpi_states[i];
 
 		state = &drv->states[i];
@@ -2106,9 +2265,15 @@ static void acpi_processor_setup_lpi_states(struct acpi_processor *pr,
 		state->flags = arch_get_idle_state_flags(lpi->arch_flags);
 		if (i != 0 && lpi->entry_method == ACPI_CSTATE_FFH)
 			state->flags |= CPUIDLE_FLAG_RCU_IDLE;
-		state->enter = acpi_idle_lpi_enter_direct;
+		if (coordinated && lpi->entry_method == ACPI_CSTATE_FFH &&
+		    !acpi_processor_ffh_lpi_is_wfi(lpi))
+			state->enter = acpi_idle_lpi_enter_leaf;
+		else
+			state->enter = acpi_idle_lpi_enter_direct;
 		drv->safe_state_index = i;
 	}
+	if (coordinated && i && !IS_ENABLED(CONFIG_PREEMPT_RT))
+		drv->states[i - 1].enter = acpi_idle_lpi_enter_domain;
 
 	drv->state_count = i;
 }
@@ -2132,7 +2297,7 @@ static void acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
 		memset(&drv->states[i], 0, sizeof(drv->states[i]));
 
 	if (pr->flags.has_lpi) {
-		acpi_processor_setup_lpi_states(pr, drv);
+		acpi_processor_setup_lpi_states(pr, drv, false);
 		return;
 	}
 
