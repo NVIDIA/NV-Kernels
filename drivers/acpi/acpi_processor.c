@@ -1008,9 +1008,11 @@ struct acpi_lpi_states_array {
 	struct acpi_lpi_state *composite_states[ACPI_PROCESSOR_MAX_POWER];
 };
 
-static int obj_get_integer(union acpi_object *obj, u32 *value)
+static int obj_get_integer(union acpi_object *obj, u32 *value,
+			   bool reject_truncation)
 {
-	if (obj->type != ACPI_TYPE_INTEGER)
+	if (obj->type != ACPI_TYPE_INTEGER ||
+	    (reject_truncation && obj->integer.value > U32_MAX))
 		return -EINVAL;
 
 	*value = obj->integer.value;
@@ -1020,15 +1022,34 @@ static int obj_get_integer(union acpi_object *obj, u32 *value)
 #define lpi_state_debug(handle, message, state_idx)	\
 	acpi_handle_debug(handle, message " for _LPI state %u\n", state_idx)
 
-static void process_lpi_state_package(union acpi_object *lpi_pkg,
-				      struct acpi_lpi_state *lpi_state,
-				      acpi_handle handle,
-				      unsigned int state_idx, bool strict)
+#define ACPI_LPI_STATE_FLAGS_ENABLED			BIT(0)
+#define ACPI_LPI_GENERIC_REGISTER_DESCRIPTOR		0x82
+
+static bool acpi_lpi_valid_register_buffer(const union acpi_object *obj)
+{
+	const struct acpi_power_register *reg;
+
+	if (obj->type != ACPI_TYPE_BUFFER || !obj->buffer.pointer ||
+	    obj->buffer.length < sizeof(*reg))
+		return false;
+
+	reg = (const struct acpi_power_register *)obj->buffer.pointer;
+	return reg->descriptor == ACPI_LPI_GENERIC_REGISTER_DESCRIPTOR &&
+	       reg->length == sizeof(*reg) -
+			      offsetof(struct acpi_power_register, space_id);
+}
+
+static int process_lpi_state_package(union acpi_object *lpi_pkg,
+				     struct acpi_lpi_state *lpi_state,
+				     acpi_handle handle,
+				     unsigned int state_idx, bool strict,
+				     bool hierarchy_strict)
 {
 	union acpi_object *lpi_pkg_elem, *obj;
 
-	if (lpi_pkg->type != ACPI_TYPE_PACKAGE || lpi_pkg->package.count < 7)
-		return;
+	if (lpi_pkg->type != ACPI_TYPE_PACKAGE ||
+	    lpi_pkg->package.count < (hierarchy_strict ? 9 : 7))
+		return hierarchy_strict ? -EINVAL : 0;
 
 	lpi_pkg_elem = lpi_pkg->package.elements;
 
@@ -1039,74 +1060,110 @@ static void process_lpi_state_package(union acpi_object *lpi_pkg,
 
 		if (obj->buffer.length < sizeof(*reg)) {
 			lpi_state_debug(handle, "Invalid register data", state_idx);
-			return;
+			return hierarchy_strict ? -EINVAL : 0;
 		}
 
 		reg = (struct acpi_power_register *)obj->buffer.pointer;
+		if (hierarchy_strict && !acpi_lpi_valid_register_buffer(obj)) {
+			lpi_state_debug(handle, "Invalid register descriptor", state_idx);
+			return -EINVAL;
+		}
 		if (reg->space_id != ACPI_ADR_SPACE_FIXED_HARDWARE) {
 			lpi_state_debug(handle, "Unsupported entry method", state_idx);
-			return;
+			return hierarchy_strict ? -EINVAL : 0;
 		}
 
 		lpi_state->entry_method = ACPI_CSTATE_FFH;
 		lpi_state->address = reg->address;
+		lpi_state->bit_width = reg->bit_width;
+		lpi_state->bit_offset = reg->bit_offset;
+		lpi_state->access_size = reg->access_size;
 	} else if (obj->type == ACPI_TYPE_INTEGER) {
 		lpi_state->entry_method = ACPI_CSTATE_INTEGER;
 		lpi_state->address = obj->integer.value;
 	} else {
 		lpi_state_debug(handle, "Invalid entry method", state_idx);
-		return;
+		return hierarchy_strict ? -EINVAL : 0;
 	}
 
-	if (obj_get_integer(&lpi_pkg_elem[0], &lpi_state->min_residency)) {
+	if (obj_get_integer(&lpi_pkg_elem[0], &lpi_state->min_residency,
+			    hierarchy_strict)) {
 		if (strict) {
 			lpi_state_debug(handle, "No min. residency", state_idx);
-			return;
+			return hierarchy_strict ? -EINVAL : 0;
 		}
 
 		lpi_state_debug(handle, "Assuming 10 us min. residency", state_idx);
 		lpi_state->min_residency = 10;
 	}
 
-	if (obj_get_integer(&lpi_pkg_elem[1], &lpi_state->wake_latency)) {
+	if (obj_get_integer(&lpi_pkg_elem[1], &lpi_state->wake_latency,
+			    hierarchy_strict)) {
 		if (strict) {
 			lpi_state_debug(handle, "No wake latency", state_idx);
-			return;
+			return hierarchy_strict ? -EINVAL : 0;
 		}
 
 		lpi_state_debug(handle, "Assuming 10 us wake latency", state_idx);
 		lpi_state->wake_latency = 10;
 	}
 
-	if (obj_get_integer(&lpi_pkg_elem[2], &lpi_state->flags))
+	if (obj_get_integer(&lpi_pkg_elem[2], &lpi_state->flags,
+			    hierarchy_strict)) {
+		if (hierarchy_strict)
+			return -EINVAL;
 		lpi_state->flags = 0;
+	}
+	if (hierarchy_strict &&
+	    (lpi_state->flags & ~ACPI_LPI_STATE_FLAGS_ENABLED))
+		return -EINVAL;
 
-	if (obj_get_integer(&lpi_pkg_elem[3], &lpi_state->arch_flags))
+	if (obj_get_integer(&lpi_pkg_elem[3], &lpi_state->arch_flags,
+			    hierarchy_strict)) {
+		if (hierarchy_strict)
+			return -EINVAL;
 		lpi_state->arch_flags = 0;
+	}
 
-	if (obj_get_integer(&lpi_pkg_elem[4], &lpi_state->res_cnt_freq))
+	if (obj_get_integer(&lpi_pkg_elem[4], &lpi_state->res_cnt_freq,
+			    hierarchy_strict)) {
+		if (hierarchy_strict)
+			return -EINVAL;
 		lpi_state->res_cnt_freq = 1;
+	}
 
-	if (obj_get_integer(&lpi_pkg_elem[5], &lpi_state->enable_parent_state))
+	if (obj_get_integer(&lpi_pkg_elem[5], &lpi_state->enable_parent_state,
+			    hierarchy_strict)) {
+		if (hierarchy_strict)
+			return -EINVAL;
 		lpi_state->enable_parent_state = 0;
+	}
 
 	/* Skip elements [7-8] i.e. Residency/Usage counters. */
+	if (hierarchy_strict &&
+	    (!acpi_lpi_valid_register_buffer(&lpi_pkg_elem[7]) ||
+	     !acpi_lpi_valid_register_buffer(&lpi_pkg_elem[8])))
+		return -EINVAL;
 
 	/*
 	 * Avoid out-of-bounds access if the size of the package is less than
 	 * expected.
 	 */
 	if (lpi_pkg->package.count < 10)
-		return;
+		return 0;
 
 	obj = &lpi_pkg_elem[9];
 	if (obj->type == ACPI_TYPE_STRING)
 		strscpy(lpi_state->desc, obj->string.pointer, ACPI_CX_DESC_LEN);
+	else if (hierarchy_strict)
+		return -EINVAL;
+
+	return 0;
 }
 
 static int acpi_processor_evaluate_lpi(acpi_handle handle,
 				       struct acpi_lpi_states_array *info,
-				       bool strict)
+				       bool strict, bool hierarchy_strict)
 {
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 	union acpi_object *lpi_data, *lpi_pkg;
@@ -1132,6 +1189,14 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 		goto end;
 	}
 
+	if (hierarchy_strict &&
+	    (lpi_data->package.elements[0].type != ACPI_TYPE_INTEGER ||
+	     lpi_data->package.elements[0].integer.value)) {
+		acpi_handle_debug(handle, "Invalid _LPI revision\n");
+		ret = -ENODATA;
+		goto end;
+	}
+
 	if (lpi_data->package.elements[1].type != ACPI_TYPE_INTEGER) {
 		acpi_handle_debug(handle, "Invalid _LPI level ID type\n");
 		ret = -ENODATA;
@@ -1139,15 +1204,16 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 	}
 	level_id = lpi_data->package.elements[1].integer.value;
 
-	if (obj_get_integer(&lpi_data->package.elements[2],
-			    &lpi_pkg_count)) {
+	if (obj_get_integer(&lpi_data->package.elements[2], &lpi_pkg_count,
+			    hierarchy_strict)) {
 		acpi_handle_debug(handle, "Invalid _LPI state count type\n");
 		ret = -ENODATA;
 		goto end;
 	}
 
 	/* Validate number of power states. */
-	if (!lpi_pkg_count || lpi_pkg_count != lpi_data->package.count - 3) {
+	if (!lpi_pkg_count || lpi_pkg_count != lpi_data->package.count - 3 ||
+	    (hierarchy_strict && lpi_pkg_count > U16_MAX)) {
 		acpi_handle_debug(handle, "Invalid _LPI state count\n");
 		ret = -ENODATA;
 		goto end;
@@ -1168,8 +1234,11 @@ static int acpi_processor_evaluate_lpi(acpi_handle handle,
 	for (state_idx = 1; state_idx <= lpi_pkg_count; state_idx++) {
 		lpi_state->index = state_idx;
 		lpi_state->level_id = level_id;
-		process_lpi_state_package(lpi_pkg++, lpi_state++, handle,
-					  state_idx, strict);
+		ret = process_lpi_state_package(lpi_pkg++, lpi_state++, handle,
+						state_idx, strict,
+						hierarchy_strict);
+		if (ret)
+			goto end;
 	}
 
 	acpi_handle_debug(handle, "Found %u power states\n", lpi_pkg_count);
@@ -1178,12 +1247,24 @@ end:
 	return ret;
 }
 
-#define ACPI_LPI_STATE_FLAGS_ENABLED			BIT(0)
-
 static void stash_composite_state(struct acpi_lpi_states_array *curr_level,
 				  struct acpi_lpi_state *t)
 {
 	curr_level->composite_states[curr_level->composite_states_size++] = t;
+}
+
+static bool
+acpi_lpi_eps_within_parent(const struct acpi_lpi_states_array *child,
+			   unsigned int parent_state_count)
+{
+	unsigned int i;
+
+	for (i = 0; i < child->size; i++)
+		if ((child->entries[i].flags & ACPI_LPI_STATE_FLAGS_ENABLED) &&
+		    child->entries[i].enable_parent_state > parent_state_count)
+			return false;
+
+	return true;
 }
 
 static bool too_many_states(acpi_handle handle, unsigned int state_count)
@@ -1258,7 +1339,11 @@ static unsigned int flatten_lpi_states(acpi_handle handle,
  * folded into @pr_power. Level 0 is the processor leaf level, and each parent
  * container increments the level by one.
  *
- * If @cb returns an error, extraction aborts.
+ * When both @strict and @cb are set, validate the complete hierarchy-facing
+ * package contract, including the revision, reserved flags, counter-register
+ * objects, and Enabled Parent State bounds.  The stricter checks are limited
+ * to callback users so the legacy flattened parser keeps its compatibility
+ * behavior.  If @cb returns an error, extraction aborts.
  *
  * Return: 0 on success, or a negative error code on failure.
  */
@@ -1273,6 +1358,7 @@ int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
 	unsigned int state_count = 0;
 	unsigned int level = 0;
 	unsigned int i;
+	bool hierarchy_strict = strict && cb;
 	int ret;
 
 	if (!osc_pc_lpi_support_confirmed &&
@@ -1282,7 +1368,8 @@ int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
 	curr = &info[0];
 	curr->composite_states_size = 0;
 
-	ret = acpi_processor_evaluate_lpi(handle, curr, strict);
+	ret = acpi_processor_evaluate_lpi(handle, curr, strict,
+					  hierarchy_strict);
 	if (ret)
 		goto out_free;
 
@@ -1313,15 +1400,15 @@ int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
 		stash_composite_state(curr, flpi);
 	}
 
-	kfree(curr->entries);
-	curr->entries = NULL;
-
 	/*
 	 * If there are no _LPI states at the first level, there are no _LPI
 	 * states at all.
 	 */
-	if (!state_count)
+	if (!state_count) {
+		kfree(curr->entries);
+		curr->entries = NULL;
 		return -ENODATA;
+	}
 
 	prev = curr;
 	curr = &info[1];
@@ -1345,13 +1432,21 @@ int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
 		level++;
 		curr->composite_states_size = 0;
 
-		ret = acpi_processor_evaluate_lpi(handle, curr, strict);
+		ret = acpi_processor_evaluate_lpi(handle, curr, strict,
+						  hierarchy_strict);
 		if (ret) {
 			if (cb)
 				goto out_free;
 			kfree(curr->entries);
 			curr->entries = NULL;
 			break;
+		}
+		if (hierarchy_strict &&
+		    !acpi_lpi_eps_within_parent(prev, curr->size)) {
+			acpi_handle_debug(handle,
+					  "_LPI enabled parent state is out of range\n");
+			ret = -EINVAL;
+			goto out_free;
 		}
 
 		if (cb) {
@@ -1364,11 +1459,19 @@ int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
 		state_count = flatten_lpi_states(pr_handle, pr_power->lpi_states,
 						 state_count, curr, prev);
 
-		kfree(curr->entries);
-		curr->entries = NULL;
+		kfree(prev->entries);
+		prev->entries = NULL;
 
 		tmp = prev, prev = curr, curr = tmp;
 	}
+	if (hierarchy_strict && !acpi_lpi_eps_within_parent(prev, 0)) {
+		acpi_handle_debug(handle,
+				  "Top-level _LPI state enables a parent\n");
+		ret = -EINVAL;
+		goto out_free;
+	}
+	kfree(prev->entries);
+	prev->entries = NULL;
 
 	/* reset the index after flattening */
 	for (i = 0; i < state_count; i++)
@@ -1379,7 +1482,8 @@ int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
 	return 0;
 
 out_free:
-	kfree(curr->entries);
+	kfree(info[0].entries);
+	kfree(info[1].entries);
 	return ret;
 }
 EXPORT_SYMBOL_NS_GPL(acpi_processor_extract_lpi_info_cb, "ACPI_PROCESSOR_IDLE");
