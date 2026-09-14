@@ -50,6 +50,7 @@ static unsigned int latency_factor __read_mostly = 2;
 module_param(latency_factor, uint, 0644);
 
 static DEFINE_PER_CPU(struct cpuidle_device *, acpi_cpuidle_device);
+static DEFINE_MUTEX(acpi_idle_rebuild_lock);
 
 static struct cpuidle_driver acpi_idle_driver = {
 	.name =		"acpi_idle",
@@ -1026,14 +1027,20 @@ int acpi_processor_hotplug(struct acpi_processor *pr)
 int acpi_processor_power_state_has_changed(struct acpi_processor *pr)
 {
 	int cpu;
+	int ret = 0;
 	struct acpi_processor *_pr;
 	struct cpuidle_device *dev;
 
 	if (disabled_by_idle_boot_param())
 		return 0;
+	if (pr->id != 0)
+		return 0;
 
-	if (!pr->flags.power_setup_done)
-		return -ENODEV;
+	mutex_lock(&acpi_idle_rebuild_lock);
+	if (!pr->flags.power_setup_done) {
+		ret = -ENODEV;
+		goto out;
+	}
 
 	/*
 	 * FIXME:  Design the ACPI notification to make it once per
@@ -1041,7 +1048,7 @@ int acpi_processor_power_state_has_changed(struct acpi_processor *pr)
 	 * to make the code that updates C-States be called once.
 	 */
 
-	if (pr->id == 0 && cpuidle_get_driver() == &acpi_idle_driver) {
+	if (cpuidle_get_driver() == &acpi_idle_driver) {
 		/* Protect against cpu-hotplug */
 		cpus_read_lock();
 
@@ -1082,7 +1089,9 @@ int acpi_processor_power_state_has_changed(struct acpi_processor *pr)
 		cpus_read_unlock();
 	}
 
-	return 0;
+out:
+	mutex_unlock(&acpi_idle_rebuild_lock);
+	return ret;
 }
 
 void acpi_processor_register_idle_driver(void)
