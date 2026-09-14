@@ -1412,6 +1412,8 @@ static const struct mtk_eint_hw mt8901_eint_hw = {
 	.db_time   = debounce_time_mt8901,
 };
 
+static const unsigned int eint_event_mt8901[] = {20};
+
 static const struct mtk_pin_soc mt8901_data = {
 	.reg_cal = mt8901_reg_cals,
 	.pins = mtk_pins_mt8901,
@@ -1432,6 +1434,8 @@ static const struct mtk_pin_soc mt8901_data = {
 	.drive_get = mtk_pinconf_drive_get_rev1,
 	.adv_drive_set = mtk_pinconf_adv_drive_set_raw,
 	.adv_drive_get = mtk_pinconf_adv_drive_get_raw,
+	.eint_event = eint_event_mt8901,
+	.total_wake_eints =	ARRAY_SIZE(eint_event_mt8901),
 };
 
 static const struct acpi_device_id mt8901_pinctrl_acpi_match[] = {
