@@ -20,12 +20,15 @@
 #include <linux/tick.h>
 #include <linux/cpuidle.h>
 #include <linux/cpu.h>
+#include <linux/cpuhotplug.h>
 #include <linux/minmax.h>
 #include <linux/mutex.h>
 #include <linux/perf_event.h>
 #include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
+#include <linux/smp.h>
 #include <linux/suspend.h>
+#include <linux/syscore_ops.h>
 #include <linux/workqueue.h>
 #include <acpi/processor.h>
 #include <linux/context_tracking.h>
@@ -78,8 +81,8 @@ struct acpi_idle_data {
 	struct device *domain_dev;
 	struct list_head runtime_states;
 	unsigned int leaf_lpi_count;
-	bool runtime_pm_active;
-	bool genpd_suspended;
+	bool consumer_active;	/* CPU logically owns an active consumer. */
+	bool genpd_suspended;	/* Paired direct genpd suspend on PREEMPT_RT. */
 };
 
 static unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER;
@@ -98,23 +101,29 @@ static DEFINE_PER_CPU(struct acpi_idle_data *, acpi_idle_data);
 
 static LIST_HEAD(domain_map);
 static DEFINE_MUTEX(domain_map_lock);
-static bool acpi_lpi_coordinated;
 
 enum acpi_lpi_lifecycle_state {
 	ACPI_LPI_BUILDING,
 	ACPI_LPI_DIRECT,
 	ACPI_LPI_UPDATING,
+	ACPI_LPI_COORDINATED,
 };
 
 static DEFINE_MUTEX(acpi_lpi_lifecycle_lock);
 static enum acpi_lpi_lifecycle_state acpi_lpi_lifecycle = ACPI_LPI_BUILDING;
+static enum cpuhp_state acpi_lpi_cpuhp_state = CPUHP_INVALID;
+static cpumask_t acpi_lpi_syscore_suspended_cpus;
 static cpumask_t acpi_lpi_excluded_cpus;
+static bool acpi_lpi_system_sleep;
+static bool acpi_lpi_syscore_suspending;
+static bool acpi_lpi_rebuild_pending;
 
 static void acpi_lpi_rebuild_workfn(struct work_struct *work);
 static DECLARE_WORK(acpi_lpi_rebuild_work, acpi_lpi_rebuild_workfn);
 
 static void __acpi_processor_power_init(struct acpi_processor *pr);
-static void acpi_processor_power_exit_locked(struct acpi_processor *pr);
+static void acpi_processor_power_exit_locked(unsigned int cpu,
+					     struct acpi_processor *pr);
 
 #define ACPI_LPI_STATE_FLAGS_ENABLED			BIT(0)
 
@@ -1061,7 +1070,8 @@ static void acpi_lpi_clear_selected_states(struct acpi_idle_data *data)
 	data->domain_state = NULL;
 }
 
-static void acpi_lpi_reject_selected_states(struct acpi_idle_data *data)
+static void acpi_lpi_reject_selected_states(struct acpi_idle_data *data,
+					    bool s2idle)
 {
 	struct acpi_lpi_runtime_state *runtime_state;
 
@@ -1070,7 +1080,7 @@ static void acpi_lpi_reject_selected_states(struct acpi_idle_data *data)
 			continue;
 
 		pm_genpd_inc_rejected(runtime_state->genpd,
-				      runtime_state->state_idx, false);
+				      runtime_state->state_idx, s2idle);
 	}
 
 	acpi_lpi_clear_selected_states(data);
@@ -1195,10 +1205,27 @@ static int acpi_lpi_pd_power_off(struct generic_pm_domain *domain)
 	struct acpi_idle_data *data;
 	unsigned int cpu = raw_smp_processor_id();
 
-	if (!READ_ONCE(acpi_lpi_coordinated))
+	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_COORDINATED)
 		return 0;
-	if (!cpumask_test_cpu(cpu, domain->cpus))
+	if (READ_ONCE(acpi_lpi_rebuild_pending))
+		return -EBUSY;
+
+	if (!cpumask_test_cpu(cpu, domain->cpus)) {
+		/*
+		 * Runtime PM can account a domain from another CPU after all of
+		 * its members are offline. No CPU enters firmware in that case,
+		 * so there is no per-CPU FFH state to select. Syscore performs the
+		 * same accounting after secondary CPUs have stopped, while the
+		 * online mask still describes their pre-suspend state.
+		 */
+		if (READ_ONCE(acpi_lpi_syscore_suspending))
+			return 0;
+		if (!cpumask_empty(domain->cpus) &&
+		    !cpumask_intersects(domain->cpus, cpu_online_mask))
+			return 0;
+
 		return -EXDEV;
+	}
 
 	data = this_cpu_read(acpi_idle_data);
 	if (!data)
@@ -1219,7 +1246,7 @@ static int acpi_lpi_pd_power_on(struct generic_pm_domain *domain)
 	struct acpi_idle_data *data;
 	unsigned int cpu = raw_smp_processor_id();
 
-	if (!READ_ONCE(acpi_lpi_coordinated))
+	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_COORDINATED)
 		return 0;
 	if (!cpumask_test_cpu(cpu, domain->cpus))
 		return 0;
@@ -1629,6 +1656,7 @@ static int acpi_lpi_attach_domain_device(struct acpi_processor *pr,
 	}
 	pm_runtime_enable(dev);
 	pm_runtime_irq_safe(dev);
+	dev_pm_syscore_device(dev, true);
 	data->domain_dev = dev;
 	return 0;
 }
@@ -1639,7 +1667,9 @@ static int acpi_processor_lpi_runtime_get(struct acpi_idle_data *data)
 
 	if (!data || !data->domain_dev)
 		return -ENODEV;
-	if (data->runtime_pm_active)
+	if (WARN_ON_ONCE(data->consumer_active && data->genpd_suspended))
+		return -EINVAL;
+	if (data->consumer_active)
 		return 0;
 
 	if (IS_ENABLED(CONFIG_PREEMPT_RT)) {
@@ -1653,7 +1683,7 @@ static int acpi_processor_lpi_runtime_get(struct acpi_idle_data *data)
 			return ret;
 	}
 
-	data->runtime_pm_active = true;
+	data->consumer_active = true;
 	return 0;
 }
 
@@ -1661,7 +1691,11 @@ static int acpi_processor_lpi_runtime_put(struct acpi_idle_data *data)
 {
 	int ret;
 
-	if (!data || !data->domain_dev || !data->runtime_pm_active)
+	if (!data || !data->domain_dev)
+		return 0;
+	if (WARN_ON_ONCE(data->consumer_active && data->genpd_suspended))
+		return -EINVAL;
+	if (!data->consumer_active)
 		return 0;
 
 	if (IS_ENABLED(CONFIG_PREEMPT_RT)) {
@@ -1677,7 +1711,7 @@ static int acpi_processor_lpi_runtime_put(struct acpi_idle_data *data)
 		}
 	}
 
-	data->runtime_pm_active = false;
+	data->consumer_active = false;
 	data->domain_state = NULL;
 	return 0;
 }
@@ -1691,11 +1725,12 @@ static int acpi_lpi_detach_domain_device(struct acpi_idle_data *data)
 
 	if (!data || !data->domain_dev)
 		return 0;
-	if (data->runtime_pm_active)
+	if (data->consumer_active)
 		return -EBUSY;
 
 	dev = data->domain_dev;
 	pd = data->base_map_entry ? data->base_map_entry->genpd : NULL;
+	dev_pm_syscore_device(dev, false);
 	was_genpd_suspended = data->genpd_suspended;
 	if (was_genpd_suspended) {
 		dev_pm_genpd_resume(dev);
@@ -1715,6 +1750,7 @@ static int acpi_lpi_detach_domain_device(struct acpi_idle_data *data)
 			dev_pm_genpd_suspend(dev);
 			data->genpd_suspended = true;
 		}
+		dev_pm_syscore_device(dev, true);
 		return ret;
 	}
 
@@ -1957,9 +1993,9 @@ out:
 	return ret;
 }
 
-static int acpi_processor_lpi_detach(struct acpi_processor *pr)
+static int acpi_processor_lpi_detach_cpu(unsigned int cpu)
 {
-	struct acpi_idle_data *data = per_cpu(acpi_idle_data, pr->id);
+	struct acpi_idle_data *data = per_cpu(acpi_idle_data, cpu);
 	bool was_active;
 	int pm_ret;
 	int ret;
@@ -1967,7 +2003,7 @@ static int acpi_processor_lpi_detach(struct acpi_processor *pr)
 	if (!data)
 		return 0;
 
-	was_active = data->runtime_pm_active;
+	was_active = data->consumer_active;
 	ret = acpi_processor_lpi_runtime_put(data);
 	if (ret)
 		return ret;
@@ -1978,7 +2014,7 @@ static int acpi_processor_lpi_detach(struct acpi_processor *pr)
 			pm_ret = acpi_processor_lpi_runtime_get(data);
 			if (pm_ret)
 				pr_warn("%s: failed to restore CPU%u runtime PM: %d\n",
-					__func__, pr->id, pm_ret);
+					__func__, cpu, pm_ret);
 		}
 		return ret;
 	}
@@ -1990,21 +2026,26 @@ static int acpi_processor_lpi_detach(struct acpi_processor *pr)
 	return acpi_lpi_remove_unused_domains();
 }
 
-static int acpi_processor_free_idle_data(struct acpi_processor *pr)
+static int acpi_processor_free_idle_data_cpu(unsigned int cpu)
 {
-	struct acpi_idle_data *data = per_cpu(acpi_idle_data, pr->id);
+	struct acpi_idle_data *data = per_cpu(acpi_idle_data, cpu);
 	int ret;
 
 	if (!data)
 		return 0;
 
-	ret = acpi_processor_lpi_detach(pr);
+	ret = acpi_processor_lpi_detach_cpu(cpu);
 	if (ret)
 		return ret;
 
 	kfree(data);
-	per_cpu(acpi_idle_data, pr->id) = NULL;
+	per_cpu(acpi_idle_data, cpu) = NULL;
 	return 0;
+}
+
+static int acpi_processor_free_idle_data(struct acpi_processor *pr)
+{
+	return acpi_processor_free_idle_data_cpu(pr->id);
 }
 
 static int acpi_processor_lpi_fallback_flat(struct acpi_processor *pr)
@@ -2182,8 +2223,9 @@ acpi_idle_lpi_enter_leaf(struct cpuidle_device *dev,
 }
 
 static int __cpuidle
-acpi_idle_lpi_enter_domain(struct cpuidle_device *dev,
-			   struct cpuidle_driver *drv, int index)
+__acpi_idle_lpi_enter_domain(struct cpuidle_device *dev,
+			     struct cpuidle_driver *drv, int index,
+			     bool s2idle)
 {
 	struct acpi_lpi_runtime_state *domain_state;
 	struct acpi_processor *pr;
@@ -2196,11 +2238,29 @@ acpi_idle_lpi_enter_domain(struct cpuidle_device *dev,
 	data = this_cpu_read(acpi_idle_data);
 	if (unlikely(!pr || !data || !data->domain_dev))
 		return -ENODEV;
+	if (READ_ONCE(acpi_lpi_rebuild_pending))
+		return acpi_idle_lpi_enter_leaf(dev, drv, index);
+
+	/* Device PM owns the shared hierarchy after system sleep begins. */
+	if (!s2idle &&
+	    (READ_ONCE(acpi_lpi_system_sleep) ||
+	     READ_ONCE(pm_suspend_target_state) != PM_SUSPEND_ON))
+		return acpi_idle_lpi_enter_leaf(dev, drv, index);
+	if (s2idle && WARN_ON_ONCE(!data->consumer_active ||
+				   data->genpd_suspended))
+		return acpi_idle_lpi_enter_leaf(dev, drv, index);
 
 	acpi_lpi_clear_selected_states(data);
-	ret = pm_runtime_put_sync_suspend(data->domain_dev);
+
+	if (s2idle) {
+		dev_pm_genpd_suspend(data->domain_dev);
+		ret = 0;
+	} else {
+		ret = pm_runtime_put_sync_suspend(data->domain_dev);
+		if (ret < 0)
+			pm_runtime_get_noresume(data->domain_dev);
+	}
 	if (ret < 0) {
-		pm_runtime_get_noresume(data->domain_dev);
 		acpi_lpi_clear_selected_states(data);
 		return ret;
 	}
@@ -2222,14 +2282,33 @@ acpi_idle_lpi_enter_domain(struct cpuidle_device *dev,
 		}
 	}
 	if (ret < 0)
-		acpi_lpi_reject_selected_states(data);
+		acpi_lpi_reject_selected_states(data, s2idle);
 
-	resume_ret = pm_runtime_resume_and_get(data->domain_dev);
-	if (resume_ret < 0)
-		pm_runtime_get_noresume(data->domain_dev);
+	if (s2idle) {
+		dev_pm_genpd_resume(data->domain_dev);
+		resume_ret = 0;
+	} else {
+		resume_ret = pm_runtime_resume_and_get(data->domain_dev);
+		if (resume_ret < 0)
+			pm_runtime_get_noresume(data->domain_dev);
+	}
 
 	acpi_lpi_clear_selected_states(data);
 	return resume_ret < 0 ? resume_ret : ret;
+}
+
+static int __cpuidle
+acpi_idle_lpi_enter_domain(struct cpuidle_device *dev,
+			   struct cpuidle_driver *drv, int index)
+{
+	return __acpi_idle_lpi_enter_domain(dev, drv, index, false);
+}
+
+static int __cpuidle
+acpi_idle_lpi_enter_s2idle(struct cpuidle_device *dev,
+			   struct cpuidle_driver *drv, int index)
+{
+	return __acpi_idle_lpi_enter_domain(dev, drv, index, true);
 }
 
 static void acpi_processor_setup_lpi_states(struct acpi_processor *pr,
@@ -2237,10 +2316,10 @@ static void acpi_processor_setup_lpi_states(struct acpi_processor *pr,
 					    bool coordinated)
 {
 	struct acpi_idle_data *data = per_cpu(acpi_idle_data, pr->id);
-	int i;
 	struct acpi_lpi_state *lpi;
 	struct cpuidle_state *state;
 	unsigned int count = pr->power.count;
+	unsigned int i;
 
 	if (!pr->flags.has_lpi)
 		return;
@@ -2254,7 +2333,7 @@ static void acpi_processor_setup_lpi_states(struct acpi_processor *pr,
 		lpi = &pr->power.lpi_states[i];
 
 		state = &drv->states[i];
-		snprintf(state->name, CPUIDLE_NAME_LEN, "LPI-%d", i);
+		snprintf(state->name, CPUIDLE_NAME_LEN, "LPI-%u", i);
 		strscpy(state->desc, lpi->desc, CPUIDLE_DESC_LEN);
 		state->exit_latency = lpi->wake_latency;
 		state->target_residency = lpi->min_residency;
@@ -2272,19 +2351,24 @@ static void acpi_processor_setup_lpi_states(struct acpi_processor *pr,
 			state->enter = acpi_idle_lpi_enter_direct;
 		drv->safe_state_index = i;
 	}
-	if (coordinated && i && !IS_ENABLED(CONFIG_PREEMPT_RT))
-		drv->states[i - 1].enter = acpi_idle_lpi_enter_domain;
+	if (coordinated && i) {
+		drv->states[i - 1].enter_s2idle = acpi_idle_lpi_enter_s2idle;
+		if (!IS_ENABLED(CONFIG_PREEMPT_RT))
+			drv->states[i - 1].enter = acpi_idle_lpi_enter_domain;
+	}
 
 	drv->state_count = i;
 }
 
 /**
- * acpi_processor_setup_cpuidle_states- prepares and configures cpuidle
- * global state data i.e. idle routines
+ * acpi_processor_setup_cpuidle_states_mode - configure CPU idle states
  *
  * @pr: the ACPI processor
+ * @coordinated: whether to install hierarchical LPI callbacks
  */
-static void acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
+static void
+acpi_processor_setup_cpuidle_states_mode(struct acpi_processor *pr,
+					 bool coordinated)
 {
 	int i;
 	struct cpuidle_driver *drv = acpi_idle_driver_for_cpu(pr->id);
@@ -2297,11 +2381,16 @@ static void acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
 		memset(&drv->states[i], 0, sizeof(drv->states[i]));
 
 	if (pr->flags.has_lpi) {
-		acpi_processor_setup_lpi_states(pr, drv, false);
+		acpi_processor_setup_lpi_states(pr, drv, coordinated);
 		return;
 	}
 
 	acpi_processor_setup_cstates(pr, drv);
+}
+
+static void acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
+{
+	acpi_processor_setup_cpuidle_states_mode(pr, false);
 }
 
 /**
@@ -2322,6 +2411,505 @@ static void acpi_processor_setup_cpuidle_dev(struct acpi_processor *pr,
 		acpi_processor_setup_cpuidle_cx(pr, dev);
 }
 
+static void acpi_lpi_disable_cpuidle_devices(struct cpumask *disabled)
+{
+	struct cpuidle_device *dev;
+	int cpu;
+
+	cpumask_clear(disabled);
+	for_each_possible_cpu(cpu) {
+		dev = per_cpu(acpi_cpuidle_device, cpu);
+		if (!dev || !dev->enabled)
+			continue;
+
+		cpuidle_disable_device(dev);
+		cpumask_set_cpu(cpu, disabled);
+	}
+}
+
+static int acpi_lpi_enable_cpuidle_devices(struct cpumask *disabled)
+{
+	struct cpuidle_device *dev;
+	int first_ret = 0;
+	int cpu;
+	int ret;
+
+	for_each_cpu(cpu, disabled) {
+		dev = per_cpu(acpi_cpuidle_device, cpu);
+		if (!dev)
+			continue;
+
+		ret = cpuidle_enable_device(dev);
+		if (ret)
+			pr_warn("CPU%d: failed to re-enable cpuidle: %d\n",
+				cpu, ret);
+		else
+			cpumask_clear_cpu(cpu, disabled);
+		if (ret && !first_ret)
+			first_ret = ret;
+	}
+
+	return first_ret;
+}
+
+static bool acpi_lpi_complete_cpu_coverage(void)
+{
+	struct acpi_lpi_genpd_map_entry *base;
+	struct acpi_processor *pr;
+	struct acpi_idle_data *data;
+	bool found = false;
+	int cpu;
+
+	for_each_present_cpu(cpu) {
+		if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+			return false;
+
+		pr = per_cpu(processors, cpu);
+		data = per_cpu(acpi_idle_data, cpu);
+		if (!pr || !pr->flags.power_setup_done || !pr->flags.has_lpi ||
+		    !data || !data->domain_dev || !data->base_map_entry)
+			return false;
+		if (!acpi_idle_driver_is_registered(cpu))
+			return false;
+
+		base = data->base_map_entry;
+		if (!base->genpd || base->genpd->state_count != 1 ||
+		    !data->leaf_lpi_count ||
+		    data->leaf_lpi_count > pr->power.count ||
+		    data->leaf_lpi_count > CPUIDLE_STATE_MAX ||
+		    !acpi_processor_ffh_lpi_is_wfi(&pr->power.lpi_states[0]))
+			return false;
+
+		found = true;
+	}
+
+	return found;
+}
+
+static void acpi_lpi_setup_cpuidle_states(bool coordinated)
+{
+	struct acpi_processor *pr;
+	int cpu;
+
+	for_each_present_cpu(cpu) {
+		if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+			continue;
+
+		pr = per_cpu(processors, cpu);
+		if (pr)
+			acpi_processor_setup_cpuidle_states_mode(pr, coordinated);
+	}
+}
+
+static int acpi_lpi_restore_runtime_pm(const struct cpumask *active)
+{
+	struct acpi_idle_data *data;
+	bool should_be_active;
+	int restore_ret;
+	int ret = 0;
+	int cpu;
+
+	for_each_present_cpu(cpu) {
+		if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+			continue;
+
+		data = per_cpu(acpi_idle_data, cpu);
+		if (!data || !data->domain_dev)
+			continue;
+
+		should_be_active = cpumask_test_cpu(cpu, active);
+		if (data->consumer_active == should_be_active)
+			continue;
+
+		if (should_be_active)
+			restore_ret = acpi_processor_lpi_runtime_get(data);
+		else
+			restore_ret = acpi_processor_lpi_runtime_put(data);
+		if (restore_ret) {
+			pr_warn("CPU%d: failed to restore LPI runtime PM: %d\n",
+				cpu, restore_ret);
+			if (!ret)
+				ret = restore_ret;
+		}
+	}
+
+	return ret;
+}
+
+static int acpi_lpi_sync_runtime_pm(struct cpumask *was_active)
+{
+	struct acpi_idle_data *data;
+	bool should_be_active;
+	int restore_ret;
+	int ret;
+	int cpu;
+
+	cpumask_clear(was_active);
+	for_each_present_cpu(cpu) {
+		if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+			continue;
+
+		data = per_cpu(acpi_idle_data, cpu);
+		if (!data)
+			return -ENODEV;
+		if (data->consumer_active)
+			cpumask_set_cpu(cpu, was_active);
+	}
+
+	for_each_present_cpu(cpu) {
+		if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+			continue;
+
+		data = per_cpu(acpi_idle_data, cpu);
+		if (!data)
+			return -ENODEV;
+		should_be_active = cpu_online(cpu);
+		if (data->consumer_active == should_be_active)
+			continue;
+
+		if (should_be_active)
+			ret = acpi_processor_lpi_runtime_get(data);
+		else
+			ret = acpi_processor_lpi_runtime_put(data);
+		if (!ret)
+			continue;
+
+		restore_ret = acpi_lpi_restore_runtime_pm(was_active);
+		return restore_ret ?: ret;
+	}
+
+	return 0;
+}
+
+static int acpi_idle_cpuhp_up(unsigned int cpu)
+{
+	struct acpi_idle_data *data;
+	int ret;
+
+	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_COORDINATED)
+		return 0;
+	if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+		return 0;
+
+	data = per_cpu(acpi_idle_data, cpu);
+	if (!data || !data->domain_dev)
+		return 0;
+
+	ret = acpi_processor_lpi_runtime_get(data);
+	if (ret)
+		pr_warn("CPU%u: failed to resume LPI domain: %d\n", cpu, ret);
+
+	return ret;
+}
+
+static int acpi_idle_cpuhp_down(unsigned int cpu)
+{
+	struct acpi_idle_data *data;
+	int ret;
+
+	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_COORDINATED)
+		return 0;
+	if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+		return 0;
+
+	data = per_cpu(acpi_idle_data, cpu);
+	if (!data || !data->domain_dev)
+		return 0;
+
+	ret = acpi_processor_lpi_runtime_put(data);
+	if (ret)
+		pr_warn("CPU%u: failed to suspend LPI domain: %d\n", cpu, ret);
+
+	/* CPU hotplug teardown callbacks cannot veto the transition. */
+	return 0;
+}
+
+static void acpi_idle_syscore_resume_devices(void)
+{
+	struct acpi_idle_data *data;
+	int ret;
+	int cpu;
+
+	for_each_cpu(cpu, &acpi_lpi_syscore_suspended_cpus) {
+		if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+			continue;
+
+		data = per_cpu(acpi_idle_data, cpu);
+		if (!data || !data->domain_dev)
+			continue;
+
+		dev_pm_genpd_resume(data->domain_dev);
+		if (pm_runtime_status_suspended(data->domain_dev)) {
+			ret = pm_runtime_set_active(data->domain_dev);
+			if (ret)
+				pr_warn("CPU%u: failed to reconcile LPI runtime PM: %d\n",
+					cpu, ret);
+		}
+		data->domain_state = NULL;
+	}
+
+	cpumask_clear(&acpi_lpi_syscore_suspended_cpus);
+	WRITE_ONCE(acpi_lpi_syscore_suspending, false);
+}
+
+static int acpi_idle_syscore_suspend(void *unused)
+{
+	struct acpi_idle_data *data;
+	int cpu;
+
+	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_COORDINATED)
+		return 0;
+	if (READ_ONCE(acpi_lpi_rebuild_pending))
+		return 0;
+
+	cpumask_clear(&acpi_lpi_syscore_suspended_cpus);
+	WRITE_ONCE(acpi_lpi_syscore_suspending, true);
+	for_each_possible_cpu(cpu) {
+		if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+			continue;
+
+		data = per_cpu(acpi_idle_data, cpu);
+		if (!data || !data->domain_dev)
+			continue;
+		if (IS_ENABLED(CONFIG_PREEMPT_RT) && data->genpd_suspended)
+			continue;
+
+		dev_pm_genpd_suspend(data->domain_dev);
+		cpumask_set_cpu(cpu, &acpi_lpi_syscore_suspended_cpus);
+	}
+
+	return 0;
+}
+
+static void acpi_idle_syscore_resume(void *unused)
+{
+	if (READ_ONCE(acpi_lpi_lifecycle) == ACPI_LPI_COORDINATED)
+		acpi_idle_syscore_resume_devices();
+}
+
+static const struct syscore_ops acpi_idle_syscore_ops = {
+	.suspend = acpi_idle_syscore_suspend,
+	.resume = acpi_idle_syscore_resume,
+};
+
+static struct syscore acpi_idle_syscore = {
+	.ops = &acpi_idle_syscore_ops,
+};
+
+static int acpi_idle_pm_notify(struct notifier_block *nb,
+			       unsigned long action, void *unused)
+{
+	switch (action) {
+	case PM_HIBERNATION_PREPARE:
+	case PM_RESTORE_PREPARE:
+	case PM_SUSPEND_PREPARE:
+		WRITE_ONCE(acpi_lpi_system_sleep, true);
+		if (READ_ONCE(acpi_lpi_lifecycle) == ACPI_LPI_COORDINATED)
+			kick_all_cpus_sync();
+		break;
+	case PM_POST_HIBERNATION:
+	case PM_POST_RESTORE:
+	case PM_POST_SUSPEND:
+		WRITE_ONCE(acpi_lpi_system_sleep, false);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block acpi_idle_pm_notifier = {
+	.notifier_call = acpi_idle_pm_notify,
+};
+
+static int acpi_lpi_activate_locked(void)
+{
+	cpumask_var_t disabled;
+	cpumask_var_t runtime_active;
+	enum cpuhp_state hp_state;
+	bool syscore_registered = false;
+	bool notifier_registered = false;
+	bool runtime_synced = false;
+	int cleanup_ret;
+	int ret;
+
+	lockdep_assert_held(&acpi_lpi_lifecycle_lock);
+
+	if (acpi_lpi_lifecycle != ACPI_LPI_DIRECT)
+		return 0;
+	if (!acpi_lpi_can_coordinate())
+		return -EOPNOTSUPP;
+	if (!READ_ONCE(acpi_idle_uses_per_cpu_drivers))
+		return -ENODEV;
+	if (READ_ONCE(pm_suspend_target_state) != PM_SUSPEND_ON)
+		return -EBUSY;
+	if (!alloc_cpumask_var(&disabled, GFP_KERNEL))
+		return -ENOMEM;
+	if (!alloc_cpumask_var(&runtime_active, GFP_KERNEL)) {
+		ret = -ENOMEM;
+		goto free_disabled;
+	}
+
+	ret = register_pm_notifier(&acpi_idle_pm_notifier);
+	if (ret)
+		goto free_mask;
+	notifier_registered = true;
+
+	register_syscore(&acpi_idle_syscore);
+	syscore_registered = true;
+
+	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
+					"acpi/idle:online",
+					acpi_idle_cpuhp_up,
+					acpi_idle_cpuhp_down);
+	if (ret < 0)
+		goto unregister_hooks;
+	hp_state = ret;
+
+	/* The CPUHP state now excludes CPU-set changes through publication. */
+	cpus_read_lock();
+	if (!acpi_lpi_complete_cpu_coverage()) {
+		ret = -ENODEV;
+		goto remove_cpuhp;
+	}
+	ret = acpi_lpi_sync_runtime_pm(runtime_active);
+	if (ret)
+		goto remove_cpuhp;
+	runtime_synced = true;
+
+	cpuidle_pause_and_lock();
+	acpi_lpi_disable_cpuidle_devices(disabled);
+	ret = acpi_processor_ffh_lpi_set_mode(true);
+	if (ret) {
+		cleanup_ret = acpi_lpi_enable_cpuidle_devices(disabled);
+		cpuidle_resume_and_unlock();
+		if (cleanup_ret)
+			ret = cleanup_ret;
+		goto remove_cpuhp;
+	}
+
+	acpi_lpi_setup_cpuidle_states(true);
+	ret = acpi_lpi_enable_cpuidle_devices(disabled);
+	if (ret) {
+		cleanup_ret = acpi_processor_ffh_lpi_set_mode(false);
+		if (!cleanup_ret) {
+			acpi_lpi_setup_cpuidle_states(false);
+			cleanup_ret = acpi_lpi_enable_cpuidle_devices(disabled);
+			cpuidle_resume_and_unlock();
+			if (cleanup_ret)
+				ret = cleanup_ret;
+			goto remove_cpuhp;
+		}
+
+		/* OSI mode is still active, so retain all coordination hooks. */
+		pr_err("failed to restore direct PSCI mode: %d\n", cleanup_ret);
+		acpi_lpi_cpuhp_state = hp_state;
+		WRITE_ONCE(acpi_lpi_lifecycle, ACPI_LPI_COORDINATED);
+		cleanup_ret = acpi_lpi_enable_cpuidle_devices(disabled);
+		if (cleanup_ret)
+			ret = cleanup_ret;
+		cpuidle_resume_and_unlock();
+		cpus_read_unlock();
+		free_cpumask_var(runtime_active);
+		free_cpumask_var(disabled);
+		return ret;
+	}
+
+	acpi_lpi_cpuhp_state = hp_state;
+	WRITE_ONCE(acpi_lpi_lifecycle, ACPI_LPI_COORDINATED);
+	cpuidle_resume_and_unlock();
+	cpus_read_unlock();
+	free_cpumask_var(runtime_active);
+	free_cpumask_var(disabled);
+
+	pr_info("hierarchical LPI coordination enabled\n");
+	return 0;
+
+remove_cpuhp:
+	if (runtime_synced) {
+		cleanup_ret = acpi_lpi_restore_runtime_pm(runtime_active);
+		if (cleanup_ret)
+			ret = cleanup_ret;
+	}
+	cpuhp_remove_state_nocalls_cpuslocked(hp_state);
+	cpus_read_unlock();
+unregister_hooks:
+	if (syscore_registered)
+		unregister_syscore(&acpi_idle_syscore);
+	if (notifier_registered)
+		unregister_pm_notifier(&acpi_idle_pm_notifier);
+	WRITE_ONCE(acpi_lpi_system_sleep, false);
+free_mask:
+	free_cpumask_var(runtime_active);
+
+free_disabled:
+	free_cpumask_var(disabled);
+	return ret;
+}
+
+static void acpi_lpi_try_activate(void)
+{
+	unsigned int sleep_flags;
+	int ret;
+
+	sleep_flags = lock_system_sleep();
+	mutex_lock(&acpi_lpi_lifecycle_lock);
+	ret = acpi_lpi_activate_locked();
+	mutex_unlock(&acpi_lpi_lifecycle_lock);
+	unlock_system_sleep(sleep_flags);
+
+	if (ret && ret != -EOPNOTSUPP && ret != -ENODEV)
+		pr_warn("hierarchical LPI activation failed: %d\n", ret);
+}
+
+static int acpi_lpi_deactivate_locked(void)
+{
+	cpumask_var_t disabled;
+	int enable_ret;
+	int ret;
+
+	lockdep_assert_held(&acpi_lpi_lifecycle_lock);
+
+	if (acpi_lpi_lifecycle != ACPI_LPI_COORDINATED)
+		return 0;
+	if (!alloc_cpumask_var(&disabled, GFP_KERNEL))
+		return -ENOMEM;
+
+	cpus_read_lock();
+	cpuidle_pause_and_lock();
+	acpi_lpi_disable_cpuidle_devices(disabled);
+	ret = acpi_processor_ffh_lpi_set_mode(false);
+	if (ret) {
+		enable_ret = acpi_lpi_enable_cpuidle_devices(disabled);
+		cpuidle_resume_and_unlock();
+		goto out_unlock_cpus;
+	}
+
+	acpi_lpi_setup_cpuidle_states(false);
+	WRITE_ONCE(acpi_lpi_lifecycle, ACPI_LPI_DIRECT);
+	enable_ret = acpi_lpi_enable_cpuidle_devices(disabled);
+	cpuidle_resume_and_unlock();
+
+	cpuhp_remove_state_nocalls_cpuslocked(acpi_lpi_cpuhp_state);
+	acpi_lpi_cpuhp_state = CPUHP_INVALID;
+	cpus_read_unlock();
+
+	unregister_syscore(&acpi_idle_syscore);
+	unregister_pm_notifier(&acpi_idle_pm_notifier);
+	WRITE_ONCE(acpi_lpi_syscore_suspending, false);
+	WRITE_ONCE(acpi_lpi_system_sleep, false);
+	cpumask_clear(&acpi_lpi_syscore_suspended_cpus);
+	free_cpumask_var(disabled);
+	pr_info("hierarchical LPI coordination disabled\n");
+	return enable_ret;
+
+out_unlock_cpus:
+	cpus_read_unlock();
+	free_cpumask_var(disabled);
+	return enable_ret ?: ret;
+}
+
 static int acpi_lpi_begin_update(bool *started, unsigned int *sleep_flags)
 {
 	int ret = 0;
@@ -2331,12 +2919,22 @@ static int acpi_lpi_begin_update(bool *started, unsigned int *sleep_flags)
 	mutex_lock(&acpi_lpi_lifecycle_lock);
 	switch (acpi_lpi_lifecycle) {
 	case ACPI_LPI_BUILDING:
+		ret = -EBUSY;
+		break;
 	case ACPI_LPI_UPDATING:
 		ret = -EBUSY;
 		break;
 	case ACPI_LPI_DIRECT:
-		WRITE_ONCE(acpi_lpi_lifecycle, ACPI_LPI_UPDATING);
-		*started = true;
+	case ACPI_LPI_COORDINATED:
+		ret = acpi_lpi_deactivate_locked();
+		if (acpi_lpi_lifecycle == ACPI_LPI_DIRECT) {
+			if (ret)
+				pr_warn("continuing LPI update with cpuidle disabled: %d\n",
+					ret);
+			WRITE_ONCE(acpi_lpi_lifecycle, ACPI_LPI_UPDATING);
+			*started = true;
+			ret = 0;
+		}
 		break;
 	}
 	mutex_unlock(&acpi_lpi_lifecycle_lock);
@@ -2346,8 +2944,11 @@ static int acpi_lpi_begin_update(bool *started, unsigned int *sleep_flags)
 	return ret;
 }
 
-static void acpi_lpi_end_update(bool started, unsigned int sleep_flags)
+static void acpi_lpi_end_update(bool started, unsigned int sleep_flags,
+				bool reactivate)
 {
+	int ret = 0;
+
 	if (!started)
 		return;
 
@@ -2356,9 +2957,14 @@ static void acpi_lpi_end_update(bool started, unsigned int sleep_flags)
 		goto out;
 
 	WRITE_ONCE(acpi_lpi_lifecycle, ACPI_LPI_DIRECT);
+	if (reactivate)
+		ret = acpi_lpi_activate_locked();
 out:
 	mutex_unlock(&acpi_lpi_lifecycle_lock);
 	unlock_system_sleep(sleep_flags);
+
+	if (ret && ret != -EOPNOTSUPP && ret != -ENODEV)
+		pr_warn("hierarchical LPI reactivation failed: %d\n", ret);
 }
 
 void acpi_processor_power_init_complete(void)
@@ -2373,14 +2979,15 @@ void acpi_processor_power_init_complete(void)
 			cpus_read_lock();
 			for_each_cpu(cpu, &acpi_lpi_excluded_cpus) {
 				pr = per_cpu(processors, cpu);
-				if (pr)
-					acpi_processor_power_exit_locked(pr);
+				acpi_processor_power_exit_locked(cpu, pr);
 			}
 			cpus_read_unlock();
 		}
 		WRITE_ONCE(acpi_lpi_lifecycle, ACPI_LPI_DIRECT);
 	}
 	mutex_unlock(&acpi_lpi_lifecycle_lock);
+
+	acpi_lpi_try_activate();
 }
 
 void acpi_processor_power_work_cancel(void)
@@ -2421,9 +3028,13 @@ int acpi_processor_hotplug(struct acpi_processor *pr)
 
 	if (!pr->flags.power_setup_done || !dev)
 		return -ENODEV;
-	if (acpi_lpi_uses_topology() &&
-	    READ_ONCE(acpi_lpi_lifecycle) == ACPI_LPI_UPDATING)
-		return -EBUSY;
+	if (acpi_lpi_uses_topology()) {
+		/* The dedicated LPI CPUHP state owns this mode. */
+		if (READ_ONCE(acpi_lpi_lifecycle) == ACPI_LPI_COORDINATED)
+			return 0;
+		if (READ_ONCE(acpi_lpi_lifecycle) == ACPI_LPI_UPDATING)
+			return -EBUSY;
+	}
 
 	cpuidle_pause_and_lock();
 	cpuidle_disable_device(dev);
@@ -2602,7 +3213,7 @@ static int acpi_lpi_rebuild_idle_states(void)
 
 out:
 	cpus_read_unlock();
-	acpi_lpi_end_update(update_started, sleep_flags);
+	acpi_lpi_end_update(update_started, sleep_flags, !ret);
 	return ret;
 }
 
@@ -2635,10 +3246,29 @@ out:
 
 static void acpi_lpi_rebuild_workfn(struct work_struct *work)
 {
+	bool retry;
 	int ret;
 
 	mutex_lock(&acpi_idle_rebuild_lock);
-	ret = acpi_lpi_rebuild_idle_states();
+	do {
+		ret = acpi_lpi_rebuild_idle_states();
+		retry = false;
+
+		/*
+		 * CPU hot-add can run after a rebuild drops its CPU read lock but
+		 * before this worker finishes. Recheck coverage while excluding a
+		 * new hot-add, and repeat if the published topology is already stale.
+		 */
+		cpus_read_lock();
+		if (READ_ONCE(acpi_lpi_rebuild_pending)) {
+			if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_COORDINATED ||
+			    acpi_lpi_complete_cpu_coverage())
+				WRITE_ONCE(acpi_lpi_rebuild_pending, false);
+			else if (!ret)
+				retry = true;
+		}
+		cpus_read_unlock();
+	} while (retry);
 	mutex_unlock(&acpi_idle_rebuild_lock);
 	if (ret)
 		pr_warn("deferred LPI hierarchy rebuild failed: %d\n", ret);
@@ -2653,17 +3283,15 @@ static int acpi_processor_free_all_idle_data(void)
 
 	for_each_possible_cpu(cpu) {
 		pr = per_cpu(processors, cpu);
-		if (!pr)
-			continue;
-
-		ret = acpi_processor_free_idle_data(pr);
+		ret = acpi_processor_free_idle_data_cpu(cpu);
 		if (ret) {
 			pr_warn("CPU%u: failed to clean up idle data: %d\n",
-				pr->id, ret);
+				cpu, ret);
 			if (!first_ret)
 				first_ret = ret;
 		}
-		pr->flags.power_setup_done = 0;
+		if (pr)
+			pr->flags.power_setup_done = 0;
 	}
 
 	return first_ret;
@@ -2894,8 +3522,11 @@ void acpi_processor_power_init(struct acpi_processor *pr)
 {
 	/* A runtime CPU addition is rebuilt after its full start succeeds. */
 	if (acpi_lpi_uses_topology() &&
-	    READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_BUILDING)
+	    READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_BUILDING) {
+		/* Block coordinated entry before CPU-online publication. */
+		WRITE_ONCE(acpi_lpi_rebuild_pending, true);
 		return;
+	}
 
 	__acpi_processor_power_init(pr);
 }
@@ -2906,8 +3537,10 @@ void acpi_processor_power_rebuild_deferred(struct acpi_processor *pr)
 		return;
 
 	cpumask_clear_cpu(pr->id, &acpi_lpi_excluded_cpus);
-	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_BUILDING)
+	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_BUILDING) {
+		WRITE_ONCE(acpi_lpi_rebuild_pending, true);
 		schedule_work(&acpi_lpi_rebuild_work);
+	}
 }
 
 static void acpi_processor_power_exit_direct(struct acpi_processor *pr)
@@ -2930,36 +3563,39 @@ static void acpi_processor_power_exit_direct(struct acpi_processor *pr)
 	pr->flags.power_setup_done = 0;
 }
 
-static void acpi_processor_power_exit_locked(struct acpi_processor *pr)
+static void acpi_processor_power_exit_locked(unsigned int cpu,
+					     struct acpi_processor *pr)
 {
-	struct cpuidle_device *dev = per_cpu(acpi_cpuidle_device, pr->id);
+	struct cpuidle_device *dev = per_cpu(acpi_cpuidle_device, cpu);
 	struct acpi_idle_data *data;
 	int ret;
 
 	lockdep_assert_held(&acpi_lpi_lifecycle_lock);
-	cpumask_set_cpu(pr->id, &acpi_lpi_excluded_cpus);
+	cpumask_set_cpu(cpu, &acpi_lpi_excluded_cpus);
 
 	if (dev) {
 		cpuidle_pause_and_lock();
 		cpuidle_unregister_device_no_lock(dev);
-		per_cpu(acpi_cpuidle_device, pr->id) = NULL;
+		per_cpu(acpi_cpuidle_device, cpu) = NULL;
 		kfree(dev);
 		cpuidle_resume_and_unlock();
 	}
 
-	ret = acpi_processor_free_idle_data(pr);
+	ret = acpi_processor_free_idle_data_cpu(cpu);
 	if (ret) {
-		data = per_cpu(acpi_idle_data, pr->id);
+		data = per_cpu(acpi_idle_data, cpu);
 		if (data && !data->domain_dev) {
 			kfree(data);
-			per_cpu(acpi_idle_data, pr->id) = NULL;
+			per_cpu(acpi_idle_data, cpu) = NULL;
 		}
 		pr_warn("CPU%u: retained LPI resources after cleanup failure: %d\n",
-			pr->id, ret);
+			cpu, ret);
 	}
 
-	pr->flags.power = 0;
-	pr->flags.power_setup_done = 0;
+	if (pr) {
+		pr->flags.power = 0;
+		pr->flags.power_setup_done = 0;
+	}
 }
 
 void acpi_processor_power_init_abort(struct acpi_processor *pr)
@@ -2973,6 +3609,10 @@ void acpi_processor_power_init_abort(struct acpi_processor *pr)
 
 	/* The caller holds the CPU hotplug writer lock; cleanup is deferred. */
 	cpumask_set_cpu(pr->id, &acpi_lpi_excluded_cpus);
+	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_BUILDING) {
+		WRITE_ONCE(acpi_lpi_rebuild_pending, true);
+		schedule_work(&acpi_lpi_rebuild_work);
+	}
 }
 
 void acpi_processor_power_exit(struct acpi_processor *pr)
@@ -2988,7 +3628,7 @@ void acpi_processor_power_exit(struct acpi_processor *pr)
 
 	sleep_flags = lock_system_sleep();
 	mutex_lock(&acpi_lpi_lifecycle_lock);
-	acpi_processor_power_exit_locked(pr);
+	acpi_processor_power_exit_locked(pr->id, pr);
 	mutex_unlock(&acpi_lpi_lifecycle_lock);
 	unlock_system_sleep(sleep_flags);
 }
