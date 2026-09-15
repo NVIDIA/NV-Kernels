@@ -9,6 +9,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/limits.h>
 #include <linux/slab.h>
 #include <linux/seq_file.h>
 #include <linux/cgroup.h>
@@ -16,6 +17,24 @@
 #include <linux/cgroup_rdma.h>
 
 #define RDMACG_MAX_STR "max"
+
+enum rdmacg_limit_tokens {
+	RDMACG_DEVICE_INDEX,
+	RDMACG_HCA_HANDLE_VAL,
+	RDMACG_HCA_HANDLE_MAX,
+	RDMACG_HCA_OBJECT_VAL,
+	RDMACG_HCA_OBJECT_MAX,
+	NR_RDMACG_LIMIT_TOKENS,
+};
+
+static const match_table_t rdmacg_limit_tokens = {
+	{ RDMACG_DEVICE_INDEX,		"index=%u"	},
+	{ RDMACG_HCA_HANDLE_VAL,	"hca_handle=%d"	},
+	{ RDMACG_HCA_HANDLE_MAX,	"hca_handle=max"	},
+	{ RDMACG_HCA_OBJECT_VAL,	"hca_object=%d"	},
+	{ RDMACG_HCA_OBJECT_MAX,	"hca_object=max"	},
+	{ NR_RDMACG_LIMIT_TOKENS,	NULL			},
+};
 
 /*
  * Protects list of resource pools maintained on per cgroup basis
@@ -355,73 +374,53 @@ void rdmacg_unregister_device(struct rdmacg_device *device)
 }
 EXPORT_SYMBOL(rdmacg_unregister_device);
 
-static int parse_resource(char *c, int *intval)
+static struct rdmacg_device *
+rdmacg_get_device_locked(const char *name, bool has_index, u32 index)
 {
-	substring_t argstr;
-	char *name, *value = c;
-	size_t len;
-	int ret, i;
-
-	name = strsep(&value, "=");
-	if (!name || !value)
-		return -EINVAL;
-
-	i = match_string(rdmacg_resource_names, RDMACG_RESOURCE_MAX, name);
-	if (i < 0)
-		return i;
-
-	len = strlen(value);
-
-	argstr.from = value;
-	argstr.to = value + len;
-
-	ret = match_int(&argstr, intval);
-	if (ret >= 0) {
-		if (*intval < 0)
-			return -EINVAL;
-		return i;
-	}
-	if (strncmp(value, RDMACG_MAX_STR, len) == 0) {
-		*intval = S32_MAX;
-		return i;
-	}
-	return -EINVAL;
-}
-
-static int rdmacg_parse_limits(char *options,
-			       int *new_limits, unsigned long *enables)
-{
-	char *c;
-	int err = -EINVAL;
-
-	/* parse resource options */
-	while ((c = strsep(&options, " ")) != NULL) {
-		int index, intval;
-
-		index = parse_resource(c, &intval);
-		if (index < 0)
-			goto err;
-
-		new_limits[index] = intval;
-		*enables |= BIT(index);
-	}
-	return 0;
-
-err:
-	return err;
-}
-
-static struct rdmacg_device *rdmacg_get_device_locked(const char *name)
-{
+	struct rdmacg_device *match = NULL;
 	struct rdmacg_device *device;
 
 	lockdep_assert_held(&rdmacg_mutex);
 
-	list_for_each_entry(device, &rdmacg_devices, dev_node)
-		if (!strcmp(name, device->name))
-			return device;
+	list_for_each_entry(device, &rdmacg_devices, dev_node) {
+		if (strcmp(name, device->name))
+			continue;
 
-	return NULL;
+		if (has_index) {
+			if (device->index == index)
+				return device;
+			continue;
+		}
+
+		if (match)
+			return ERR_PTR(-ENOTUNIQ);
+		match = device;
+	}
+
+	return match ?: ERR_PTR(-ENODEV);
+}
+
+static bool
+rdmacg_device_name_unique_locked(const struct rdmacg_device *device)
+{
+	struct rdmacg_device *other;
+
+	lockdep_assert_held(&rdmacg_mutex);
+
+	list_for_each_entry(other, &rdmacg_devices, dev_node)
+		if (other != device && !strcmp(other->name, device->name))
+			return false;
+
+	return true;
+}
+
+static void rdmacg_print_device_key(struct seq_file *sf,
+				    const struct rdmacg_device *device)
+{
+	seq_puts(sf, device->name);
+	if (!rdmacg_device_name_unique_locked(device))
+		seq_printf(sf, " index=%u", device->index);
+	seq_putc(sf, ' ');
 }
 
 static ssize_t rdmacg_resource_set_max(struct kernfs_open_file *of,
@@ -432,8 +431,11 @@ static ssize_t rdmacg_resource_set_max(struct kernfs_open_file *of,
 	struct rdmacg_resource_pool *rpool;
 	struct rdmacg_device *device;
 	char *options = strstrip(buf);
+	char *p;
 	int *new_limits;
 	unsigned long enables = 0;
+	u32 dev_index = 0;
+	bool has_index = false;
 	int i = 0, ret = 0;
 
 	/* extract the device name first */
@@ -449,16 +451,59 @@ static ssize_t rdmacg_resource_set_max(struct kernfs_open_file *of,
 		goto err;
 	}
 
-	ret = rdmacg_parse_limits(options, new_limits, &enables);
-	if (ret)
-		goto parse_err;
+	/* parse the optional device index and resource limit tokens */
+	while ((p = strsep(&options, " \t\n"))) {
+		substring_t args[MAX_OPT_ARGS];
+		int tok, intval;
+
+		if (!*p)
+			continue;
+
+		tok = match_token(p, rdmacg_limit_tokens, args);
+		switch (tok) {
+		case RDMACG_DEVICE_INDEX:
+			if (has_index || match_uint(&args[0], &dev_index)) {
+				ret = -EINVAL;
+				goto parse_err;
+			}
+			has_index = true;
+			break;
+		case RDMACG_HCA_HANDLE_VAL:
+			if (match_int(&args[0], &intval) || intval < 0) {
+				ret = -EINVAL;
+				goto parse_err;
+			}
+			new_limits[RDMACG_RESOURCE_HCA_HANDLE] = intval;
+			enables |= BIT(RDMACG_RESOURCE_HCA_HANDLE);
+			break;
+		case RDMACG_HCA_HANDLE_MAX:
+			new_limits[RDMACG_RESOURCE_HCA_HANDLE] = S32_MAX;
+			enables |= BIT(RDMACG_RESOURCE_HCA_HANDLE);
+			break;
+		case RDMACG_HCA_OBJECT_VAL:
+			if (match_int(&args[0], &intval) || intval < 0) {
+				ret = -EINVAL;
+				goto parse_err;
+			}
+			new_limits[RDMACG_RESOURCE_HCA_OBJECT] = intval;
+			enables |= BIT(RDMACG_RESOURCE_HCA_OBJECT);
+			break;
+		case RDMACG_HCA_OBJECT_MAX:
+			new_limits[RDMACG_RESOURCE_HCA_OBJECT] = S32_MAX;
+			enables |= BIT(RDMACG_RESOURCE_HCA_OBJECT);
+			break;
+		default:
+			ret = -EINVAL;
+			goto parse_err;
+		}
+	}
 
 	/* acquire lock to synchronize with hot plug devices */
 	mutex_lock(&rdmacg_mutex);
 
-	device = rdmacg_get_device_locked(dev_name);
-	if (!device) {
-		ret = -ENODEV;
+	device = rdmacg_get_device_locked(dev_name, has_index, dev_index);
+	if (IS_ERR(device)) {
+		ret = PTR_ERR(device);
 		goto dev_err;
 	}
 
@@ -532,7 +577,7 @@ static int rdmacg_resource_read(struct seq_file *sf, void *v)
 	mutex_lock(&rdmacg_mutex);
 
 	list_for_each_entry(device, &rdmacg_devices, dev_node) {
-		seq_printf(sf, "%s ", device->name);
+		rdmacg_print_device_key(sf, device);
 
 		rpool = find_cg_rpool_locked(cg, device);
 		print_rpool_values(sf, rpool);
