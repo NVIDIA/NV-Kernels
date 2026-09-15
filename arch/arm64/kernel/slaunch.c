@@ -186,9 +186,9 @@ static const char *dcrtm_type_name(int type);
 static bool __init slaunch_parse_address_map(phys_addr_t dlme_data_pa,
 					     struct dlme_data_header *hdr)
 {
-	phys_addr_t map_pa;
-	u64 map_size;
-	u64 hdr_size, prot_size;
+	phys_addr_t map_pa, map_phys_end;
+	u64 dlme_data_size, map_offset, map_end;
+	u64 hdr_size, prot_size, map_size;
 	struct drtm_mem_region_hdr *map_hdr;
 	struct drtm_mem_region *regions;
 	u32 num_regions, i;
@@ -202,8 +202,15 @@ static bool __init slaunch_parse_address_map(phys_addr_t dlme_data_pa,
 		      le16_to_cpu(hdr->version));
 
 	hdr_size = le16_to_cpu(hdr->this_hdr_size);
+	dlme_data_size = le64_to_cpu(hdr->dlme_data_size);
 	prot_size = le64_to_cpu(hdr->protected_regions_size);
 	map_size = le64_to_cpu(hdr->address_map_size);
+
+	if (hdr_size < sizeof(*hdr)) {
+		pr_err("slaunch: DLME data header too small (%llu bytes)\n",
+		       hdr_size);
+		return false;
+	}
 
 	if (map_size == 0) {
 		pr_err("slaunch: D-CRTM address map is empty\n");
@@ -216,7 +223,14 @@ static bool __init slaunch_parse_address_map(phys_addr_t dlme_data_pa,
 		return false;
 	}
 
-	map_pa = dlme_data_pa + hdr_size + prot_size;
+	if (check_add_overflow(hdr_size, prot_size, &map_offset) ||
+	    check_add_overflow(map_offset, map_size, &map_end) ||
+	    map_end > dlme_data_size ||
+	    check_add_overflow(dlme_data_pa, map_offset, &map_pa) ||
+	    check_add_overflow(map_pa, map_size, &map_phys_end)) {
+		pr_err("slaunch: address map is outside DLME data\n");
+		return false;
+	}
 
 	/* Map temporarily to validate and log */
 	map_hdr = early_memremap(map_pa, (size_t)map_size);
