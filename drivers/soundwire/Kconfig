@@ -57,6 +57,30 @@ config SOUNDWIRE_QCOM
 	  enable this config option to get the SoundWire support for that
 	  device
 
+config SOUNDWIRE_MTK
+	tristate "MediaTek SoundWire Master driver"
+	select SOUNDWIRE_GENERIC_ALLOCATION
+	depends on SND_SOC && ACPI
+	depends on MTK_POWER_WRAP
+	depends on PINCTRL_MT8901
+	select SND_SOC_ACPI
+	select SOUNDWIRE_MTK_MT8901_CLK
+	help
+	  SoundWire MediaTek Master driver.
+	  If you have an MediaTek platform which has a SoundWire Master then
+	  enable this config option to get the SoundWire support for that
+	  device.
+
+config SOUNDWIRE_MTK_MT8901_CLK
+	bool
+	depends on SOUNDWIRE_MTK
+	depends on MTK_POWER_WRAP
+	help
+	  MT8901 clock and power control backend for the MediaTek SoundWire
+	  Master driver. Every hardware version the driver supports needs it,
+	  so SOUNDWIRE_MTK selects it; there is no configuration in which the
+	  manager probes without it.
+
 config SOUNDWIRE_GENERIC_ALLOCATION
 	tristate
 

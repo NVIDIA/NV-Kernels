@@ -36,3 +36,6 @@ obj-$(CONFIG_SOUNDWIRE_INTEL) += soundwire-intel.o
 #Qualcomm driver
 soundwire-qcom-y :=	qcom.o
 obj-$(CONFIG_SOUNDWIRE_QCOM) += soundwire-qcom.o
+
+#MediaTek driver
+obj-$(CONFIG_SOUNDWIRE_MTK) += mediatek/
