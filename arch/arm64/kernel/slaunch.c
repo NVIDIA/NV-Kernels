@@ -853,12 +853,14 @@ static void __init slaunch_validate_srtm_log(u64 log_pa,
 /* Validate System Table + ConfigurationTable pointers against D-CRTM
  * map. Runs pre-efi_init, panics on bad input.
  */
-static void __init slaunch_validate_raw_systab(u64 systab_pa)
+static void __init
+slaunch_validate_raw_systab(u64 systab_pa, const struct efi_memory_map *efi_map)
 {
 	efi_system_table_t *systab;
 	efi_config_table_t *cfgtbl;
-	unsigned long tables_pa;
+	unsigned long tables_addr;
 	unsigned long nr_tables;
+	phys_addr_t tables_pa;
 	size_t tbl_size;
 	unsigned long j;
 
@@ -872,10 +874,10 @@ static void __init slaunch_validate_raw_systab(u64 systab_pa)
 		      systab_pa);
 
 	nr_tables = systab->nr_tables;
-	tables_pa = (unsigned long)systab->tables;
+	tables_addr = (unsigned long)systab->tables;
 	early_memunmap(systab, sizeof(efi_system_table_t));
 
-	if (nr_tables == 0 || !tables_pa) {
+	if (nr_tables == 0 || !tables_addr) {
 		pr_info("slaunch: EFI System Table has no ConfigurationTable entries\n");
 		return;
 	}
@@ -889,14 +891,17 @@ static void __init slaunch_validate_raw_systab(u64 systab_pa)
 		panic("slaunch: EFI System Table nr_tables=%lu overflows tbl_size\n",
 		      nr_tables);
 
-	if (!dcrtm_range_in_normal(tables_pa, tbl_size))
-		panic("slaunch: EFI ConfigurationTable array at 0x%lx NOT in NORMAL region\n",
-		      tables_pa);
+	tables_pa = efi_memmap_virt_to_phys(efi_map, tables_addr);
+	if (tables_pa != tables_addr)
+		pr_info("slaunch: EFI ConfigurationTable address 0x%lx resolves to PA 0x%llx\n",
+			tables_addr, (u64)tables_pa);
+	validate_efi_table_range("EFI ConfigurationTable array", tables_pa,
+				 tbl_size);
 
 	cfgtbl = early_memremap_ro(tables_pa, tbl_size);
 	if (!cfgtbl)
-		panic("slaunch: failed to map ConfigurationTable at 0x%lx\n",
-		      tables_pa);
+		panic("slaunch: failed to map ConfigurationTable at 0x%llx\n",
+		      (u64)tables_pa);
 
 	for (j = 0; j < nr_tables; j++) {
 		unsigned long tbl_ptr = (unsigned long)cfgtbl[j].table;
@@ -924,9 +929,12 @@ static void __init slaunch_validate_raw_systab(u64 systab_pa)
 /*
  * Validate the raw EFI memory map at /chosen/linux,uefi-mmap-start.
  * Walks descriptors at desc-size stride (NOT sizeof(efi_memory_desc_t),
- * which can differ for forward compatibility), pre-efi_init.
+ * which can differ for forward compatibility), pre-efi_init. Leaves the
+ * validated map mapped in @efi_map for system-table address translation.
  */
-static void __init slaunch_validate_raw_mmap(const struct sl_efi_info *info)
+static void __init
+slaunch_validate_raw_mmap(const struct sl_efi_info *info,
+			  struct efi_memory_map *efi_map)
 {
 	void *mmap;
 	u64 offset;
@@ -1035,9 +1043,16 @@ static void __init slaunch_validate_raw_mmap(const struct sl_efi_info *info)
 		}
 	}
 
-	early_memunmap(mmap, info->mmap_size);
 	pr_info("slaunch: early raw EFI mmap validation PASSED (%u of %u descriptors checked)\n",
 		nchecked, ndesc);
+
+	efi_map->phys_map = info->mmap_pa;
+	efi_map->map = mmap;
+	efi_map->map_end = (u8 *)mmap + info->mmap_size;
+	efi_map->nr_map = ndesc;
+	efi_map->desc_version = info->desc_ver;
+	efi_map->desc_size = info->desc_size;
+	efi_map->flags = 0;
 
 	/* Remember raw mmap extent for later overlap checks (e.g. the SRTM
 	 * TPM event log validator must reject a published log PA that aliases
@@ -1049,15 +1064,11 @@ static void __init slaunch_validate_raw_mmap(const struct sl_efi_info *info)
 
 static void __init slaunch_validate_efi_early(const struct sl_efi_info *info)
 {
-	/*
-	 * Stage the raw EFI mmap extent before the systab validator so
-	 * slaunch_validate_srtm_log() can reject an SRTM log PA aliasing it;
-	 * validate_raw_mmap() re-publishes these after its own checks.
-	 */
-	sl_efi_mmap_pa        = info->mmap_pa;
-	sl_efi_mmap_size      = info->mmap_size;
-	slaunch_validate_raw_systab(info->systab_pa);
-	slaunch_validate_raw_mmap(info);
+	struct efi_memory_map efi_map;
+
+	slaunch_validate_raw_mmap(info, &efi_map);
+	slaunch_validate_raw_systab(info->systab_pa, &efi_map);
+	early_memunmap(efi_map.map, info->mmap_size);
 }
 
 /*
@@ -2022,6 +2033,46 @@ static void __init slaunch_inject_mmap_overlap(const struct sl_efi_info *info)
 	early_memunmap(mmap, info->mmap_size);
 }
 
+/* Redirect systab->tables through a crafted EFI runtime descriptor. */
+static void __init
+inject_mmap_cfgtbl_redirect(const struct sl_efi_info *info)
+{
+	efi_system_table_t *systab;
+	efi_memory_desc_t *md;
+	unsigned long tables_addr;
+	void *mmap;
+
+	systab = early_memremap(info->systab_pa, sizeof(*systab));
+	if (!systab) {
+		pr_warn("slaunch: INJECT mmap_cfgtbl_redirect: systab map failed\n");
+		return;
+	}
+	tables_addr = systab->tables;
+	early_memunmap(systab, sizeof(*systab));
+
+	if (!tables_addr) {
+		pr_warn("slaunch: INJECT mmap_cfgtbl_redirect: no ConfigurationTable address\n");
+		return;
+	}
+
+	mmap = early_memremap(info->mmap_pa, info->mmap_size);
+	if (!mmap) {
+		pr_warn("slaunch: INJECT mmap_cfgtbl_redirect: mmap map failed\n");
+		return;
+	}
+
+	md = mmap;
+	md->type = EFI_MEMORY_MAPPED_IO;
+	md->phys_addr = sl_dtb_pa;
+	md->virt_addr = tables_addr;
+	md->num_pages = 1;
+	md->attribute = EFI_MEMORY_RUNTIME;
+	early_memunmap(mmap, info->mmap_size);
+
+	pr_warn("slaunch: INJECT mmap_cfgtbl_redirect: ConfigurationTable address 0x%lx resolves to DTB PA 0x%llx (expect panic 'overlaps DTB')\n",
+		tables_addr, (u64)sl_dtb_pa);
+}
+
 /* Overwrite the first non-null EFI ConfigurationTable entry in the raw
  * systab's cfgtbl array with a synthetic SRTM-log entry. Returns true
  * if we managed to plant the entry. Used by srtm_log_* injectors only;
@@ -2123,6 +2174,10 @@ static void __init slaunch_inject_fault(struct sl_efi_info *info)
 		slaunch_inject_mmap_overlap(info);
 		return;
 	}
+	if (sl_cmdline_has("slaunch_inject=mmap_cfgtbl_redirect")) {
+		inject_mmap_cfgtbl_redirect(info);
+		return;
+	}
 	if (sl_cmdline_has("slaunch_inject=mmap_size_huge")) {
 		/*
 		 * Inflate the local mmap size (a 48-multiple, so the
@@ -2210,6 +2265,15 @@ static void __init slaunch_inject_initrd(u64 *start, u64 *size)
  */
 static void __init slaunch_selftest(void)
 {
+	efi_memory_desc_t md[2] = {};
+	struct efi_memory_map map = {
+		.map = md,
+		.map_end = (u8 *)md + sizeof(md),
+		.nr_map = ARRAY_SIZE(md),
+		.desc_version = 1,
+		.desc_size = sizeof(*md),
+	};
+
 	/* T1: dcrtm_range_in_normal MUST reject wrapping start+size */
 	if (dcrtm_range_in_normal(0xFFFFFFFFFFFFE000ULL, 0x10000ULL))
 		panic("selftest: dcrtm_range_in_normal accepted wrapping range\n");
@@ -2267,7 +2331,41 @@ static void __init slaunch_selftest(void)
 			panic("selftest: slaunch_phys_is_protected_ram flagged non-RAM PA\n");
 	}
 
-	pr_info("slaunch: ALL SELFTESTS PASSED (9/9)\n");
+	/* T10: translate an address within a non-identity runtime mapping. */
+	md[0].attribute = EFI_MEMORY_RUNTIME;
+	md[0].virt_addr = 0x100000;
+	md[0].phys_addr = 0x200000;
+	md[0].num_pages = 2;
+	if (efi_memmap_virt_to_phys(&map, 0x100800) != 0x200800)
+		panic("selftest: EFI memory-map translation missed non-identity mapping\n");
+
+	/* T11: descriptors without EFI_MEMORY_RUNTIME must be ignored. */
+	md[0].attribute = 0;
+	if (efi_memmap_virt_to_phys(&map, 0x100800) != 0x100800)
+		panic("selftest: EFI memory-map translation used non-runtime descriptor\n");
+
+	/* T12: an address with no runtime mapping remains unchanged. */
+	md[0].attribute = EFI_MEMORY_RUNTIME;
+	if (efi_memmap_virt_to_phys(&map, 0x300000) != 0x300000)
+		panic("selftest: EFI memory-map translation changed unmatched address\n");
+
+	/* T13: a zero runtime virt_addr terminates the search. */
+	md[0].virt_addr = 0;
+	md[1].attribute = EFI_MEMORY_RUNTIME;
+	md[1].virt_addr = 0x300000;
+	md[1].phys_addr = 0x400000;
+	md[1].num_pages = 1;
+	if (efi_memmap_virt_to_phys(&map, 0x300000) != 0x300000)
+		panic("selftest: EFI memory-map translation ignored zero virt_addr\n");
+
+	/* T14: the first matching runtime descriptor determines the result. */
+	md[0].virt_addr = 0x300000;
+	md[0].phys_addr = 0x500000;
+	md[0].num_pages = 1;
+	if (efi_memmap_virt_to_phys(&map, 0x300000) != 0x500000)
+		panic("selftest: EFI memory-map translation ignored first match\n");
+
+	pr_info("slaunch: ALL SELFTESTS PASSED (14/14)\n");
 }
 #endif /* CONFIG_ARM64_SECURE_LAUNCH_SELFTEST */
 
