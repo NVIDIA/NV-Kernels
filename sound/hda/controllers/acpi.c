@@ -353,7 +353,7 @@ MODULE_DEVICE_TABLE(acpi, hda_acpi_match);
 static struct platform_driver hda_acpi_platform_driver = {
 	.driver = {
 		.name = KBUILD_MODNAME,
-		.pm = &hda_acpi_pm,
+		.pm = pm_ptr(&hda_acpi_pm),
 		.acpi_match_table = hda_acpi_match,
 	},
 	.probe = hda_acpi_probe,
