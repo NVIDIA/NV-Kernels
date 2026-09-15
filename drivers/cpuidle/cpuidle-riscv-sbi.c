@@ -104,7 +104,7 @@ static __cpuidle int __sbi_enter_domain_idle_state(struct cpuidle_device *dev,
 
 	/* Do runtime PM to manage a hierarchical CPU toplogy. */
 	if (s2idle)
-		dev_pm_genpd_suspend(pd_dev);
+		dev_pm_genpd_suspend_s2idle(pd_dev);
 	else
 		pm_runtime_put_sync_suspend(pd_dev);
 
