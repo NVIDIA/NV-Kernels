@@ -434,9 +434,11 @@ static inline bool dev_pm_genpd_is_on(struct device *dev)
 
 #ifdef CONFIG_PM_GENERIC_DOMAINS_SLEEP
 void dev_pm_genpd_suspend(struct device *dev);
+void dev_pm_genpd_suspend_s2idle(struct device *dev);
 void dev_pm_genpd_resume(struct device *dev);
 #else
 static inline void dev_pm_genpd_suspend(struct device *dev) {}
+static inline void dev_pm_genpd_suspend_s2idle(struct device *dev) {}
 static inline void dev_pm_genpd_resume(struct device *dev) {}
 #endif
 
