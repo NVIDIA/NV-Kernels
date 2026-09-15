@@ -808,6 +808,7 @@ EXPORT_SYMBOL_GPL(dev_pm_genpd_is_on);
  *
  * @genpd: The PM domain the idle-state belongs to.
  * @state_idx: The index of the idle-state that failed.
+ * @s2idle: Whether the failed attempt was made for suspend-to-idle.
  *
  * In some special cases the ->power_off() callback is asynchronously powering
  * off the PM domain, leading to that it may return zero to indicate success,
@@ -819,14 +820,76 @@ EXPORT_SYMBOL_GPL(dev_pm_genpd_is_on);
  * while this routine is getting called.
  */
 void pm_genpd_inc_rejected(struct generic_pm_domain *genpd,
-			   unsigned int state_idx)
+			   unsigned int state_idx, bool s2idle)
 {
 	genpd_lock(genpd);
-	genpd->states[genpd->state_idx].rejected++;
-	genpd->states[genpd->state_idx].usage--;
+	if (WARN_ON_ONCE(state_idx >= genpd->state_count))
+		goto out;
+
+	genpd->states[state_idx].rejected++;
+	genpd->states[state_idx].usage--;
+	if (s2idle && genpd->gov && genpd->gov->system_power_down_ok)
+		genpd->states[state_idx].usage_s2idle--;
+
+out:
 	genpd_unlock(genpd);
 }
 EXPORT_SYMBOL_GPL(pm_genpd_inc_rejected);
+
+/**
+ * pm_genpd_widen_state_latency() - Widen a genpd state's latency bounds.
+ * @genpd: PM domain containing the state.
+ * @state_idx: Index of the state to update.
+ * @power_off_latency_ns: Minimum power-off latency bound in nanoseconds.
+ * @power_on_latency_ns: Minimum power-on latency bound in nanoseconds.
+ *
+ * Increase the state's latency bounds under the genpd lock and invalidate the
+ * governor's cached decision when either bound changes. Latency bounds are
+ * never reduced, because a concurrent or earlier observation may have already
+ * established a more conservative value.
+ *
+ * The domain must be on while its bounds are changed. This guarantees that no
+ * parent can reuse cached timing for an already-off child. The caller must
+ * prevent concurrent power-off and removal of @genpd for the duration of the
+ * call.
+ *
+ * Return: 0 on success or a negative error code.
+ */
+int pm_genpd_widen_state_latency(struct generic_pm_domain *genpd,
+				 unsigned int state_idx,
+				 s64 power_off_latency_ns,
+				 s64 power_on_latency_ns)
+{
+	struct genpd_power_state *state;
+
+	if (!genpd || power_off_latency_ns < 0 || power_on_latency_ns < 0)
+		return -EINVAL;
+
+	genpd_lock(genpd);
+	if (genpd->status != GENPD_STATE_ON) {
+		genpd_unlock(genpd);
+		return -EBUSY;
+	}
+	if (state_idx >= genpd->state_count) {
+		genpd_unlock(genpd);
+		return -EINVAL;
+	}
+
+	state = &genpd->states[state_idx];
+	if (power_off_latency_ns > state->power_off_latency_ns ||
+	    power_on_latency_ns > state->power_on_latency_ns) {
+		state->power_off_latency_ns =
+			max(state->power_off_latency_ns, power_off_latency_ns);
+		state->power_on_latency_ns =
+			max(state->power_on_latency_ns, power_on_latency_ns);
+		if (genpd->gd)
+			genpd->gd->max_off_time_changed = true;
+	}
+	genpd_unlock(genpd);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pm_genpd_widen_state_latency);
 
 static int _genpd_power_on(struct generic_pm_domain *genpd, bool timed)
 {
@@ -1438,6 +1501,13 @@ static void genpd_sync_power_off(struct generic_pm_domain *genpd, bool use_lock,
 		return;
 	} else {
 		genpd->states[genpd->state_idx].usage++;
+
+		/*
+		 * The ->system_power_down_ok() callback is currently used only
+		 * for s2idle. Use it to know when to update the usage counter.
+		 */
+		if (genpd->gov && genpd->gov->system_power_down_ok)
+			genpd->states[genpd->state_idx].usage_s2idle++;
 	}
 
 	genpd->status = GENPD_STATE_OFF;
@@ -1920,6 +1990,28 @@ static int genpd_get_cpu(struct generic_pm_domain *genpd, struct device *dev)
 	return -1;
 }
 
+static bool genpd_hierarchy_has_cpu(struct generic_pm_domain *genpd, int cpu,
+				    unsigned int depth)
+{
+	struct gpd_link *link;
+	bool found = false;
+
+	genpd_lock_nested(genpd, depth);
+	if (!genpd_is_cpu_domain(genpd))
+		goto out;
+
+	found = cpumask_test_cpu(cpu, genpd->cpus);
+	list_for_each_entry(link, &genpd->child_links, child_node) {
+		if (found)
+			break;
+		found = genpd_hierarchy_has_cpu(link->parent, cpu, depth + 1);
+	}
+out:
+	genpd_unlock(genpd);
+
+	return found;
+}
+
 static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
 			    struct device *base_dev)
 {
@@ -1962,6 +2054,54 @@ static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
 
 	return ret;
 }
+
+/**
+ * pm_genpd_add_virtual_cpu_device - Add a virtual CPU device to a PM domain.
+ * @genpd: CPU PM domain to add the device to.
+ * @dev: Virtual CPU device to be added.
+ * @cpu_dev: Physical CPU device represented by @dev.
+ *
+ * Add @dev to the CPU domain @genpd while using @cpu_dev to derive its CPU
+ * identity. This is useful for a virtual consumer that represents a physical
+ * CPU in a domain hierarchy. Reject the attachment if the CPU is already
+ * represented by the target domain or any of its ancestors, because genpd's
+ * CPU masks do not reference-count duplicate ownership paths.
+ *
+ * @cpu_dev only needs to remain valid for this synchronous call. Genpd stores
+ * the resolved CPU number, not a pointer to @cpu_dev.
+ *
+ * The CPU-domain topology above @genpd must be complete before this function
+ * is called. Adding parent links after attaching CPU consumers is unsupported,
+ * because those links cannot be checked for duplicate CPU ownership.
+ *
+ * Context: Sleepable. Takes the internal genpd list lock and the domain lock;
+ * callers must not hold either lock.
+ *
+ * Return: 0 on success, or a negative error code.
+ */
+int pm_genpd_add_virtual_cpu_device(struct generic_pm_domain *genpd,
+				    struct device *dev,
+				    struct device *cpu_dev)
+{
+	int cpu;
+	int ret;
+
+	if (!genpd || !dev || !cpu_dev || !genpd_is_cpu_domain(genpd))
+		return -EINVAL;
+	cpu = genpd_get_cpu(genpd, cpu_dev);
+	if (cpu < 0)
+		return -EINVAL;
+
+	mutex_lock(&gpd_list_lock);
+	if (genpd_hierarchy_has_cpu(genpd, cpu, 0))
+		ret = -EBUSY;
+	else
+		ret = genpd_add_device(genpd, dev, cpu_dev);
+	mutex_unlock(&gpd_list_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(pm_genpd_add_virtual_cpu_device);
 
 /**
  * pm_genpd_add_device - Add a device to an I/O PM domain.
@@ -3780,11 +3920,11 @@ static int idle_states_show(struct seq_file *s, void *data)
 	if (ret)
 		return -ERESTARTSYS;
 
-	seq_puts(s, "State          Time Spent(ms) Usage      Rejected   Above      Below\n");
+	seq_puts(s, "State  Time(ms)       Usage      Rejected   Above      Below      S2idle\n");
 
 	for (i = 0; i < genpd->state_count; i++) {
 		struct genpd_power_state *state = &genpd->states[i];
-		char state_name[15];
+		char state_name[7];
 
 		idle_time += state->idle_time;
 
@@ -3796,14 +3936,45 @@ static int idle_states_show(struct seq_file *s, void *data)
 			}
 		}
 
-		if (!state->name)
-			snprintf(state_name, ARRAY_SIZE(state_name), "S%-13d", i);
-
+		snprintf(state_name, ARRAY_SIZE(state_name), "S%-5d", i);
 		do_div(idle_time, NSEC_PER_MSEC);
-		seq_printf(s, "%-14s %-14llu %-10llu %-10llu %-10llu %llu\n",
-			   state->name ?: state_name, idle_time,
-			   state->usage, state->rejected, state->above,
-			   state->below);
+		seq_printf(s, "%-6s %-14llu %-10llu %-10llu %-10llu %-10llu %llu\n",
+			   state_name, idle_time, state->usage, state->rejected,
+			   state->above, state->below, state->usage_s2idle);
+	}
+
+	genpd_unlock(genpd);
+	return ret;
+}
+
+static int idle_states_desc_show(struct seq_file *s, void *data)
+{
+	struct generic_pm_domain *genpd = s->private;
+	unsigned int i;
+	int ret = 0;
+
+	ret = genpd_lock_interruptible(genpd);
+	if (ret)
+		return -ERESTARTSYS;
+
+	seq_puts(s, "State  Latency(us)  Residency(us)  Name\n");
+
+	for (i = 0; i < genpd->state_count; i++) {
+		struct genpd_power_state *state = &genpd->states[i];
+		u64 latency, residency;
+		char state_name[7];
+
+		latency = state->power_off_latency_ns +
+			state->power_on_latency_ns;
+		do_div(latency, NSEC_PER_USEC);
+
+		residency = state->residency_ns;
+		do_div(residency, NSEC_PER_USEC);
+
+		snprintf(state_name, ARRAY_SIZE(state_name), "S%-5d", i);
+		seq_printf(s, "%-6s %-12llu %-14llu %s\n",
+			   state_name, latency, residency,
+			   state->name ?: "N/A");
 	}
 
 	genpd_unlock(genpd);
@@ -3899,6 +4070,7 @@ DEFINE_SHOW_ATTRIBUTE(summary);
 DEFINE_SHOW_ATTRIBUTE(status);
 DEFINE_SHOW_ATTRIBUTE(sub_domains);
 DEFINE_SHOW_ATTRIBUTE(idle_states);
+DEFINE_SHOW_ATTRIBUTE(idle_states_desc);
 DEFINE_SHOW_ATTRIBUTE(active_time);
 DEFINE_SHOW_ATTRIBUTE(total_idle_time);
 DEFINE_SHOW_ATTRIBUTE(devices);
@@ -3919,6 +4091,8 @@ static void genpd_debug_add(struct generic_pm_domain *genpd)
 			    d, genpd, &sub_domains_fops);
 	debugfs_create_file("idle_states", 0444,
 			    d, genpd, &idle_states_fops);
+	debugfs_create_file("idle_states_desc", 0444,
+			    d, genpd, &idle_states_desc_fops);
 	debugfs_create_file("active_time", 0444,
 			    d, genpd, &active_time_fops);
 	debugfs_create_file("total_idle_time", 0444,

@@ -171,7 +171,7 @@ struct genpd_governor_data {
 	ktime_t last_enter;
 	bool reflect_residency;
 	bool cached_power_down_ok;
-	bool cached_power_down_state_idx;
+	unsigned int cached_power_down_state_idx;
 };
 
 struct genpd_power_state {
@@ -183,6 +183,7 @@ struct genpd_power_state {
 	u64 rejected;
 	u64 above;
 	u64 below;
+	u64 usage_s2idle;
 	struct fwnode_handle *fwnode;
 	u64 idle_time;
 	void *data;
@@ -309,6 +310,9 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
 }
 
 int pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev);
+int pm_genpd_add_virtual_cpu_device(struct generic_pm_domain *genpd,
+				    struct device *dev,
+				    struct device *cpu_dev);
 int pm_genpd_remove_device(struct device *dev);
 int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
 			   struct generic_pm_domain *subdomain);
@@ -318,7 +322,11 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 		  struct dev_power_governor *gov, bool is_off);
 int pm_genpd_remove(struct generic_pm_domain *genpd);
 void pm_genpd_inc_rejected(struct generic_pm_domain *genpd,
-			   unsigned int state_idx);
+			   unsigned int state_idx, bool s2idle);
+int pm_genpd_widen_state_latency(struct generic_pm_domain *genpd,
+				 unsigned int state_idx,
+				 s64 power_off_latency_ns,
+				 s64 power_on_latency_ns);
 struct device *dev_to_genpd_dev(struct device *dev);
 int dev_pm_genpd_set_performance_state(struct device *dev, unsigned int state);
 int dev_pm_genpd_add_notifier(struct device *dev, struct notifier_block *nb);
@@ -347,6 +355,14 @@ static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
 {
 	return -ENOSYS;
 }
+
+static inline int
+pm_genpd_add_virtual_cpu_device(struct generic_pm_domain *genpd,
+				struct device *dev, struct device *cpu_dev)
+{
+	return -EOPNOTSUPP;
+}
+
 static inline int pm_genpd_remove_device(struct device *dev)
 {
 	return -ENOSYS;
@@ -372,8 +388,17 @@ static inline int pm_genpd_remove(struct generic_pm_domain *genpd)
 }
 
 static inline void pm_genpd_inc_rejected(struct generic_pm_domain *genpd,
-					 unsigned int state_idx)
+					 unsigned int state_idx, bool s2idle)
 { }
+
+static inline int
+pm_genpd_widen_state_latency(struct generic_pm_domain *genpd,
+			     unsigned int state_idx,
+			     s64 power_off_latency_ns,
+			     s64 power_on_latency_ns)
+{
+	return -EOPNOTSUPP;
+}
 
 static inline struct device *dev_to_genpd_dev(struct device *dev)
 {
