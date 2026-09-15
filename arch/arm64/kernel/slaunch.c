@@ -17,6 +17,7 @@
 #include <linux/unaligned.h>
 #include <linux/initrd.h>
 #include <linux/iommu.h>
+#include <linux/acpi.h>
 #include <linux/security.h>
 #include <linux/dmi.h>
 #include <crypto/sha2.h>
@@ -1085,6 +1086,8 @@ void __init slaunch_setup(void)
 		return;
 
 	pr_info("slaunch: DRTM Secure Launch detected\n");
+	/* Prevent AML from introducing unmeasured ACPI tables after launch. */
+	acpi_disable_aml_load();
 	iommu_enable_dma_isolation();
 
 	/* Map DLME data header for reservation */
