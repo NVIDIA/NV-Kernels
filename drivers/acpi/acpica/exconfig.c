@@ -302,6 +302,11 @@ acpi_ex_load_op(union acpi_operand_object *obj_desc,
 
 	target->integer.value = 0;
 
+	if (acpi_gbl_disable_aml_load) {
+		ACPI_ERROR((AE_INFO, "AML Load opcode is disabled"));
+		return_ACPI_STATUS(AE_ACCESS);
+	}
+
 	/* Source Object can be either an op_region or a Buffer/Field */
 
 	switch (obj_desc->common.type) {

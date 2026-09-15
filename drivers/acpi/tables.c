@@ -43,6 +43,11 @@ static int acpi_apic_instance __initdata_or_acpilib;
  */
 static bool acpi_verify_table_checksum __initdata_or_acpilib = false;
 
+void __init acpi_disable_aml_load(void)
+{
+	acpi_gbl_disable_aml_load = TRUE;
+}
+
 void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 {
 	if (!header)
