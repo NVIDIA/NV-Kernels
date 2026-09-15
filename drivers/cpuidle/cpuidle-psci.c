@@ -34,6 +34,10 @@
 struct psci_cpuidle_data {
 	u32 *psci_states;
 	struct device *dev;
+	struct psci_cpuidle_domain_state *domain_states;
+	unsigned int domain_state_count;
+	unsigned int domain_state_capacity;
+	bool collect_domain_states;
 };
 
 struct psci_cpuidle_domain_state {
@@ -43,22 +47,32 @@ struct psci_cpuidle_domain_state {
 };
 
 static DEFINE_PER_CPU_READ_MOSTLY(struct psci_cpuidle_data, psci_cpuidle_data);
-static DEFINE_PER_CPU(struct psci_cpuidle_domain_state, psci_domain_state);
 static bool psci_cpuidle_use_syscore;
 
-void psci_set_domain_state(struct generic_pm_domain *pd, unsigned int state_idx,
-			   u32 state)
+int psci_set_domain_state(struct generic_pm_domain *pd, unsigned int state_idx,
+			  u32 state)
 {
-	struct psci_cpuidle_domain_state *ds = this_cpu_ptr(&psci_domain_state);
+	struct psci_cpuidle_data *data = this_cpu_ptr(&psci_cpuidle_data);
+	struct psci_cpuidle_domain_state *ds;
 
+	if (!data->collect_domain_states)
+		return 0;
+	if (data->domain_state_count >= data->domain_state_capacity)
+		return -ENOSPC;
+
+	ds = &data->domain_states[data->domain_state_count++];
 	ds->pd = pd;
 	ds->state_idx = state_idx;
 	ds->state = state;
+	return 0;
 }
 
 static inline void psci_clear_domain_state(void)
 {
-	__this_cpu_write(psci_domain_state.state, 0);
+	struct psci_cpuidle_data *data = this_cpu_ptr(&psci_cpuidle_data);
+
+	data->domain_state_count = 0;
+	data->collect_domain_states = false;
 }
 
 static __cpuidle int __psci_enter_domain_idle_state(struct cpuidle_device *dev,
@@ -69,22 +83,27 @@ static __cpuidle int __psci_enter_domain_idle_state(struct cpuidle_device *dev,
 	u32 *states = data->psci_states;
 	struct device *pd_dev = data->dev;
 	struct psci_cpuidle_domain_state *ds;
+	unsigned int i;
 	u32 state = states[idx];
 	int ret;
 
+	psci_clear_domain_state();
 	ret = cpu_pm_enter();
 	if (ret)
 		return -1;
 
 	/* Do runtime PM to manage a hierarchical CPU toplogy. */
+	data->collect_domain_states = true;
 	if (s2idle)
 		dev_pm_genpd_suspend_s2idle(pd_dev);
 	else
 		pm_runtime_put_sync_suspend(pd_dev);
+	data->collect_domain_states = false;
 
-	ds = this_cpu_ptr(&psci_domain_state);
-	if (ds->state)
+	if (data->domain_state_count) {
+		ds = &data->domain_states[data->domain_state_count - 1];
 		state = ds->state;
+	}
 
 	trace_psci_domain_idle_enter(dev->cpu, state, s2idle);
 	ret = psci_cpu_suspend_enter(state) ? -1 : idx;
@@ -98,8 +117,12 @@ static __cpuidle int __psci_enter_domain_idle_state(struct cpuidle_device *dev,
 	cpu_pm_exit();
 
 	/* Correct domain-idlestate statistics if we failed to enter. */
-	if (ret == -1 && ds->state)
-		pm_genpd_inc_rejected(ds->pd, ds->state_idx, s2idle);
+	if (ret == -1) {
+		for (i = 0; i < data->domain_state_count; i++) {
+			ds = &data->domain_states[i];
+			pm_genpd_inc_rejected(ds->pd, ds->state_idx, s2idle);
+		}
+	}
 
 	/* Clear the domain state to start fresh when back from idle. */
 	psci_clear_domain_state();
@@ -246,10 +269,29 @@ int psci_dt_parse_state_node(struct device_node *np, u32 *state)
 	return 0;
 }
 
-static int psci_dt_cpu_init_topology(struct cpuidle_driver *drv,
+static unsigned int psci_pd_count_domains(struct generic_pm_domain *pd)
+{
+	struct gpd_link *link;
+	unsigned int child_count;
+	unsigned int count = 1;
+
+	list_for_each_entry(link, &pd->child_links, child_node) {
+		child_count = psci_pd_count_domains(link->parent);
+		if (!child_count || check_add_overflow(count, child_count, &count))
+			return 0;
+	}
+
+	return count;
+}
+
+static int psci_dt_cpu_init_topology(struct device *dev,
+				     struct cpuidle_driver *drv,
 				     struct psci_cpuidle_data *data,
 				     unsigned int state_count, int cpu)
 {
+	struct generic_pm_domain *pd;
+	unsigned int domain_count;
+
 	/* Currently limit the hierarchical topology to be used in OSI mode. */
 	if (!psci_has_osi_support())
 		return 0;
@@ -257,6 +299,29 @@ static int psci_dt_cpu_init_topology(struct cpuidle_driver *drv,
 	data->dev = dt_idle_attach_cpu(cpu, "psci");
 	if (IS_ERR_OR_NULL(data->dev))
 		return PTR_ERR_OR_ZERO(data->dev);
+	if (!data->dev->pm_domain) {
+		dt_idle_detach_cpu(data->dev);
+		data->dev = NULL;
+		return -ENODEV;
+	}
+
+	pd = pd_to_genpd(data->dev->pm_domain);
+	domain_count = psci_pd_count_domains(pd);
+	if (!domain_count) {
+		dt_idle_detach_cpu(data->dev);
+		data->dev = NULL;
+		return -EOVERFLOW;
+	}
+
+	data->domain_states =
+		devm_kcalloc(dev, domain_count, sizeof(*data->domain_states),
+			     GFP_KERNEL);
+	if (!data->domain_states) {
+		dt_idle_detach_cpu(data->dev);
+		data->dev = NULL;
+		return -ENOMEM;
+	}
+	data->domain_state_capacity = domain_count;
 
 	psci_cpuidle_use_syscore = true;
 
@@ -306,7 +371,7 @@ static int psci_dt_cpu_init_idle(struct device *dev, struct cpuidle_driver *drv,
 		return -ENODEV;
 
 	/* Initialize optional data, used for the hierarchical topology. */
-	ret = psci_dt_cpu_init_topology(drv, data, state_count, cpu);
+	ret = psci_dt_cpu_init_topology(dev, drv, data, state_count, cpu);
 	if (ret < 0)
 		return ret;
 
@@ -344,6 +409,11 @@ static void psci_cpu_deinit_idle(int cpu)
 	struct psci_cpuidle_data *data = per_cpu_ptr(&psci_cpuidle_data, cpu);
 
 	dt_idle_detach_cpu(data->dev);
+	data->dev = NULL;
+	data->domain_states = NULL;
+	data->domain_state_count = 0;
+	data->domain_state_capacity = 0;
+	data->collect_domain_states = false;
 	psci_cpuidle_use_syscore = false;
 }
 
