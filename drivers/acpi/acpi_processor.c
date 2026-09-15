@@ -514,6 +514,11 @@ static void acpi_processor_post_eject(struct acpi_device *device)
 	cpus_write_unlock();
 	cpu_maps_update_done();
 
+#if IS_BUILTIN(CONFIG_ACPI_PROCESSOR)
+	/* Rebuild against the CPU-present mask after removal is published. */
+	acpi_processor_power_post_eject();
+#endif
+
 	try_offline_node(cpu_to_node(pr->id));
 
  out:
