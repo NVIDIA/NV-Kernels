@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved
+ * Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved
  */
 
 #include <linux/kernel.h>
@@ -8,58 +8,103 @@
 #include <linux/platform_device.h>
 #include <linux/acpi.h>
 #include <linux/arm_ffa.h>
+#include <linux/delay.h>
+#include <linux/kref.h>
 #include <linux/list.h>
+#include <linux/slab.h>
 
 #define DRV_NAME "nvidia-ffa-ec"
 
-/* platform device for FFA ACPI device (HID MSFT000C) */
+/*
+ * Spec version selected at probe time:
+ *   true  - MSFT000C, OpenDevicePartnership legacy draft spec
+ *           (https://github.com/OpenDevicePartnership/documentation/blob/0f7b6bad77a3eb07b66b66d0e3af718db2ec1c24/bookshelf/Shelf%204%20Specifications/EC%20Interface/src/secure-ec-services-overview.md)
+ *   false - ARML0002, ARM DEN0077A v1.3 spec
+ *           (https://support.arm.com/documentation/den0077)
+ */
+static bool ffa_ec_legacy_spec;
+
+/* platform device for FFA ACPI device */
 static struct platform_device *ffa_pdev;
 
-/* FFA device for EC notification service */
-static struct ffa_device *notify_ffa_dev;
+/*
+ * FFA device for the control-plane service used to register EC
+ * notifications. A given platform's FF-A bridge only exposes one of the
+ * two possible UUIDs:
+ *
+ *   MSFT000C: EC notification service UUID
+ *             (b510b3a3-59f6-4054-ba7a-ff2eb1eac765)
+ *   ARML0002: inter-partition setup protocol UUID
+ *             (e474d87e-5731-4044-a727-cb3e8cf3c8df)
+ */
+static struct ffa_device *control_ffa_dev;
 
-static const uuid_t nvidia_ec_notify_service_uuid =
-	UUID_INIT(0xb510b3a3, 0x59f6, 0x4054, 0xba, 0x7a, 0xff, 0x2e, 0xb1, 0xea, 0xc7, 0x65);
-
-static const uuid_t nvidia_ec_managment_service_uuid =
-	UUID_INIT(0x330c1273, 0xfde5, 0x4757, 0x98, 0x19, 0x5b, 0x65, 0x39, 0x03, 0x75, 0x02);
-
-static const uuid_t nvidia_ec_power_service_uuid =
-	UUID_INIT(0x7157addf, 0x2fbe, 0x4c63, 0xae, 0x95, 0xef, 0xac, 0x16, 0xe3, 0xb0, 0x1c);
-
-static const uuid_t nvidia_ec_battery_service_uuid =
-	UUID_INIT(0x25cb5207, 0xac36, 0x427d, 0xaa, 0xef, 0x3a, 0xa7, 0x88, 0x77, 0xd2, 0x7e);
-
-static const uuid_t nvidia_ec_thermal_service_uuid =
-	UUID_INIT(0x31f56da7, 0x593c, 0x4d72, 0xa4, 0xb3, 0x8f, 0xc7, 0x17, 0x1a, 0xc0, 0x73);
-
-static const uuid_t nvidia_ec_fan_service_uuid =
-	UUID_INIT(0x7697530c, 0xd079, 0x4ec1, 0xa4, 0xc4, 0xcf, 0x0d, 0x2b, 0xdc, 0x93, 0xfa);
-
-static const uuid_t nvidia_ec_ucsi_service_uuid =
-	UUID_INIT(0x65467f50, 0x827f, 0x4e4f, 0x87, 0x70, 0xdb, 0xf4, 0xc3, 0xf7, 0x7f, 0x45);
-
-static const uuid_t nvidia_ec_input_service_uuid =
-	UUID_INIT(0xe3168a99, 0x4a57, 0x4a2b, 0x8c, 0x5e, 0x11, 0xbc, 0xfe, 0xc7, 0x34, 0x06);
-
-static const uuid_t nvidia_ec_time_alarm_service_uuid =
-	UUID_INIT(0x23ea63ed, 0xb593, 0x46ea, 0xb0, 0x27, 0x89, 0x24, 0xdf, 0x88, 0xe9, 0x2f);
+/*
+ * Outer UUID identifying the payload as "Device Properties" in the ACPI
+ * _DSD returned by the FFA bridge. DEN0077A v1.3 changed this GUID
+ * between drafts:
+ *
+ *   ALP3 and earlier: daffd814-6eba-4d8c-8a91-bc9bbf4aa301
+ *   ALP4 and later:   c08c3233-b316-4723-a9d7-e21b7ac0fb6a
+ */
+static const guid_t nvidia_notify_bind_guid_legacy =
+	GUID_INIT(0xdaffd814, 0x6eba, 0x4d8c, 0x8a, 0x91, 0xbc, 0x9b, 0xbf, 0x4a, 0xa3, 0x01);
 
 static const guid_t nvidia_notify_bind_guid =
-	GUID_INIT(0xdaffd814, 0x6eba, 0x4d8c, 0x8a, 0x91, 0xbc, 0x9b, 0xbf, 0x4a, 0xa3, 0x01);
+	GUID_INIT(0xc08c3233, 0xb316, 0x4723, 0xa9, 0xd7, 0xe2, 0x1b, 0x7a, 0xc0, 0xfb, 0x6a);
 
 static const guid_t nvidia_notify_dsm_guid =
 	GUID_INIT(0x7681541e, 0x8827, 0x4239, 0x8d, 0x9d, 0x36, 0xbe, 0x7f, 0xe1, 0x25, 0x42);
 
 #define NVIDIA_FFA_MAX_NOTIFICATIONS	64
 
+/* Timeout for retrying transient failures from sync_send_receive2() */
+#define NVIDIA_FFA_SEND_TIMEOUT_MS	10
+
+/* Revision values for the "arm-arml0002-ffa-ntf-bind" property package */
+#define NVIDIA_FFA_NTF_BIND_REV_MSFT000C		1
+#define NVIDIA_FFA_NTF_BIND_REV_ARML0002	0x00010000
+
+/*
+ * Notification tuple encoding for ARML0002 (DEN0077A v1.3 section 18.7.1,
+ * Table 18.25):
+ *   bits[63:32] = cookie (u32)
+ *   bits[31:23] = notification ID (9-bit field, LSB at bit 23)
+ *   bits[22:1]  = Reserved (MBZ)
+ *   bit[0]      = per-vCPU flag (0 = global)
+ */
+#define NVIDIA_EC_NOTIF_TUPLE(cookie, id) \
+	(((u64)(cookie) << 32) | (((u64)(id) & 0x1FF) << 23))
+
+/* Message info field: bits[2:0] = 0b010 means notification registration */
+#define NVIDIA_EC_INTERPARTITION_MSG_NOTIF_REG	0x2
+
+/*
+ * Per-notification mapping: a cookie from ACPI _DSD paired with the
+ * physical notification ID (0-63) handed out by the global bitmap
+ * nvidia_ffa_notif_id_map.
+ */
+struct nvidia_ec_notification {
+	u32 cookie;    /* cookie value from ACPI _DSD property */
+	u8  notif_id;  /* allocated physical notification ID (0-63) */
+};
+
 /* EC service FFA device structure */
 struct nvidia_ec_ffa_device {
 	struct ffa_device *ffa_dev;
+	struct kref refcnt;
 	u8 notification_count;
-	u8 notification_id[NVIDIA_FFA_MAX_NOTIFICATIONS];
+	struct nvidia_ec_notification notifications[NVIDIA_FFA_MAX_NOTIFICATIONS];
 	struct list_head list;
 };
+
+static void nvidia_ec_ffa_device_release(struct kref *kref)
+{
+	struct nvidia_ec_ffa_device *ec_ffa_dev =
+		container_of(kref, struct nvidia_ec_ffa_device, refcnt);
+
+	kfree(ec_ffa_dev);
+}
 
 /* List to contain all EC services FFA device */
 static LIST_HEAD(nvidia_ec_ffa_dev_head);
@@ -67,10 +112,42 @@ static LIST_HEAD(nvidia_ec_ffa_dev_head);
 /* Lock to serialize EC services FFA device list access */
 static DEFINE_MUTEX(nvidia_ffa_lock);
 
-/* EC secure services FFA packet structure sent via ACPI */
-struct nvidia_ec_ffa_packet {
+/*
+ * Bitmap of allocated physical notification IDs (0-63), shared across all
+ * EC services. Protected by nvidia_ffa_lock.
+ */
+static DECLARE_BITMAP(nvidia_ffa_notif_id_map, NVIDIA_FFA_MAX_NOTIFICATIONS);
+
+/*
+ * EC secure services FFA packet structure — MSFT000C (FFH offset 4).
+ * https://github.com/OpenDevicePartnership/documentation/blob/0f7b6bad77a3eb07b66b66d0e3af718db2ec1c24/bookshelf/Shelf%204%20Specifications/EC%20Interface/src/secure-ec-services-overview.md#operation-region-definition
+ *
+ * Byte layout:
+ *   [0]      u8  status  — zero on input; 1 on error output
+ *   [1]      u8  length  — payload byte count
+ *   [2..17]  u8  uuid[16]
+ *   [18+]    u8  rawdata[]
+ */
+struct nvidia_ec_ffa_packet_msft000c {
 	u8 status;
 	u8 length;
+	u8 uuid[UUID_SIZE];
+	u8 rawdata[];
+} __packed;
+
+/*
+ * EC secure services FFA packet structure — ARML0002 (FFH offset 2).
+ * Layout per the OpenDevicePartnership odp-embedded-controller
+ * secure-ec-services-overview spec (Operation Region Definition).
+ *
+ *   [0..7]   u64 status  — AML writes 0; FFH handler sets 1 on error
+ *   [8..15]  u64 recvid  — receiver endpoint ID, not touched by handler
+ *   [16..31] u8  uuid[16] — target service UUID
+ *   [32+]    u8  rawdata[] — payload copied to/from X4..X17
+ */
+struct nvidia_ec_ffa_packet_arml0002 {
+	u64 status;
+	u64 recvid;
 	u8 uuid[UUID_SIZE];
 	u8 rawdata[];
 } __packed;
@@ -108,56 +185,30 @@ static void nvidia_uuid_to_aml_uuid_buf(const uuid_t *uuid, u8 *buf)
 	memcpy(buf + 8, src + 8, 8);
 }
 
-static int nvidia_ffa_rescan_acpi_device(struct device *dev, void *data)
-{
-	struct acpi_device *adev = to_acpi_device(dev);
-
-	if (acpi_dev_hid_uid_match(adev, data, NULL)) {
-		acpi_bus_scan(adev->handle);
-		return 1;
-	}
-
-	return 0;
-}
-
-static const char *nvidia_get_acpi_id_from_uuid(uuid_t *uuid)
-{
-	if (uuid_equal(uuid, &nvidia_ec_battery_service_uuid))
-		return "PNP0C0A";
-
-	if (uuid_equal(uuid, &nvidia_ec_time_alarm_service_uuid))
-		return "ACPI000E";
-
-	if (uuid_equal(uuid, &nvidia_ec_fan_service_uuid))
-		return "PNP0C0B";
-
-	if (uuid_equal(uuid, &nvidia_ec_ucsi_service_uuid))
-		return "PNP0CA0";
-
-	return NULL;
-}
-
 /*
  * Fill the virtual notification IDs array supported by the current FFA device.
- * ACPI _DSD object contains notification mapping. It uses nexted package
- * acpi object.
+ * ACPI _DSD object contains notification mapping via nested packages.
  *
- * From the example given in
- * https://github.com/OpenDevicePartnership/documentation/blob/main/bookshelf/Shelf%204%20Specifications/EC%20Interface/src/secure-ec-services-overview.md#register-notification
+ * Both MSFT000C and ARML0002 use the same property key
+ * "arm-arml0002-ffa-ntf-bind" and the same nested package structure, but
+ * differ in the revision field:
+ *   MSFT000C: pkg4_rev = 1
+ *   ARML0002: pkg4_rev = 0x00010000
+ *
+ * From the example given in DEN0077A v1.3 section 18.8.2:
  *
  * pkg1		        Name(_DSD, Package() {
- * pkg1_guid		  ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"), // Device Prop UUID
+ * pkg1_guid		  ToUUID("c08c3233-b316-4723-a9d7-e21b7ac0fb6a"),
  * pkg2			    Package() {
  * pkg3			    Package(2) {
  * pkg3_prop		      "arm-arml0002-ffa-ntf-bind",
  * pkg4			      Package() {
- * pkg4_rev			1, // Revision
- * pkg4_count			1, // Count of following packages
+ * pkg4_rev			0x00010000,  // Revision (v1.0)
+ * pkg4_count			1,           // Count of following packages
  * pkg5				Package () {
- * pkg5_uuid			  ToUUID("330c1273-fde5-4757-9819-5b6539037502"), // Service1 UUID
+ * pkg5_uuid			  ToUUID("...service UUID..."),
  * pkg6				  Package () {
- * pkg6_notify_id[]		    0x01,     // Cookie1 (UINT32)
- *				    0x07,     // Cookie2
+ * pkg6_notify_id[]		    0x01,    // Cookie1 (UINT32)
  *				  }
  *				},
  *			      }
@@ -165,7 +216,7 @@ static const char *nvidia_get_acpi_id_from_uuid(uuid_t *uuid)
  *			  }
  *			}) // _DSD()
  *
- * The variable names in this function are according to above.
+ * Local variable names below follow the pkgN_* labels in the diagram above.
  */
 static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_dev)
 {
@@ -189,11 +240,8 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 
 	/*
 	 * _DSD returns a Package() with one or more pairs of elements.
-	 * The first element of each pair is a Universal Unique Identifier (UUID).
-	 * The second element of each pair is another Package() Data Structure.
-	 *
-	 * The _DSD for FFA device will have only one pair of elements so
-	 * pkg1 elements count should be 2.
+	 * The first element of each pair is a UUID, the second is a Package().
+	 * The FFA device _DSD has only one such pair so count must be 2.
 	 */
 	if (pkg1->package.count != 2) {
 		kfree(output.pointer);
@@ -209,14 +257,16 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 		return -EINVAL;
 	}
 
-	/* Check if GUID macthes with notify device prop GUID */
+	/* Check if GUID matches with notify device prop GUID */
 	if (!guid_equal((guid_t *)pkg1_guid->buffer.pointer,
-			&nvidia_notify_bind_guid)) {
+			&nvidia_notify_bind_guid) &&
+	    !guid_equal((guid_t *)pkg1_guid->buffer.pointer,
+			&nvidia_notify_bind_guid_legacy)) {
 		kfree(output.pointer);
 		return -EINVAL;
 	}
 
-	/* pkg3 should conatin 1 element with package type */
+	/* pkg2 should contain 1 element with package type */
 	if (pkg2->package.count != 1) {
 		kfree(output.pointer);
 		return -EINVAL;
@@ -239,8 +289,8 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 
 	pkg4 = &pkg3->package.elements[1];
 	/*
-	 * pkg4 should have minimum 3 elements (revision, count and minimum
-	 * one notification map package)
+	 * pkg4 must have at least 3 elements: revision, count, and one
+	 * notification map package.
 	 */
 	if (pkg4->type != ACPI_TYPE_PACKAGE ||
 	    pkg4->package.count < 3) {
@@ -251,17 +301,17 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 	pkg4_rev = &pkg4->package.elements[0];
 	pkg4_count = &pkg4->package.elements[1];
 
-	/* Check if revision is 1 */
+	/* Accept both revision values */
 	if (pkg4_rev->type != ACPI_TYPE_INTEGER ||
-	    pkg4_rev->integer.value != 1) {
+	    (pkg4_rev->integer.value != NVIDIA_FFA_NTF_BIND_REV_MSFT000C &&
+	     pkg4_rev->integer.value != NVIDIA_FFA_NTF_BIND_REV_ARML0002)) {
 		kfree(output.pointer);
 		return -EINVAL;
 	}
 
 	/*
-	 * The pkg4_count represents the count of following packages.
-	 * pkg4_count + 1 (for revision) + 1 (for pkg4_count itself) should
-	 * match total number of elements in pkg4.
+	 * pkg4_count + 1 (revision) + 1 (count itself) must equal total
+	 * elements in pkg4.
 	 */
 	if (pkg4_count->type != ACPI_TYPE_INTEGER ||
 	    (pkg4_count->integer.value + 2) != pkg4->package.count) {
@@ -270,25 +320,23 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 	}
 
 	/*
-	 * Traverse the array of notification map packages.
-	 * Each notification map package contains 2 elements, UUID
-	 * and notification ID array package. Check if there is a notification
-	 * map for the FFA device by comparing UUID and update the
-	 * notification_id[] and notification_count.
+	 * Traverse the array of notification map packages. Each entry has a
+	 * UUID and a package of cookie integers. Match UUID against the FFA
+	 * device and populate notifications[].cookie.
 	 */
 	for (i = 2; i < pkg4->package.count; i++) {
-		union acpi_object *pkg5_uuid, *pkg5 = &pkg4->package.elements[2];
+		union acpi_object *pkg5_uuid, *pkg5 = &pkg4->package.elements[i];
 		union acpi_object *pkg6;
 		uuid_t uuid;
 		int j;
 
-		if (pkg5->type != ACPI_TYPE_PACKAGE &&
+		if (pkg5->type != ACPI_TYPE_PACKAGE ||
 		    pkg5->package.count != 2) {
 			kfree(output.pointer);
 			return -EINVAL;
 		}
 
-		pkg5_uuid =  &pkg5->package.elements[0];
+		pkg5_uuid = &pkg5->package.elements[0];
 		pkg6 = &pkg5->package.elements[1];
 		if (pkg5_uuid->type != ACPI_TYPE_BUFFER ||
 		    pkg5_uuid->buffer.length != UUID_SIZE ||
@@ -301,6 +349,16 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 		if (!uuid_equal(&uuid, &ec_ffa_dev->ffa_dev->uuid))
 			continue;
 
+		/*
+		 * Reject firmware _DSD that declares more cookies than the
+		 * fixed-size notifications[] array can hold, before storing
+		 * any of them.
+		 */
+		if (pkg6->package.count > NVIDIA_FFA_MAX_NOTIFICATIONS) {
+			kfree(output.pointer);
+			return -E2BIG;
+		}
+
 		for (j = 0; j < pkg6->package.count; j++) {
 			union acpi_object *pkg6_notify_id = &pkg6->package.elements[j];
 
@@ -309,7 +367,14 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 				return -EINVAL;
 			}
 
-			ec_ffa_dev->notification_id[j] = pkg6_notify_id->integer.value;
+			/* Cookie is u32 in _DSD; reject out-of-range firmware values. */
+			if (pkg6_notify_id->integer.value > U32_MAX) {
+				kfree(output.pointer);
+				return -ERANGE;
+			}
+
+			ec_ffa_dev->notifications[j].cookie =
+				(u32)pkg6_notify_id->integer.value;
 		}
 
 		ec_ffa_dev->notification_count = pkg6->package.count;
@@ -323,28 +388,65 @@ static int nvidia_ffa_fill_notification_map(struct nvidia_ec_ffa_device *ec_ffa_
 
 /*
  * Notification EC service callback.
- * Get the ffa device from callback data and invoke notification _DSM with
- * notify_id.
  *
- * The details regarding _DSM is documented in
- * https://github.com/OpenDevicePartnership/documentation/tree/main/bookshelf/Shelf%204%20Specifications#notification-events
+ * notify_id is the physical notification ID (bit position, 0-63) registered
+ * with notify_request. cb_data is the ffa_device * passed to notify_request;
+ * its lifetime is drained by the FF-A core (ffa_notifications_cleanup()
+ * flushes the pcpu notification workqueue before ffa_partitions_cleanup()
+ * frees ffa_devices), so it is safe to dereference here.
+ *
+ * Resolve cb_data to our per-service nvidia_ec_ffa_device under
+ * nvidia_ffa_lock, which is also held around list_del + the final kref_put
+ * in the remove and probe-failure-unwind paths. On a lookup miss (removal
+ * or unwind has already run for this service) skip the _DSM invocation
+ * entirely rather than fabricate a cookie for firmware.
  */
 static void nvidia_ffa_ec_service_notif_callback(int notify_id, void *cb_data)
 {
-	struct acpi_device *adev = ACPI_COMPANION(&ffa_pdev->dev);
-	struct ffa_device *ffa_dev = (struct ffa_device *)cb_data;
+	struct acpi_device *adev;
+	struct ffa_device *ffa_dev = cb_data;
+	struct nvidia_ec_ffa_device *cur, *ec_ffa_dev = NULL;
 	union acpi_object args[2], input_pkg;
-	union acpi_object  *output;
+	union acpi_object *output;
+	u32 cookie = 0;
 	u8 uuid[UUID_SIZE];
+	int i;
 
-	nvidia_uuid_to_aml_uuid_buf(&ffa_dev->uuid, uuid);
+	if (!ffa_pdev)
+		return;
+
+	adev = ACPI_COMPANION(&ffa_pdev->dev);
+	if (!adev)
+		return;
+
+	mutex_lock(&nvidia_ffa_lock);
+	list_for_each_entry(cur, &nvidia_ec_ffa_dev_head, list) {
+		if (cur->ffa_dev != ffa_dev)
+			continue;
+
+		for (i = 0; i < cur->notification_count; i++) {
+			if (cur->notifications[i].notif_id != (u8)notify_id)
+				continue;
+			cookie = cur->notifications[i].cookie;
+			ec_ffa_dev = cur;
+			kref_get(&ec_ffa_dev->refcnt);
+			break;
+		}
+		break;
+	}
+	mutex_unlock(&nvidia_ffa_lock);
+
+	if (!ec_ffa_dev)
+		return;
+
+	nvidia_uuid_to_aml_uuid_buf(&ec_ffa_dev->ffa_dev->uuid, uuid);
 
 	args[0].type = ACPI_TYPE_BUFFER;
 	args[0].buffer.length = sizeof(uuid);
 	args[0].buffer.pointer = uuid;
 
 	args[1].type = ACPI_TYPE_INTEGER;
-	args[1].integer.value = notify_id;
+	args[1].integer.value = cookie;
 
 	input_pkg.type = ACPI_TYPE_PACKAGE;
 	input_pkg.package.count = 2;
@@ -356,59 +458,57 @@ static void nvidia_ffa_ec_service_notif_callback(int notify_id, void *cb_data)
 		dev_err(&ffa_pdev->dev, "Failed to execute notify\n");
 	else
 		ACPI_FREE(output);
+
+	kref_put(&ec_ffa_dev->refcnt, nvidia_ec_ffa_device_release);
 }
 
 /*
- * Create notification setup for the notification_id.
+ * MSFT000C notification setup.
  *
  * The details regarding notification setup is documented in
- * https://github.com/OpenDevicePartnership/documentation/tree/main/bookshelf/Shelf%204%20Specifications#register-notification
- *
- * This function setup 1:1 mapping between hardware notification ID and
- * virtual notification ID.
+ * https://github.com/OpenDevicePartnership/documentation/blob/0f7b6bad77a3eb07b66b66d0e3af718db2ec1c24/bookshelf/Shelf%204%20Specifications/EC%20Interface/src/secure-ec-services-overview.md#register-notification
  */
-static int nvidia_ffa_notification_setup(struct nvidia_ec_ffa_device *ec_ffa_dev,
-					 u8 notification_id)
+static int nvidia_ffa_notification_setup_msft000c(struct nvidia_ec_ffa_device *ec_ffa_dev,
+						  u32 cookie, u8 notif_id)
 {
 	struct ffa_send_direct_data2 ffa_data = { 0 };
 	u8 *uuid = (u8 *)&ec_ffa_dev->ffa_dev->uuid;
 	int ret;
 
-	/* X4 register, function 1 */
-	ffa_data.data[0] = 1;
-
 	BUILD_BUG_ON(UUID_SIZE != 16);
 	BUILD_BUG_ON(sizeof(ffa_data.data[1]) < 8);
 
-	/* X5 and X6 registers contain UUID */
+	/* X4: function 1 (NOTIFY_SETUP) */
+	ffa_data.data[0] = 1;
+
+	/* X5, X6: EC service UUID */
 	memcpy(&ffa_data.data[1], uuid, 8);
 	memcpy(&ffa_data.data[2], uuid + 8, 8);
 
-	/* X7 register, the number of notification mappings */
+	/* X7: number of notification mappings */
 	ffa_data.data[3] = 1;
 
-	/* X7 register, notification ID and notification bitmap bit number */
-	ffa_data.data[4] = ((u64)notification_id << 32) | notification_id;
+	/* X8: cookie in upper 32 bits, physical notification ID in lower 32 bits */
+	ffa_data.data[4] = ((u64)cookie << 32) | notif_id;
 
-	if (!notify_ffa_dev->ops ||
-	    !notify_ffa_dev->ops->msg_ops ||
-	    !notify_ffa_dev->ops->msg_ops->sync_send_receive2) {
+	if (!control_ffa_dev->ops ||
+	    !control_ffa_dev->ops->msg_ops ||
+	    !control_ffa_dev->ops->msg_ops->sync_send_receive2)
 		return -EINVAL;
-	}
 
-	ret = notify_ffa_dev->ops->msg_ops->sync_send_receive2(notify_ffa_dev,
+	ret = control_ffa_dev->ops->msg_ops->sync_send_receive2(control_ffa_dev,
 							       &ffa_data);
 	if (ret) {
 		dev_err(&ec_ffa_dev->ffa_dev->dev,
-			"Failed to send NOTIFY_SETUP id=%d error=%d\n",
-			notification_id, ret);
+			"Failed to send NOTIFY_SETUP cookie=%u notif_id=%u error=%d\n",
+			cookie, notif_id, ret);
 		return ret;
 	}
 
 	if (ffa_data.data[0]) {
 		dev_err(&ec_ffa_dev->ffa_dev->dev,
-			"NOTIFY_SETUP returned failure id=%d error=%ld\n",
-			notification_id, ffa_data.data[0]);
+			"NOTIFY_SETUP returned failure cookie=%u notif_id=%u error=%ld\n",
+			cookie, notif_id, ffa_data.data[0]);
 
 		/*
 		 * TODO: destroy operation is not yet implemented in the firmware
@@ -421,9 +521,71 @@ static int nvidia_ffa_notification_setup(struct nvidia_ec_ffa_device *ec_ffa_dev
 	return 0;
 }
 
-/* Destroy notification setup for the notification_id */
+/*
+ * ARML0002 notification setup (DEN0077A v1.3 section 18.7.1, Table 18.25).
+ * Uses the inter-partition setup protocol UUID.
+ */
+static int nvidia_ffa_notification_setup_arml0002(struct nvidia_ec_ffa_device *ec_ffa_dev,
+						  u32 cookie, u8 notif_id)
+{
+	struct ffa_send_direct_data2 ffa_data = { 0 };
+	u8 *svc_uuid = (u8 *)&ec_ffa_dev->ffa_dev->uuid;
+	int ret;
+
+	BUILD_BUG_ON(UUID_SIZE != 16);
+	BUILD_BUG_ON(sizeof(ffa_data.data[1]) < 8);
+
+	/* Sender UUID: not applicable for OS-side caller, left as zero */
+
+	/* X7, X8: receiver (EC) service UUID */
+	memcpy(&ffa_data.data[3], svc_uuid, 8);
+	memcpy(&ffa_data.data[4], svc_uuid + 8, 8);
+
+	/* X9: notification registration request */
+	ffa_data.data[5] = NVIDIA_EC_INTERPARTITION_MSG_NOTIF_REG;
+
+	/* X10: one tuple */
+	ffa_data.data[6] = 1;
+
+	/* X11: cookie in upper 32 bits, physical notification ID in bits[31:23] */
+	ffa_data.data[7] = NVIDIA_EC_NOTIF_TUPLE(cookie, notif_id);
+
+	if (!control_ffa_dev->ops ||
+	    !control_ffa_dev->ops->msg_ops ||
+	    !control_ffa_dev->ops->msg_ops->sync_send_receive2)
+		return -EINVAL;
+
+	ret = control_ffa_dev->ops->msg_ops->sync_send_receive2(control_ffa_dev,
+							      &ffa_data);
+	if (ret) {
+		dev_err(&ec_ffa_dev->ffa_dev->dev,
+			"Failed to send NOTIFY_SETUP cookie=%u notif_id=%u error=%d\n",
+			cookie, notif_id, ret);
+		return ret;
+	}
+
+	if (ffa_data.data[0]) {
+		dev_err(&ec_ffa_dev->ffa_dev->dev,
+			"NOTIFY_SETUP returned failure cookie=%u notif_id=%u error=%ld\n",
+			cookie, notif_id, ffa_data.data[0]);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int nvidia_ffa_notification_setup(struct nvidia_ec_ffa_device *ec_ffa_dev,
+					 u32 cookie, u8 notif_id)
+{
+	if (!ffa_ec_legacy_spec)
+		return nvidia_ffa_notification_setup_arml0002(ec_ffa_dev, cookie, notif_id);
+
+	return nvidia_ffa_notification_setup_msft000c(ec_ffa_dev, cookie, notif_id);
+}
+
+/* Destroy notification setup for the given physical notification ID */
 static void nvidia_ffa_notification_destroy(struct nvidia_ec_ffa_device *ec_ffa_dev,
-					    u8 notification_id)
+					    u8 notif_id)
 {
 	/*
 	 * TODO: destroy operation is not yet implemented in the firmware.
@@ -435,8 +597,8 @@ static void nvidia_ffa_notification_destroy(struct nvidia_ec_ffa_device *ec_ffa_
  * Create notifications for the FFA device.
  *
  * 1. Get notification map array for FFA device.
- * 2. For each notification, setup notification with notify service and
- *    then invoke notify_request method to enable notification for FFA device.
+ * 2. For each notification, setup notification with the control service and
+ *    then invoke notify_request to enable notification for the FFA device.
  */
 static int nvidia_ffa_create_notifications(struct nvidia_ec_ffa_device *ec_ffa_dev)
 {
@@ -456,39 +618,85 @@ static int nvidia_ffa_create_notifications(struct nvidia_ec_ffa_device *ec_ffa_d
 	}
 
 	for (i = 0; i < ec_ffa_dev->notification_count; i++) {
-		ret = nvidia_ffa_notification_setup(ec_ffa_dev,
-						    ec_ffa_dev->notification_id[i]);
+		struct nvidia_ec_notification *n = &ec_ffa_dev->notifications[i];
+
+		if (ffa_ec_legacy_spec) {
+			/*
+			 * MSFT000C (draft spec) firmware predates the
+			 * cookie/notif_id split and rejects NOTIFY_SETUP when
+			 * the two halves of X8 differ. Use the cookie itself
+			 * as the physical notification ID; the AML-declared
+			 * cookie must fit in the FFA framework's 6-bit
+			 * notification ID space.
+			 */
+			if (n->cookie >= NVIDIA_FFA_MAX_NOTIFICATIONS) {
+				dev_err(&ec_ffa_dev->ffa_dev->dev,
+					"MSFT000C cookie=%u exceeds notification ID range\n",
+					n->cookie);
+				ret = -EINVAL;
+				break;
+			}
+			n->notif_id = (u8)n->cookie;
+		} else {
+			/*
+			 * ARML0002: allocate a free physical notification ID
+			 * from the global bitmap.
+			 */
+			unsigned int id;
+
+			mutex_lock(&nvidia_ffa_lock);
+			id = find_first_zero_bit(nvidia_ffa_notif_id_map,
+						 NVIDIA_FFA_MAX_NOTIFICATIONS);
+			if (id >= NVIDIA_FFA_MAX_NOTIFICATIONS) {
+				mutex_unlock(&nvidia_ffa_lock);
+				dev_err(&ec_ffa_dev->ffa_dev->dev,
+					"No free notification IDs (cookie=%u)\n",
+					n->cookie);
+				ret = -ENOSPC;
+				break;
+			}
+			set_bit(id, nvidia_ffa_notif_id_map);
+			n->notif_id = (u8)id;
+			mutex_unlock(&nvidia_ffa_lock);
+		}
+
+		ret = nvidia_ffa_notification_setup(ec_ffa_dev, n->cookie, n->notif_id);
 		if (ret) {
 			dev_err(&ec_ffa_dev->ffa_dev->dev,
-				"Failed to setup notification id=%d error=%d\n",
-				ec_ffa_dev->notification_id[i], ret);
+				"Failed to setup notification cookie=%u notif_id=%u error=%d\n",
+				n->cookie, n->notif_id, ret);
+			if (!ffa_ec_legacy_spec)
+				clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
 			break;
 		}
 
 		ret = ec_ffa_dev->ffa_dev->ops->notifier_ops->notify_request(
 				ec_ffa_dev->ffa_dev, false,
 				nvidia_ffa_ec_service_notif_callback,
-				ec_ffa_dev->ffa_dev, ec_ffa_dev->notification_id[i]);
+				ec_ffa_dev->ffa_dev, n->notif_id);
 		if (ret) {
-			nvidia_ffa_notification_destroy(ec_ffa_dev,
-							ec_ffa_dev->notification_id[i]);
+			nvidia_ffa_notification_destroy(ec_ffa_dev, n->notif_id);
+			if (!ffa_ec_legacy_spec)
+				clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
 			dev_err(&ec_ffa_dev->ffa_dev->dev,
-				"Failed to request notification id=%d error=%d\n",
-				ec_ffa_dev->notification_id[i], ret);
+				"Failed to request notification cookie=%u notif_id=%u error=%d\n",
+				n->cookie, n->notif_id, ret);
 			break;
 		}
 	}
 
-	/* Remove already setup notification in case of error */
+	/* Remove already setup notifications in case of error */
 	if (ret) {
 		int j;
 
 		for (j = 0; j < i; j++) {
+			struct nvidia_ec_notification *n = &ec_ffa_dev->notifications[j];
+
 			ec_ffa_dev->ffa_dev->ops->notifier_ops->notify_relinquish(
-				ec_ffa_dev->ffa_dev,
-				ec_ffa_dev->notification_id[j]);
-			nvidia_ffa_notification_destroy(ec_ffa_dev,
-							ec_ffa_dev->notification_id[j]);
+				ec_ffa_dev->ffa_dev, n->notif_id);
+			if (!ffa_ec_legacy_spec)
+				clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
+			nvidia_ffa_notification_destroy(ec_ffa_dev, n->notif_id);
 		}
 
 		ec_ffa_dev->notification_count = 0;
@@ -503,155 +711,224 @@ static void nvidia_ffa_remove_notifications(struct nvidia_ec_ffa_device *ec_ffa_
 	int i;
 
 	for (i = 0; i < ec_ffa_dev->notification_count; i++) {
+		struct nvidia_ec_notification *n = &ec_ffa_dev->notifications[i];
+
 		ec_ffa_dev->ffa_dev->ops->notifier_ops->notify_relinquish(
-			ec_ffa_dev->ffa_dev,
-			ec_ffa_dev->notification_id[i]);
-		nvidia_ffa_notification_destroy(ec_ffa_dev,
-						ec_ffa_dev->notification_id[i]);
+			ec_ffa_dev->ffa_dev, n->notif_id);
+		if (!ffa_ec_legacy_spec)
+			clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
+		nvidia_ffa_notification_destroy(ec_ffa_dev, n->notif_id);
 	}
 }
 
 /*
- * Handler function for FFH operation region offset 4.
- * When ACPI interpreter runs code with FFH operation region offset 4,
- * then this data is meant for EC secure services. The FFH buffer has
- * data in 'struct nvidia_ec_ffa_packet' format. In this packet, it has UUID
- * for EC secure service and then the service specific raw data.
+ * Common FFA send path shared by both FFH handlers.
  *
- * 1. Extract the UUID from this packet and get ffa_device for it.
- * 2. Fill raw data in 'struct ffa_send_direct_data2' and
- *    invoke sync_send_receive2() routine for the ffa_device.
- * 3. From response, fill the data in 'struct ffa_send_direct_data2'
- *    and return.
+ * Looks up the EC device by UUID, copies input_len bytes from rawdata into
+ * the FFA data registers, sends FFA_MSG_SEND_DIRECT_REQ2, then copies
+ * output_len bytes of the response back into rawdata.
+ *
+ * Returns 0 on success, negative error code on failure.
  */
-static int nvidia_ffh_handler(struct acpi_ffh_info *info, acpi_integer *value, void *region_context)
+static int nvidia_ffh_do_ffa_send(uuid_t uuid, u8 *rawdata,
+				  unsigned int input_len, unsigned int output_len)
 {
 	struct ffa_send_direct_data2 ffa_data = { 0 };
-	struct nvidia_ec_ffa_packet *ffa_packet = (struct nvidia_ec_ffa_packet *)value;
-	struct nvidia_ec_ffa_device *cur, *ec_dev =  NULL;
+	struct nvidia_ec_ffa_device *cur, *ec_dev = NULL;
+	ktime_t deadline;
 	int ret;
-	unsigned int ffh_copy_len;
-	uuid_t uuid;
-
-	/* Only offset 4 is supported */
-	if (info->offset != 4)
-		return -EOPNOTSUPP;
-
-	/* Length should not be less than header length */
-	if (info->length < offsetof(struct nvidia_ec_ffa_packet, rawdata))
-		return -EINVAL;
-
-	/* Length should not be less than actual packet length */
-	if (info->length <
-	    ffa_packet->length + offsetof(struct nvidia_ec_ffa_packet, rawdata)) {
-		ffa_packet->status = 1;
-		return -EINVAL;
-	}
-
-	/* Packet length should not greater than FFA supported data length */
-	if (ffa_packet->length > sizeof(ffa_data.data)) {
-		ffa_packet->status = 1;
-		return -EINVAL;
-	}
-
-	/* Convert AML UUID to FFA UUID */
-	uuid = nvidia_get_uuid_from_aml_buf((u8 *)ffa_packet->uuid);
 
 	mutex_lock(&nvidia_ffa_lock);
-	/* Get nvidia_ec_ffa_device for the current UUID */
 	list_for_each_entry(cur, &nvidia_ec_ffa_dev_head, list) {
 		if (uuid_equal(&uuid, &cur->ffa_dev->uuid)) {
 			ec_dev = cur;
+			kref_get(&ec_dev->refcnt);
+			get_device(&ec_dev->ffa_dev->dev);
 			break;
 		}
 	}
 	mutex_unlock(&nvidia_ffa_lock);
 
-	if (!ec_dev) {
-		ffa_packet->status = 1;
-		return -EINVAL;
-	}
-
-	/* Copy the ACPI FFH packet data into FFA data */
-	memcpy(ffa_data.data, ffa_packet->rawdata, ffa_packet->length);
+	if (!ec_dev)
+		return -ENODEV;
 
 	if (!ec_dev->ffa_dev->ops ||
 	    !ec_dev->ffa_dev->ops->msg_ops ||
 	    !ec_dev->ffa_dev->ops->msg_ops->sync_send_receive2) {
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out_put;
 	}
 
-	ret = ec_dev->ffa_dev->ops->msg_ops->sync_send_receive2(ec_dev->ffa_dev,
-								&ffa_data);
+	memcpy(ffa_data.data, rawdata, input_len);
+
+	/*
+	 * Some SP implementations return a transient failure when a previous
+	 * FFA request is still in flight. Retry with a short backoff until
+	 * NVIDIA_FFA_SEND_TIMEOUT_MS has elapsed.
+	 */
+	deadline = ktime_add_ms(ktime_get(), NVIDIA_FFA_SEND_TIMEOUT_MS);
+	while (true) {
+		ret = ec_dev->ffa_dev->ops->msg_ops->sync_send_receive2(ec_dev->ffa_dev,
+								       &ffa_data);
+		if (ret != -EBUSY)
+			break;
+
+		if (ktime_after(ktime_get(), deadline))
+			break;
+
+		usleep_range(500, 1000);
+	}
+
 	if (ret) {
 		dev_err(&ec_dev->ffa_dev->dev,
 			"Failed to send FFA messages error=%d\n", ret);
-		ffa_packet->status = 1;
-		return ret;
+		goto out_put;
 	}
 
-	/* Set the status as success */
-	ffa_packet->status = 0;
+	memcpy(rawdata, ffa_data.data, output_len);
+	ret = 0;
+
+out_put:
+	put_device(&ec_dev->ffa_dev->dev);
+	kref_put(&ec_dev->refcnt, nvidia_ec_ffa_device_release);
+	return ret;
+}
+
+/* FFH handler — MSFT000C (FFH offset 4) */
+static int nvidia_ffh_handler_msft000c(struct acpi_ffh_info *info, acpi_integer *value)
+{
+	struct nvidia_ec_ffa_packet_msft000c *pkt = (struct nvidia_ec_ffa_packet_msft000c *)value;
+	unsigned int rawdata_buflen, ffh_copy_len;
+	uuid_t uuid;
+	int ret;
+
+	/* Buffer must fit at least the fixed header */
+	if (info->length < offsetof(struct nvidia_ec_ffa_packet_msft000c, rawdata))
+		return -EINVAL;
+
+	rawdata_buflen = info->length - offsetof(struct nvidia_ec_ffa_packet_msft000c, rawdata);
+
+	/* Buffer must fit header + declared payload */
+	if (rawdata_buflen < pkt->length) {
+		pkt->status = 1;
+		return -EINVAL;
+	}
+
+	/* Payload must fit in the 14 FFA data registers (112 bytes) */
+	if (pkt->length > sizeof_field(struct ffa_send_direct_data2, data)) {
+		pkt->status = 1;
+		return -EINVAL;
+	}
 
 	/*
-	 * Copy the ACPI FFA data back into ACPI FFH packet.
-	 *
-	 * ACPI FFH packet raw data length can't be fetched here, so copy
-	 * all bytes from ffa_data.data
+	 * MSFT000C responses can be larger than the request, and the FFH
+	 * region does not carry a response length. Send pkt->length bytes to
+	 * the SP, and copy back as much of the response register file as the
+	 * AML buffer can hold, bounded by the 14 FFA data registers (112
+	 * bytes).
 	 */
-	ffh_copy_len = min(sizeof(ffa_data.data),
-			   info->length - offsetof(struct nvidia_ec_ffa_packet, rawdata));
+	ffh_copy_len = min(rawdata_buflen,
+			   sizeof_field(struct ffa_send_direct_data2, data));
 
-	memcpy(ffa_packet->rawdata, ffa_data.data, ffh_copy_len);
-	return 0;
+	uuid = nvidia_get_uuid_from_aml_buf(pkt->uuid);
+	ret = nvidia_ffh_do_ffa_send(uuid, pkt->rawdata, pkt->length,
+				     ffh_copy_len);
+	pkt->status = ret ? 1 : 0;
+	return ret;
+}
+
+/* FFH handler — ARML0002 (FFH offset 2) */
+static int nvidia_ffh_handler_arml0002(struct acpi_ffh_info *info, acpi_integer *value)
+{
+	struct nvidia_ec_ffa_packet_arml0002 *pkt = (struct nvidia_ec_ffa_packet_arml0002 *)value;
+	unsigned int payload_len;
+	uuid_t uuid;
+	int ret;
+
+	/* Buffer must fit the fixed header */
+	if (info->length < offsetof(struct nvidia_ec_ffa_packet_arml0002, rawdata))
+		return -EINVAL;
+
+	payload_len = info->length - offsetof(struct nvidia_ec_ffa_packet_arml0002, rawdata);
+
+	/* Payload must fit in the 14 FFA data registers (112 bytes) */
+	if (payload_len > sizeof_field(struct ffa_send_direct_data2, data)) {
+		pkt->status = 1;
+		return -EINVAL;
+	}
+
+	uuid = nvidia_get_uuid_from_aml_buf(pkt->uuid);
+	ret = nvidia_ffh_do_ffa_send(uuid, pkt->rawdata, payload_len, payload_len);
+	pkt->status = ret ? 1 : 0;
+	return ret;
+}
+
+/*
+ * Dispatch to the correct FFH handler based on the spec version and FFH
+ * operation-region offset. The offset selects the FFA packet layout the
+ * SPMC expects:
+ *   ARML0002: offset 2 — struct nvidia_ec_ffa_packet_arml0002
+ *             operation-region defined by ARM DEN0048D "Arm Functional
+ *             Fixed Hardware Specification (FFH)" v1.3 section 2.3
+ *   MSFT000C: offset 4 — struct nvidia_ec_ffa_packet_msft000c
+ *             operation-region defined by the OpenDevicePartnership
+ *             draft (secure-ec-services-overview.md)
+ */
+static int nvidia_ffh_handler(struct acpi_ffh_info *info, acpi_integer *value,
+			      void *region_context)
+{
+	if (!ffa_ec_legacy_spec && info->offset == 2)
+		return nvidia_ffh_handler_arml0002(info, value);
+
+	if (ffa_ec_legacy_spec && info->offset == 4)
+		return nvidia_ffh_handler_msft000c(info, value);
+
+	return -EOPNOTSUPP;
 }
 
 static int nvidia_ffa_ec_service_probe(struct ffa_device *ffa_dev)
 {
 	struct nvidia_ec_ffa_device *nvidia_ec_ffa_dev;
-	const char *acpi_id = NULL;
 	int ret;
 
-	if (!ffa_pdev || !notify_ffa_dev) {
-		dev_err(&ffa_dev->dev, "nvidia ffa or notify device not available\n");
+	if (!ffa_pdev || !control_ffa_dev) {
+		dev_err(&ffa_dev->dev, "nvidia ffa or control device not available\n");
 		return -ENODEV;
 	}
 
-	nvidia_ec_ffa_dev = devm_kzalloc(&ffa_dev->dev,
-					 sizeof(*nvidia_ec_ffa_dev),
-					 GFP_KERNEL);
+	nvidia_ec_ffa_dev = kzalloc(sizeof(*nvidia_ec_ffa_dev), GFP_KERNEL);
 	if (!nvidia_ec_ffa_dev) {
 		dev_err(&ffa_dev->dev, "Failed to allocate memory\n");
 		return -ENOMEM;
 	}
 
 	nvidia_ec_ffa_dev->ffa_dev = ffa_dev;
+	kref_init(&nvidia_ec_ffa_dev->refcnt);
 	INIT_LIST_HEAD(&nvidia_ec_ffa_dev->list);
 
-	ret = nvidia_ffa_create_notifications(nvidia_ec_ffa_dev);
-	if (ret) {
-		dev_info(&ffa_dev->dev,
-			 "Failed to create ffa notifications error=%d\n",
-			  ret);
-		devm_kfree(&ffa_dev->dev, nvidia_ec_ffa_dev);
-		return ret;
-	}
-
+	/*
+	 * Publish nvidia_ec_ffa_dev on the global list before
+	 * notify_request() is issued from nvidia_ffa_create_notifications().
+	 * The framework can start dispatching the callback as soon as
+	 * notify_request() returns; the callback walks
+	 * nvidia_ec_ffa_dev_head under nvidia_ffa_lock, so the entry must
+	 * already be visible by then.
+	 */
 	mutex_lock(&nvidia_ffa_lock);
 	list_add(&nvidia_ec_ffa_dev->list, &nvidia_ec_ffa_dev_head);
 	mutex_unlock(&nvidia_ffa_lock);
 
-	/*
-	 * When acpi subsystem probe all ACPI devices, then it execute _STA
-	 * method for each device. The _STA method fails at that time since
-	 * custom FFA driver won't be ready. Get ACPI ID from UUID and
-	 * rescan the device again.
-	 */
-	acpi_id = nvidia_get_acpi_id_from_uuid(&ffa_dev->uuid);
-	if (acpi_id) {
-		acpi_bus_for_each_dev(nvidia_ffa_rescan_acpi_device,
-				      (void *)acpi_id);
+	ret = nvidia_ffa_create_notifications(nvidia_ec_ffa_dev);
+	if (ret) {
+		dev_err(&ffa_dev->dev,
+			"Failed to create ffa notifications error=%d\n", ret);
+		mutex_lock(&nvidia_ffa_lock);
+		list_del(&nvidia_ec_ffa_dev->list);
+		mutex_unlock(&nvidia_ffa_lock);
+		kref_put(&nvidia_ec_ffa_dev->refcnt, nvidia_ec_ffa_device_release);
+		return ret;
 	}
+
 
 	return 0;
 }
@@ -665,22 +942,57 @@ static void nvidia_ffa_ec_service_remove(struct ffa_device *ffa_dev)
 		if (cur->ffa_dev == ffa_dev) {
 			list_del(&cur->list);
 			nvidia_ffa_remove_notifications(cur);
-			devm_kfree(&ffa_dev->dev, cur);
-			break;
+			mutex_unlock(&nvidia_ffa_lock);
+			kref_put(&cur->refcnt, nvidia_ec_ffa_device_release);
+			return;
 		}
 	}
 	mutex_unlock(&nvidia_ffa_lock);
 }
 
 static const struct ffa_device_id nvidia_ffa_ec_service_ids[] = {
-	{ nvidia_ec_managment_service_uuid },
-	{ nvidia_ec_power_service_uuid },
-	{ nvidia_ec_battery_service_uuid },
-	{ nvidia_ec_thermal_service_uuid },
-	{ nvidia_ec_fan_service_uuid },
-	{ nvidia_ec_ucsi_service_uuid },
-	{ nvidia_ec_input_service_uuid },
-	{ nvidia_ec_time_alarm_service_uuid },
+	/* management */
+	{ UUID_INIT(0x330c1273, 0xfde5, 0x4757,
+		    0x98, 0x19, 0x5b, 0x65, 0x39, 0x03, 0x75, 0x02) },
+	/* power */
+	{ UUID_INIT(0x7157addf, 0x2fbe, 0x4c63,
+		    0xae, 0x95, 0xef, 0xac, 0x16, 0xe3, 0xb0, 0x1c) },
+	/* battery */
+	{ UUID_INIT(0x25cb5207, 0xac36, 0x427d,
+		    0xaa, 0xef, 0x3a, 0xa7, 0x88, 0x77, 0xd2, 0x7e) },
+	/* thermal */
+	{ UUID_INIT(0x31f56da7, 0x593c, 0x4d72,
+		    0xa4, 0xb3, 0x8f, 0xc7, 0x17, 0x1a, 0xc0, 0x73) },
+	/* fan */
+	{ UUID_INIT(0x7697530c, 0xd079, 0x4ec1,
+		    0xa4, 0xc4, 0xcf, 0x0d, 0x2b, 0xdc, 0x93, 0xfa) },
+	/* ucsi */
+	{ UUID_INIT(0x65467f50, 0x827f, 0x4e4f,
+		    0x87, 0x70, 0xdb, 0xf4, 0xc3, 0xf7, 0x7f, 0x45) },
+	/* input */
+	{ UUID_INIT(0xe3168a99, 0x4a57, 0x4a2b,
+		    0x8c, 0x5e, 0x11, 0xbc, 0xfe, 0xc7, 0x34, 0x06) },
+	/* time/alarm */
+	{ UUID_INIT(0x23ea63ed, 0xb593, 0x46ea,
+		    0xb0, 0x27, 0x89, 0x24, 0xdf, 0x88, 0xe9, 0x2f) },
+
+	/* Custom UUIDs used by OEM platforms. */
+	{ UUID_INIT(0x3dddfaa6, 0x361b, 0x4eb4,
+		    0xa4, 0x24, 0x8d, 0x10, 0x08, 0x9d, 0x16, 0x53) },
+	{ UUID_INIT(0xa3e7f7cf, 0x66ca, 0x43b9,
+		    0x9b, 0x6e, 0x99, 0x47, 0xb8, 0xe2, 0xa5, 0x11) },
+	{ UUID_INIT(0x884a63a0, 0x3285, 0x4120,
+		    0x83, 0xaa, 0xee, 0xc0, 0x08, 0xa0, 0xa5, 0x46) },
+	{ UUID_INIT(0x378daedc, 0xf06b, 0x4446,
+		    0x83, 0x14, 0x40, 0xab, 0x93, 0x3c, 0x87, 0xa3) },
+	{ UUID_INIT(0x3592e053, 0xe409, 0x4ce0,
+		    0xa0, 0x89, 0x97, 0xbd, 0x53, 0x37, 0x1c, 0x88) },
+	{ UUID_INIT(0x8a61cc5c, 0x2bbb, 0x4e29,
+		    0xa0, 0x2e, 0x02, 0x17, 0xe3, 0xf2, 0x42, 0x5a) },
+	{ UUID_INIT(0xde5dca60, 0x9fec, 0x47fb,
+		    0x85, 0x68, 0xdf, 0xf1, 0xf5, 0x42, 0x13, 0x83) },
+	{ UUID_INIT(0x73cc07ac, 0xd184, 0x4b5a,
+		    0x89, 0x07, 0x83, 0x7c, 0x5b, 0x0a, 0xe1, 0x2b) },
 	{}
 };
 
@@ -689,9 +1001,22 @@ static struct ffa_driver nvidia_ffa_ec_service_driver = {
 	.probe = nvidia_ffa_ec_service_probe,
 	.remove = nvidia_ffa_ec_service_remove,
 	.id_table = nvidia_ffa_ec_service_ids,
+	.driver = {
+		.suppress_bind_attrs = true,
+	},
 };
 
-static int nvidia_ffa_notify_service_probe(struct ffa_device *ffa_dev)
+/*
+ * Unified control-plane service driver.
+ *
+ * The id_table lists both control-plane UUIDs; a given platform's FF-A
+ * bridge only exposes one of them (chosen by the ACPI HID that also
+ * seeds ffa_ec_legacy_spec at parent probe time):
+ *
+ * Whichever device the framework matches, the probe stores it in
+ * control_ffa_dev and registers the shared EC service driver.
+ */
+static int nvidia_ffa_control_service_probe(struct ffa_device *ffa_dev)
 {
 	int ret;
 
@@ -700,47 +1025,53 @@ static int nvidia_ffa_notify_service_probe(struct ffa_device *ffa_dev)
 		return -ENODEV;
 	}
 
-	notify_ffa_dev = ffa_dev;
+	if (control_ffa_dev) {
+		dev_err(&ffa_dev->dev, "control FFA device already registered\n");
+		return -EBUSY;
+	}
+
+	control_ffa_dev = ffa_dev;
 
 	ret = ffa_driver_register(&nvidia_ffa_ec_service_driver, THIS_MODULE, DRV_NAME);
 	if (ret) {
 		dev_err(&ffa_dev->dev,
 			"Failed to register ec service driver error=%d\n", ret);
-		notify_ffa_dev = NULL;
+		control_ffa_dev = NULL;
 		return ret;
 	}
 
 	return 0;
 }
 
-static void nvidia_ffa_notify_service_remove(struct ffa_device *ffa_dev)
+static void nvidia_ffa_control_service_remove(struct ffa_device *ffa_dev)
 {
 	ffa_driver_unregister(&nvidia_ffa_ec_service_driver);
-	notify_ffa_dev = NULL;
+	control_ffa_dev = NULL;
 }
 
-static const struct ffa_device_id nvidia_ffa_notify_service_ids[] = {
-	{ nvidia_ec_notify_service_uuid },
+static const struct ffa_device_id nvidia_ffa_control_service_ids[] = {
+	/* MSFT000C notify service */
+	{ UUID_INIT(0xb510b3a3, 0x59f6, 0x4054,
+		    0xba, 0x7a, 0xff, 0x2e, 0xb1, 0xea, 0xc7, 0x65) },
+	/* ARML0002 inter-partition setup (DEN0077A v1.3 section 18.7) */
+	{ UUID_INIT(0xe474d87e, 0x5731, 0x4044,
+		    0xa7, 0x27, 0xcb, 0x3e, 0x8c, 0xf3, 0xc8, 0xdf) },
 	{}
 };
 
-static struct ffa_driver nvidia_ffa_notify_service_driver = {
-	.name = "nvidia-ffa-notify",
-	.probe = nvidia_ffa_notify_service_probe,
-	.remove = nvidia_ffa_notify_service_remove,
-	.id_table = nvidia_ffa_notify_service_ids,
+static struct ffa_driver nvidia_ffa_control_service_driver = {
+	.name = "nvidia-ffa-control",
+	.probe = nvidia_ffa_control_service_probe,
+	.remove = nvidia_ffa_control_service_remove,
+	.id_table = nvidia_ffa_control_service_ids,
+	.driver = {
+		.suppress_bind_attrs = true,
+	},
 };
 
 static const struct acpi_device_id nvidia_ffa_device_ids[] = {
-	/*
-	 * Please refer
-	 * https://github.com/OpenDevicePartnership/documentation/blob/main/bookshelf/Shelf%204%20Specifications/EC%20Interface/src/secure-ec-services-overview.md#hid-definition
-	 * where MSFT000C is documented.
-	 *
-	 * The _HID 'MSFT000C' is reserved for FFA device which uses
-	 * FFA interface for secure EC communication.
-	 */
-	{"MSFT000C", 0},
+	{"MSFT000C", true},
+	{"ARML0002", false},
 	{"", 0},
 };
 
@@ -748,6 +1079,7 @@ MODULE_DEVICE_TABLE(acpi, nvidia_ffa_device_ids);
 
 static int nvidia_ffa_probe(struct platform_device *pdev)
 {
+	const struct acpi_device_id *acpi_id;
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
 	acpi_status status;
 	unsigned long long data = 0;
@@ -762,6 +1094,13 @@ static int nvidia_ffa_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "No ACPI companion found\n");
 		return -ENODEV;
 	}
+
+	acpi_id = acpi_match_device(nvidia_ffa_device_ids, &pdev->dev);
+	if (!acpi_id) {
+		dev_err(&pdev->dev, "No matching ACPI device ID\n");
+		return -ENODEV;
+	}
+	ffa_ec_legacy_spec = acpi_id->driver_data;
 
 	status = acpi_evaluate_integer(adev->handle, "AVAL", NULL, &data);
 	if (ACPI_FAILURE(status)) {
@@ -783,10 +1122,11 @@ static int nvidia_ffa_probe(struct platform_device *pdev)
 
 	ffa_pdev = pdev;
 
-	ret = ffa_driver_register(&nvidia_ffa_notify_service_driver, THIS_MODULE, DRV_NAME);
+	ret = ffa_driver_register(&nvidia_ffa_control_service_driver,
+				  THIS_MODULE, DRV_NAME);
 	if (ret) {
 		dev_err(&pdev->dev,
-			"Failed to register notify service driver error=%d\n", ret);
+			"Failed to register control service driver error=%d\n", ret);
 		acpi_arm64_ffh_update_custom_offset_handler(NULL);
 		ffa_pdev = NULL;
 		return ret;
@@ -797,7 +1137,7 @@ static int nvidia_ffa_probe(struct platform_device *pdev)
 
 static void nvidia_ffa_remove(struct platform_device *pdev)
 {
-	ffa_driver_unregister(&nvidia_ffa_notify_service_driver);
+	ffa_driver_unregister(&nvidia_ffa_control_service_driver);
 	ffa_pdev = NULL;
 	acpi_arm64_ffh_update_custom_offset_handler(NULL);
 }
@@ -808,6 +1148,7 @@ static struct platform_driver nvidia_ffa_driver = {
 	.driver = {
 		.name = "nvidia-ffa",
 		.acpi_match_table = nvidia_ffa_device_ids,
+		.suppress_bind_attrs = true,
 	},
 };
 
@@ -815,7 +1156,7 @@ static int __init nvidia_ffa_init(void)
 {
 	return platform_driver_register(&nvidia_ffa_driver);
 }
-module_init(nvidia_ffa_init);
+arch_initcall(nvidia_ffa_init);
 
 static void __exit nvidia_ffa_exit(void)
 {
