@@ -15,6 +15,30 @@
 #include <asm/early_ioremap.h>
 #include <asm/efi.h>
 
+/*
+ * Translate an EFI virtual address into a physical address. Some members of
+ * the EFI system table may have been virtually remapped by
+ * SetVirtualAddressMap().
+ */
+phys_addr_t __init
+efi_memmap_virt_to_phys(const struct efi_memory_map *map, unsigned long addr)
+{
+	efi_memory_desc_t *md;
+
+	for_each_efi_memory_desc_in_map(map, md) {
+		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+			continue;
+		if (!md->virt_addr)
+			/* No virtual mapping has been installed by the stub. */
+			break;
+		if (md->virt_addr <= addr &&
+		    addr - md->virt_addr < md->num_pages << EFI_PAGE_SHIFT)
+			return md->phys_addr + addr - md->virt_addr;
+	}
+
+	return addr;
+}
+
 /**
  * __efi_memmap_init - Common code for mapping the EFI memory map
  * @data: EFI memory map data

@@ -738,6 +738,9 @@ extern int __init __efi_memmap_init(struct efi_memory_map_data *data);
 extern int __init efi_memmap_init_early(struct efi_memory_map_data *data);
 extern int __init efi_memmap_init_late(phys_addr_t addr, unsigned long size);
 extern void __init efi_memmap_unmap(void);
+extern phys_addr_t __init
+efi_memmap_virt_to_phys(const struct efi_memory_map *map,
+			unsigned long addr);
 
 #ifdef CONFIG_EFI_ESRT
 extern void __init efi_esrt_init(void);

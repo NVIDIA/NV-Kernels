@@ -36,28 +36,6 @@ static int __init is_memory(efi_memory_desc_t *md)
 	return 0;
 }
 
-/*
- * Translate a EFI virtual address into a physical address: this is necessary,
- * as some data members of the EFI system table are virtually remapped after
- * SetVirtualAddressMap() has been called.
- */
-static phys_addr_t __init efi_to_phys(unsigned long addr)
-{
-	efi_memory_desc_t *md;
-
-	for_each_efi_memory_desc(md) {
-		if (!(md->attribute & EFI_MEMORY_RUNTIME))
-			continue;
-		if (md->virt_addr == 0)
-			/* no virtual mapping has been installed by the stub */
-			break;
-		if (md->virt_addr <= addr &&
-		    (addr - md->virt_addr) < (md->num_pages << EFI_PAGE_SHIFT))
-			return md->phys_addr + addr - md->virt_addr;
-	}
-	return addr;
-}
-
 extern __weak const efi_config_table_type_t efi_arch_tables[];
 
 /*
@@ -103,6 +81,8 @@ static int __init uefi_init(u64 efi_system_table)
 {
 	efi_config_table_t *config_tables;
 	efi_system_table_t *systab;
+	phys_addr_t fw_vendor;
+	phys_addr_t tables;
 	size_t table_size;
 	int retval;
 
@@ -123,11 +103,12 @@ static int __init uefi_init(u64 efi_system_table)
 	efi.runtime = systab->runtime;
 	efi.runtime_version = systab->hdr.revision;
 
-	efi_systab_report_header(&systab->hdr, efi_to_phys(systab->fw_vendor));
+	fw_vendor = efi_memmap_virt_to_phys(&efi.memmap, systab->fw_vendor);
+	efi_systab_report_header(&systab->hdr, fw_vendor);
 
 	table_size = sizeof(efi_config_table_t) * systab->nr_tables;
-	config_tables = early_memremap_ro(efi_to_phys(systab->tables),
-					  table_size);
+	tables = efi_memmap_virt_to_phys(&efi.memmap, systab->tables);
+	config_tables = early_memremap_ro(tables, table_size);
 	if (config_tables == NULL) {
 		pr_warn("Unable to map EFI config table array.\n");
 		retval = -ENOMEM;
