@@ -1275,7 +1275,8 @@ int acpi_processor_extract_lpi_info_cb(acpi_handle pr_handle,
 	unsigned int i;
 	int ret;
 
-	if (!osc_pc_lpi_support_confirmed)
+	if (!osc_pc_lpi_support_confirmed &&
+	    !osc_os_lpi_support_confirmed)
 		return -EOPNOTSUPP;
 
 	curr = &info[0];
