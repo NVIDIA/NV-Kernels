@@ -828,7 +828,7 @@ void pm_genpd_inc_rejected(struct generic_pm_domain *genpd,
 
 	genpd->states[state_idx].rejected++;
 	genpd->states[state_idx].usage--;
-	if (s2idle && genpd->gov && genpd->gov->system_power_down_ok)
+	if (s2idle)
 		genpd->states[state_idx].usage_s2idle--;
 
 out:
@@ -1405,6 +1405,7 @@ late_initcall_sync(genpd_power_off_unused);
  * genpd_sync_power_off - Synchronously power off a PM domain and its parents.
  * @genpd: PM domain to power off, if possible.
  * @use_lock: use the lock.
+ * @s2idle: account successful state selection as suspend-to-idle.
  * @depth: nesting count for lockdep.
  *
  * Check if the given PM domain can be powered off (during system suspend or
@@ -1415,7 +1416,7 @@ late_initcall_sync(genpd_power_off_unused);
  * these cases the lock must be held.
  */
 static void genpd_sync_power_off(struct generic_pm_domain *genpd, bool use_lock,
-				 unsigned int depth)
+				 bool s2idle, unsigned int depth)
 {
 	struct gpd_link *link;
 
@@ -1447,11 +1448,7 @@ static void genpd_sync_power_off(struct generic_pm_domain *genpd, bool use_lock,
 	} else {
 		genpd->states[genpd->state_idx].usage++;
 
-		/*
-		 * The ->system_power_down_ok() callback is currently used only
-		 * for s2idle. Use it to know when to update the usage counter.
-		 */
-		if (genpd->gov && genpd->gov->system_power_down_ok)
+		if (s2idle)
 			genpd->states[genpd->state_idx].usage_s2idle++;
 	}
 
@@ -1463,7 +1460,8 @@ static void genpd_sync_power_off(struct generic_pm_domain *genpd, bool use_lock,
 		if (use_lock)
 			genpd_lock_nested(link->parent, depth + 1);
 
-		genpd_sync_power_off(link->parent, use_lock, depth + 1);
+		genpd_sync_power_off(link->parent, use_lock, s2idle,
+				     depth + 1);
 
 		if (use_lock)
 			genpd_unlock(link->parent);
@@ -1581,7 +1579,7 @@ static int genpd_finish_suspend(struct device *dev,
 
 	genpd_lock(genpd);
 	genpd->suspended_count++;
-	genpd_sync_power_off(genpd, true, 0);
+	genpd_sync_power_off(genpd, true, false, 0);
 	genpd_unlock(genpd);
 
 	return 0;
@@ -1747,7 +1745,7 @@ static void genpd_complete(struct device *dev)
 	genpd_unlock(genpd);
 }
 
-static void genpd_switch_state(struct device *dev, bool suspend)
+static void genpd_switch_state(struct device *dev, bool suspend, bool s2idle)
 {
 	struct generic_pm_domain *genpd;
 	bool use_lock;
@@ -1763,7 +1761,7 @@ static void genpd_switch_state(struct device *dev, bool suspend)
 
 	if (suspend) {
 		genpd->suspended_count++;
-		genpd_sync_power_off(genpd, use_lock, 0);
+		genpd_sync_power_off(genpd, use_lock, s2idle, 0);
 	} else {
 		genpd_sync_power_on(genpd, use_lock, 0);
 		genpd->suspended_count--;
@@ -1778,15 +1776,26 @@ static void genpd_switch_state(struct device *dev, bool suspend)
  * @dev: The device that is attached to the genpd, that can be suspended.
  *
  * This routine should typically be called for a device that needs to be
- * suspended during the syscore suspend phase. It may also be called during
- * suspend-to-idle to suspend a corresponding CPU device that is attached to a
- * genpd.
+ * suspended during the syscore suspend phase.
  */
 void dev_pm_genpd_suspend(struct device *dev)
 {
-	genpd_switch_state(dev, true);
+	genpd_switch_state(dev, true, false);
 }
 EXPORT_SYMBOL_GPL(dev_pm_genpd_suspend);
+
+/**
+ * dev_pm_genpd_suspend_s2idle - Suspend the genpd for @dev during s2idle
+ * @dev: The device that is attached to the genpd, that can be suspended.
+ *
+ * This is equivalent to dev_pm_genpd_suspend(), but records successful domain
+ * state selections as suspend-to-idle entries.
+ */
+void dev_pm_genpd_suspend_s2idle(struct device *dev)
+{
+	genpd_switch_state(dev, true, true);
+}
+EXPORT_SYMBOL_GPL(dev_pm_genpd_suspend_s2idle);
 
 /**
  * dev_pm_genpd_resume - Synchronously try to resume the genpd for @dev
@@ -1798,7 +1807,7 @@ EXPORT_SYMBOL_GPL(dev_pm_genpd_suspend);
  */
 void dev_pm_genpd_resume(struct device *dev)
 {
-	genpd_switch_state(dev, false);
+	genpd_switch_state(dev, false, false);
 }
 EXPORT_SYMBOL_GPL(dev_pm_genpd_resume);
 
