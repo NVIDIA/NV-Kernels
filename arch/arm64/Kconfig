@@ -2484,12 +2484,12 @@ config ARM64_SECURE_LAUNCH_SELFTEST
 	  Build slaunch_selftest() into the kernel. At the end of
 	  slaunch_measure_post_efi() the self-test calls the address-map
 	  validation helpers (dcrtm_range_in_normal,
-	  dcrtm_range_overlaps_non_normal, efi_regions_overlap) with
-	  crafted inputs that previously bypassed validation due to
-	  integer overflow. The helpers must reject the bad inputs and
-	  accept the good ones; mismatch panics with selftest:* message.
+	  dcrtm_range_overlaps_non_normal, efi_regions_overlap, and
+	  efi_memmap_virt_to_phys) with crafted inputs. The helpers must
+	  reject bad inputs and accept good ones; mismatch panics with a
+	  selftest:* message.
 
-	  Useful for proving the overflow / wrap guards work as designed.
+	  Useful for proving the validation guards work as designed.
 
 	  If unsure, say N.
 
@@ -2506,8 +2506,8 @@ config ARM64_SECURE_LAUNCH_FAULT_INJECT
 	  treats that as a passing negative test.
 
 	  Tokens implemented: mmap_wrap, mmap_pages_overflow,
-	  mmap_size_huge, systab_nr_tables_huge, sha384_force,
-	  sha_algo_bad.
+	  mmap_cfgtbl_redirect, mmap_size_huge,
+	  systab_nr_tables_huge, sha384_force, sha_algo_bad.
 
 	  Useful for proving end-to-end that the validation pipeline
 	  catches the canonical exploits. Intended for development testing only; leave disabled in production builds.
