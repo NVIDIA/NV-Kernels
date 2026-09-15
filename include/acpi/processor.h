@@ -481,6 +481,9 @@ void acpi_processor_power_init(struct acpi_processor *pr);
 void acpi_processor_power_hotadd_begin(void);
 void acpi_processor_power_init_abort(struct acpi_processor *pr);
 void acpi_processor_power_rebuild_deferred(struct acpi_processor *pr);
+#if IS_BUILTIN(CONFIG_ACPI_PROCESSOR)
+void acpi_processor_power_post_eject(void);
+#endif
 void acpi_processor_power_exit(struct acpi_processor *pr);
 void acpi_processor_power_work_cancel(void);
 int acpi_processor_power_state_has_changed(struct acpi_processor *pr);
