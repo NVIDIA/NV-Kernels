@@ -196,6 +196,12 @@ ACPI_INIT_GLOBAL(u8, acpi_gbl_disable_auto_repair, FALSE);
 ACPI_INIT_GLOBAL(u8, acpi_gbl_disable_ssdt_table_install, FALSE);
 
 /*
+ * Optionally disable the AML Load opcode. This does not affect LoadTable or
+ * table loads initiated by the host operating system.
+ */
+ACPI_INIT_GLOBAL(u8, acpi_gbl_disable_aml_load, FALSE);
+
+/*
  * Optionally enable runtime namespace override.
  */
 ACPI_INIT_GLOBAL(u8, acpi_gbl_runtime_namespace_override, TRUE);

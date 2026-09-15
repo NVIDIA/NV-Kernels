@@ -724,6 +724,7 @@ int acpi_match_platform_list(const struct acpi_platform_list *plat);
 
 extern void acpi_early_init(void);
 extern void acpi_subsystem_init(void);
+void __init acpi_disable_aml_load(void);
 
 extern int acpi_nvs_register(__u64 start, __u64 size);
 
@@ -899,6 +900,7 @@ static inline struct device *acpi_get_first_physical_node(struct acpi_device *ad
 
 static inline void acpi_early_init(void) { }
 static inline void acpi_subsystem_init(void) { }
+static inline void acpi_disable_aml_load(void) { }
 
 static inline int early_acpi_boot_init(void)
 {
