@@ -422,6 +422,10 @@ bool osc_sb_apei_support_acked;
 bool osc_pc_lpi_support_confirmed;
 EXPORT_SYMBOL_GPL(osc_pc_lpi_support_confirmed);
 
+/* OSPM and the platform agreed that OS-initiated LPI is supported. */
+bool osc_os_lpi_support_confirmed;
+EXPORT_SYMBOL_GPL(osc_os_lpi_support_confirmed);
+
 /*
  * ACPI 6.2 Section 6.2.11.2 'Platform-Wide OSPM Capabilities':
  *   Starting with ACPI Specification 6.2, all _CPC registers can be in
@@ -453,6 +457,10 @@ static void acpi_bus_osc_negotiate_platform_control(void)
 	feature_mask = OSC_SB_PR3_SUPPORT | OSC_SB_HOTPLUG_OST_SUPPORT |
 			OSC_SB_PCLPI_SUPPORT | OSC_SB_OVER_16_PSTATES_SUPPORT |
 			OSC_SB_GED_SUPPORT | OSC_SB_IRQ_RESOURCE_SOURCE_SUPPORT;
+	if (IS_ENABLED(CONFIG_ARM64) && IS_BUILTIN(CONFIG_ACPI_PROCESSOR) &&
+	    IS_ENABLED(CONFIG_ARM_PSCI_CPUIDLE) &&
+	    IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS_SLEEP))
+		feature_mask |= OSC_SB_OSLPI_SUPPORT;
 
 	if (IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_X86))
 		feature_mask |= OSC_SB_GENERIC_INITIATOR_SUPPORT;
@@ -505,6 +513,7 @@ static void acpi_bus_osc_negotiate_platform_control(void)
 	osc_sb_cppc2_support_acked = feature_mask & OSC_SB_CPCV2_SUPPORT;
 	osc_sb_apei_support_acked = feature_mask & OSC_SB_APEI_SUPPORT;
 	osc_pc_lpi_support_confirmed = feature_mask & OSC_SB_PCLPI_SUPPORT;
+	osc_os_lpi_support_confirmed = feature_mask & OSC_SB_OSLPI_SUPPORT;
 	osc_sb_native_usb4_support_confirmed = feature_mask & OSC_SB_NATIVE_USB4_SUPPORT;
 	osc_cpc_flexible_adr_space_confirmed = feature_mask & OSC_SB_CPC_FLEXIBLE_ADR_SPACE;
 }
