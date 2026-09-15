@@ -908,6 +908,7 @@ static bool acpi_lpi_can_coordinate(void)
 {
 	/* The arm64 FFH hooks are intentionally not linked to processor.ko. */
 	return IS_BUILTIN(CONFIG_ACPI_PROCESSOR) &&
+	       osc_os_lpi_support_confirmed &&
 	       acpi_processor_ffh_lpi_hierarchy_supported();
 }
 
