@@ -204,7 +204,7 @@ CONFIG_GPIO_AAEON                               note<'Disable all Ubuntu ODM dri
 CONFIG_I3C                                      policy<{'arm64': 'm'}>
 CONFIG_I3C                                      note<'Enable I3C bus support for Tegra410 and SPD5118 temperature sensors'>
 
-CONFIG_IMA_INIT_LATE_SYNC                       policy<{'arm64': 'y'}>
+CONFIG_IMA_INIT_LATE_SYNC                       policy<{'amd64': 'n', 'arm64': 'y'}>
 CONFIG_IMA_INIT_LATE_SYNC                       note<'LP: #2166208'>
 
 CONFIG_IOMMUFD_VFIO_CONTAINER                   policy<{'arm64': 'y'}>
