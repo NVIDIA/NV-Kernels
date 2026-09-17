@@ -274,6 +274,12 @@ static bool _default_power_down_ok(struct dev_pm_domain *pd, ktime_t now)
 	int state_idx = genpd->state_count - 1;
 	struct gpd_link *link;
 
+	while (state_idx >= 0 && genpd->states[state_idx].disable)
+		state_idx--;
+
+	if (state_idx < 0)
+		return false;
+
 	/*
 	 * Find the next wakeup from devices that can determine their own wakeup
 	 * to find when the domain would wakeup and do it for every device down
@@ -284,6 +290,11 @@ static bool _default_power_down_ok(struct dev_pm_domain *pd, ktime_t now)
 	if ((genpd->flags & GENPD_FLAG_MIN_RESIDENCY) && (gd->next_wakeup != KTIME_MAX)) {
 		/* Let's find out the deepest domain idle state, the devices prefer */
 		while (state_idx >= 0) {
+			if (genpd->states[state_idx].disable) {
+				state_idx--;
+				continue;
+			}
+
 			if (next_wakeup_allows_state(genpd, state_idx, now)) {
 				gd->max_off_time_changed = true;
 				break;
@@ -292,9 +303,8 @@ static bool _default_power_down_ok(struct dev_pm_domain *pd, ktime_t now)
 		}
 
 		if (state_idx < 0) {
-			state_idx = 0;
 			gd->cached_power_down_ok = false;
-			goto done;
+			return false;
 		}
 	}
 
@@ -324,15 +334,19 @@ static bool _default_power_down_ok(struct dev_pm_domain *pd, ktime_t now)
 	 * Find a state to power down to, starting from the state
 	 * determined by the next wakeup.
 	 */
-	while (!__default_power_down_ok(pd, state_idx)) {
-		if (state_idx == 0) {
-			gd->cached_power_down_ok = false;
+	while (state_idx >= 0) {
+		if (!genpd->states[state_idx].disable &&
+		    __default_power_down_ok(pd, state_idx))
 			break;
-		}
+
 		state_idx--;
 	}
 
-done:
+	if (state_idx < 0) {
+		gd->cached_power_down_ok = false;
+		return false;
+	}
+
 	genpd->state_idx = state_idx;
 	gd->cached_power_down_state_idx = genpd->state_idx;
 	return gd->cached_power_down_ok;
@@ -405,6 +419,9 @@ static bool cpu_power_down_ok(struct dev_pm_domain *pd)
 	 */
 	i = genpd->state_idx;
 	do {
+		if (genpd->states[i].disable)
+			continue;
+
 		if ((idle_duration_ns >= (genpd->states[i].residency_ns +
 		    genpd->states[i].power_off_latency_ns)) &&
 		    (global_constraint >= (genpd->states[i].power_on_latency_ns +
@@ -433,11 +450,6 @@ static bool cpu_system_power_down_ok(struct dev_pm_domain *pd)
 	s64 constraint_ns;
 	int state_idx = genpd->state_count - 1;
 
-	if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN)) {
-		genpd->state_idx = state_idx;
-		return true;
-	}
-
 	no_constraint = constraint_us == PM_QOS_RESUME_LATENCY_NO_CONSTRAINT;
 	constraint_ns = no_constraint ? PM_QOS_RESUME_LATENCY_NO_CONSTRAINT_NS :
 			(s64)constraint_us * NSEC_PER_USEC;
@@ -446,6 +458,16 @@ static bool cpu_system_power_down_ok(struct dev_pm_domain *pd)
 	while (state_idx >= 0) {
 		s64 latency_ns = genpd->states[state_idx].power_off_latency_ns +
 				 genpd->states[state_idx].power_on_latency_ns;
+
+		if (genpd->states[state_idx].disable) {
+			state_idx--;
+			continue;
+		}
+
+		if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN)) {
+			genpd->state_idx = state_idx;
+			return true;
+		}
 
 		/* The no-constraint value is a sentinel, not a latency budget. */
 		if (no_constraint || latency_ns <= constraint_ns) {

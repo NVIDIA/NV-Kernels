@@ -174,11 +174,14 @@ struct genpd_governor_data {
 	unsigned int cached_power_down_state_idx;
 };
 
+#define GENPD_STATE_DISABLED_BY_USER	BIT(0)
+
 struct genpd_power_state {
 	const char *name;
 	s64 power_off_latency_ns;
 	s64 power_on_latency_ns;
 	s64 residency_ns;
+	unsigned int disable;
 	u64 usage;
 	u64 rejected;
 	u64 above;
