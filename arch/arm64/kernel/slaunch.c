@@ -1321,6 +1321,7 @@ static void __init slaunch_measure_kaslr_seed_source(void)
  * late_initcall), so no device can tamper with them. The hashes are
  * attestation evidence a remote verifier compares to known-good values.
  */
+
 /* Validate PA + length against D-CRTM map, then measure. Every
  * failure is fatal — silent skip breaks attestation soundness.
  */
@@ -1432,15 +1433,17 @@ static void __init slaunch_measure_acpi(void)
 	struct acpi_table_header *xsdt;
 	phys_addr_t rsdp_pa, xsdt_pa;
 	phys_addr_t dsdt_pa = 0, facs_pa = 0;
+	u64 dsdt64_pa = 0, facs64_pa = 0;
+	u32 dsdt32_pa = 0, facs32_pa = 0;
 	u32 rsdp_len, xsdt_len, num_entries, i;
 	u8 *entry_ptrs;
 
 	/* Every failure below is fatal. The "kernel acts on unmeasured
 	 * bytes" case breaks the attestation-based trust model.
 	 */
-	rsdp_pa = efi.acpi20;
-	if (rsdp_pa == EFI_INVALID_TABLE_ADDR || !rsdp_pa)
-		panic("slaunch: no ACPI RSDP in EFI System Table (DRTM requires ACPI)\n");
+	rsdp_pa = acpi_os_get_root_pointer();
+	if (!rsdp_pa)
+		panic("slaunch: no ACPI RSDP (DRTM requires ACPI)\n");
 
 	if (!dcrtm_range_in_normal(rsdp_pa, sizeof(*rsdp)))
 		panic("slaunch: RSDP PA 0x%llx NOT in NORMAL region\n",
@@ -1509,6 +1512,8 @@ static void __init slaunch_measure_acpi(void)
 		char desc[32];
 
 		memcpy(&tbl_pa, entry_ptrs + i * ACPI_XSDT_ENTRY_SIZE, sizeof(tbl_pa));
+		if (!tbl_pa)
+			continue;
 
 		if (!dcrtm_range_in_normal(tbl_pa, sizeof(*tbl)))
 			panic("slaunch: XSDT entry[%u] PA 0x%llx (hdr) NOT in NORMAL\n",
@@ -1534,39 +1539,36 @@ static void __init slaunch_measure_acpi(void)
 		snprintf(desc, sizeof(desc), "ACPI:%.4s", tbl->signature);
 		slaunch_measure(desc, tbl, tbl_len);
 
-		/* Capture FADT indirection while FADT is mapped. Prefer
-		 * 64-bit X_* fields (ACPI 2.0+); fall back to 32-bit
-		 * fields if FADT length is too short to carry them.
+		/* Capture FADT indirection while mapped. ACPICA's address-selection
+		 * policy is applied after the walk.
 		 */
 		if (!memcmp(tbl->signature, ACPI_SIG_FADT, sizeof(tbl->signature))) {
 			fadt = (struct acpi_table_fadt *)tbl;
 			if (tbl_len >= offsetofend(struct acpi_table_fadt, Xdsdt))
-				memcpy(&dsdt_pa,
-				       &fadt->Xdsdt,
-				       sizeof(u64));
-			if (!dsdt_pa &&
-			    tbl_len >= offsetofend(struct acpi_table_fadt, dsdt)) {
-				u32 d32;
-
-				memcpy(&d32, &fadt->dsdt, sizeof(d32));
-				dsdt_pa = d32;
-			}
+				memcpy(&dsdt64_pa, &fadt->Xdsdt, sizeof(dsdt64_pa));
+			if (tbl_len >= offsetofend(struct acpi_table_fadt, dsdt))
+				memcpy(&dsdt32_pa, &fadt->dsdt, sizeof(dsdt32_pa));
 			if (tbl_len >= offsetofend(struct acpi_table_fadt, Xfacs))
-				memcpy(&facs_pa,
-				       &fadt->Xfacs,
-				       sizeof(u64));
-			if (!facs_pa &&
-			    tbl_len >= offsetofend(struct acpi_table_fadt, facs)) {
-				u32 f32;
-
-				memcpy(&f32, &fadt->facs, sizeof(f32));
-				facs_pa = f32;
-			}
+				memcpy(&facs64_pa, &fadt->Xfacs, sizeof(facs64_pa));
+			if (tbl_len >= offsetofend(struct acpi_table_fadt, facs))
+				memcpy(&facs32_pa, &fadt->facs, sizeof(facs32_pa));
 		}
 		early_memunmap(tbl, tbl_len);
 	}
 
 	early_memunmap(xsdt, xsdt_len);
+
+	if (acpi_fadt_use_32bit_address(dsdt32_pa, dsdt64_pa,
+					acpi_gbl_use32_bit_fadt_addresses))
+		dsdt_pa = dsdt32_pa;
+	else
+		dsdt_pa = dsdt64_pa;
+
+	if (acpi_fadt_use_32bit_address(facs32_pa, facs64_pa,
+					acpi_gbl_use32_bit_facs_addresses))
+		facs_pa = facs32_pa;
+	else
+		facs_pa = facs64_pa;
 
 	/*
 	 * Follow FADT indirections (not in XSDT): DSDT carries the AML
@@ -2365,7 +2367,7 @@ static void __init slaunch_selftest(void)
 /*
  * Post-efi_init jobs that need efi_init's outputs: re-reserve DLME data
  * (efi_init's memblock_remove wiped the slaunch_setup reservation),
- * measure ACPI tables via efi.acpi20, and run the validation-helper
+ * measure the ACPI tables selected by the kernel, and run the validation-helper
  * self-test. Untrusted EFI inputs were already validated in slaunch_setup().
  */
 void __init slaunch_measure_post_efi(void)
