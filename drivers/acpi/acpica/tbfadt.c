@@ -228,15 +228,7 @@ acpi_tb_init_generic_address(struct acpi_generic_address *generic_address,
 static u64
 acpi_tb_select_address(char *register_name, u32 address32, u64 address64)
 {
-
-	if (!address64) {
-
-		/* 64-bit address is zero, use 32-bit address */
-
-		return ((u64)address32);
-	}
-
-	if (address32 && (address64 != (u64)address32)) {
+	if (address32 && address64 && address64 != (u64)address32) {
 
 		/* Address mismatch between 32-bit and 64-bit versions */
 
@@ -247,15 +239,11 @@ acpi_tb_select_address(char *register_name, u32 address32, u64 address64)
 				   ACPI_FORMAT_UINT64(address64),
 				   acpi_gbl_use32_bit_fadt_addresses ? 32 :
 				   64));
-
-		/* 32-bit address override */
-
-		if (acpi_gbl_use32_bit_fadt_addresses) {
-			return ((u64)address32);
-		}
 	}
 
-	/* Default is to use the 64-bit address */
+	if (acpi_fadt_use_32bit_address(address32, address64,
+					acpi_gbl_use32_bit_fadt_addresses))
+		return ((u64)address32);
 
 	return (address64);
 }

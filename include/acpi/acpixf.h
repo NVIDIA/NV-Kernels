@@ -456,6 +456,11 @@ ACPI_EXTERNAL_RETURN_UINT32(u32
 						     acpi_physical_address
 						     address, acpi_size length,
 						     u8 warn))
+static ACPI_INLINE u32
+acpi_fadt_use_32bit_address(u32 address32, u64 address64, u8 use32)
+{
+	return (address32 && (!address64 || use32));
+}
 ACPI_EXTERNAL_RETURN_STATUS(acpi_status
 			     acpi_decode_pld_buffer(u8 *in_buffer,
 						    acpi_size length,
