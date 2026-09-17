@@ -1451,13 +1451,19 @@ static void __init slaunch_measure_acpi(void)
 		panic("slaunch: RSDP header remap failed at 0x%llx\n",
 		      (u64)rsdp_pa);
 
+	if (memcmp(rsdp->signature, ACPI_SIG_RSDP, sizeof(rsdp->signature)))
+		panic("slaunch: invalid RSDP signature\n");
+	if (rsdp->revision < 2)
+		panic("slaunch: ACPI 1.0 RSDP is not supported\n");
+
 	memcpy(&rsdp_len, &rsdp->length, sizeof(rsdp_len));
 	memcpy(&xsdt_pa, &rsdp->xsdt_physical_address, sizeof(xsdt_pa));
 	early_memunmap(rsdp, sizeof(*rsdp));
 
 	if (rsdp_len < sizeof(*rsdp))
-		panic("slaunch: RSDP length %u < %u\n",
-		      rsdp_len, (u32)sizeof(*rsdp));
+		panic("slaunch: RSDP length %u < %u\n", rsdp_len, (u32)sizeof(*rsdp));
+	if (!xsdt_pa)
+		panic("slaunch: RSDP has no XSDT\n");
 
 	if (!dcrtm_range_in_normal(rsdp_pa, rsdp_len))
 		panic("slaunch: RSDP [0x%llx+%u] NOT in NORMAL region\n",
@@ -1474,6 +1480,8 @@ static void __init slaunch_measure_acpi(void)
 	xsdt = early_memremap(xsdt_pa, sizeof(*xsdt));
 	if (!xsdt)
 		panic("slaunch: XSDT header remap failed at 0x%llx\n", xsdt_pa);
+	if (memcmp(xsdt->signature, ACPI_SIG_XSDT, sizeof(xsdt->signature)))
+		panic("slaunch: invalid XSDT signature\n");
 	memcpy(&xsdt_len, &xsdt->length, sizeof(xsdt_len));
 	early_memunmap(xsdt, sizeof(*xsdt));
 
