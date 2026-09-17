@@ -132,8 +132,16 @@ acpi_processor_combine_lpi_states(const struct acpi_lpi_state *local,
 	 * state's value therefore becomes the composite value at this level.
 	 */
 	result->min_residency = parent->min_residency;
-	if (check_add_overflow(local->wake_latency, parent->wake_latency,
-			       &result->wake_latency))
+	/*
+	 * Preserve the maximum representable latency when a hierarchy level
+	 * adds to it. Other finite overflows still make the composite invalid.
+	 */
+	if (local->wake_latency == U32_MAX ||
+	    parent->wake_latency == U32_MAX)
+		result->wake_latency = U32_MAX;
+	else if (check_add_overflow(local->wake_latency,
+				    parent->wake_latency,
+				    &result->wake_latency))
 		return false;
 	result->enable_parent_state = parent->enable_parent_state;
 	result->level_id = parent->level_id;
