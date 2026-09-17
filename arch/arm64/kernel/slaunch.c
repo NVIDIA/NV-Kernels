@@ -1321,44 +1321,12 @@ static void __init slaunch_measure_kaslr_seed_source(void)
  * late_initcall), so no device can tamper with them. The hashes are
  * attestation evidence a remote verifier compares to known-good values.
  */
-/*
- * RSDP layout (ACPI 2.0+): we only need xsdt_physical_address at offset 24
- * and length at offset 20. Avoid depending on <acpi/acpi.h> for the struct.
- */
-/* Minimal ACPI table header — avoid full <acpi/acpi.h> dependency.
- * Full header is 36 bytes; XSDT entries follow after this.
- */
-struct slaunch_acpi_hdr {
-	char signature[4];
-	u32 length;
-	u8 revision;
-	u8 checksum;
-	char oem_id[6];
-	char oem_table_id[8];
-	u32 oem_revision;
-	u32 creator_id;
-	u32 creator_revision;
-} __packed;
-
-#define RSDP_SIZE_V1	20
-#define RSDP_OFF_LEN	20	/* u32 length (ACPI 2.0+) */
-#define RSDP_OFF_XSDT	24	/* u64 xsdt_physical_address */
-#define RSDP_MIN_MAP	36	/* enough to read through xsdt_physical_address */
-
-/* FADT field offsets (ACPI 6.x §5.2.9) — used to follow indirection
- * to DSDT and FACS. Local copies to avoid pulling in <acpi/actbl.h>.
- */
-#define FADT_FIRMWARE_CTRL_OFF		36	/* u32 */
-#define FADT_DSDT_OFF			40	/* u32 */
-#define FADT_X_FIRMWARE_CTRL_OFF	132	/* u64, ACPI 2.0+ */
-#define FADT_X_DSDT_OFF			140	/* u64, ACPI 2.0+ */
-
 /* Validate PA + length against D-CRTM map, then measure. Every
  * failure is fatal — silent skip breaks attestation soundness.
  */
 static void __init slaunch_measure_one_acpi(phys_addr_t pa, const char *desc)
 {
-	struct slaunch_acpi_hdr *tbl;
+	struct acpi_table_header *tbl;
 	u32 tbl_len;
 
 	if (!pa)
@@ -1460,12 +1428,12 @@ static void __init slaunch_verify_hash_algo(void)
 
 static void __init slaunch_measure_acpi(void)
 {
-	struct slaunch_acpi_hdr *xsdt;
+	struct acpi_table_rsdp *rsdp;
+	struct acpi_table_header *xsdt;
 	phys_addr_t rsdp_pa, xsdt_pa;
 	phys_addr_t dsdt_pa = 0, facs_pa = 0;
 	u32 rsdp_len, xsdt_len, num_entries, i;
-	u64 *entry_ptrs;
-	void *rsdp;
+	u8 *entry_ptrs;
 
 	/* Every failure below is fatal. The "kernel acts on unmeasured
 	 * bytes" case breaks the attestation-based trust model.
@@ -1474,22 +1442,22 @@ static void __init slaunch_measure_acpi(void)
 	if (rsdp_pa == EFI_INVALID_TABLE_ADDR || !rsdp_pa)
 		panic("slaunch: no ACPI RSDP in EFI System Table (DRTM requires ACPI)\n");
 
-	if (!dcrtm_range_in_normal(rsdp_pa, RSDP_MIN_MAP))
+	if (!dcrtm_range_in_normal(rsdp_pa, sizeof(*rsdp)))
 		panic("slaunch: RSDP PA 0x%llx NOT in NORMAL region\n",
 		      (u64)rsdp_pa);
 
-	rsdp = early_memremap(rsdp_pa, RSDP_MIN_MAP);
+	rsdp = early_memremap(rsdp_pa, sizeof(*rsdp));
 	if (!rsdp)
 		panic("slaunch: RSDP header remap failed at 0x%llx\n",
 		      (u64)rsdp_pa);
 
-	/* ACPI 2.0+ RSDP must be >= 36 bytes so xsdt_pa (offset 24-31) is measured. */
-	rsdp_len = *(u32 *)((u8 *)rsdp + RSDP_OFF_LEN);
-	if (rsdp_len < RSDP_MIN_MAP)
+	memcpy(&rsdp_len, &rsdp->length, sizeof(rsdp_len));
+	memcpy(&xsdt_pa, &rsdp->xsdt_physical_address, sizeof(xsdt_pa));
+	early_memunmap(rsdp, sizeof(*rsdp));
+
+	if (rsdp_len < sizeof(*rsdp))
 		panic("slaunch: RSDP length %u < %u\n",
-		      rsdp_len, (u32)RSDP_MIN_MAP);
-	xsdt_pa = *(u64 *)((u8 *)rsdp + RSDP_OFF_XSDT);
-	early_memunmap(rsdp, RSDP_MIN_MAP);
+		      rsdp_len, (u32)sizeof(*rsdp));
 
 	if (!dcrtm_range_in_normal(rsdp_pa, rsdp_len))
 		panic("slaunch: RSDP [0x%llx+%u] NOT in NORMAL region\n",
@@ -1506,7 +1474,7 @@ static void __init slaunch_measure_acpi(void)
 	xsdt = early_memremap(xsdt_pa, sizeof(*xsdt));
 	if (!xsdt)
 		panic("slaunch: XSDT header remap failed at 0x%llx\n", xsdt_pa);
-	xsdt_len = xsdt->length;
+	memcpy(&xsdt_len, &xsdt->length, sizeof(xsdt_len));
 	early_memunmap(xsdt, sizeof(*xsdt));
 
 	if (xsdt_len < sizeof(*xsdt))
@@ -1522,14 +1490,17 @@ static void __init slaunch_measure_acpi(void)
 	slaunch_measure("XSDT", xsdt, xsdt_len);
 
 	/* Walk XSDT entries. Each is a 64-bit PA to a top-level ACPI table. */
-	num_entries = (xsdt_len - sizeof(*xsdt)) / sizeof(u64);
-	entry_ptrs = (u64 *)((u8 *)xsdt + sizeof(*xsdt));
+	num_entries = (xsdt_len - sizeof(*xsdt)) / ACPI_XSDT_ENTRY_SIZE;
+	entry_ptrs = (u8 *)xsdt + sizeof(*xsdt);
 
 	for (i = 0; i < num_entries; i++) {
-		struct slaunch_acpi_hdr *tbl;
-		u64 tbl_pa = entry_ptrs[i];
+		struct acpi_table_fadt *fadt;
+		struct acpi_table_header *tbl;
+		u64 tbl_pa;
 		u32 tbl_len;
 		char desc[32];
+
+		memcpy(&tbl_pa, entry_ptrs + i * ACPI_XSDT_ENTRY_SIZE, sizeof(tbl_pa));
 
 		if (!dcrtm_range_in_normal(tbl_pa, sizeof(*tbl)))
 			panic("slaunch: XSDT entry[%u] PA 0x%llx (hdr) NOT in NORMAL\n",
@@ -1538,7 +1509,7 @@ static void __init slaunch_measure_acpi(void)
 		if (!tbl)
 			panic("slaunch: XSDT entry[%u] header remap failed at 0x%llx\n",
 			      i, tbl_pa);
-		tbl_len = tbl->length;
+		memcpy(&tbl_len, &tbl->length, sizeof(tbl_len));
 		early_memunmap(tbl, sizeof(*tbl));
 
 		if (tbl_len < sizeof(*tbl))
@@ -1559,31 +1530,28 @@ static void __init slaunch_measure_acpi(void)
 		 * 64-bit X_* fields (ACPI 2.0+); fall back to 32-bit
 		 * fields if FADT length is too short to carry them.
 		 */
-		if (!memcmp(tbl->signature, "FACP", 4)) {
-			if (tbl_len >= FADT_X_DSDT_OFF + sizeof(u64))
+		if (!memcmp(tbl->signature, ACPI_SIG_FADT, sizeof(tbl->signature))) {
+			fadt = (struct acpi_table_fadt *)tbl;
+			if (tbl_len >= offsetofend(struct acpi_table_fadt, Xdsdt))
 				memcpy(&dsdt_pa,
-				       (u8 *)tbl + FADT_X_DSDT_OFF,
+				       &fadt->Xdsdt,
 				       sizeof(u64));
 			if (!dsdt_pa &&
-			    tbl_len >= FADT_DSDT_OFF + sizeof(u32)) {
+			    tbl_len >= offsetofend(struct acpi_table_fadt, dsdt)) {
 				u32 d32;
 
-				memcpy(&d32,
-				       (u8 *)tbl + FADT_DSDT_OFF,
-				       sizeof(u32));
+				memcpy(&d32, &fadt->dsdt, sizeof(d32));
 				dsdt_pa = d32;
 			}
-			if (tbl_len >= FADT_X_FIRMWARE_CTRL_OFF + sizeof(u64))
+			if (tbl_len >= offsetofend(struct acpi_table_fadt, Xfacs))
 				memcpy(&facs_pa,
-				       (u8 *)tbl + FADT_X_FIRMWARE_CTRL_OFF,
+				       &fadt->Xfacs,
 				       sizeof(u64));
 			if (!facs_pa &&
-			    tbl_len >= FADT_FIRMWARE_CTRL_OFF + sizeof(u32)) {
+			    tbl_len >= offsetofend(struct acpi_table_fadt, facs)) {
 				u32 f32;
 
-				memcpy(&f32,
-				       (u8 *)tbl + FADT_FIRMWARE_CTRL_OFF,
-				       sizeof(u32));
+				memcpy(&f32, &fadt->facs, sizeof(f32));
 				facs_pa = f32;
 			}
 		}
