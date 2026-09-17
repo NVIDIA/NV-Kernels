@@ -2299,6 +2299,18 @@ acpi_idle_lpi_enter_leaf(struct cpuidle_device *dev,
 	return ret < 0 ? ret : index;
 }
 
+static bool acpi_lpi_leaf_domain_disabled(struct acpi_idle_data *data)
+{
+	struct generic_pm_domain *genpd;
+
+	if (!data->base_map_entry)
+		return false;
+
+	genpd = data->base_map_entry->genpd;
+	return genpd->state_count == 1 &&
+	       READ_ONCE(genpd->states[0].disable);
+}
+
 static int __cpuidle
 __acpi_idle_lpi_enter_domain(struct cpuidle_device *dev,
 			     struct cpuidle_driver *drv, int index,
@@ -2308,6 +2320,8 @@ __acpi_idle_lpi_enter_domain(struct cpuidle_device *dev,
 	struct acpi_processor *pr;
 	struct acpi_idle_data *data;
 	struct acpi_lpi_state lpi;
+	bool fallback_rcu_idle = false;
+	int entered_index = index;
 	int resume_ret;
 	int ret;
 
@@ -2345,17 +2359,27 @@ __acpi_idle_lpi_enter_domain(struct cpuidle_device *dev,
 	domain_state = data->domain_state;
 	if (domain_state)
 		acpi_lpi_prepare_ffh_entry_state(&lpi, &domain_state->state);
-	else
+	else if (acpi_lpi_leaf_domain_disabled(data)) {
+		lpi = pr->power.lpi_states[0];
+		fallback_rcu_idle =
+			drv->states[index].flags & CPUIDLE_FLAG_RCU_IDLE;
+		entered_index = 0;
+	} else {
 		lpi = pr->power.lpi_states[index];
+	}
 
 	if (lpi.entry_method != ACPI_CSTATE_FFH) {
 		ret = -EINVAL;
 	} else {
 		ret = acpi_processor_ffh_lpi_prepare_state(&lpi);
 		if (!ret) {
+			if (fallback_rcu_idle)
+				ct_cpuidle_enter();
 			ret = acpi_processor_ffh_lpi_enter(&lpi);
+			if (fallback_rcu_idle)
+				ct_cpuidle_exit();
 			if (ret >= 0)
-				ret = index;
+				ret = entered_index;
 		}
 	}
 	if (ret < 0)
