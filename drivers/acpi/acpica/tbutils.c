@@ -35,16 +35,15 @@ acpi_status acpi_tb_initialize_facs(void)
 {
 	struct acpi_table_facs *facs;
 
-	if (acpi_gbl_FADT.Xfacs &&
-		   (!acpi_gbl_FADT.facs
-		    || !acpi_gbl_use32_bit_facs_addresses)) {
-		(void)acpi_get_table_by_index(acpi_gbl_xfacs_index,
+	if (acpi_fadt_use_32bit_address(acpi_gbl_FADT.facs, acpi_gbl_FADT.Xfacs,
+					acpi_gbl_use32_bit_facs_addresses)) {
+		(void)acpi_get_table_by_index(acpi_gbl_facs_index,
 					      ACPI_CAST_INDIRECT_PTR(struct
 								     acpi_table_header,
 								     &facs));
 		acpi_gbl_FACS = facs;
-	} else if (acpi_gbl_FADT.facs) {
-		(void)acpi_get_table_by_index(acpi_gbl_facs_index,
+	} else if (acpi_gbl_FADT.Xfacs) {
+		(void)acpi_get_table_by_index(acpi_gbl_xfacs_index,
 					      ACPI_CAST_INDIRECT_PTR(struct
 								     acpi_table_header,
 								     &facs));
