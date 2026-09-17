@@ -22,7 +22,9 @@
 #include <linux/suspend.h>
 #include <linux/export.h>
 #include <linux/cpu.h>
+#include <linux/capability.h>
 #include <linux/debugfs.h>
+#include <linux/uaccess.h>
 
 /* Provides a unique ID for each genpd device */
 static DEFINE_IDA(genpd_ida);
@@ -321,7 +323,7 @@ static void genpd_reflect_residency(struct generic_pm_domain *genpd)
 {
 	struct genpd_governor_data *gd = genpd->gd;
 	struct genpd_power_state *state, *next_state;
-	unsigned int state_idx;
+	unsigned int next_idx, state_idx;
 	s64 sleep_ns, target_ns;
 
 	if (!gd || !gd->reflect_residency)
@@ -334,13 +336,20 @@ static void genpd_reflect_residency(struct generic_pm_domain *genpd)
 
 	if (sleep_ns < target_ns) {
 		state->above++;
-	} else if (state_idx < (genpd->state_count -1)) {
-		next_state = &genpd->states[state_idx + 1];
-		target_ns = next_state->power_off_latency_ns +
-			next_state->residency_ns;
+	} else {
+		for (next_idx = state_idx + 1;
+		     next_idx < genpd->state_count; next_idx++) {
+			if (READ_ONCE(genpd->states[next_idx].disable))
+				continue;
 
-		if (sleep_ns >= target_ns)
-			state->below++;
+			next_state = &genpd->states[next_idx];
+			target_ns = next_state->power_off_latency_ns +
+				next_state->residency_ns;
+
+			if (sleep_ns >= target_ns)
+				state->below++;
+			break;
+		}
 	}
 
 	gd->reflect_residency = false;
@@ -1004,6 +1013,48 @@ static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
 	queue_work(pm_wq, &genpd->power_off_work);
 }
 
+static bool genpd_state_disabled(struct generic_pm_domain *genpd,
+				 unsigned int state_idx)
+{
+	return READ_ONCE(genpd->states[state_idx].disable);
+}
+
+#ifdef CONFIG_PM_SLEEP
+static int genpd_deepest_enabled_state(struct generic_pm_domain *genpd)
+{
+	int state_idx = genpd->state_count - 1;
+
+	while (state_idx >= 0 && genpd_state_disabled(genpd, state_idx))
+		state_idx--;
+
+	return state_idx;
+}
+#endif
+
+static int genpd_shallowest_enabled_state(struct generic_pm_domain *genpd)
+{
+	unsigned int state_idx;
+
+	for (state_idx = 0; state_idx < genpd->state_count; state_idx++)
+		if (!genpd_state_disabled(genpd, state_idx))
+			return state_idx;
+
+	return -EINVAL;
+}
+
+static bool genpd_child_allows_parent_power_off(struct generic_pm_domain *child)
+{
+	unsigned int state_idx;
+
+	if (!child->state_count)
+		return false;
+
+	state_idx = child->state_count - 1;
+
+	return READ_ONCE(child->state_idx) == state_idx &&
+	       !genpd_state_disabled(child, state_idx);
+}
+
 /**
  * genpd_power_off - Remove power from a given PM domain.
  * @genpd: PM domain to power down.
@@ -1022,6 +1073,7 @@ static void genpd_power_off(struct generic_pm_domain *genpd, bool one_dev_on,
 	struct pm_domain_data *pdd;
 	struct gpd_link *link;
 	unsigned int not_suspended = 0;
+	int state_idx;
 
 	/*
 	 * Do not try to power off the domain in the following situations:
@@ -1044,7 +1096,8 @@ static void genpd_power_off(struct generic_pm_domain *genpd, bool one_dev_on,
 	 */
 	list_for_each_entry(link, &genpd->parent_links, parent_node) {
 		struct generic_pm_domain *child = link->child;
-		if (child->state_idx < child->state_count - 1)
+
+		if (!genpd_child_allows_parent_power_off(child))
 			return;
 	}
 
@@ -1070,9 +1123,18 @@ static void genpd_power_off(struct generic_pm_domain *genpd, bool one_dev_on,
 			return;
 	}
 
-	/* Default to shallowest state. */
-	if (!genpd->gov)
-		genpd->state_idx = 0;
+	/* Default to the shallowest enabled state. */
+	if (!genpd->gov) {
+		state_idx = genpd_shallowest_enabled_state(genpd);
+		if (state_idx < 0)
+			return;
+		genpd->state_idx = state_idx;
+	}
+
+	/* Governors that are unaware of disabled states fail safely. */
+	if (genpd->state_idx >= genpd->state_count ||
+	    genpd_state_disabled(genpd, genpd->state_idx))
+		return;
 
 	/* Don't power off, if a child domain is waiting to power on. */
 	if (atomic_read(&genpd->sd_count) > 0)
@@ -1474,6 +1536,7 @@ static void genpd_sync_power_off(struct generic_pm_domain *genpd, bool use_lock,
 				 bool s2idle, unsigned int depth)
 {
 	struct gpd_link *link;
+	int state_idx;
 
 	if (!genpd_status_on(genpd) || genpd_is_always_on(genpd))
 		return;
@@ -1482,10 +1545,11 @@ static void genpd_sync_power_off(struct generic_pm_domain *genpd, bool use_lock,
 	    || atomic_read(&genpd->sd_count) > 0)
 		return;
 
-	/* Check that the children are in their deepest (powered-off) state. */
+	/* A child must be in its absolute deepest state and it must be enabled. */
 	list_for_each_entry(link, &genpd->parent_links, parent_node) {
 		struct generic_pm_domain *child = link->child;
-		if (child->state_idx < child->state_count - 1)
+
+		if (!genpd_child_allows_parent_power_off(child))
 			return;
 	}
 
@@ -1493,9 +1557,17 @@ static void genpd_sync_power_off(struct generic_pm_domain *genpd, bool use_lock,
 		if (!genpd->gov->system_power_down_ok(&genpd->domain))
 			return;
 	} else {
-		/* Default to the deepest state. */
-		genpd->state_idx = genpd->state_count - 1;
+		/* Default to the deepest enabled state. */
+		state_idx = genpd_deepest_enabled_state(genpd);
+		if (state_idx < 0)
+			return;
+		genpd->state_idx = state_idx;
 	}
+
+	/* Governors that are unaware of disabled states fail safely. */
+	if (genpd->state_idx >= genpd->state_count ||
+	    genpd_state_disabled(genpd, genpd->state_idx))
+		return;
 
 	if (_genpd_power_off(genpd, false)) {
 		genpd->states[genpd->state_idx].rejected++;
@@ -3990,6 +4062,109 @@ static int idle_states_desc_show(struct seq_file *s, void *data)
 	return ret;
 }
 
+/* The caller must hold genpd's lock to stabilize its parent links. */
+static void genpd_queue_power_off_recheck(struct generic_pm_domain *genpd)
+{
+	struct gpd_link *link;
+
+	if (genpd_status_on(genpd)) {
+		genpd_queue_power_off_work(genpd);
+		return;
+	}
+
+	/*
+	 * An already-off domain returns early from genpd_power_off() and cannot
+	 * propagate a new power-off decision. Retry each direct parent instead.
+	 * A parent which powers off will propagate the decision further.
+	 */
+	list_for_each_entry(link, &genpd->child_links, child_node) {
+		struct generic_pm_domain *parent = link->parent;
+
+		genpd_lock_nested(parent, SINGLE_DEPTH_NESTING);
+		genpd_queue_power_off_work(parent);
+		genpd_unlock(parent);
+	}
+}
+
+static int state_disable_show(struct seq_file *s, void *data)
+{
+	struct generic_pm_domain *genpd = s->private;
+	unsigned int state_idx;
+	int ret;
+
+	ret = genpd_lock_interruptible(genpd);
+	if (ret)
+		return -ERESTARTSYS;
+
+	for (state_idx = 0; state_idx < genpd->state_count; state_idx++)
+		seq_printf(s, "%u %u\n", state_idx,
+			   !!(genpd->states[state_idx].disable &
+			      GENPD_STATE_DISABLED_BY_USER));
+
+	genpd_unlock(genpd);
+	return 0;
+}
+
+static ssize_t state_disable_write(struct file *file,
+				   const char __user *user_buf,
+				   size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct generic_pm_domain *genpd = s->private;
+	unsigned int disable, new_disable, old_disable, state_idx;
+	char buf[32];
+	int ret;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+	if (!count || count >= sizeof(buf))
+		return -EINVAL;
+	if (copy_from_user(buf, user_buf, count))
+		return -EFAULT;
+	buf[count] = '\0';
+
+	if (sscanf(buf, "%u %u", &state_idx, &disable) != 2 || disable > 1)
+		return -EINVAL;
+
+	ret = genpd_lock_interruptible(genpd);
+	if (ret)
+		return -ERESTARTSYS;
+	if (state_idx >= genpd->state_count) {
+		genpd_unlock(genpd);
+		return -EINVAL;
+	}
+
+	old_disable = genpd->states[state_idx].disable;
+	if (disable)
+		new_disable = old_disable | GENPD_STATE_DISABLED_BY_USER;
+	else
+		new_disable = old_disable & ~GENPD_STATE_DISABLED_BY_USER;
+
+	if (new_disable != old_disable) {
+		WRITE_ONCE(genpd->states[state_idx].disable, new_disable);
+		if (genpd->gd)
+			genpd->gd->max_off_time_changed = true;
+		if (!new_disable)
+			genpd_queue_power_off_recheck(genpd);
+	}
+	genpd_unlock(genpd);
+
+	return count;
+}
+
+static int state_disable_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, state_disable_show, inode->i_private);
+}
+
+static const struct file_operations state_disable_fops = {
+	.open		= state_disable_open,
+	.read		= seq_read,
+	.write		= state_disable_write,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 static int active_time_show(struct seq_file *s, void *data)
 {
 	struct generic_pm_domain *genpd = s->private;
@@ -4102,6 +4277,8 @@ static void genpd_debug_add(struct generic_pm_domain *genpd)
 			    d, genpd, &idle_states_fops);
 	debugfs_create_file("idle_states_desc", 0444,
 			    d, genpd, &idle_states_desc_fops);
+	debugfs_create_file("state_disable", 0644,
+			    d, genpd, &state_disable_fops);
 	debugfs_create_file("active_time", 0444,
 			    d, genpd, &active_time_fops);
 	debugfs_create_file("total_idle_time", 0444,
