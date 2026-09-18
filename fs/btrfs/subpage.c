@@ -422,7 +422,24 @@ void btrfs_subpage_set_writeback(const struct btrfs_fs_info *fs_info,
 
 	spin_lock_irqsave(&subpage->lock, flags);
 	subpage->writeback_bitmap |= tmp;
-	set_page_writeback(page);
+
+	/*
+	 * Don't clear the TOWRITE tag when starting writeback on a still-dirty
+	 * page. Doing so can cause WB_SYNC_ALL writepages() to overlook it,
+	 * assume writeback is complete, and exit too early — violating sync
+	 * ordering guarantees.
+	 */
+	set_page_writeback_keepwrite(page);
+	if (!PageDirty(page)) {
+		struct address_space *mapping = page_mapping(page);
+		XA_STATE(xas, &mapping->i_pages, page->index);
+		unsigned long xas_flags;
+
+		xas_lock_irqsave(&xas, xas_flags);
+		xas_load(&xas);
+		xas_clear_mark(&xas, PAGECACHE_TAG_TOWRITE);
+		xas_unlock_irqrestore(&xas, xas_flags);
+	}
 	spin_unlock_irqrestore(&subpage->lock, flags);
 }
 
