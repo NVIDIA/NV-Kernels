@@ -743,6 +743,7 @@ static int virtblk_probe_zoned_device(struct virtio_device *vdev,
 		dev_warn(&vdev->dev, "zero write granularity reported\n");
 		return -ENODEV;
 	}
+	blk_queue_zone_write_granularity(q, wg);
 	blk_queue_physical_block_size(q, wg);
 	blk_queue_io_min(q, wg);
 
