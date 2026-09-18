@@ -338,6 +338,10 @@ static int pcie_port_device_register(struct pci_dev *dev)
 	if (status)
 		return status;
 
+#ifdef CONFIG_MTK_POWER_WRAP
+	mtk_pci_pwrap_init(dev);
+#endif
+
 	/* Get and check PCI Express port services */
 	capabilities = get_port_device_capability(dev);
 	if (!capabilities)
@@ -686,6 +690,7 @@ static int pcie_portdrv_probe(struct pci_dev *dev,
 					const struct pci_device_id *id)
 {
 	int type = pci_pcie_type(dev);
+	u32 pm_flags = DPM_FLAG_NO_DIRECT_COMPLETE;
 	int status;
 
 	if (!pci_is_pcie(dev) ||
@@ -704,8 +709,10 @@ static int pcie_portdrv_probe(struct pci_dev *dev,
 
 	pci_save_state(dev);
 
-	dev_pm_set_driver_flags(&dev->dev, DPM_FLAG_NO_DIRECT_COMPLETE |
-					   DPM_FLAG_SMART_SUSPEND);
+	if (!mtk_pci_pwrap_is_managed(dev))
+		pm_flags |= DPM_FLAG_SMART_SUSPEND;
+
+	dev_pm_set_driver_flags(&dev->dev, pm_flags);
 
 	if (pci_bridge_d3_possible(dev)) {
 		/*
