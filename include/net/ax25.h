@@ -238,6 +238,7 @@ typedef struct ax25_dev {
 #endif
 	refcount_t		refcount;
 	struct rcu_head		rcu;
+	bool device_up;
 } ax25_dev;
 
 typedef struct ax25_cb {
