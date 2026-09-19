@@ -979,6 +979,16 @@ Fixup:
 	if (device_can_wakeup(dev) && !device_may_wakeup(dev))
 		dev->power.may_skip_resume = false;
 
+#ifdef CONFIG_MTK_POWER_WRAP
+	/* Gate only after PCI configuration-space accesses are complete. */
+	if (!(pci_dev->skip_bus_pm && pm_suspend_no_platform())) {
+		int error = mtk_pci_pwrap_suspend(pci_dev, true);
+
+		if (error)
+			return error;
+	}
+#endif
+
 	return 0;
 }
 
@@ -998,8 +1008,17 @@ static int pci_pm_resume_noirq(struct device *dev)
 	 * configuration here and attempting to put them into D0 again is
 	 * pointless, so avoid doing that.
 	 */
-	if (!(skip_bus_pm && pm_suspend_no_platform()))
+	if (!(skip_bus_pm && pm_suspend_no_platform())) {
+#ifdef CONFIG_MTK_POWER_WRAP
+		/* Restore segment config access before touching the device. */
+		int error = mtk_pci_pwrap_resume(pci_dev, true);
+
+		if (error)
+			return error;
+#endif
+
 		pci_pm_default_resume_early(pci_dev);
+	}
 
 	pci_fixup_device(pci_fixup_resume_early, pci_dev);
 	pcie_pme_root_status_cleanup(pci_dev);
@@ -1371,6 +1390,19 @@ static int pci_pm_runtime_suspend(struct device *dev)
 		pci_finish_runtime_suspend(pci_dev);
 	}
 
+#ifdef CONFIG_MTK_POWER_WRAP
+	/* Gate the segment only after PCI config-space accesses are complete. */
+	if (pci_dev->current_state != PCI_D0 &&
+	    pci_dev->current_state != PCI_UNKNOWN) {
+		/*
+		 * The driver and PCI device are already suspended.  On failure,
+		 * leave the segment powered instead of returning with runtime PM
+		 * state inconsistent with the device state.
+		 */
+		mtk_pci_pwrap_suspend(pci_dev, false);
+	}
+#endif
+
 	return 0;
 }
 
@@ -1386,6 +1418,12 @@ static int pci_pm_runtime_resume(struct device *dev)
 	 * to a driver because although we left it in D0, it may have gone to
 	 * D3cold when the bridge above it runtime suspended.
 	 */
+#ifdef CONFIG_MTK_POWER_WRAP
+	error = mtk_pci_pwrap_resume(pci_dev, false);
+	if (error)
+		return error;
+#endif
+
 	pci_pm_default_resume_early(pci_dev);
 	pci_resume_ptm(pci_dev);
 
