@@ -230,10 +230,6 @@ CONFIG_ARM64_SECURE_LAUNCH_FIRME                note<'Extend DRTM measurements i
 CONFIG_ARM64_SECURE_LAUNCH_FIRME_SLOT           policy<{'arm64': '1'}>
 CONFIG_ARM64_SECURE_LAUNCH_SELFTEST             policy<{'arm64': 'n'}>
 CONFIG_ARM64_SECURE_LAUNCH_FAULT_INJECT         policy<{'arm64': 'n'}>
-CONFIG_ARM64_SECURE_LAUNCH_KASLR                policy<{'arm64': 'y'}>
-CONFIG_ARM64_SECURE_LAUNCH_KASLR                note<'DRTM trusted linear-map KASLR; requires MEMORY_HOTPLUG=n'>
-CONFIG_MEMORY_HOTPLUG                           policy<{'arm64': 'n'}>
-CONFIG_MEMORY_HOTPLUG                           note<'off to enable ARM64_SECURE_LAUNCH_KASLR'>
 CONFIG_NVIDIA_FIRME_GUEST                       policy<{'arm64': 'm'}>
 CONFIG_NVIDIA_FIRME_GUEST                       note<'NVIDIA FIRME attestation driver for DRTM'>
 CONFIG_EFI_ZBOOT                                policy<{'arm64': 'n'}>
@@ -243,34 +239,3 @@ CONFIG_HAVE_KERNEL_GZIP                         policy<{'arm64': '-'}>
 CONFIG_HAVE_KERNEL_ZSTD                         policy<{'arm64': '-'}>
 CONFIG_KERNEL_GZIP                              policy<{'arm64': '-'}>
 CONFIG_KERNEL_ZSTD                              policy<{'arm64': '-'}>
-
-# DRTM: symbols force-disabled on arm64 by MEMORY_HOTPLUG=n (needed for ARM64_SECURE_LAUNCH_KASLR)
-CONFIG_ACPI_HOTPLUG_MEMORY                      policy<{'arm64': '-'}>
-CONFIG_DEVICE_MIGRATION                         policy<{'arm64': '-'}>
-CONFIG_DEVICE_PRIVATE                           policy<{'arm64': '-'}>
-CONFIG_DEV_DAX_KMEM                             policy<{'arm64': '-'}>
-CONFIG_DEV_DAX_PMEM                             policy<{'arm64': '-'}>
-CONFIG_DRM_XE_GPUSVM                            policy<{'arm64': '-'}>
-CONFIG_DRM_XE_PAGEMAP                           policy<{'arm64': '-'}>
-CONFIG_FS_DAX                                   policy<{'arm64': '-'}>
-CONFIG_FS_DAX_PMD                               policy<{'arm64': '-'}>
-CONFIG_FUSE_DAX                                 policy<{'arm64': '-'}>
-CONFIG_HSA_AMD_P2P                              policy<{'arm64': '-'}>
-CONFIG_HSA_AMD_SVM                              policy<{'arm64': '-'}>
-CONFIG_MEMORY_HOTREMOVE                         policy<{'arm64': '-'}>
-CONFIG_MEMORY_NOTIFIER_ERROR_INJECT             policy<{'arm64': '-'}>
-CONFIG_MHP_DEFAULT_ONLINE_TYPE_OFFLINE          policy<{'arm64': '-'}>
-CONFIG_MHP_DEFAULT_ONLINE_TYPE_ONLINE_AUTO      policy<{'arm64': '-'}>
-CONFIG_MHP_DEFAULT_ONLINE_TYPE_ONLINE_KERNEL    policy<{'arm64': '-'}>
-CONFIG_MHP_DEFAULT_ONLINE_TYPE_ONLINE_MOVABLE   policy<{'arm64': '-'}>
-CONFIG_MHP_MEMMAP_ON_MEMORY                     policy<{'arm64': '-'}>
-CONFIG_ND_PFN                                   policy<{'arm64': '-'}>
-CONFIG_NVDIMM_DAX                               policy<{'arm64': '-'}>
-CONFIG_NVDIMM_PFN                               policy<{'arm64': '-'}>
-CONFIG_PCI_P2PDMA                               policy<{'arm64': '-'}>
-CONFIG_TEST_HMM                                 policy<{'arm64': '-'}>
-CONFIG_VFIO_PCI_DMABUF                          policy<{'arm64': '-'}>
-CONFIG_VIRTIO_MEM                               policy<{'arm64': '-'}>
-CONFIG_XEN_BALLOON_MEMORY_HOTPLUG               policy<{'arm64': '-'}>
-CONFIG_XEN_UNPOPULATED_ALLOC                    policy<{'arm64': '-'}>
-CONFIG_ZONE_DEVICE                              policy<{'arm64': '-'}>
