@@ -6413,7 +6413,7 @@ CONFIG_INFINIBAND_ADDR_TRANS_CONFIGFS           policy<{'amd64': 'y', 'arm64': '
 CONFIG_INFINIBAND_BNXT_RE                       policy<{'amd64': 'm', 'arm64': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_INFINIBAND_CXGB4                         policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_INFINIBAND_EFA                           policy<{'amd64': 'm', 'arm64': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
-CONFIG_INFINIBAND_ERDMA                         policy<{'amd64': 'm', 'arm64': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
+CONFIG_INFINIBAND_ERDMA                         policy<{'amd64': 'm', 'arm64': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': '-'}>
 CONFIG_INFINIBAND_HFI1                          policy<{'amd64': 'm'}>
 CONFIG_INFINIBAND_HNS_HIP08                     policy<{'arm64': 'm'}>
 CONFIG_INFINIBAND_IPOIB                         policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
