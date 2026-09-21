@@ -856,7 +856,7 @@ static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
 
 		error = rockchip_pm_add_subdomain(pmu, np);
 		if (error)
-			return error;
+			goto err_out;
 	}
 
 	return 0;
