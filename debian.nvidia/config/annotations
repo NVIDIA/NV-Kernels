@@ -147,6 +147,9 @@ CONFIG_IOMMU_DEFAULT_DMA_STRICT                 note<'On Nvidia CPU passthrough 
 CONFIG_IOMMU_DEFAULT_PASSTHROUGH                policy<{'amd64': 'n', 'arm64': 'y'}>
 CONFIG_IOMMU_DEFAULT_PASSTHROUGH                note<'On Nvidia CPU passthrough mode is recommend so set passthrough mode as default for better performance'>
 
+CONFIG_KEXEC_HANDOVER_ENABLE_DEFAULT            policy<{'arm64-nvidia': 'n'}>
+CONFIG_KEXEC_HANDOVER_ENABLE_DEFAULT            note<'Disable default KHO on 4K arm64-nvidia for GB10 long-term-pin workloads'>
+
 CONFIG_LEDS_AAEON                               policy<{'amd64': '-'}>
 CONFIG_LEDS_AAEON                               note<'Disable all Ubuntu ODM drivers'>
 
