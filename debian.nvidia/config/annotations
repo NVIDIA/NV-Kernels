@@ -308,3 +308,46 @@ CONFIG_HAVE_KERNEL_GZIP                         policy<{'arm64': '-'}>
 CONFIG_HAVE_KERNEL_ZSTD                         policy<{'arm64': '-'}>
 CONFIG_KERNEL_GZIP                              policy<{'arm64': '-'}>
 CONFIG_KERNEL_ZSTD                              policy<{'arm64': '-'}>
+
+# ---- Changes for noble ----
+
+CONFIG_AMCC_QT2025_PHY                          policy<{'arm64': '-'}>
+CONFIG_ANDROID_BINDER_IPC_RUST                  policy<{'arm64': '-'}>
+CONFIG_AX88796B_RUST_PHY                        policy<{'arm64': '-'}>
+CONFIG_BLK_DEV_RUST_NULL                        policy<{'arm64': '-'}>
+CONFIG_CC_HAS_COUNTED_BY                        policy<{'arm64': '-'}>
+CONFIG_CC_HAS_MIN_FUNCTION_ALIGNMENT            policy<{'arm64': '-'}>
+CONFIG_CC_HAS_MULTIDIMENSIONAL_NONSTRING        policy<{'arm64': '-'}>
+CONFIG_CC_HAS_SANE_FUNCTION_ALIGNMENT           policy<{'arm64': '-'}>
+CONFIG_CPUFREQ_DT_RUST                          policy<{'arm64': '-'}>
+CONFIG_DRM_NOVA                                 policy<{'arm64': '-'}>
+CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'arm64': '-'}>
+CONFIG_DRM_TYR                                  policy<{'arm64': '-'}>
+CONFIG_FIND_BIT_BENCHMARK_RUST                  policy<{'arm64': '-'}>
+CONFIG_HAVE_RUST                                policy<{'arm64': '-'}>
+CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_44             policy<{'arm64': '-'}>
+CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_65             policy<{'arm64': '-'}>
+CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_87             policy<{'arm64': '-'}>
+CONFIG_NOVA_CORE                                policy<{'arm64': '-'}>
+CONFIG_OPENSSL_SUPPORTS_ML_DSA                  policy<{'arm64': '-'}>
+CONFIG_RELR                                     policy<{'arm64': '-'}>
+CONFIG_RUST                                     policy<{'arm64': '-'}>
+CONFIG_RUSTC_HAS_COERCE_POINTEE                 policy<{'arm64': '-'}>
+CONFIG_RUSTC_HAS_FILE_AS_C_STR                  policy<{'arm64': '-'}>
+CONFIG_RUSTC_HAS_FILE_WITH_NUL                  policy<{'arm64': '-'}>
+CONFIG_RUSTC_HAS_SLICE_AS_FLATTENED             policy<{'arm64': '-'}>
+CONFIG_RUSTC_HAS_SPAN_FILE                      policy<{'arm64': '-'}>
+CONFIG_RUSTC_HAS_UNNECESSARY_TRANSMUTES         policy<{'arm64': '-'}>
+CONFIG_RUSTC_LLVM_VERSION                       policy<{'arm64': '170006'}>
+CONFIG_RUSTC_SUPPORTS_ARM                       policy<{'arm64': '-'}>
+CONFIG_RUSTC_SUPPORTS_ARM64                     policy<{'arm64': '-'}>
+CONFIG_RUSTC_VERSION                            policy<{'arm64': '107500'}>
+CONFIG_RUST_BITMAP_HARDENED                     policy<{'arm64': '-'}>
+CONFIG_RUST_BUILD_ASSERT_ALLOW                  policy<{'arm64': '-'}>
+CONFIG_RUST_DEBUG_ASSERTIONS                    policy<{'arm64': '-'}>
+CONFIG_RUST_FW_LOADER_ABSTRACTIONS              policy<{'arm64': '-'}>
+CONFIG_RUST_IS_AVAILABLE                        policy<{'arm64': '-'}>
+CONFIG_RUST_OVERFLOW_CHECKS                     policy<{'arm64': '-'}>
+CONFIG_RUST_PHYLIB_ABSTRACTIONS                 policy<{'arm64': '-'}>
+CONFIG_SAMPLES_RUST                             policy<{'arm64': '-'}>
+CONFIG_TOOLS_SUPPORT_RELR                       policy<{'arm64': '-'}>
