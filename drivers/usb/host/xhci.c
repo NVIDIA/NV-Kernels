@@ -707,7 +707,11 @@ void xhci_stop(struct usb_hcd *hcd)
 {
 	u32 temp;
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
-	struct xhci_interrupter *ir = xhci->interrupters[0];
+	struct xhci_interrupter *ir = NULL;
+	bool hw_accessible;
+
+	if (xhci->interrupters)
+		ir = xhci->interrupters[0];
 
 	mutex_lock(&xhci->mutex);
 
@@ -717,13 +721,18 @@ void xhci_stop(struct usb_hcd *hcd)
 		return;
 	}
 
-	xhci_remove_dbc_dev(xhci);
+	hw_accessible = HCD_HW_ACCESSIBLE(hcd);
+
+	/* A failed platform resume can leave only software teardown possible. */
+	xhci_remove_dbc_dev(xhci, hw_accessible);
 
 	spin_lock_irq(&xhci->lock);
 	xhci->xhc_state |= XHCI_STATE_HALTED;
 	xhci->cmd_ring_state = CMD_RING_STATE_STOPPED;
-	xhci_halt(xhci);
-	xhci_reset(xhci, XHCI_RESET_SHORT_USEC);
+	if (hw_accessible) {
+		xhci_halt(xhci);
+		xhci_reset(xhci, XHCI_RESET_SHORT_USEC);
+	}
 	spin_unlock_irq(&xhci->lock);
 
 	/* Deleting Compliance Mode Recovery Timer */
@@ -738,18 +747,22 @@ void xhci_stop(struct usb_hcd *hcd)
 	if (xhci->quirks & XHCI_AMD_PLL_FIX)
 		usb_amd_dev_put();
 
-	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
-			"// Disabling event ring interrupts");
-	temp = readl(&xhci->op_regs->status);
-	writel((temp & ~0x1fff) | STS_EINT, &xhci->op_regs->status);
-	xhci_disable_interrupter(xhci, ir);
+	if (hw_accessible) {
+		xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+			       "// Disabling event ring interrupts");
+		temp = readl(&xhci->op_regs->status);
+		writel((temp & ~0x1fff) | STS_EINT, &xhci->op_regs->status);
+		if (ir)
+			xhci_disable_interrupter(xhci, ir);
+	}
 
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "cleaning up memory");
 	xhci_mem_cleanup(xhci);
 	xhci_debugfs_exit(xhci);
-	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
-			"xhci_stop completed - status = %x",
-			readl(&xhci->op_regs->status));
+	if (hw_accessible)
+		xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+			       "%s completed - status = %x", __func__,
+			       readl(&xhci->op_regs->status));
 	mutex_unlock(&xhci->mutex);
 }
 EXPORT_SYMBOL_GPL(xhci_stop);
@@ -766,8 +779,9 @@ EXPORT_SYMBOL_GPL(xhci_stop);
 void xhci_shutdown(struct usb_hcd *hcd)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+	bool hw_accessible = HCD_HW_ACCESSIBLE(hcd);
 
-	if (xhci->quirks & XHCI_SPURIOUS_REBOOT)
+	if (hw_accessible && (xhci->quirks & XHCI_SPURIOUS_REBOOT))
 		usb_disable_xhci_ports(to_pci_dev(hcd->self.sysdev));
 
 	/* Don't poll the roothubs after shutdown. */
@@ -779,6 +793,11 @@ void xhci_shutdown(struct usb_hcd *hcd)
 	if (xhci->shared_hcd) {
 		clear_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
 		timer_delete_sync(&xhci->shared_hcd->rh_timer);
+	}
+
+	if (!hw_accessible) {
+		xhci_dbg(xhci, "skip shutdown of inaccessible hardware\n");
+		return;
 	}
 
 	spin_lock_irq(&xhci->lock);
@@ -1125,6 +1144,13 @@ int xhci_resume(struct xhci_hcd *xhci, bool power_lost, bool is_auto_resume)
 		xhci_restore_registers(xhci);
 		/* step 2: initialize command ring buffer */
 		xhci_set_cmd_ring_deq(xhci);
+		if (xhci->quirks & XHCI_DELAY_BEFORE_CRS) {
+			/*
+			 * Allow DRAM reads triggered by register restoration to
+			 * complete before setting CRS.
+			 */
+			mdelay(2);
+		}
 		/* step 3: restore state and start state*/
 		/* step 3: set CRS flag */
 		command = readl(&xhci->op_regs->command);
@@ -1789,9 +1815,13 @@ static int xhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	if (!ep || !ep_ring)
 		goto err_giveback;
 
+	/* Failed platform recovery marks the host dead and drains its URBs. */
+	if (xhci->xhc_state & XHCI_STATE_DYING)
+		goto done;
+
 	/* If xHC is dead take it down and return ALL URBs in xhci_hc_died() */
 	temp = readl(&xhci->op_regs->status);
-	if (temp == ~(u32)0 || xhci->xhc_state & XHCI_STATE_DYING) {
+	if (temp == ~(u32)0) {
 		xhci_hc_died(xhci);
 		goto done;
 	}
@@ -4154,10 +4184,15 @@ int xhci_disable_slot(struct xhci_hcd *xhci, u32 slot_id)
 	xhci_debugfs_remove_slot(xhci, slot_id);
 
 	spin_lock_irqsave(&xhci->lock, flags);
-	/* Don't disable the slot if the host controller is dead. */
+	/* Don't disable the slot if the host is inaccessible or dead. */
+	if (!HCD_HW_ACCESSIBLE(xhci_to_hcd(xhci)) ||
+	    xhci->xhc_state & (XHCI_STATE_DYING | XHCI_STATE_HALTED)) {
+		spin_unlock_irqrestore(&xhci->lock, flags);
+		xhci_free_command(xhci, command);
+		return -ENODEV;
+	}
 	state = readl(&xhci->op_regs->status);
-	if (state == 0xffffffff || (xhci->xhc_state & XHCI_STATE_DYING) ||
-			(xhci->xhc_state & XHCI_STATE_HALTED)) {
+	if (state == 0xffffffff) {
 		spin_unlock_irqrestore(&xhci->lock, flags);
 		xhci_free_command(xhci, command);
 		return -ENODEV;
@@ -4668,6 +4703,9 @@ static int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 	unsigned long	flags;
 	int		hird, exit_latency;
 	int		ret;
+
+	if (!HCD_HW_ACCESSIBLE(hcd))
+		return -ESHUTDOWN;
 
 	if (xhci->quirks & XHCI_HW_LPM_DISABLE)
 		return -EPERM;
@@ -5563,6 +5601,7 @@ static void xhci_clear_tt_buffer_complete(struct usb_hcd *hcd,
 {
 	struct xhci_hcd *xhci;
 	struct usb_device *udev;
+	struct xhci_virt_device *vdev;
 	unsigned int slot_id;
 	unsigned int ep_index;
 	unsigned long flags;
@@ -5573,9 +5612,17 @@ static void xhci_clear_tt_buffer_complete(struct usb_hcd *hcd,
 	udev = (struct usb_device *)ep->hcpriv;
 	slot_id = udev->slot_id;
 	ep_index = xhci_get_endpoint_index(&ep->desc);
+	vdev = xhci->devs[slot_id];
 
-	xhci->devs[slot_id]->eps[ep_index].ep_state &= ~EP_CLEARING_TT;
-	xhci_ring_doorbell_for_active_rings(xhci, slot_id, ep_index);
+	if (!vdev)
+		goto out;
+
+	vdev->eps[ep_index].ep_state &= ~EP_CLEARING_TT;
+	if (HCD_HW_ACCESSIBLE(hcd) &&
+	    !(xhci->xhc_state & XHCI_STATE_DYING))
+		xhci_ring_doorbell_for_active_rings(xhci, slot_id, ep_index);
+
+out:
 	spin_unlock_irqrestore(&xhci->lock, flags);
 }
 

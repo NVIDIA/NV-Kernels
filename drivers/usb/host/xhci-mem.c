@@ -1831,7 +1831,7 @@ xhci_remove_interrupter(struct xhci_hcd *xhci, struct xhci_interrupter *ir)
 	 * low or high 32 bits of ERSTBA immediately causes the controller to
 	 * dereference the partially cleared 64 bit address, causing IOMMU error.
 	 */
-	if (ir->ir_set) {
+	if (ir->ir_set && HCD_HW_ACCESSIBLE(xhci_to_hcd(xhci))) {
 		tmp = readl(&ir->ir_set->erst_size);
 		tmp &= ~ERST_SIZE_MASK;
 		writel(tmp, &ir->ir_set->erst_size);
