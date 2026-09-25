@@ -1645,6 +1645,7 @@ struct xhci_hcd {
 #define XHCI_ETRON_HOST	BIT_ULL(49)
 #define XHCI_LIMIT_ENDPOINT_INTERVAL_9 BIT_ULL(50)
 #define XHCI_NVIDIA_MT8901_HOST		BIT_ULL(51)
+#define XHCI_DELAY_BEFORE_CRS		BIT_ULL(52)
 
 	unsigned int		num_active_eps;
 	unsigned int		limit_active_eps;
