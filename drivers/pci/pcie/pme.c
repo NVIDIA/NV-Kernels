@@ -274,6 +274,11 @@ static irqreturn_t pcie_pme_irq(int irq, void *context)
 	data = get_service_data((struct pcie_device *)context);
 
 	spin_lock_irqsave(&data->lock, flags);
+	if (data->noirq) {
+		spin_unlock_irqrestore(&data->lock, flags);
+		return IRQ_NONE;
+	}
+
 	pcie_capability_read_dword(port, PCI_EXP_RTSTA, &rtsta);
 
 	if (PCI_POSSIBLE_ERROR(rtsta) || !(rtsta & PCI_EXP_RTSTA_PME)) {
@@ -412,6 +417,7 @@ static int pcie_pme_suspend(struct pcie_device *srv)
 	pcie_pme_disable_interrupt(port, data);
 
 	synchronize_irq(srv->irq);
+	cancel_work_sync(&data->work);
 
 	return 0;
 }
