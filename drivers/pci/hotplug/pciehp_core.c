@@ -349,6 +349,39 @@ static int pciehp_runtime_resume(struct pcie_device *dev)
 }
 #endif /* PM */
 
+/*
+ * A caller which removes config-space access for the complete host may only
+ * do so after pciehp's system-suspend callback and the PM core have quiesced
+ * the IRQ.  A polling controller or Attention Button delayed work can still
+ * access the port independently, so those configurations are not safe.
+ * Use the controller's cached state because the port may already be D3cold.
+ */
+bool pciehp_is_safe_for_poweroff(struct pci_dev *pdev)
+{
+	struct pci_host_bridge *host;
+	struct pcie_device *pcie;
+	struct controller *ctrl;
+	struct device *dev;
+
+	if (!pdev->is_hotplug_bridge)
+		return true;
+	if (!pdev->is_pciehp)
+		return false;
+
+	host = pci_find_host_bridge(pdev->bus);
+	if (!host || (!pcie_ports_native && !host->native_pme))
+		return false;
+
+	dev = pcie_port_find_device(pdev, PCIE_PORT_SERVICE_HP);
+	if (!dev)
+		return false;
+
+	pcie = to_pcie_device(dev);
+	ctrl = get_service_data(pcie);
+
+	return ctrl && !ctrl->poll_thread && !ATTN_BUTTN(ctrl);
+}
+
 static struct pcie_port_service_driver hpdriver_portdrv = {
 	.name		= "pciehp",
 	.port_type	= PCIE_ANY_PORT,

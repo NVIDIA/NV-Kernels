@@ -12,6 +12,7 @@ obj-$(CONFIG_PCI)		+= pcie/
 obj-$(CONFIG_PCI)		+= pwrctrl/
 
 ifdef CONFIG_PCI
+obj-$(CONFIG_MTK_POWER_WRAP)	+= pci-mtk-pwrap.o
 obj-$(CONFIG_PROC_FS)		+= proc.o
 obj-$(CONFIG_SYSFS)		+= pci-sysfs.o slot.o
 obj-$(CONFIG_ACPI)		+= pci-acpi.o
