@@ -76,6 +76,7 @@ int mtk_pwrap_dev_resume(void *dev_ctrl, u8 sys_trans);
 int mtk_pwrap_com_idle(void *dev_ctrl, u8 com_idx);
 int mtk_pwrap_com_active(void *dev_ctrl, u8 com_idx);
 void *mtk_pwrap_dev_probe(const char *acpi_path);
+bool mtk_pwrap_dev_supports_state_control(void *dev_ctrl);
 #else
 static inline int mtk_send_power_control_req(struct _power_cntrl_request *pwrctlreq)
 {
@@ -115,6 +116,11 @@ static inline int mtk_pwrap_com_active(void *dev_ctrl, u8 com_idx)
 static inline void *mtk_pwrap_dev_probe(const char *acpi_path)
 {
 	return NULL;
+}
+
+static inline bool mtk_pwrap_dev_supports_state_control(void *dev_ctrl)
+{
+	return false;
 }
 #endif /* CONFIG_MTK_POWER_WRAP */
 
