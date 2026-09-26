@@ -266,6 +266,31 @@ int pci_finish_runtime_suspend(struct pci_dev *dev);
 void pcie_clear_device_status(struct pci_dev *dev);
 void pcie_clear_root_pme_status(struct pci_dev *dev);
 bool pci_check_pme_status(struct pci_dev *dev);
+#ifdef CONFIG_HOTPLUG_PCI_PCIE
+bool pciehp_is_safe_for_poweroff(struct pci_dev *dev);
+#else
+static inline bool pciehp_is_safe_for_poweroff(struct pci_dev *dev)
+{
+	return !dev->is_hotplug_bridge;
+}
+#endif
+#ifdef CONFIG_MTK_POWER_WRAP
+void mtk_pci_pwrap_init(struct pci_dev *dev);
+bool mtk_pci_pwrap_is_managed(struct pci_dev *dev);
+void mtk_pci_pwrap_suspend_noirq(struct pci_dev *dev);
+void mtk_pci_pwrap_resume_noirq(struct pci_dev *dev);
+#else
+static inline void mtk_pci_pwrap_init(struct pci_dev *dev) { }
+
+static inline bool mtk_pci_pwrap_is_managed(struct pci_dev *dev)
+{
+	return false;
+}
+
+static inline void mtk_pci_pwrap_suspend_noirq(struct pci_dev *dev) { }
+
+static inline void mtk_pci_pwrap_resume_noirq(struct pci_dev *dev) { }
+#endif
 void pci_pme_wakeup_bus(struct pci_bus *bus);
 void pci_pme_restore(struct pci_dev *dev);
 bool pci_dev_need_resume(struct pci_dev *dev);
