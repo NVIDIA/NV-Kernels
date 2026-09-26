@@ -979,6 +979,8 @@ Fixup:
 	if (device_can_wakeup(dev) && !device_may_wakeup(dev))
 		dev->power.may_skip_resume = false;
 
+	/* Gate only after every PCI configuration-space access is complete. */
+	mtk_pci_pwrap_suspend_noirq(pci_dev);
 	return 0;
 }
 
@@ -988,6 +990,9 @@ static int pci_pm_resume_noirq(struct device *dev)
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
 	pci_power_t prev_state = pci_dev->current_state;
 	bool skip_bus_pm = pci_dev->skip_bus_pm;
+
+	/* Restore host config and MMIO access before the first PCI access. */
+	mtk_pci_pwrap_resume_noirq(pci_dev);
 
 	if (dev_pm_skip_resume(dev))
 		return 0;
