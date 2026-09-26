@@ -431,6 +431,14 @@ void *mtk_pwrap_dev_probe(const char *acpi_path)
 }
 EXPORT_SYMBOL_GPL(mtk_pwrap_dev_probe);
 
+bool mtk_pwrap_dev_supports_state_control(void *dev_ctrl)
+{
+	struct pwrap_dev_config *cfg = dev_ctrl;
+
+	return cfg && cfg->control_type == CTRL_BY_SCMI;
+}
+EXPORT_SYMBOL_GPL(mtk_pwrap_dev_supports_state_control);
+
 static int pwrap_config_resource(struct platform_device *pdev, kernel_ulong_t driver_data)
 {
 	enum mtk_pwrap_type type;
