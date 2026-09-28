@@ -4793,6 +4793,7 @@ static void arm_smmu_write_strtab(struct arm_smmu_device *smmu)
 
 static int arm_smmu_device_reset(struct arm_smmu_device *smmu)
 {
+	struct arm_smmu_cmd cmd;
 	int ret;
 	u32 reg, enables;
 
@@ -4840,17 +4841,25 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu)
 		return ret;
 	}
 
+	/*
+	 * Secondary CMDQs (e.g. Tegra241 VCMDQs) are only reinitialised by
+	 * impl_ops->device_reset() at the end of this function. On resume
+	 * their HW state may be lost while their SW state still looks enabled,
+	 * so these invalidations must go to the main CMDQ enabled above.
+	 */
+
 	/* Invalidate any cached configuration */
-	arm_smmu_cmdq_issue_cmd_with_sync(smmu, arm_smmu_make_cmd_cfgi_all());
+	cmd = arm_smmu_make_cmd_cfgi_all();
+	arm_smmu_cmdq_issue_cmdlist(smmu, &smmu->cmdq, &cmd, 1, true);
 
 	/* Invalidate any stale TLB entries */
 	if (smmu->features & ARM_SMMU_FEAT_HYP) {
-		arm_smmu_cmdq_issue_cmd_with_sync(
-			smmu, arm_smmu_make_cmd_op(CMDQ_OP_TLBI_EL2_ALL));
+		cmd = arm_smmu_make_cmd_op(CMDQ_OP_TLBI_EL2_ALL);
+		arm_smmu_cmdq_issue_cmdlist(smmu, &smmu->cmdq, &cmd, 1, true);
 	}
 
-	arm_smmu_cmdq_issue_cmd_with_sync(
-		smmu, arm_smmu_make_cmd_op(CMDQ_OP_TLBI_NSNH_ALL));
+	cmd = arm_smmu_make_cmd_op(CMDQ_OP_TLBI_NSNH_ALL);
+	arm_smmu_cmdq_issue_cmdlist(smmu, &smmu->cmdq, &cmd, 1, true);
 
 	/* Event queue */
 	writeq_relaxed(smmu->evtq.q.q_base, smmu->base + ARM_SMMU_EVTQ_BASE);
