@@ -212,6 +212,25 @@ static uint32_t pack_message_header(u8 message_id, u8 message_type, u8 protocol_
 			SCMI_MESSAGE_HEADER_TOKEN_MASK));
 }
 
+/**
+ * sspm_ci_set() - send one TINYSYS SET command to the SSPM and wait for its ack
+ * @feature_id: firmware feature the command addresses
+ * @p1: first payload word (typically the device id)
+ * @p2: second payload word (typically the composite action word)
+ * @p3: third payload word
+ * @p4: fourth payload word
+ * @p5: fifth payload word
+ *
+ * Return:
+ * * 0 - the firmware acknowledged the command.
+ * * -ENODEV - the mailbox is not mapped (no SSPM on this platform).
+ * * -EBUSY - the mailbox never became free, the command was NOT written and
+ *   nothing was sent; the caller's power state is unchanged and it may retry
+ *   or keep its current state.
+ * * -ETIMEDOUT - the command WAS written and the doorbell rung, but no ack
+ *   arrived in time; the firmware may still complete it, so the outcome is
+ *   unknown. A late ack is drained before the next command.
+ */
 int sspm_ci_set(u32 feature_id,
 	u32 p1, u32 p2, u32 p3, u32 p4, u32 p5)
 {
@@ -259,8 +278,14 @@ int sspm_ci_set(u32 feature_id,
 		count++;
 		if (count > SSPM_CI_MAX_POLL_COUNT) {
 			mutex_unlock(&_hw_rsc);
-			dev_err(__dev, "scmi timeout\n");
-			return -ETIMEDOUT;
+			/*
+			 * Nothing was written or sent: distinct from the ack
+			 * timeout below so callers can tell "not submitted"
+			 * (state unchanged, safe to retry) from "completion
+			 * unknown".
+			 */
+			dev_err(__dev, "scmi mailbox busy, command not submitted\n");
+			return -EBUSY;
 		}
 		mdelay(1);
 	}
@@ -295,7 +320,8 @@ int sspm_ci_set(u32 feature_id,
 			WRITE_ONCE(_inflight_hdr, 0);
 			_drain_needed = true;
 			mutex_unlock(&_hw_rsc);
-			dev_err(__dev, "scmi timeout (hdr %#x)\n", message_header);
+			dev_err(__dev, "scmi ack timeout (hdr %#x), completion unknown\n",
+				message_header);
 			return -ETIMEDOUT;
 		}
 		mdelay(1);
