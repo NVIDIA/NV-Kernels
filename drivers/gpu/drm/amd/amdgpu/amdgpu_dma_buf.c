@@ -456,7 +456,7 @@ error:
 }
 
 /**
- * amdgpu_dma_buf_move_notify - &attach.invalidate_mappings implementation
+ * amdgpu_dma_buf_move_notify - &attach.move_notify implementation
  *
  * @attach: the DMA-buf attachment
  *
@@ -534,7 +534,7 @@ amdgpu_dma_buf_move_notify(struct dma_buf_attachment *attach)
 
 static const struct dma_buf_attach_ops amdgpu_dma_buf_attach_ops = {
 	.allow_peer2peer = true,
-	.invalidate_mappings = amdgpu_dma_buf_move_notify
+	.move_notify = amdgpu_dma_buf_move_notify
 };
 
 /**
