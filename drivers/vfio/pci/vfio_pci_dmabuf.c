@@ -357,7 +357,7 @@ void vfio_pci_dma_buf_move(struct vfio_pci_core_device *vdev, bool revoked)
 			dma_resv_lock(priv->dmabuf->resv, NULL);
 			if (revoked)
 				priv->revoked = true;
-			dma_buf_invalidate_mappings(priv->dmabuf);
+			dma_buf_move_notify(priv->dmabuf);
 			dma_resv_wait_timeout(priv->dmabuf->resv,
 					      DMA_RESV_USAGE_BOOKKEEP, false,
 					      MAX_SCHEDULE_TIMEOUT);
