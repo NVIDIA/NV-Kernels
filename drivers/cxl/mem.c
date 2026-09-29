@@ -157,6 +157,7 @@ static int cxl_mem_probe(struct device *dev)
 		if (rc) {
 			if (rc == -ENODEV)
 				dev_info(dev, "PMEM disabled by platform\n");
+			put_device(&parent_port->dev);
 			return rc;
 		}
 	}
