@@ -825,7 +825,7 @@ int intel_dp_hdcp_init(struct intel_digital_port *dig_port,
 	if (!is_hdcp_supported(dev_priv, port))
 		return 0;
 
-	if (intel_connector->mst_port)
+	if (intel_connector->mst.dp)
 		return intel_hdcp_init(intel_connector, dig_port,
 				       &intel_dp_mst_hdcp_shim);
 	else if (!intel_dp_is_edp(intel_dp))

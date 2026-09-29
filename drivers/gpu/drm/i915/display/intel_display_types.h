@@ -629,10 +629,6 @@ struct intel_connector {
 	   state of connector->polled in case hotplug storm detection changes it */
 	u8 polled;
 
-	struct drm_dp_mst_port *port;
-
-	struct intel_dp *mst_port;
-
 	struct {
 		struct drm_dp_aux *dsc_decompression_aux;
 		u8 dsc_dpcd[DP_DSC_RECEIVER_CAP_SIZE];
@@ -641,6 +637,11 @@ struct intel_connector {
 		u8 dsc_hblank_expansion_quirk:1;
 		u8 dsc_decompression_enabled:1;
 	} dp;
+
+	struct {
+		struct drm_dp_mst_port *port;
+		struct intel_dp *dp;
+	} mst;
 
 	/* Work struct to schedule a uevent on link train failure */
 	struct work_struct modeset_retry_work;
@@ -1787,14 +1788,15 @@ struct intel_dp {
 	struct intel_pps pps;
 
 	bool is_mst;
-	int active_mst_links;
 
 	/* connector directly attached - won't be use for modeset in mst world */
 	struct intel_connector *attached_connector;
 
-	/* mst connector list */
-	struct intel_dp_mst_encoder *mst_encoders[I915_MAX_PIPES];
-	struct drm_dp_mst_topology_mgr mst_mgr;
+	struct {
+		struct intel_dp_mst_encoder *stream_encoders[I915_MAX_PIPES];
+		struct drm_dp_mst_topology_mgr mgr;
+		int active_links;
+	} mst;
 
 	u32 (*get_aux_clock_divider)(struct intel_dp *dp, int index);
 	/*
