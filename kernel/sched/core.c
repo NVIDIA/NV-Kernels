@@ -11409,10 +11409,10 @@ static int sched_non_preferred_cpu_push_stop(void *arg)
 		 * safely bail out.
 		 */
 		cpu = select_fallback_rq(rq->cpu, p);
+		context_unsafe_alias(rq);
 		rq_lock(rq, &rf);
 		rq->npc_push_work_pending = false;
 		update_rq_clock(rq);
-		context_unsafe_alias(rq);
 
 		if (task_rq(p) == rq && task_on_rq_queued(p)) {
 			struct rq *dest_rq = __migrate_task(rq, &rf, p, cpu);
