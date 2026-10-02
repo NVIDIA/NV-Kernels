@@ -12,6 +12,7 @@
 #include <linux/range.h>
 #include <linux/errno.h>
 #include <cxl/mailbox.h>
+#include <cxl/pci.h>
 #include <uapi/cxl/cxl_regs.h>
 
 /**
@@ -421,8 +422,6 @@ struct cxl_region *cxl_create_region(struct cxl_root_decoder *cxlrd,
 				     int ways);
 int cxl_memdev_attach_region(struct cxl_memdev *cxlmd, struct cxl_attach_region *attach);
 
-
-enum cxl_regloc_type;
 
 #if IS_ENABLED(CONFIG_CXL_BUS)
 
