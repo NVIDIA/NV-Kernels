@@ -120,7 +120,7 @@ static int __init load_moklist_certs(const bool load_db)
 	efi_char16_t *efivar_name = L"MokListRT";
 	const char *parse_mokvar_name = "UEFI:MokListRT (MOKvar table)";
 	const char *parse_efivar_name = "UEFI:MokListRT";
-	efi_element_handler_t (*get_handler_for_guid)(const efi_guid_t *) = get_handler_for_db;
+	efi_element_handler_t (*get_handler_for_guid)(const efi_guid_t *) = get_handler_for_mok;
 
 	if (!load_db) {
 		mokvar_name = "MokListXRT";
