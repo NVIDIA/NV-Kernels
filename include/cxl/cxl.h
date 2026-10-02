@@ -12,6 +12,7 @@
 #include <linux/range.h>
 #include <linux/errno.h>
 #include <cxl/mailbox.h>
+#include <cxl/pci.h>
 #include <uapi/cxl/cxl_regs.h>
 
 /**
@@ -420,8 +421,6 @@ static inline bool cxl_region_contains_soft_reserve(struct resource *res)
 	return false;
 }
 #endif
-
-enum cxl_regloc_type;
 
 #if IS_ENABLED(CONFIG_CXL_BUS)
 
