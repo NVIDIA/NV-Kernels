@@ -1,0 +1,23 @@
+linux-nvidia (7.3.0-1000.0) stonking; urgency=medium
+
+  * Initial changelog entry.
+
+ -- Jacob Martin <jacob.martin@canonical.com>  Fri, 02 Oct 2026 16:20:05 -0500
+
+linux (7.3.0-8.8) stonking; urgency=medium
+
+  * stonking/linux: 7.3.0-8.8 -proposed tracker (LP: #2168832)
+
+  * Ubuntu 26.04 linux kernel has non-functional nova-core GPU driver enabled,
+    conflicting with nouveau (LP: #2150845)
+    - [Config] Disable DRM_NOVA
+    - [Config] Disable NOVA_CORE
+
+  * Include v4l2loopback in default modules set for 26.04 (LP: #2168012)
+    - [Packaging] Add dependency for v4l2loopback
+
+  * linux: enable CONFIG_EROFS_FS_PAGE_CACHE_SHARE (LP: #2158501)
+    - [Config] Enable CONFIG_EROFS_FS_PAGE_CACHE_SHARE
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Tue, 29 Sep 2026 19:04:39 +0200
+
