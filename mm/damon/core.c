@@ -1188,7 +1188,8 @@ static void damos_adjust_quota(struct damon_ctx *c, struct damos *s)
 	unsigned long cumulated_sz;
 	unsigned int score, max_score = 0;
 
-	if (!quota->ms && !quota->sz && !quota->get_score)
+	if (!quota->esz && !quota->ms && !quota->sz &&
+			!quota->get_score)
 		return;
 
 	/* First charge window */
