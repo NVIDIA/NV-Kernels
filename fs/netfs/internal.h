@@ -70,6 +70,8 @@ int netfs_add_folios_to_buffer(struct xarray *buffer,
 			       struct address_space *mapping,
 			       pgoff_t index, pgoff_t to, gfp_t gfp_mask);
 void netfs_clear_buffer(struct xarray *buffer);
+int netfs_clear_stale_pre_isize(struct inode *inode, unsigned long long from,
+				unsigned long long to, bool nowait);
 
 /*
  * objects.c
