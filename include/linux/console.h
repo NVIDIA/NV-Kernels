@@ -531,6 +531,8 @@ extern atomic_t ignore_console_lock_warning;
 #define VESA_HSYNC_SUSPEND      2
 #define VESA_POWERDOWN          3
 
+DEFINE_LOCK_GUARD_0(console_lock, console_lock(), console_unlock());
+
 extern void console_init(void);
 
 /* For deferred console takeover */
