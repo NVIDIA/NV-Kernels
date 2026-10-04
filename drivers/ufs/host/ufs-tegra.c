@@ -10,6 +10,7 @@
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
 #include <linux/reset.h>
+#include <soc/tegra/fuse.h>
 
 #include <ufs/ufshcd.h>
 #include <ufs/ufshci.h>
@@ -534,7 +535,6 @@ static int ufs_tegra_link_startup_notify(struct ufs_hba *hba, enum ufs_notify_ch
 		{ UIC_ARG_MIB(PA_TXHSG1SYNCLENGTH), UFS_TEGRA_HSG_SYNC_LEN, DME_LOCAL },
 		{ UIC_ARG_MIB(PA_TXHSG2SYNCLENGTH), UFS_TEGRA_HSG_SYNC_LEN, DME_LOCAL },
 		{ UIC_ARG_MIB(PA_TXHSG3SYNCLENGTH), UFS_TEGRA_HSG_SYNC_LEN, DME_LOCAL },
-		{ UIC_ARG_MIB(PA_TXHSG4SYNCLENGTH), UFS_TEGRA_HSG_SYNC_LEN, DME_LOCAL },
 		{ UIC_ARG_MIB(DME_LocalFC0ProtectionTimeOutVal), UFS_TEGRA_FC0_TIMEOUT, DME_LOCAL },
 		{ UIC_ARG_MIB(DME_LocalTC0ReplayTimeOutVal), UFS_TEGRA_TC0_TIMEOUT, DME_LOCAL },
 		{ UIC_ARG_MIB(DME_LocalAFC0ReqTimeOutVal), UFS_TEGRA_AFC0_TIMEOUT, DME_LOCAL },
@@ -563,6 +563,14 @@ static int ufs_tegra_link_startup_notify(struct ufs_hba *hba, enum ufs_notify_ch
 					       ARRAY_SIZE(post_change_attrs));
 		if (err)
 			return err;
+
+		/* Tegra simulators does not implement the Gear 4 attribute. */
+		if (tegra_is_silicon()) {
+			err = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TXHSG4SYNCLENGTH),
+					     UFS_TEGRA_HSG_SYNC_LEN);
+			if (err)
+				return err;
+		}
 
 		err = ufs_tegra_mphy_calibrate_rx(hba);
 		if (err)
