@@ -3283,7 +3283,6 @@ CONFIG_CRYPTO_DEV_SUN8I_CE_TRNG                 policy<{'arm64': 'y'}>
 CONFIG_CRYPTO_DEV_SUN8I_SS                      policy<{'arm64': 'm'}>
 CONFIG_CRYPTO_DEV_SUN8I_SS_DEBUG                policy<{'arm64': 'n'}>
 CONFIG_CRYPTO_DEV_SUN8I_SS_HASH                 policy<{'arm64': 'y'}>
-CONFIG_CRYPTO_DEV_SUN8I_SS_PRNG                 policy<{'arm64': 'y'}>
 CONFIG_CRYPTO_DEV_VIRTIO                        policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 's390x': 'm'}>
 CONFIG_CRYPTO_DEV_VMX                           policy<{'ppc64el': 'y'}>
 CONFIG_CRYPTO_DEV_VMX_ENCRYPT                   policy<{'ppc64el': 'm'}>
