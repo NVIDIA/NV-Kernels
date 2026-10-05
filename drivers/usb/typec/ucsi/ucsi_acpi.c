@@ -111,15 +111,16 @@ static int ucsi_acer_read(struct ucsi *ucsi, unsigned int offset,
 			  void *val, size_t val_len)
 {
 	struct ucsi_acpi *ua = ucsi_get_drvdata(ucsi);
+	u16 *version = val;
 	int ret;
 
 	ret = ucsi_acpi_read(ucsi, offset, val, val_len);
 	if (ret)
 		return ret;
 
-	if (offset == UCSI_VERSION && !*(u16 *)val) {
+	if (offset == UCSI_VERSION && val_len == sizeof(*version) && !*version) {
 		dev_warn(ua->dev, "UCSI version is zero, assuming 1.2\n");
-		*(u16 *)val = UCSI_VERSION_1_2;
+		*version = UCSI_VERSION_1_2;
 	}
 
 	return 0;
