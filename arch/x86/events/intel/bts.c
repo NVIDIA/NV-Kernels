@@ -562,7 +562,7 @@ static int bts_event_init(struct perf_event *event)
 	 * users to profile the kernel.
 	 */
 	if (event->attr.exclude_kernel) {
-		ret = perf_allow_kernel(&event->attr);
+		ret = perf_allow_kernel();
 		if (ret)
 			return ret;
 	}
