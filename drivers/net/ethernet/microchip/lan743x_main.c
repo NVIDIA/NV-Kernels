@@ -1574,6 +1574,21 @@ static int lan743x_dmac_tx_wait_till_stopped(struct lan743x_adapter *adapter,
 	return result;
 }
 
+static int lan743x_dmac_tx_reset(struct lan743x_adapter *adapter,
+				 int tx_channel)
+{
+	int ret;
+
+	lan743x_csr_write(adapter, DMAC_CMD, DMAC_CMD_TX_SWR_(tx_channel));
+	ret = lan743x_csr_wait_for_bit(adapter, DMAC_CMD,
+				       DMAC_CMD_TX_SWR_(tx_channel),
+				       0, 1000, 20000, 100);
+	if (ret)
+		netdev_err(adapter->netdev,
+			   "TX channel %d reset timed out\n", tx_channel);
+	return ret;
+}
+
 static int lan743x_dmac_rx_get_state(struct lan743x_adapter *adapter,
 				     int rx_channel)
 {
@@ -1601,6 +1616,21 @@ static int lan743x_dmac_rx_wait_till_stopped(struct lan743x_adapter *adapter,
 	if (result == DMAC_CHANNEL_STATE_STOP_PENDING)
 		result = -ENODEV;
 	return result;
+}
+
+static int lan743x_dmac_rx_reset(struct lan743x_adapter *adapter,
+				 int rx_channel)
+{
+	int ret;
+
+	lan743x_csr_write(adapter, DMAC_CMD, DMAC_CMD_RX_SWR_(rx_channel));
+	ret = lan743x_csr_wait_for_bit(adapter, DMAC_CMD,
+				       DMAC_CMD_RX_SWR_(rx_channel),
+				       0, 1000, 20000, 100);
+	if (ret)
+		netdev_err(adapter->netdev,
+			   "RX channel %d reset timed out\n", rx_channel);
+	return ret;
 }
 
 static void lan743x_tx_release_desc(struct lan743x_tx *tx,
@@ -2208,14 +2238,63 @@ cleanup:
 	return ret;
 }
 
+static int lan743x_tx_fifo_enable(struct lan743x_tx *tx)
+{
+	struct lan743x_adapter *adapter = tx->adapter;
+	int ret;
+
+	/* initialize fifo */
+	lan743x_csr_write(adapter, FCT_TX_CTL,
+			  FCT_TX_CTL_RESET_(tx->channel_number));
+	ret = lan743x_csr_wait_for_bit(adapter, FCT_TX_CTL,
+				       FCT_TX_CTL_RESET_(tx->channel_number),
+				       0, 1000, 20000, 100);
+	if (ret) {
+		netdev_err(adapter->netdev,
+			   "TX channel %d FIFO reset timed out\n",
+			   tx->channel_number);
+		return ret;
+	}
+
+	/* enable fifo */
+	lan743x_csr_write(adapter, FCT_TX_CTL,
+			  FCT_TX_CTL_EN_(tx->channel_number));
+	return 0;
+}
+
+static int lan743x_tx_fifo_disable(struct lan743x_tx *tx)
+{
+	struct lan743x_adapter *adapter = tx->adapter;
+	int ret;
+
+	lan743x_csr_write(adapter, FCT_TX_CTL,
+			  FCT_TX_CTL_DIS_(tx->channel_number));
+	ret = lan743x_csr_wait_for_bit(adapter, FCT_TX_CTL,
+				       FCT_TX_CTL_EN_(tx->channel_number),
+				       0, 1000, 20000, 100);
+	if (ret)
+		netdev_err(adapter->netdev,
+			   "TX channel %d FIFO disable timed out\n",
+			   tx->channel_number);
+	return ret;
+}
+
 static void lan743x_tx_close(struct lan743x_tx *tx)
 {
 	struct lan743x_adapter *adapter = tx->adapter;
+	bool stop_failed = false;
+	int ret;
 
 	lan743x_csr_write(adapter,
 			  DMAC_CMD,
 			  DMAC_CMD_STOP_T_(tx->channel_number));
-	lan743x_dmac_tx_wait_till_stopped(adapter, tx->channel_number);
+	ret = lan743x_dmac_tx_wait_till_stopped(adapter, tx->channel_number);
+	if (ret < 0 || ret == DMAC_CHANNEL_STATE_STARTED) {
+		stop_failed = true;
+		netdev_warn(adapter->netdev,
+			    "TX channel %d failed to stop, resetting it\n",
+			    tx->channel_number);
+	}
 
 	lan743x_csr_write(adapter,
 			  DMAC_INT_EN_CLR,
@@ -2225,11 +2304,9 @@ static void lan743x_tx_close(struct lan743x_tx *tx)
 	napi_disable(&tx->napi);
 	netif_napi_del(&tx->napi);
 
-	lan743x_csr_write(adapter, FCT_TX_CTL,
-			  FCT_TX_CTL_DIS_(tx->channel_number));
-	lan743x_csr_wait_for_bit(adapter, FCT_TX_CTL,
-				 FCT_TX_CTL_EN_(tx->channel_number),
-				 0, 1000, 20000, 100);
+	lan743x_tx_fifo_disable(tx);
+	if (stop_failed)
+		lan743x_dmac_tx_reset(adapter, tx->channel_number);
 
 	lan743x_tx_release_all_descriptors(tx);
 
@@ -2249,23 +2326,14 @@ static int lan743x_tx_open(struct lan743x_tx *tx)
 	if (ret)
 		return ret;
 
-	/* initialize fifo */
-	lan743x_csr_write(adapter, FCT_TX_CTL,
-			  FCT_TX_CTL_RESET_(tx->channel_number));
-	lan743x_csr_wait_for_bit(adapter, FCT_TX_CTL,
-				 FCT_TX_CTL_RESET_(tx->channel_number),
-				 0, 1000, 20000, 100);
-
-	/* enable fifo */
-	lan743x_csr_write(adapter, FCT_TX_CTL,
-			  FCT_TX_CTL_EN_(tx->channel_number));
+	ret = lan743x_tx_fifo_enable(tx);
+	if (ret)
+		goto ring_cleanup;
 
 	/* reset tx channel */
-	lan743x_csr_write(adapter, DMAC_CMD,
-			  DMAC_CMD_TX_SWR_(tx->channel_number));
-	lan743x_csr_wait_for_bit(adapter, DMAC_CMD,
-				 DMAC_CMD_TX_SWR_(tx->channel_number),
-				 0, 1000, 20000, 100);
+	ret = lan743x_dmac_tx_reset(adapter, tx->channel_number);
+	if (ret)
+		goto fifo_disable;
 
 	/* Write TX_BASE_ADDR */
 	lan743x_csr_write(adapter,
@@ -2337,6 +2405,13 @@ static int lan743x_tx_open(struct lan743x_tx *tx)
 	lan743x_csr_write(adapter, DMAC_CMD,
 			  DMAC_CMD_START_T_(tx->channel_number));
 	return 0;
+
+fifo_disable:
+	lan743x_tx_fifo_disable(tx);
+
+ring_cleanup:
+	lan743x_tx_ring_cleanup(tx);
+	return ret;
 }
 
 static int lan743x_rx_next_index(struct lan743x_rx *rx, int index)
@@ -2765,6 +2840,7 @@ cleanup:
 static void lan743x_rx_close(struct lan743x_rx *rx)
 {
 	struct lan743x_adapter *adapter = rx->adapter;
+	int ret;
 
 	lan743x_csr_write(adapter, FCT_RX_CTL,
 			  FCT_RX_CTL_DIS_(rx->channel_number));
@@ -2774,7 +2850,13 @@ static void lan743x_rx_close(struct lan743x_rx *rx)
 
 	lan743x_csr_write(adapter, DMAC_CMD,
 			  DMAC_CMD_STOP_R_(rx->channel_number));
-	lan743x_dmac_rx_wait_till_stopped(adapter, rx->channel_number);
+	ret = lan743x_dmac_rx_wait_till_stopped(adapter, rx->channel_number);
+	if (ret < 0 || ret == DMAC_CHANNEL_STATE_STARTED) {
+		netdev_warn(adapter->netdev,
+			    "RX channel %d failed to stop, resetting it\n",
+			    rx->channel_number);
+		lan743x_dmac_rx_reset(adapter, rx->channel_number);
+	}
 
 	lan743x_csr_write(adapter, DMAC_INT_EN_CLR,
 			  DMAC_INT_BIT_RXFRM_(rx->channel_number));
@@ -2800,11 +2882,9 @@ static int lan743x_rx_open(struct lan743x_rx *rx)
 
 	netif_napi_add(adapter->netdev, &rx->napi, lan743x_rx_napi_poll);
 
-	lan743x_csr_write(adapter, DMAC_CMD,
-			  DMAC_CMD_RX_SWR_(rx->channel_number));
-	lan743x_csr_wait_for_bit(adapter, DMAC_CMD,
-				 DMAC_CMD_RX_SWR_(rx->channel_number),
-				 0, 1000, 20000, 100);
+	ret = lan743x_dmac_rx_reset(adapter, rx->channel_number);
+	if (ret)
+		goto napi_delete;
 
 	/* set ring base address */
 	lan743x_csr_write(adapter,
