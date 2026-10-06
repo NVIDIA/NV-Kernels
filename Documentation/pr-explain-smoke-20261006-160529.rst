@@ -1,0 +1,9 @@
+Independent PR explanation smoke test
+=====================================
+
+This documentation-only change validates the independent PR explanation service.
+It should produce a public explanation page and one owned automation comment.
+
+No runtime behavior changes are intended.
+
+DO NOT MERGE.
