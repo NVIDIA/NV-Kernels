@@ -193,6 +193,7 @@ void dql_reset(struct dql *dql)
 	dql->limit = dql->min_limit;
 	dql->num_queued = 0;
 	dql->num_completed = 0;
+	dql->adj_limit = dql->limit;
 	dql->last_obj_cnt = 0;
 	dql->prev_num_queued = 0;
 	dql->prev_last_obj_cnt = 0;
