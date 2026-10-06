@@ -1513,26 +1513,39 @@ static int nvme_rdma_dma_map_req(struct ib_device *ibdev, struct request *rq,
 		int *count, int *pi_count)
 {
 	struct nvme_rdma_request *req = blk_mq_rq_to_pdu(rq);
+#ifdef CONFIG_NVFS
+	bool sg_allocated = false;
+#endif
 	int ret;
 
 	req->data_sgl.sg_table.sgl = (struct scatterlist *)(req + 1);
-	ret = sg_alloc_table_chained(&req->data_sgl.sg_table,
-			blk_rq_nr_phys_segments(rq), req->data_sgl.sg_table.sgl,
-			NVME_INLINE_SG_CNT);
-	if (ret)
-		return -ENOMEM;
 
 #ifdef CONFIG_NVFS
 	{
 		bool is_nvfs_io = false;
-		ret = nvme_rdma_nvfs_map_data(ibdev, rq, &is_nvfs_io, count);
-		if (is_nvfs_io) {
-			if (ret)
+
+		ret = nvme_rdma_nvfs_map_data(ibdev, rq, &is_nvfs_io,
+					      &sg_allocated, count);
+		if (ret) {
+			if (sg_allocated)
 				goto out_free_table;
-			return 0;
+			return ret;
 		}
+		if (is_nvfs_io)
+			return 0;
+	}
+	if (!sg_allocated) {
+#endif
+		ret = sg_alloc_table_chained(&req->data_sgl.sg_table,
+					     blk_rq_nr_phys_segments(rq),
+					     req->data_sgl.sg_table.sgl,
+					     NVME_INLINE_SG_CNT);
+		if (ret)
+			return -ENOMEM;
+#ifdef CONFIG_NVFS
 	}
 #endif
+
 	req->data_sgl.nents = blk_rq_map_sg(rq, req->data_sgl.sg_table.sgl);
 
 	*count = ib_dma_map_sg(ibdev, req->data_sgl.sg_table.sgl,
