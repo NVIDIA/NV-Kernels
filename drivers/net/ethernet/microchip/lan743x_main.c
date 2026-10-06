@@ -1574,6 +1574,15 @@ static int lan743x_dmac_tx_wait_till_stopped(struct lan743x_adapter *adapter,
 	return result;
 }
 
+static int lan743x_dmac_tx_reset(struct lan743x_adapter *adapter,
+				 int tx_channel)
+{
+	lan743x_csr_write(adapter, DMAC_CMD, DMAC_CMD_TX_SWR_(tx_channel));
+	return lan743x_csr_wait_for_bit(adapter, DMAC_CMD,
+					DMAC_CMD_TX_SWR_(tx_channel),
+					0, 1000, 20000, 100);
+}
+
 static int lan743x_dmac_rx_get_state(struct lan743x_adapter *adapter,
 				     int rx_channel)
 {
@@ -1601,6 +1610,15 @@ static int lan743x_dmac_rx_wait_till_stopped(struct lan743x_adapter *adapter,
 	if (result == DMAC_CHANNEL_STATE_STOP_PENDING)
 		result = -ENODEV;
 	return result;
+}
+
+static int lan743x_dmac_rx_reset(struct lan743x_adapter *adapter,
+				 int rx_channel)
+{
+	lan743x_csr_write(adapter, DMAC_CMD, DMAC_CMD_RX_SWR_(rx_channel));
+	return lan743x_csr_wait_for_bit(adapter, DMAC_CMD,
+					DMAC_CMD_RX_SWR_(rx_channel),
+					0, 1000, 20000, 100);
 }
 
 static void lan743x_tx_release_desc(struct lan743x_tx *tx,
@@ -2215,7 +2233,16 @@ static void lan743x_tx_close(struct lan743x_tx *tx)
 	lan743x_csr_write(adapter,
 			  DMAC_CMD,
 			  DMAC_CMD_STOP_T_(tx->channel_number));
-	lan743x_dmac_tx_wait_till_stopped(adapter, tx->channel_number);
+	if (lan743x_dmac_tx_wait_till_stopped(adapter,
+					      tx->channel_number) < 0) {
+		netdev_warn(adapter->netdev,
+			    "TX channel %d failed to stop, resetting it\n",
+			    tx->channel_number);
+		if (lan743x_dmac_tx_reset(adapter, tx->channel_number))
+			netdev_err(adapter->netdev,
+				   "TX channel %d reset timed out\n",
+				   tx->channel_number);
+	}
 
 	lan743x_csr_write(adapter,
 			  DMAC_INT_EN_CLR,
@@ -2774,7 +2801,16 @@ static void lan743x_rx_close(struct lan743x_rx *rx)
 
 	lan743x_csr_write(adapter, DMAC_CMD,
 			  DMAC_CMD_STOP_R_(rx->channel_number));
-	lan743x_dmac_rx_wait_till_stopped(adapter, rx->channel_number);
+	if (lan743x_dmac_rx_wait_till_stopped(adapter,
+					      rx->channel_number) < 0) {
+		netdev_warn(adapter->netdev,
+			    "RX channel %d failed to stop, resetting it\n",
+			    rx->channel_number);
+		if (lan743x_dmac_rx_reset(adapter, rx->channel_number))
+			netdev_err(adapter->netdev,
+				   "RX channel %d reset timed out\n",
+				   rx->channel_number);
+	}
 
 	lan743x_csr_write(adapter, DMAC_INT_EN_CLR,
 			  DMAC_INT_BIT_RXFRM_(rx->channel_number));
