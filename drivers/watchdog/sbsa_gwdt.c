@@ -830,6 +830,9 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
 	 */
 	if (!gwdt->no_hw_stop)
 		watchdog_stop_on_reboot(wdd);
+	/* The action=0 WS0 workaround needs separate resume heartbeat accounting. */
+	if (gwdt->no_hw_stop && action)
+		watchdog_stop_ping_on_suspend(wdd);
 	ret = devm_watchdog_register_device(dev, wdd);
 	if (ret) {
 		if (early_action)
