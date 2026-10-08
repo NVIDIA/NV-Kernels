@@ -168,17 +168,16 @@ static void mtk_eint_unmask(struct irq_data *d)
 		mtk_eint_flip_edge(eint, d->hwirq);
 }
 
-/*
- * Clear the event_clr bit for a single EINT so its wake-event is not
- * suppressed. Mirrors mtk_eint_unmask() addressing: register is banked
- * per instance and word-indexed by (idx / 32).
- */
-static void mtk_eint_event_unmask_one(struct mtk_eint *eint,
-				      unsigned int eint_num)
+static void mtk_eint_write_event_mask(struct mtk_eint *eint,
+				      unsigned int eint_num,
+				      unsigned int reg_offset)
 {
 	unsigned int idx, inst;
 	unsigned int mask;
 	void __iomem *reg;
+
+	if (!eint->hw->has_event_mask)
+		return;
 
 	if (eint_num >= eint->hw->ap_num)
 		return;
@@ -190,8 +189,45 @@ static void mtk_eint_event_unmask_one(struct mtk_eint *eint,
 		return;
 
 	mask = BIT(idx & 0x1f);
-	reg = mtk_eint_get_offset(eint, eint_num, eint->regs->event_clr);
+	reg = mtk_eint_get_offset(eint, eint_num, reg_offset);
 	writel(mask, reg);
+}
+
+/*
+ * Clear the event_clr bit for a single EINT so its wake-event is not
+ * suppressed. Mirrors mtk_eint_unmask() addressing: register is banked
+ * per instance and word-indexed by (idx / 32).
+ */
+static void mtk_eint_event_unmask_one(struct mtk_eint *eint,
+				      unsigned int eint_num)
+{
+	mtk_eint_write_event_mask(eint, eint_num, eint->regs->event_clr);
+}
+
+static bool mtk_eint_is_static_event_unmask_pin(struct mtk_eint *eint,
+						unsigned int eint_num)
+{
+	unsigned int i;
+
+	if (!eint->event_pins)
+		return false;
+
+	for (i = 0; i < eint->num_event_pins; i++) {
+		if (eint->event_pins[i] == eint_num)
+			return true;
+	}
+
+	return false;
+}
+
+/*
+ * Set the event mask for a single EINT so its wake-event is suppressed
+ * again. Callers must skip pins in the SoC's static event-unmask list.
+ */
+static void mtk_eint_event_mask_one(struct mtk_eint *eint,
+				    unsigned int eint_num)
+{
+	mtk_eint_write_event_mask(eint, eint_num, eint->regs->event_set);
 }
 
 /*
@@ -202,11 +238,39 @@ static void mtk_eint_apply_event_unmask(struct mtk_eint *eint)
 {
 	unsigned int i;
 
-	if (!eint->event_pins || !eint->num_event_pins)
+	if (!eint->hw->has_event_mask || !eint->event_pins ||
+	    !eint->num_event_pins)
 		return;
 
 	for (i = 0; i < eint->num_event_pins; i++)
 		mtk_eint_event_unmask_one(eint, eint->event_pins[i]);
+}
+
+static void mtk_eint_apply_wake_event_unmask(struct mtk_eint *eint)
+{
+	unsigned int eint_num, pin, shift;
+	int inst, port, port_num;
+	u32 bits;
+
+	if (!eint->hw->has_event_mask)
+		return;
+
+	for (inst = 0; inst < eint->nbase; inst++) {
+		port_num = DIV_ROUND_UP(eint->base_pin_num[inst], 32);
+		for (port = 0; port < port_num; port++) {
+			bits = eint->wake_mask[inst][port];
+			while (bits) {
+				shift = __ffs(bits);
+				bits &= ~BIT(shift);
+				pin = port * 32 + shift;
+				if (pin >= eint->base_pin_num[inst])
+					continue;
+
+				eint_num = eint->pin_list[inst][pin];
+				mtk_eint_event_unmask_one(eint, eint_num);
+			}
+		}
+	}
 }
 
 static unsigned int mtk_eint_get_mask(struct mtk_eint *eint,
@@ -287,10 +351,14 @@ static int mtk_eint_irq_set_wake(struct irq_data *d, unsigned int on)
 	unsigned int shift = idx & 0x1f;
 	unsigned int port = idx >> 5;
 
-	if (on)
+	if (on) {
 		eint->wake_mask[inst][port] |= BIT(shift);
-	else
+		mtk_eint_event_unmask_one(eint, d->hwirq);
+	} else {
 		eint->wake_mask[inst][port] &= ~BIT(shift);
+		if (!mtk_eint_is_static_event_unmask_pin(eint, d->hwirq))
+			mtk_eint_event_mask_one(eint, d->hwirq);
+	}
 
 	return 0;
 }
@@ -485,6 +553,7 @@ int mtk_eint_do_resume(struct mtk_eint *eint)
 {
 	mtk_eint_chip_write_mask(eint, eint->cur_mask);
 	mtk_eint_apply_event_unmask(eint);
+	mtk_eint_apply_wake_event_unmask(eint);
 
 	return 0;
 }
