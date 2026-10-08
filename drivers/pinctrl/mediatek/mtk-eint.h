@@ -42,6 +42,7 @@ struct mtk_eint_hw {
 	unsigned int	ap_num;
 	unsigned int	db_cnt;
 	const unsigned int *db_time;
+	bool		has_event_mask;
 };
 
 struct mtk_eint_pin {
