@@ -1908,10 +1908,14 @@ void smbd_destroy(struct TCP_Server_Info *server)
 	log_rdma_event(INFO, "destroying rdma session\n");
 	if (sc->status < SMBDIRECT_SOCKET_DISCONNECTING)
 		smbd_disconnect_rdma_work(&sc->disconnect_work);
+	/*
+	 * Don't wait for RDMA_CM_EVENT_DISCONNECTED. rdma_disconnect() was
+	 * already called above if needed, and rdma_destroy_id() waits for a
+	 * currently running event handler and prevents further events.
+	 */
 	if (sc->status < SMBDIRECT_SOCKET_DISCONNECTED) {
-		log_rdma_event(INFO, "wait for transport being disconnected\n");
-		wait_event(sc->status_wait, sc->status == SMBDIRECT_SOCKET_DISCONNECTED);
-		log_rdma_event(INFO, "waited for transport being disconnected\n");
+		sc->status = SMBDIRECT_SOCKET_DISCONNECTED;
+		smbd_disconnect_wake_up_all(sc);
 	}
 
 	/*

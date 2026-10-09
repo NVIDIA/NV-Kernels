@@ -471,8 +471,6 @@ static void free_transport(struct smb_direct_transport *t)
 	disable_work_sync(&sc->disconnect_work);
 	if (sc->status < SMBDIRECT_SOCKET_DISCONNECTING)
 		smb_direct_disconnect_rdma_work(&sc->disconnect_work);
-	if (sc->status < SMBDIRECT_SOCKET_DISCONNECTED)
-		wait_event(sc->status_wait, sc->status == SMBDIRECT_SOCKET_DISCONNECTED);
 
 	/*
 	 * Wake up all waiters in all wait queues
@@ -490,6 +488,16 @@ static void free_transport(struct smb_direct_transport *t)
 
 	if (sc->rdma.cm_id)
 		rdma_lock_handler(sc->rdma.cm_id);
+
+	/*
+	 * Don't wait for RDMA_CM_EVENT_DISCONNECTED. With the handler locked,
+	 * stop waiting and prevent the event handler from draining the QP while
+	 * it is destroyed below.
+	 */
+	if (sc->status < SMBDIRECT_SOCKET_DISCONNECTED) {
+		sc->status = SMBDIRECT_SOCKET_DISCONNECTED;
+		smb_direct_disconnect_wake_up_all(sc);
+	}
 
 	if (sc->ib.qp) {
 		ib_drain_qp(sc->ib.qp);
