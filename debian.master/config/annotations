@@ -396,7 +396,6 @@ CONFIG_LRU_GEN                                  note<'{Enable multi-gen LRU by d
 CONFIG_LRU_GEN_ENABLED                          policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_LRU_GEN_ENABLED                          note<'{Enable multi-gen LRU by default - LP: #2023629}'>
 
-
 CONFIG_MFD_SM501                                policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'y', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'n'}>
 CONFIG_MFD_SM501                                note<'boot essential on OMAP4'>
 
