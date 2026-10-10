@@ -41,8 +41,29 @@ struct vncr_tlb {
  * memory usage and potential number of different sets of S2 PTs in
  * the guests. Running out of S2 MMUs only affects performance (we
  * will invalidate them more often).
+ *
+ * The default can be overridden with kvm-arm.nested_s2_mmus_per_vcpu=
+ * for hosts whose guests run many concurrent nested VMs per vcpu.
  */
 #define S2_MMU_PER_VCPU		2
+#define S2_MMU_PER_VCPU_MAX	64
+
+static unsigned int s2_mmu_per_vcpu __ro_after_init = S2_MMU_PER_VCPU;
+
+static int __init early_kvm_nested_s2_mmus_per_vcpu_cfg(char *arg)
+{
+	unsigned int val;
+
+	if (!arg || kstrtouint(arg, 0, &val))
+		return -EINVAL;
+
+	if (!val || val > S2_MMU_PER_VCPU_MAX)
+		return -EINVAL;
+
+	s2_mmu_per_vcpu = val;
+	return 0;
+}
+early_param("kvm-arm.nested_s2_mmus_per_vcpu", early_kvm_nested_s2_mmus_per_vcpu_cfg);
 
 void kvm_init_nested(struct kvm *kvm)
 {
@@ -89,7 +110,7 @@ int kvm_vcpu_init_nested(struct kvm_vcpu *vcpu)
 	 * alive. Userspace may try to recover by initializing the vcpu
 	 * again, and there is no reason to affect the whole VM for this.
 	 */
-	num_mmus = atomic_read(&kvm->online_vcpus) * S2_MMU_PER_VCPU;
+	num_mmus = atomic_read(&kvm->online_vcpus) * s2_mmu_per_vcpu;
 
 	if (num_mmus > kvm->arch.nested_mmus_size) {
 		tmp = kvcalloc(num_mmus, sizeof(*tmp), GFP_KERNEL_ACCOUNT);
