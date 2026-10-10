@@ -2676,7 +2676,6 @@ static void pci_init_capabilities(struct pci_dev *dev)
 	pci_rebar_init(dev);		/* Resizable BAR */
 	pci_dev3_init(dev);		/* Device 3 capabilities */
 	pci_ide_init(dev);		/* Link Integrity and Data Encryption */
-	pci_cxl_hdm_init(dev);		/* CXL HDM Decoder Capability */
 
 	pcie_report_downtraining(dev);
 	pci_init_reset_methods(dev);

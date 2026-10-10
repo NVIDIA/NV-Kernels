@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/memregion.h>
+#include <linux/overflow.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 
@@ -216,6 +217,28 @@ void pci_cxl_hdm_release(struct pci_dev *pdev)
 	kfree(info);
 }
 
+/*
+ * A BAR that firmware left unprogrammed still reports its size, but
+ * __pci_read_base() leaves it at start 0 without setting IORESOURCE_UNSET,
+ * so the start test below is what catches that case. IORESOURCE_UNSET
+ * covers a BAR whose assignment was attempted and failed.
+ */
+static bool cxl_pci_bar_usable(struct pci_dev *pdev, int bar)
+{
+	struct resource *res = &pdev->resource[bar];
+
+	if (!pci_resource_len(pdev, bar))
+		return false;
+	if (res->flags & (IORESOURCE_UNSET | IORESOURCE_DISABLED))
+		return false;
+	if (resource_type(res) != IORESOURCE_MEM)
+		return false;
+	if (!res->start || !res->end)
+		return false;
+
+	return true;
+}
+
 static int cxl_pci_hdm_find_bar(struct pci_dev *pdev, resource_size_t hdm_start,
 				resource_size_t hdm_size, int *bar,
 				resource_size_t *offset)
@@ -225,9 +248,7 @@ static int cxl_pci_hdm_find_bar(struct pci_dev *pdev, resource_size_t hdm_start,
 	for (int i = 0; i < PCI_STD_NUM_BARS; i++) {
 		struct resource *res = &pdev->resource[i];
 
-		if (!pci_resource_len(pdev, i))
-			continue;
-		if (resource_type(res) != IORESOURCE_MEM)
+		if (!cxl_pci_bar_usable(pdev, i))
 			continue;
 		if (hdm_start < res->start || hdm_end > res->end)
 			continue;
@@ -277,11 +298,17 @@ static void __iomem *cxl_pci_hdm_ioremap_current(struct pci_dev *pdev,
 	if (bar < 0 || bar >= PCI_STD_NUM_BARS || !size)
 		return ERR_PTR(-EINVAL);
 
-	bar_len = pci_resource_len(pdev, bar);
-	if (!bar_len || offset > bar_len || size > bar_len - offset)
+	if (!cxl_pci_bar_usable(pdev, bar))
 		return ERR_PTR(-ENODEV);
 
-	hdm_start = pci_resource_start(pdev, bar) + offset;
+	bar_len = pci_resource_len(pdev, bar);
+	if (offset > bar_len || size > bar_len - offset)
+		return ERR_PTR(-ENODEV);
+
+	if (check_add_overflow(pci_resource_start(pdev, bar), offset,
+			       &hdm_start))
+		return ERR_PTR(-EOVERFLOW);
+
 	hdm = ioremap(hdm_start, size);
 	if (!hdm) {
 		pci_err(pdev, "failed to remap CXL HDM decoder registers\n");
@@ -380,7 +407,8 @@ static int cxl_pci_hdm_capable(struct pci_dev *pdev)
 	if (rc)
 		return pcibios_err_to_errno(rc);
 
-	if (!(cap & PCI_DVSEC_CXL_MEM_CAPABLE))
+	if (!(cap & PCI_DVSEC_CXL_MEM_CAPABLE) ||
+	    !FIELD_GET(PCI_DVSEC_CXL_HDM_COUNT, cap))
 		return -ENOTTY;
 
 	return 0;
@@ -396,7 +424,7 @@ static int __pci_cxl_hdm_init(struct pci_dev *pdev)
 	bool allocated_info = false;
 	int decoder_count;
 	int dvsec;
-	u16 command;
+	u16 command = 0;
 	int rc;
 
 	scoped_guard(rwsem_read, &cxl_rwsem.dpa) {
@@ -409,19 +437,29 @@ static int __pci_cxl_hdm_init(struct pci_dev *pdev)
 	if (rc)
 		return rc;
 
-	rc = pci_read_config_word(pdev, PCI_COMMAND, &command);
+	/*
+	 * Locate the register block and confirm its BAR is assigned before
+	 * enabling memory decode or mapping anything. Firmware can hand over
+	 * a device whose BARs it never programmed, and probing MMIO off such
+	 * a BAR takes an external abort on some architectures.
+	 */
+	rc = cxl_find_regblock(pdev, CXL_REGLOC_RBI_COMPONENT, &map);
 	if (rc)
-		return pcibios_err_to_errno(rc);
+		return rc;
 
-	if (!(command & PCI_COMMAND_MEMORY))
-		restore_command = true;
+	if (map.bar_index >= PCI_STD_NUM_BARS ||
+	    !cxl_pci_bar_usable(pdev, map.bar_index))
+		return -ENODEV;
 
-	if (restore_command) {
-		rc = pci_write_config_word(pdev, PCI_COMMAND,
-					   command | PCI_COMMAND_MEMORY);
-		if (rc)
-			return pcibios_err_to_errno(rc);
-	}
+	/*
+	 * pci_bus_add_device() has already published the sysfs and procfs
+	 * attributes, so the reset and config files are live while the
+	 * PCI_COMMAND toggle and the MMIO probe below run. Serialise against
+	 * them. pci_reset_function() already holds pci_dev_lock() when it
+	 * reaches cxl_rwsem.dpa through cxl_reset_function(), so taking the
+	 * device lock here keeps that established nesting order.
+	 */
+	guard(pci_dev)(pdev);
 
 	if (!info) {
 		info = kzalloc_obj(*info, GFP_KERNEL);
@@ -445,7 +483,7 @@ static int __pci_cxl_hdm_init(struct pci_dev *pdev)
 	}
 	info->dvsec_ctrl_valid = true;
 
-	rc = cxl_find_regblock(pdev, CXL_REGLOC_RBI_COMPONENT, &map);
+	rc = cxl_hdm_enable_mem(pdev, &command, &restore_command);
 	if (rc)
 		goto out_restore_command;
 
