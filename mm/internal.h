@@ -1078,6 +1078,10 @@ struct page *follow_trans_huge_pmd(struct vm_area_struct *vma,
 struct vm_area_struct *vma_merge_extend(struct vma_iterator *vmi,
 					struct vm_area_struct *vma,
 					unsigned long delta);
+#ifdef CONFIG_MMU
+int split_vma(struct vma_iterator *vmi, struct vm_area_struct *vma,
+	      unsigned long addr, int new_below);
+#endif
 
 enum {
 	/* mark page accessed */
