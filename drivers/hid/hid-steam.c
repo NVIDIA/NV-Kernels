@@ -1059,14 +1059,13 @@ static void steam_mode_switch_cb(struct work_struct *work)
 	bool client_opened;
 	bool gamepad_mode;
 
-	if (!lizard_mode)
-		return;
-
 	spin_lock_irqsave(&steam->lock, flags);
 	steam->gamepad_mode = !steam->gamepad_mode;
 	gamepad_mode = steam->gamepad_mode;
 	client_opened = steam->client_opened;
 	spin_unlock_irqrestore(&steam->lock, flags);
+	if (!lizard_mode)
+		return;
 
 	guard(mutex)(&steam->report_mutex);
 	if (gamepad_mode)
