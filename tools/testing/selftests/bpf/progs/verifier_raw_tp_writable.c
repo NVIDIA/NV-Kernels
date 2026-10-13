@@ -50,7 +50,7 @@ l0_%=:	/* shift the buffer pointer to a variable location */\
 SEC("raw_tracepoint.w")
 __description("raw_tracepoint_writable: reject negative const offset")
 __failure
-__msg("invalid negative tracepoint buffer offset")
+__msg("R6 invalid tracepoint buffer access: off=-8, size=8")
 __naked void tracepoint_writable_reject_negative_const_offset(void)
 {
 	asm volatile ("					\
