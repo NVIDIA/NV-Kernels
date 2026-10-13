@@ -7,7 +7,7 @@
 SEC("iter/bpf_map_elem")
 __description("PTR_TO_BUF: reject negative const offset")
 __failure
-__msg("invalid negative rdwr buffer offset")
+__msg("R2 invalid rdwr buffer access: off=-8, size=8")
 __naked void ptr_to_buf_reject_negative_const_offset(void)
 {
 	asm volatile ("r0 = 0;					\
