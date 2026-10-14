@@ -10,4 +10,5 @@ obj-$(CONFIG_PINCTRL_TEGRA194)		+= pinctrl-tegra194.o
 obj-$(CONFIG_PINCTRL_TEGRA234)		+= pinctrl-tegra234.o
 obj-$(CONFIG_PINCTRL_TEGRA238)		+= pinctrl-tegra238.o
 obj-$(CONFIG_PINCTRL_TEGRA264)		+= pinctrl-tegra264.o
+obj-$(CONFIG_PINCTRL_TEGRA268)		+= pinctrl-tegra268.o
 obj-$(CONFIG_PINCTRL_TEGRA_XUSB)	+= pinctrl-tegra-xusb.o

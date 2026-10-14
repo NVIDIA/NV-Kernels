@@ -59,6 +59,17 @@ config PINCTRL_TEGRA264
 	  and configuration for the MAIN, AON and UPHY pin controllers found
 	  on Tegra264.
 
+config PINCTRL_TEGRA268
+	tristate "NVIDIA Tegra268 pinctrl driver"
+	depends on ARCH_TEGRA || COMPILE_TEST
+	default m if ARCH_TEGRA_268_SOC
+	select PINCTRL_TEGRA
+	help
+	  Say Y or M here to enable support for the pinctrl driver for
+	  NVIDIA Tegra268 SoC. This driver controls the pin multiplexing
+	  and configuration for the MAIN, AON and UPHY pin controllers found
+	  on Tegra268.
+
 config PINCTRL_TEGRA_XUSB
 	bool "NVIDIA Tegra XUSB pin controller" if COMPILE_TEST && !ARCH_TEGRA
 	default y if ARCH_TEGRA
