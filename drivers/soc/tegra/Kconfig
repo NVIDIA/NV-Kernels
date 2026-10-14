@@ -147,6 +147,15 @@ config ARCH_TEGRA_264_SOC
 	help
 	  Enable support for the NVIDIA Tegra264 SoC.
 
+config ARCH_TEGRA_268_SOC
+	bool "NVIDIA Tegra268 SoC"
+	default ARCH_TEGRA
+	depends on !CPU_BIG_ENDIAN
+	select MAILBOX
+	select SOC_TEGRA_PMC
+	help
+	  Enable support for the NVIDIA Tegra268 SoC.
+
 endif
 endif
 
