@@ -168,8 +168,6 @@ int cxl_hdm_decode_decoder(struct cxl_decoder_settings *settings, int id,
 	if (base == U64_MAX || size == U64_MAX ||
 	    (size && base > U64_MAX - (size - 1)))
 		return -ENXIO;
-	if (enabled && !size)
-		return -ENXIO;
 
 	settings->hpa_range = (struct range) {
 		.start = base,
@@ -1046,6 +1044,10 @@ static int cxl_hdm_ranges_collect(struct cxl_hdm_range_context *ctx,
 		struct cxl_decoder_settings *settings = &info->settings[i];
 
 		if (!(settings->flags & CXL_DECODER_F_ENABLE))
+			continue;
+
+		/* A committed zero-size decoder maps no HPA. */
+		if (!range_len(&settings->hpa_range))
 			continue;
 
 		if (settings->flags & CXL_DECODER_F_NORMALIZED_ADDRESSING) {
