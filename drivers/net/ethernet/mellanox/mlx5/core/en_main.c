@@ -6125,11 +6125,13 @@ static int mlx5e_probe(struct auxiliary_device *adev,
 
 static void mlx5e_remove(struct auxiliary_device *adev)
 {
+	struct mlx5_adev *edev = container_of(adev, struct mlx5_adev, adev);
 	struct mlx5e_dev *mlx5e_dev = auxiliary_get_drvdata(adev);
 	struct net_device *netdev = mlx5e_dev->netdev;
 	struct mlx5e_priv *priv = netdev_priv(netdev);
+	struct mlx5_core_dev *mdev = edev->mdev;
 
-	mlx5_core_uplink_netdev_set(priv->mdev, NULL);
+	mlx5_core_uplink_netdev_set(mdev, NULL);
 
 	if (priv->profile)
 		mlx5e_dcbnl_delete_app(priv);
@@ -6142,7 +6144,7 @@ static void mlx5e_remove(struct auxiliary_device *adev)
 		_mlx5e_suspend(adev, false);
 	} else {
 		if (test_bit(MLX5E_STATE_DESTROYING, &priv->state))
-			mlx5e_destroy_mdev_resources(priv->mdev);
+			mlx5e_destroy_mdev_resources(mdev);
 		else
 			_mlx5e_suspend(adev, true);
 	}
