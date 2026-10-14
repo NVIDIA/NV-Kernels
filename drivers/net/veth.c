@@ -1916,7 +1916,7 @@ static int veth_newlink(struct net_device *dev,
 
 	priv = netdev_priv(peer);
 	rcu_assign_pointer(priv->peer, dev);
-	err = veth_init_queues(peer, tb);
+	err = veth_init_queues(peer, tbp);
 	if (err)
 		goto err_queues;
 
