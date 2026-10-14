@@ -155,6 +155,37 @@ static const struct of_device_id usb_xhci_of_match[] = {
 MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
 #endif
 
+/*
+ * On MediaTek v2 xHCI the system wake event is described by firmware as an
+ * ACPI GpioInt: an EINT line routed to the SPM, which is what can wake the SoC
+ * from s2idle.  It is not a platform IRQ resource, so platform_get_irq()
+ * never returns it.  Prefer it, and fall back to the second normal interrupt
+ * for firmware that does not describe a GpioInt.
+ */
+static int xhci_plat_mtk_get_wakeup_irq(struct platform_device *pdev,
+					bool *from_gpio, bool *wake_capable)
+{
+	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
+	int irq;
+
+	*from_gpio = false;
+	*wake_capable = false;
+
+	if (adev) {
+		irq = acpi_dev_gpio_irq_wake_get(adev, 0, wake_capable);
+		if (irq > 0) {
+			*from_gpio = true;
+			return irq;
+		}
+		if (irq == -EPROBE_DEFER)
+			return irq;
+		dev_dbg(&pdev->dev, "no usable ACPI GpioInt wake irq (%d)\n", irq);
+		*wake_capable = false;
+	}
+
+	return platform_get_irq_optional(pdev, 1);
+}
+
 int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const struct xhci_plat_priv *priv_match)
 {
 	const struct hc_driver	*driver;
@@ -168,6 +199,8 @@ int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const s
 	const struct of_device_id *of_match;
 	bool mtk_hw_prepared = false;
 	int wakeup_irq = -1;
+	bool wakeup_from_gpio = false;
+	bool wakeup_capable = false;
 
 	if (usb_disabled())
 		return -ENODEV;
@@ -252,7 +285,8 @@ int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const s
 
 	if (priv && priv->is_mtk_v2) {
 
-		wakeup_irq = platform_get_irq_optional(pdev, 1);
+		wakeup_irq = xhci_plat_mtk_get_wakeup_irq(pdev, &wakeup_from_gpio,
+							  &wakeup_capable);
 		if (wakeup_irq == -EPROBE_DEFER) {
 			ret = wakeup_irq;
 			goto disable_clk;
@@ -385,7 +419,16 @@ int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const s
 			dev_err(&pdev->dev, "set wakeup irq %d failed\n", wakeup_irq);
 			goto dealloc_usb3_hcd;
 		}
-		dev_info(&pdev->dev, "wakeup irq %d\n", wakeup_irq);
+		dev_info(&pdev->dev, "%swakeup irq %d\n",
+			 wakeup_from_gpio ? "ACPI GpioInt " : "", wakeup_irq);
+
+		/*
+		 * Firmware marked the wake line as wake-capable, so the
+		 * controller should be able to wake the system without
+		 * userspace having to enable it first.
+		 */
+		if (wakeup_capable)
+			device_init_wakeup(&pdev->dev, true);
 	}
 
 	device_enable_async_suspend(&pdev->dev);
