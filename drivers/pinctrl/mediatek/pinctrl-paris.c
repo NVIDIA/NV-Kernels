@@ -954,6 +954,14 @@ static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
 	    desc->eint.eint_n == EINT_NA)
 		return -ENOTSUPP;
 
+	/*
+	 * Not every EINT has debounce hardware, the virtual GPIOs among them.
+	 * Report that as unsupported so gpiolib treats the request as optional
+	 * rather than warning about an -EINVAL from the EINT driver.
+	 */
+	if (!hw->eint->pins[desc->eint.eint_n].debounce)
+		return -ENOTSUPP;
+
 	debounce = pinconf_to_config_argument(config);
 
 	return mtk_eint_set_debounce(hw->eint, desc->eint.eint_n, debounce);
