@@ -329,6 +329,9 @@ static void io_req_task_link_timeout(struct io_kiocb *req, struct io_tw_state *t
 			};
 
 			ret = io_try_cancel(req->task->io_uring, &cd, issue_flags);
+			/* a number of requests for futex and waitid */
+			if (ret > 0)
+				ret = 0;
 		}
 		io_req_set_res(req, ret ?: -ETIME, 0);
 		io_req_task_complete(req, ts);
