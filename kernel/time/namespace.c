@@ -410,11 +410,21 @@ int proc_timens_set_offset(struct file *file, struct task_struct *p,
 			goto out;
 		}
 
+		if (off->val.tv_nsec < 0 || off->val.tv_nsec >= NSEC_PER_SEC) {
+			err = -EINVAL;
+			goto out;
+		}
+
 		err = -ERANGE;
 
 		if (off->val.tv_sec > KTIME_SEC_MAX ||
 		    off->val.tv_sec < -KTIME_SEC_MAX)
 			goto out;
+
+		if (off->val.tv_nsec < 0 || off->val.tv_nsec >= NSEC_PER_SEC) {
+			err = -EINVAL;
+			goto out;
+		}
 
 		tp = timespec64_add(tp, off->val);
 		/*
