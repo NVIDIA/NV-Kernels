@@ -1639,6 +1639,7 @@ CONFIG_ARM64_ERRATUM_2658417                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_2966298                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_3117295                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_3194386                    policy<{'arm64': 'y'}>
+CONFIG_ARM64_ERRATUM_3821522                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_4118414                    policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_819472                     policy<{'arm64': 'y'}>
 CONFIG_ARM64_ERRATUM_824069                     policy<{'arm64': 'y'}>
@@ -1669,6 +1670,7 @@ CONFIG_ARM64_VA_BITS                            policy<{'arm64': '48'}>
 CONFIG_ARM64_VA_BITS_39                         policy<{'arm64': 'n', 'arm64-generic-64k': '-'}>
 CONFIG_ARM64_VA_BITS_42                         policy<{'arm64-generic-64k': 'n'}>
 CONFIG_ARM64_VA_BITS_52                         policy<{'arm64-generic-64k': 'n'}>
+CONFIG_ARM64_WORKAROUND_BROKEN_AMU_CONSTCNT     policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_CLEAN_CACHE             policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_REPEAT_TLBI             policy<{'arm64': 'y'}>
 CONFIG_ARM64_WORKAROUND_SPECULATIVE_AT          policy<{'arm64': 'y'}>
