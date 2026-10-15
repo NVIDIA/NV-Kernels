@@ -1770,6 +1770,7 @@ const struct tegra_xusb_padctl_soc tegra238_xusb_padctl_soc = {
 	.poll_trk_completed = true,
 	.trk_hw_mode = false,
 	.supports_lp_cfg_en = true,
+	.has_per_pad_term = true,
 };
 EXPORT_SYMBOL_GPL(tegra238_xusb_padctl_soc);
 
