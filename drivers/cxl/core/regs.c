@@ -216,6 +216,39 @@ void __iomem *devm_cxl_iomap_block(struct device *dev, resource_size_t addr,
 }
 EXPORT_SYMBOL_FOR_MODULES(devm_cxl_iomap_block, "cxl_core");
 
+/**
+ * cxl_reg_map_set_owned_resource() - record the BAR a driver owns
+ * @map: register map of the component register block
+ * @res: resource of the whole component register BAR, which the caller
+ *	requests itself, before or after this call
+ *
+ * A driver that requests the whole component register BAR itself, such as
+ * vfio-cxl, records that BAR here. cxl_map_component_regs() then maps the
+ * blocks inside @res without requesting them again and refuses any block
+ * outside it. A register map has at most one owned resource.
+ *
+ * Call this after cxl_pci_setup_regs() has filled @map: enumeration rewrites
+ * the whole map and drops a previously recorded owned resource.
+ *
+ * Return: 0 on success, -EBUSY if an owned resource is already set, or
+ * -EINVAL if @map has not been set up or its block lies outside @res.
+ */
+int cxl_reg_map_set_owned_resource(struct cxl_register_map *map,
+				   struct resource *res)
+{
+	struct resource block = DEFINE_RES_MEM(map->resource, map->max_size);
+
+	if (WARN_ON_ONCE(map->owned))
+		return -EBUSY;
+	if (WARN_ON_ONCE(map->resource == CXL_RESOURCE_NONE ||
+			 !resource_contains(res, &block)))
+		return -EINVAL;
+
+	map->owned = res;
+	return 0;
+}
+EXPORT_SYMBOL_NS_GPL(cxl_reg_map_set_owned_resource, "CXL");
+
 int cxl_map_component_regs(const struct cxl_register_map *map,
 			   struct cxl_component_regs *regs,
 			   unsigned long map_mask)
@@ -234,6 +267,7 @@ int cxl_map_component_regs(const struct cxl_register_map *map,
 		struct mapinfo *mi = &mapinfo[i];
 		resource_size_t addr;
 		resource_size_t length;
+		struct resource res;
 
 		if (!mi->rmap->valid)
 			continue;
@@ -241,8 +275,16 @@ int cxl_map_component_regs(const struct cxl_register_map *map,
 			continue;
 		addr = map->resource + mi->rmap->offset;
 		length = mi->rmap->size;
-		*(mi->addr) = devm_cxl_iomap_block(host, addr, length);
-		if (!*(mi->addr))
+		res = DEFINE_RES_MEM(addr, length);
+
+		if (map->owned) {
+			if (!resource_contains(map->owned, &res))
+				return -ENXIO;
+			*mi->addr = devm_cxl_ioremap_block(host, addr, length);
+		} else {
+			*mi->addr = devm_cxl_iomap_block(host, addr, length);
+		}
+		if (!*mi->addr)
 			return -ENOMEM;
 	}
 
