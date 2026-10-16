@@ -5004,6 +5004,20 @@ static bool cxl_sbr_masked(struct pci_dev *dev)
 	return true;
 }
 
+/*
+ * A secondary bus reset below a CXL port with SBR masked does not reach the
+ * devices on the bus, so a bus or slot reset there would report success for
+ * a reset that did not happen. The probes and the save/restore resets that
+ * pci_reset_bus() and reset_subordinate use refuse it; error recovery
+ * (pci_bus_error_reset()) keeps its existing behavior.
+ */
+static bool pci_bus_cxl_sbr_masked(struct pci_bus *bus)
+{
+	struct pci_dev *bridge = bus->self;
+
+	return bridge && pcie_is_cxl(bridge) && cxl_sbr_masked(bridge);
+}
+
 static int pci_reset_bus_function(struct pci_dev *dev, bool probe)
 {
 	struct pci_dev *bridge = pci_upstream_bridge(dev);
@@ -5642,6 +5656,9 @@ static int pci_slot_reset(struct pci_slot *slot, bool probe)
  */
 int pci_probe_reset_slot(struct pci_slot *slot)
 {
+	if (slot && pci_bus_cxl_sbr_masked(slot->bus))
+		return -ENOTTY;
+
 	return pci_slot_reset(slot, PCI_RESET_PROBE);
 }
 EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
@@ -5665,7 +5682,7 @@ static int pci_try_reset_slot(struct pci_slot *slot)
 {
 	int rc;
 
-	rc = pci_slot_reset(slot, PCI_RESET_PROBE);
+	rc = pci_probe_reset_slot(slot);
 	if (rc)
 		return rc;
 
@@ -5712,7 +5729,7 @@ static int pci_try_reset_bus(struct pci_bus *bus)
 {
 	int rc;
 
-	rc = pci_bus_reset(bus, PCI_RESET_PROBE);
+	rc = pci_probe_reset_bus(bus);
 	if (rc)
 		return rc;
 
@@ -5753,8 +5770,13 @@ static int pci_reset_bridge(struct pci_dev *bridge, bool restore)
 	if (list_empty(&bus->slots))
 		goto bus_reset;
 
+	/*
+	 * Probe without the CXL SBR mask check: error recovery keeps its
+	 * reset path below a masked CXL port, and pci_try_reset_slot() and
+	 * pci_try_reset_bus() refuse the restore path there.
+	 */
 	list_for_each_entry(slot, &bus->slots, list)
-		if (pci_probe_reset_slot(slot))
+		if (pci_slot_reset(slot, PCI_RESET_PROBE))
 			goto bus_reset;
 
 	list_for_each_entry(slot, &bus->slots, list) {
@@ -5800,6 +5822,9 @@ int pci_try_reset_bridge(struct pci_dev *bridge)
  */
 int pci_probe_reset_bus(struct pci_bus *bus)
 {
+	if (pci_bus_cxl_sbr_masked(bus))
+		return -ENOTTY;
+
 	return pci_bus_reset(bus, PCI_RESET_PROBE);
 }
 EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
