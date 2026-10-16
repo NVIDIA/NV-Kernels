@@ -187,9 +187,31 @@ static void vfio_pci_region_get(struct vfio_pci_device *device, int index,
 	ioctl_assert(device->fd, VFIO_DEVICE_GET_REGION_INFO, info);
 }
 
+/* Return the sparse-mmap capability in @info, or NULL if the region has none. */
+static struct vfio_region_info_cap_sparse_mmap *
+vfio_pci_sparse_mmap_cap(struct vfio_region_info *info)
+{
+	struct vfio_info_cap_header *hdr;
+	u32 offset;
+
+	if (!(info->flags & VFIO_REGION_INFO_FLAG_CAPS))
+		return NULL;
+
+	for (offset = info->cap_offset; offset; offset = hdr->next) {
+		hdr = (void *)info + offset;
+		if (hdr->id == VFIO_REGION_INFO_CAP_SPARSE_MMAP)
+			return (struct vfio_region_info_cap_sparse_mmap *)hdr;
+	}
+
+	return NULL;
+}
+
 static void vfio_pci_bar_map(struct vfio_pci_device *device, int index)
 {
 	struct vfio_pci_bar *bar = &device->bars[index];
+	struct vfio_region_info_cap_sparse_mmap *sparse;
+	u8 infobuf[1024] = {};
+	struct vfio_region_info *info = (void *)infobuf;
 	size_t align, size;
 	int prot = 0;
 	void *vaddr;
@@ -217,9 +239,38 @@ static void vfio_pci_bar_map(struct vfio_pci_device *device, int index)
 	align = min_t(size_t, size, SZ_1G);
 
 	vaddr = mmap_reserve(size, align, 0);
-	bar->vaddr = mmap(vaddr, size, prot, MAP_SHARED | MAP_FIXED,
-			  device->fd, bar->info.offset);
-	VFIO_ASSERT_NE(bar->vaddr, MAP_FAILED);
+
+	/*
+	 * A BAR that is only partially mmappable, such as a CXL Type-2 component
+	 * BAR with the HDM decoder block trapped, advertises the mmappable
+	 * ranges through a sparse-mmap capability. Map each area within the
+	 * reservation and leave the excluded ranges unmapped; mapping the whole
+	 * BAR would be rejected.
+	 */
+	info->argsz = sizeof(infobuf);
+	info->index = index;
+	ioctl_assert(device->fd, VFIO_DEVICE_GET_REGION_INFO, info);
+	sparse = vfio_pci_sparse_mmap_cap(info);
+	if (sparse) {
+		u32 i;
+
+		bar->vaddr = vaddr;
+		for (i = 0; i < sparse->nr_areas; i++) {
+			void *p;
+
+			if (!sparse->areas[i].size)
+				continue;
+			p = mmap(vaddr + sparse->areas[i].offset,
+				 sparse->areas[i].size, prot,
+				 MAP_SHARED | MAP_FIXED, device->fd,
+				 bar->info.offset + sparse->areas[i].offset);
+			VFIO_ASSERT_NE(p, MAP_FAILED);
+		}
+	} else {
+		bar->vaddr = mmap(vaddr, size, prot, MAP_SHARED | MAP_FIXED,
+				  device->fd, bar->info.offset);
+		VFIO_ASSERT_NE(bar->vaddr, MAP_FAILED);
+	}
 
 	madvise(bar->vaddr, size, MADV_HUGEPAGE);
 }
