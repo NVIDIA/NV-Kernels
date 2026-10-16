@@ -149,6 +149,35 @@ int __iommu_map(struct iommu *iommu, struct dma_region *region)
 	return 0;
 }
 
+/*
+ * Map a range of a file (a memfd or a supported dma-buf, such as a VFIO PCI
+ * dma-buf from VFIO_DEVICE_FEATURE_DMA_BUF) into the IOAS by fd. This is an
+ * iommufd-only ioctl; the legacy VFIO container has no equivalent.
+ */
+int __iommu_map_file(struct iommu *iommu, int fd, u64 start, u64 length,
+		     iova_t iova)
+{
+	struct iommu_ioas_map_file args = {
+		.size = sizeof(args),
+		.flags = IOMMU_IOAS_MAP_READABLE |
+			 IOMMU_IOAS_MAP_WRITEABLE |
+			 IOMMU_IOAS_MAP_FIXED_IOVA,
+		.ioas_id = iommu->ioas_id,
+		.fd = fd,
+		.start = start,
+		.length = length,
+		.iova = iova,
+	};
+
+	if (!iommu->iommufd)
+		return -EINVAL;
+
+	if (ioctl(iommu->iommufd, IOMMU_IOAS_MAP_FILE, &args))
+		return -errno;
+
+	return 0;
+}
+
 static int __vfio_iommu_unmap(int fd, u64 iova, u64 size, u32 flags, u64 *unmapped)
 {
 	struct vfio_iommu_type1_dma_unmap args = {
