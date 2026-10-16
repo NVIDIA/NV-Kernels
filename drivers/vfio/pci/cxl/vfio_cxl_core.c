@@ -637,6 +637,22 @@ static int vfio_cxl_open_device(struct vfio_pci_core_device *vdev)
 	int ret;
 
 	/*
+	 * Keep the HDM decoder block out of the guest's direct BAR access: the
+	 * guest reaches it only through the trapped decoder region, and a write
+	 * through the BAR could uncommit or move an unlocked decoder that the
+	 * host relies on. Exclude it from mmap, fill reads with -1 and drop
+	 * writes. The list is cleared on close, so re-add it per open.
+	 */
+	ret = vfio_pci_core_add_excluded_range(vdev, cxl->hdm->hdm_bar,
+					       cxl->hdm->hdm_offset,
+					       cxl->hdm_len,
+					       VFIO_PCI_EXCLUDE_MMAP |
+					       VFIO_PCI_EXCLUDE_READ |
+					       VFIO_PCI_EXCLUDE_WRITE);
+	if (ret)
+		return ret;
+
+	/*
 	 * vfio-pci-core frees all dynamic regions on close and on a failed
 	 * open, so register them here per open rather than at bind.
 	 */
