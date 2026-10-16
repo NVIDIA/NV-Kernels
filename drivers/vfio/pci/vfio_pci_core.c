@@ -1982,6 +1982,77 @@ static void vfio_pci_zap_bars(struct vfio_pci_core_device *vdev)
 	unmap_mapping_range(core_vdev->inode->i_mapping, start, len, true);
 }
 
+/**
+ * vfio_pci_core_revoke_region() - take a device-specific region out of use
+ * @vdev: vfio PCI device, with memory_lock held for write
+ * @index: vfio region index of a device-specific region
+ *
+ * Zap the user mmaps of the region and revoke its dma-bufs, for a provider
+ * whose region depends on device state that is about to change. The BARs
+ * follow the memory enable bit instead; a device-specific region may not.
+ * A later fault on the region goes back to the region's own fault handler.
+ */
+void vfio_pci_core_revoke_region(struct vfio_pci_core_device *vdev,
+				 unsigned int index)
+{
+	struct vfio_pci_region *region;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	if (WARN_ON(index < VFIO_PCI_NUM_REGIONS ||
+		    index - VFIO_PCI_NUM_REGIONS >= vdev->num_regions))
+		return;
+
+	region = &vdev->region[index - VFIO_PCI_NUM_REGIONS];
+	unmap_mapping_range(vdev->vdev.inode->i_mapping,
+			    VFIO_PCI_INDEX_TO_OFFSET(index), region->size, true);
+	vfio_pci_dma_buf_move_region(vdev, index, true);
+}
+EXPORT_SYMBOL_GPL(vfio_pci_core_revoke_region);
+
+/**
+ * vfio_pci_core_rearm_region() - put a revoked device-specific region back
+ * @vdev: vfio PCI device, with memory_lock held for write
+ * @index: vfio region index passed to vfio_pci_core_revoke_region()
+ */
+void vfio_pci_core_rearm_region(struct vfio_pci_core_device *vdev,
+				unsigned int index)
+{
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	vfio_pci_dma_buf_move_region(vdev, index, false);
+}
+EXPORT_SYMBOL_GPL(vfio_pci_core_rearm_region);
+
+/**
+ * vfio_pci_core_clear_memory_enable() - follow a device that lost Memory Space
+ * @vdev: vfio PCI device, with memory_lock held for write
+ *
+ * For a provider whose failed operation left Memory Space disabled in the
+ * device. Zap the BAR mmaps, revoke the BAR dma-bufs and clear vfio's record
+ * of the Memory Space bit, as a user write that clears the bit would. The
+ * user's next Memory Space write enables it again.
+ */
+void vfio_pci_core_clear_memory_enable(struct vfio_pci_core_device *vdev)
+{
+	__le16 *virt_cmd;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	/* Closed, or not open yet: vfio_config_init() reads the device. */
+	if (!vdev->vconfig)
+		return;
+
+	virt_cmd = (__le16 *)&vdev->vconfig[PCI_COMMAND];
+	if (!(*virt_cmd & cpu_to_le16(PCI_COMMAND_MEMORY)))
+		return;
+
+	vfio_pci_zap_bars(vdev);
+	vfio_pci_dma_buf_move(vdev, true);
+	*virt_cmd &= cpu_to_le16(~PCI_COMMAND_MEMORY);
+}
+EXPORT_SYMBOL_GPL(vfio_pci_core_clear_memory_enable);
+
 void vfio_pci_zap_and_down_write_memory_lock(struct vfio_pci_core_device *vdev)
 {
 	down_write(&vdev->memory_lock);
@@ -2019,15 +2090,25 @@ static unsigned long vma_to_pfn(struct vm_area_struct *vma)
 	return (pci_resource_start(vdev->pdev, index) >> PAGE_SHIFT) + pgoff;
 }
 
-vm_fault_t vfio_pci_vmf_insert_pfn(struct vfio_pci_core_device *vdev,
-				   struct vm_fault *vmf,
-				   unsigned long pfn,
-				   unsigned int order)
+/**
+ * __vfio_pci_vmf_insert_pfn() - insert a pfn without the memory enable and
+ *	runtime PM checks
+ * @vdev: vfio PCI device, with memory_lock held for read
+ * @vmf: the fault being served
+ * @pfn: first pfn to insert
+ * @order: page order of the mapping
+ *
+ * For a device-specific region that does not follow the memory enable bit.
+ * The caller checks the state its region depends on under memory_lock, and
+ * revokes the region with vfio_pci_core_revoke_region() when it changes or
+ * before the device leaves D0.
+ */
+vm_fault_t __vfio_pci_vmf_insert_pfn(struct vfio_pci_core_device *vdev,
+				     struct vm_fault *vmf,
+				     unsigned long pfn,
+				     unsigned int order)
 {
 	lockdep_assert_held_read(&vdev->memory_lock);
-
-	if (vdev->pm_runtime_engaged || !__vfio_pci_memory_enabled(vdev))
-		return VM_FAULT_SIGBUS;
 
 	if (!order)
 		return vmf_insert_pfn(vmf->vma, vmf->address, pfn);
@@ -2039,6 +2120,20 @@ vm_fault_t vfio_pci_vmf_insert_pfn(struct vfio_pci_core_device *vdev,
 		return vmf_insert_pfn_pud(vmf, pfn, false);
 
 	return VM_FAULT_FALLBACK;
+}
+EXPORT_SYMBOL_GPL(__vfio_pci_vmf_insert_pfn);
+
+vm_fault_t vfio_pci_vmf_insert_pfn(struct vfio_pci_core_device *vdev,
+				   struct vm_fault *vmf,
+				   unsigned long pfn,
+				   unsigned int order)
+{
+	lockdep_assert_held_read(&vdev->memory_lock);
+
+	if (vdev->pm_runtime_engaged || !__vfio_pci_memory_enabled(vdev))
+		return VM_FAULT_SIGBUS;
+
+	return __vfio_pci_vmf_insert_pfn(vdev, vmf, pfn, order);
 }
 EXPORT_SYMBOL_GPL(vfio_pci_vmf_insert_pfn);
 

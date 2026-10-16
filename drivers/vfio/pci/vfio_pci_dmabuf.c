@@ -19,6 +19,7 @@ struct vfio_pci_dma_buf {
 	u32 nr_ranges;
 	struct kref kref;
 	struct completion comp;
+	u32 region_index;
 	u8 revoked : 1;
 };
 
@@ -288,6 +289,7 @@ int vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
 	priv->vdev = vdev;
 	priv->nr_ranges = get_dma_buf.nr_ranges;
 	priv->size = length;
+	priv->region_index = get_dma_buf.region_index;
 	ret = vdev->pci_ops->get_dmabuf_phys(vdev, &priv->provider,
 					     get_dma_buf.region_index,
 					     priv->phys_vec, dma_ranges,
@@ -347,6 +349,49 @@ err_free_ranges:
 	return ret;
 }
 
+static void vfio_pci_dma_buf_move_one(struct vfio_pci_dma_buf *priv,
+				      bool revoked)
+{
+	if (!get_file_active(&priv->dmabuf->file))
+		return;
+
+	if (priv->revoked != revoked) {
+		dma_resv_lock(priv->dmabuf->resv, NULL);
+		if (revoked)
+			priv->revoked = true;
+		dma_buf_invalidate_mappings(priv->dmabuf);
+		dma_resv_wait_timeout(priv->dmabuf->resv,
+				      DMA_RESV_USAGE_BOOKKEEP, false,
+				      MAX_SCHEDULE_TIMEOUT);
+		dma_resv_unlock(priv->dmabuf->resv);
+		if (revoked) {
+			kref_put(&priv->kref, vfio_pci_dma_buf_done);
+			wait_for_completion(&priv->comp);
+			/*
+			 * Re-arm the registered kref reference and the
+			 * completion so the post-revoke state matches the
+			 * post-creation state.  An un-revoke followed by a
+			 * new mapping needs the kref to be non-zero before
+			 * kref_get(), and vfio_pci_dma_buf_cleanup()
+			 * delegates its drain back through this revoke
+			 * path on a possibly-already-revoked dma-buf.
+			 */
+			kref_init(&priv->kref);
+			reinit_completion(&priv->comp);
+		} else {
+			dma_resv_lock(priv->dmabuf->resv, NULL);
+			priv->revoked = false;
+			dma_resv_unlock(priv->dmabuf->resv);
+		}
+	}
+	fput(priv->dmabuf->file);
+}
+
+/*
+ * Revoke or re-arm the dma-bufs of the BARs, which follow the memory enable
+ * bit. A device-specific region is moved by its provider through
+ * vfio_pci_dma_buf_move_region().
+ */
 void vfio_pci_dma_buf_move(struct vfio_pci_core_device *vdev, bool revoked)
 {
 	struct vfio_pci_dma_buf *priv;
@@ -354,41 +399,23 @@ void vfio_pci_dma_buf_move(struct vfio_pci_core_device *vdev, bool revoked)
 
 	lockdep_assert_held_write(&vdev->memory_lock);
 
-	list_for_each_entry_safe(priv, tmp, &vdev->dmabufs, dmabufs_elm) {
-		if (!get_file_active(&priv->dmabuf->file))
-			continue;
+	list_for_each_entry_safe(priv, tmp, &vdev->dmabufs, dmabufs_elm)
+		if (priv->region_index < VFIO_PCI_NUM_REGIONS)
+			vfio_pci_dma_buf_move_one(priv, revoked);
+}
 
-		if (priv->revoked != revoked) {
-			dma_resv_lock(priv->dmabuf->resv, NULL);
-			if (revoked)
-				priv->revoked = true;
-			dma_buf_invalidate_mappings(priv->dmabuf);
-			dma_resv_wait_timeout(priv->dmabuf->resv,
-					      DMA_RESV_USAGE_BOOKKEEP, false,
-					      MAX_SCHEDULE_TIMEOUT);
-			dma_resv_unlock(priv->dmabuf->resv);
-			if (revoked) {
-				kref_put(&priv->kref, vfio_pci_dma_buf_done);
-				wait_for_completion(&priv->comp);
-				/*
-				 * Re-arm the registered kref reference and the
-				 * completion so the post-revoke state matches the
-				 * post-creation state.  An un-revoke followed by a
-				 * new mapping needs the kref to be non-zero before
-				 * kref_get(), and vfio_pci_dma_buf_cleanup()
-				 * delegates its drain back through this revoke
-				 * path on a possibly-already-revoked dma-buf.
-				 */
-				kref_init(&priv->kref);
-				reinit_completion(&priv->comp);
-			} else {
-				dma_resv_lock(priv->dmabuf->resv, NULL);
-				priv->revoked = false;
-				dma_resv_unlock(priv->dmabuf->resv);
-			}
-		}
-		fput(priv->dmabuf->file);
-	}
+/* Revoke or re-arm the dma-bufs exported from one device-specific region. */
+void vfio_pci_dma_buf_move_region(struct vfio_pci_core_device *vdev,
+				  unsigned int index, bool revoked)
+{
+	struct vfio_pci_dma_buf *priv;
+	struct vfio_pci_dma_buf *tmp;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	list_for_each_entry_safe(priv, tmp, &vdev->dmabufs, dmabufs_elm)
+		if (priv->region_index == index)
+			vfio_pci_dma_buf_move_one(priv, revoked);
 }
 
 void vfio_pci_dma_buf_cleanup(struct vfio_pci_core_device *vdev)
@@ -405,7 +432,8 @@ void vfio_pci_dma_buf_cleanup(struct vfio_pci_core_device *vdev)
 	 * ready, so cleanup itself does not need to participate in kref
 	 * bookkeeping.
 	 */
-	vfio_pci_dma_buf_move(vdev, true);
+	list_for_each_entry_safe(priv, tmp, &vdev->dmabufs, dmabufs_elm)
+		vfio_pci_dma_buf_move_one(priv, true);
 
 	list_for_each_entry_safe(priv, tmp, &vdev->dmabufs, dmabufs_elm) {
 		if (!get_file_active(&priv->dmabuf->file))

@@ -241,6 +241,11 @@ int vfio_pci_core_register_dev_region(struct vfio_pci_core_device *vdev,
 				      unsigned int type, unsigned int subtype,
 				      const struct vfio_pci_regops *ops,
 				      size_t size, u32 flags, void *data);
+void vfio_pci_core_revoke_region(struct vfio_pci_core_device *vdev,
+				 unsigned int index);
+void vfio_pci_core_rearm_region(struct vfio_pci_core_device *vdev,
+				unsigned int index);
+void vfio_pci_core_clear_memory_enable(struct vfio_pci_core_device *vdev);
 void vfio_pci_core_close_device(struct vfio_device *core_vdev);
 int vfio_pci_core_init_dev(struct vfio_device *core_vdev);
 void vfio_pci_core_release_dev(struct vfio_device *core_vdev);
@@ -264,6 +269,9 @@ ssize_t vfio_pci_core_read(struct vfio_device *core_vdev, char __user *buf,
 		size_t count, loff_t *ppos);
 ssize_t vfio_pci_core_write(struct vfio_device *core_vdev, const char __user *buf,
 		size_t count, loff_t *ppos);
+vm_fault_t __vfio_pci_vmf_insert_pfn(struct vfio_pci_core_device *vdev,
+				     struct vm_fault *vmf, unsigned long pfn,
+				     unsigned int order);
 vm_fault_t vfio_pci_vmf_insert_pfn(struct vfio_pci_core_device *vdev,
 				   struct vm_fault *vmf, unsigned long pfn,
 				   unsigned int order);
