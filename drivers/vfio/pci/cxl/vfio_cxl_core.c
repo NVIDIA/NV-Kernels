@@ -302,9 +302,25 @@ static ssize_t vfio_cxl_comp_rw(struct vfio_pci_core_device *vdev,
 	return count;
 }
 
+static int vfio_cxl_comp_add_capability(struct vfio_pci_core_device *vdev,
+					struct vfio_pci_region *region,
+					struct vfio_info_cap *caps)
+{
+	struct cxl_hdm_info *hdm = vdev->cxl->hdm;
+	struct vfio_region_info_cap_cxl_comp_regs cap = {
+		.header.id = VFIO_REGION_INFO_CAP_CXL_COMP_REGS,
+		.header.version = 1,
+		.bar = hdm->hdm_bar,
+		.offset = hdm->hdm_offset,
+	};
+
+	return vfio_info_add_capability(caps, &cap.header, sizeof(cap));
+}
+
 static const struct vfio_pci_regops vfio_cxl_comp_regops = {
 	.rw = vfio_cxl_comp_rw,
 	.release = vfio_cxl_region_release,
+	.add_capability = vfio_cxl_comp_add_capability,
 };
 
 /*
