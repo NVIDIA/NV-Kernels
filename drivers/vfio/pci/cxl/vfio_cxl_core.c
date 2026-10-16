@@ -9,6 +9,7 @@
 #include <linux/cleanup.h>
 #include <linux/delay.h>
 #include <linux/io.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/range.h>
@@ -29,6 +30,7 @@
  * @hdm_valid: true when host CPU access to the HDM range is safe; under memory_lock
  * @await_mem_active: the device reports Mem_HwInit_Mode, so wait for
  *	Memory_Active before host access reopens after a reset or low power
+ * @mem_region_index: vfio region index of the HDM memory region while open, else 0
  */
 struct vfio_cxl_state {
 	struct cxl_dev_state cxlds;
@@ -38,7 +40,81 @@ struct vfio_cxl_state {
 	struct cxl_hdm_info *hdm;
 	bool hdm_valid;
 	bool await_mem_active;
+	unsigned int mem_region_index;
 };
+
+static unsigned long vfio_cxl_mem_pgoff(struct vm_area_struct *vma,
+					unsigned long addr)
+{
+	unsigned long mask = (1U << (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT)) - 1;
+
+	return (vma->vm_pgoff & mask) + ((addr - vma->vm_start) >> PAGE_SHIFT);
+}
+
+static vm_fault_t vfio_cxl_mem_huge_fault(struct vm_fault *vmf,
+					  unsigned int order)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	struct vfio_pci_core_device *vdev = vma->vm_private_data;
+	struct vfio_cxl_state *cxl = vdev->cxl;
+	unsigned long addr = ALIGN_DOWN(vmf->address, PAGE_SIZE << order);
+	unsigned long pfn = PHYS_PFN(cxl->hpa_range.start) +
+			    vfio_cxl_mem_pgoff(vma, addr);
+	vm_fault_t ret = VM_FAULT_FALLBACK;
+
+	if (is_aligned_for_order(vma, addr, pfn, order)) {
+		scoped_guard(rwsem_read, &vdev->memory_lock) {
+			/*
+			 * Insert a PFN only for a known-good decoder whose
+			 * media is ready. CXL.mem decode follows the committed
+			 * decoder and Mem_Enable, not Memory Space Enable (CXL
+			 * r4.0 sec 8.2.4.20.2, 8.1.3.2), so skip the BAR memory
+			 * enable check; low power closes hdm_valid through
+			 * power_down.
+			 */
+			if (cxl->hdm_valid && cxl->cxlds.media_ready)
+				ret = __vfio_pci_vmf_insert_pfn(vdev, vmf, pfn,
+								order);
+			else
+				ret = VM_FAULT_SIGBUS;
+		}
+	}
+
+	return ret;
+}
+
+static vm_fault_t vfio_cxl_mem_fault(struct vm_fault *vmf)
+{
+	return vfio_cxl_mem_huge_fault(vmf, 0);
+}
+
+static const struct vm_operations_struct vfio_cxl_mem_vm_ops = {
+	.fault = vfio_cxl_mem_fault,
+#ifdef CONFIG_ARCH_SUPPORTS_HUGE_PFNMAP
+	.huge_fault = vfio_cxl_mem_huge_fault,
+#endif
+};
+
+static int vfio_cxl_mem_mmap(struct vfio_pci_core_device *vdev,
+			     struct vfio_pci_region *region,
+			     struct vm_area_struct *vma)
+{
+	unsigned long mask = (1U << (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT)) - 1;
+	u64 req_start = (vma->vm_pgoff & mask) << PAGE_SHIFT;
+	u64 req_len = vma->vm_end - vma->vm_start;
+
+	if (req_start + req_len > region->size)
+		return -EINVAL;
+
+	/*
+	 * CXL.mem is coherent memory, so leave the mapping write-back cacheable.
+	 */
+	vm_flags_set(vma, VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP);
+	vma->vm_ops = &vfio_cxl_mem_vm_ops;
+	vma->vm_private_data = vdev;
+
+	return 0;
+}
 
 /*
  * Copy one chunk between the bounce buffer and the HDM range under
@@ -131,6 +207,7 @@ static void vfio_cxl_region_release(struct vfio_pci_core_device *vdev,
 
 static const struct vfio_pci_regops vfio_cxl_mem_regops = {
 	.rw = vfio_cxl_mem_rw,
+	.mmap = vfio_cxl_mem_mmap,
 	.release = vfio_cxl_region_release,
 };
 
@@ -409,20 +486,31 @@ static int vfio_cxl_add_region(struct vfio_pci_core_device *vdev, u32 subtype,
 static int vfio_cxl_open_device(struct vfio_pci_core_device *vdev)
 {
 	struct vfio_cxl_state *cxl = vdev->cxl;
+	int ret;
 
 	/*
 	 * vfio-pci-core frees all dynamic regions on close and on a failed
 	 * open, so register them here per open rather than at bind.
 	 */
-	return vfio_cxl_add_region(vdev, VFIO_REGION_SUBTYPE_CXL_MEM,
-				   &vfio_cxl_mem_regops,
-				   range_len(&cxl->hpa_range),
-				   VFIO_REGION_INFO_FLAG_READ |
-				   VFIO_REGION_INFO_FLAG_WRITE);
+	ret = vfio_cxl_add_region(vdev, VFIO_REGION_SUBTYPE_CXL_MEM,
+				  &vfio_cxl_mem_regops,
+				  range_len(&cxl->hpa_range),
+				  VFIO_REGION_INFO_FLAG_READ |
+				  VFIO_REGION_INFO_FLAG_WRITE |
+				  VFIO_REGION_INFO_FLAG_MMAP);
+	if (ret)
+		return ret;
+
+	/* Record where the HDM memory region landed, to revoke it later. */
+	cxl->mem_region_index = VFIO_PCI_NUM_REGIONS + vdev->num_regions - 1;
+
+	return 0;
 }
 
 static void vfio_cxl_close_device(struct vfio_pci_core_device *vdev)
 {
+	/* vfio-pci-core frees the regions after this returns. */
+	vdev->cxl->mem_region_index = 0;
 }
 
 static void vfio_cxl_reset_prepare(struct vfio_pci_core_device *vdev)
@@ -432,6 +520,33 @@ static void vfio_cxl_reset_prepare(struct vfio_pci_core_device *vdev)
 static int vfio_cxl_reset_done(struct vfio_pci_core_device *vdev)
 {
 	return 0;
+}
+
+/*
+ * Take the HDM memory region out of use: zap its mmaps and revoke its
+ * dma-bufs. A fault then gets SIGBUS from vfio_cxl_mem_huge_fault() until
+ * hdm_valid is set again.
+ */
+static void vfio_cxl_revoke_hdm(struct vfio_pci_core_device *vdev)
+{
+	struct vfio_cxl_state *cxl = vdev->cxl;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	cxl->hdm_valid = false;
+	if (cxl->mem_region_index)
+		vfio_pci_core_revoke_region(vdev, cxl->mem_region_index);
+}
+
+static void vfio_cxl_rearm_hdm(struct vfio_pci_core_device *vdev)
+{
+	struct vfio_cxl_state *cxl = vdev->cxl;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	cxl->hdm_valid = true;
+	if (cxl->mem_region_index)
+		vfio_pci_core_rearm_region(vdev, cxl->mem_region_index);
 }
 
 /*
@@ -451,9 +566,7 @@ static int vfio_cxl_reset(struct vfio_pci_core_device *vdev)
 /* Low power loses the committed decoder: close host access until restored. */
 static void vfio_cxl_power_down(struct vfio_pci_core_device *vdev)
 {
-	lockdep_assert_held_write(&vdev->memory_lock);
-
-	vdev->cxl->hdm_valid = false;
+	vfio_cxl_revoke_hdm(vdev);
 }
 
 static void vfio_cxl_power_up(struct vfio_pci_core_device *vdev)
@@ -482,7 +595,7 @@ static void vfio_cxl_power_up(struct vfio_pci_core_device *vdev)
 	if (ret)
 		pci_warn(pdev, "vfio-cxl: HDM decoder restore failed: %d\n", ret);
 	else if (!vfio_cxl_await_mem_active(vdev))
-		cxl->hdm_valid = true;
+		vfio_cxl_rearm_hdm(vdev);
 }
 
 static const struct vfio_cxl_ops vfio_cxl_ops = {
