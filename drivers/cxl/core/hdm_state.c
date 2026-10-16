@@ -306,7 +306,8 @@ static int cxl_hdm_ranges_collect(struct cxl_hdm_quiesce *q,
 	return 0;
 }
 
-static int cxl_hdm_ranges_request(struct cxl_hdm_quiesce *q)
+static int cxl_hdm_ranges_request(struct cxl_hdm_quiesce *q,
+				  const struct resource *owned)
 {
 	struct cxl_hdm_range *range;
 
@@ -314,6 +315,12 @@ static int cxl_hdm_ranges_request(struct cxl_hdm_quiesce *q)
 
 	list_for_each_entry(range, &q->ranges, list) {
 		const struct range *hpa_range = &range->hpa_range;
+		struct resource res = DEFINE_RES_MEM(hpa_range->start,
+						     range->len);
+
+		/* The caller already holds this range exclusively. */
+		if (owned && resource_contains(owned, &res))
+			continue;
 
 		range->res = request_mem_region(hpa_range->start, range->len,
 						"cxl_reset");
@@ -353,15 +360,20 @@ static int cxl_hdm_ranges_invalidate(struct cxl_hdm_quiesce *q)
  * cxl_hdm_quiesce_prepare() - take the HPA ranges of a device out of use
  * @q: quiesce state to initialize
  * @snapshot: HDM state from cxl_hdm_cache_snapshot()
+ * @owned: resource the caller holds exclusively over the ranges, or NULL
  *
  * Reserve every enabled system-physical range in @snapshot exclusively, then
- * write back and invalidate CPU caches for them. Call
- * cxl_hdm_quiesce_destroy() afterwards whether or not this succeeds.
+ * write back and invalidate CPU caches for them. A range inside @owned is
+ * not requested again; the caller's reservation already excludes other
+ * users.
+ *
+ * Call cxl_hdm_quiesce_destroy() afterwards whether or not this succeeds.
  *
  * Return: 0 on success, or a negative errno.
  */
 int cxl_hdm_quiesce_prepare(struct cxl_hdm_quiesce *q,
-			    const struct cxl_hdm_info *snapshot)
+			    const struct cxl_hdm_info *snapshot,
+			    const struct resource *owned)
 {
 	int rc;
 
@@ -376,7 +388,7 @@ int cxl_hdm_quiesce_prepare(struct cxl_hdm_quiesce *q,
 	if (rc)
 		return rc;
 
-	rc = cxl_hdm_ranges_request(q);
+	rc = cxl_hdm_ranges_request(q, owned);
 	if (rc)
 		return rc;
 
