@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config VFIO_CXL
+	tristate "VFIO support for CXL Type-2 devices"
+	depends on CXL_BUS && CXL_MEM
+	select VFIO_PCI_CORE
+	help
+	  Add CXL HDM handling to vfio-pci so a CXL Type-2 device, such as a
+	  CXL-attached accelerator, can be assigned to a virtual machine.
+	  vfio-pci loads this module on demand when it binds a CXL device.
+
+	  If you don't know what to do here, say N.
