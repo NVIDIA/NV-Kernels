@@ -755,47 +755,18 @@ static inline void pci_doe_destroy(struct pci_dev *pdev) { }
 static inline void pci_doe_disconnected(struct pci_dev *pdev) { }
 #endif
 
-struct cxl_hdm_info;
-struct cxl_pci_cache;
+#include <cxl/pci.h>
+
 #ifdef CONFIG_CXL_RESET
 void pci_cxl_hdm_cache_init(struct pci_dev *pdev);
 void pci_cxl_hdm_cache_release(struct pci_dev *pdev);
 int cxl_reset_function(struct pci_dev *pdev, bool probe);
-struct cxl_hdm_info *pci_cxl_reset_prepare(struct pci_dev *pdev,
-					struct cxl_pci_cache **cachep);
-int cxl_restore_state_after_pci_reset(struct pci_dev *pdev,
-				      const struct cxl_hdm_info *snapshot,
-				      struct cxl_pci_cache *cache,
-				      bool reset_attempted, int rc, u16 *command);
-int cxl_restore_command_after_pci_reset(struct pci_dev *pdev, u16 command);
 #else
 static inline void pci_cxl_hdm_cache_init(struct pci_dev *pdev) { }
 static inline void pci_cxl_hdm_cache_release(struct pci_dev *pdev) { }
 static inline int cxl_reset_function(struct pci_dev *pdev, bool probe)
 {
 	return -ENOTTY;
-}
-
-static inline struct cxl_hdm_info *
-pci_cxl_reset_prepare(struct pci_dev *pdev, struct cxl_pci_cache **cachep)
-{
-	*cachep = NULL;
-	return NULL;
-}
-
-static inline int
-cxl_restore_state_after_pci_reset(struct pci_dev *pdev,
-				  const struct cxl_hdm_info *snapshot,
-				  struct cxl_pci_cache *cache,
-				  bool reset_attempted, int rc, u16 *command)
-{
-	return rc;
-}
-
-static inline int cxl_restore_command_after_pci_reset(struct pci_dev *pdev,
-						      u16 command)
-{
-	return 0;
 }
 #endif
 
