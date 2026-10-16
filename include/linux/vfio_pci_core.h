@@ -29,6 +29,7 @@ struct vfio_pci_core_device;
 struct vfio_pci_region;
 struct p2pdma_provider;
 struct dma_buf_attachment;
+struct vfio_cxl_state;
 
 struct vfio_pci_eventfd {
 	struct eventfd_ctx	*ctx;
@@ -109,6 +110,8 @@ struct vfio_pci_core_device {
 	struct vfio_device	vdev;
 	struct pci_dev		*pdev;
 	const struct vfio_pci_device_ops *pci_ops;
+	const struct vfio_cxl_ops *cxl_ops;
+	struct vfio_cxl_state   *cxl;
 	void __iomem		*barmap[PCI_STD_NUM_BARS];
 	bool			bar_mmap_supported[PCI_STD_NUM_BARS];
 	/* Flags modified at runtime - dedicated storage unit */

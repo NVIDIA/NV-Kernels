@@ -2180,6 +2180,12 @@ static void vfio_pci_vga_uninit(struct vfio_pci_core_device *vdev)
 
 static const struct vfio_cxl_ops *vfio_pci_cxl_ops;
 static DECLARE_RWSEM(vfio_pci_cxl_ops_rwsem);
+/*
+ * A probe that gives up on the provider is freed along with its vfio
+ * device, so the "already asked" state has to live with the module.
+ */
+static DEFINE_MUTEX(vfio_pci_cxl_load_lock);
+static bool vfio_pci_cxl_load_requested;
 
 int vfio_pci_core_register_cxl_ops(const struct vfio_cxl_ops *ops)
 {
@@ -2202,6 +2208,137 @@ void vfio_pci_core_unregister_cxl_ops(const struct vfio_cxl_ops *ops)
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_unregister_cxl_ops);
 
+static const struct vfio_cxl_ops *vfio_pci_get_cxl_ops(void)
+{
+	guard(rwsem_read)(&vfio_pci_cxl_ops_rwsem);
+
+	if (vfio_pci_cxl_ops && try_module_get(vfio_pci_cxl_ops->owner))
+		return vfio_pci_cxl_ops;
+
+	return NULL;
+}
+
+static void vfio_pci_put_cxl_ops(const struct vfio_cxl_ops *ops)
+{
+	module_put(ops->owner);
+}
+
+/*
+ * A CXL Type-2 device advertises both CXL.cache and CXL.mem in its CXL DVSEC.
+ * pcie_is_cxl() is also true for Type-1 (cache only) and Type-3 (mem only)
+ * devices, which the vfio-cxl provider does not handle, so confirm the Type-2
+ * identity before engaging it.
+ */
+static bool vfio_pci_is_cxl_type2(struct pci_dev *pdev)
+{
+	u16 dvsec, cap;
+
+	if (!pcie_is_cxl(pdev))
+		return false;
+
+	dvsec = pci_find_dvsec_capability(pdev, PCI_VENDOR_ID_CXL,
+					  PCI_DVSEC_CXL_DEVICE);
+	if (!dvsec)
+		return false;
+
+	if (pci_read_config_word(pdev, dvsec + PCI_DVSEC_CXL_CAP, &cap))
+		return false;
+
+	return (cap & PCI_DVSEC_CXL_CACHE_CAPABLE) &&
+		(cap & PCI_DVSEC_CXL_MEM_CAPABLE);
+}
+
+/*
+ * Load vfio-cxl on demand for a CXL Type-2 device and hand the device to its
+ * ops. If the provider is absent the device is bound without the CXL
+ * extensions; a built-in provider whose initcall has not run yet is waited
+ * for with -EPROBE_DEFER.
+ */
+static int vfio_pci_core_cxl_init(struct vfio_pci_core_device *vdev)
+{
+	const struct vfio_cxl_ops *ops;
+	int ret;
+
+	if (!vfio_pci_is_cxl_type2(vdev->pdev))
+		return 0;
+
+	ops = vfio_pci_get_cxl_ops();
+	if (!ops) {
+		if (IS_BUILTIN(CONFIG_VFIO_CXL))
+			return -EPROBE_DEFER;
+
+		/*
+		 * Never load the provider synchronously from here.
+		 * pci_call_probe() can run probe on a NUMA locality worker
+		 * and wait for it with flush_work(), and that caller may
+		 * itself be an async probe, so modprobe would block in
+		 * async_synchronize_full() waiting for the probe that is
+		 * waiting for modprobe. current_is_async() does not see that
+		 * case, because the worker is not the async task.
+		 *
+		 * vfio-pci carries a softdep on vfio-cxl, so userspace loads
+		 * the provider before the driver and this path is only the
+		 * fallback for a direct insmod. Ask for it without waiting
+		 * and bind without CXL rather than deferring: registering the
+		 * provider binds no device, so nothing would retry the
+		 * deferred probe.
+		 */
+		scoped_guard(mutex, &vfio_pci_cxl_load_lock) {
+			if (!vfio_pci_cxl_load_requested) {
+				vfio_pci_cxl_load_requested = true;
+				request_module_nowait("vfio-cxl");
+			}
+		}
+		pci_info(vdev->pdev,
+			 "vfio-cxl not loaded, continuing without CXL support; load it and re-bind to enable it\n");
+		return 0;
+	}
+
+	ret = ops->init(vdev);
+	/*
+	 * A provider that is not ready yet (for example its CXL port has not
+	 * enumerated) returns -EPROBE_DEFER. Propagate it so the bind retries
+	 * rather than continuing without CXL support.
+	 */
+	if (ret == -EPROBE_DEFER) {
+		vfio_pci_put_cxl_ops(ops);
+		return ret;
+	}
+	/*
+	 * Any other failure is non-fatal: a CXL device that cannot be brought
+	 * up as Type-2 still works without the CXL extensions, so log and
+	 * continue rather than failing the bind.
+	 */
+	if (ret) {
+		pci_warn(vdev->pdev,
+			 "CXL init failed (%d), continuing without CXL support\n",
+			 ret);
+		vfio_pci_put_cxl_ops(ops);
+		return 0;
+	}
+
+	vdev->cxl_ops = ops;
+	return 0;
+}
+
+/*
+ * The provider state is devres on pdev->dev, so it dies with the bind, but
+ * the vfio_device release op can run later: the final cdev close completes
+ * vfio_unregister_group_dev() while __fput() still holds the cdev's parent
+ * reference. Tear the provider down on the unbind path to match how it was
+ * allocated. Idempotent, because vfio_pci_core_release_dev() still has to
+ * cover a probe that failed after init.
+ */
+static void vfio_pci_core_cxl_release(struct vfio_pci_core_device *vdev)
+{
+	if (!vdev->cxl_ops)
+		return;
+
+	vdev->cxl_ops->release(vdev);
+	vfio_pci_put_cxl_ops(vdev->cxl_ops);
+	vdev->cxl_ops = NULL;
+}
+
 int vfio_pci_core_init_dev(struct vfio_device *core_vdev)
 {
 	struct vfio_pci_core_device *vdev =
@@ -2223,6 +2360,10 @@ int vfio_pci_core_init_dev(struct vfio_device *core_vdev)
 	init_rwsem(&vdev->memory_lock);
 	xa_init(&vdev->ctx);
 
+	ret = vfio_pci_core_cxl_init(vdev);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_init_dev);
@@ -2231,6 +2372,8 @@ void vfio_pci_core_release_dev(struct vfio_device *core_vdev)
 {
 	struct vfio_pci_core_device *vdev =
 		container_of(core_vdev, struct vfio_pci_core_device, vdev);
+
+	vfio_pci_core_cxl_release(vdev);
 
 	mutex_destroy(&vdev->igate);
 	mutex_destroy(&vdev->ioeventfds_lock);
@@ -2337,6 +2480,13 @@ out_power:
 	vfio_pci_vga_uninit(vdev);
 out_vf:
 	vfio_pci_vf_uninit(vdev);
+	/*
+	 * Registration can fail after the cdev is published, and an open in
+	 * flight then delays the final vfio release past the driver's own
+	 * cleanup. Tear the provider down here, where pdev devres still backs
+	 * its state. Idempotent, so the release op stays a no-op.
+	 */
+	vfio_pci_core_cxl_release(vdev);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_register_device);
@@ -2346,6 +2496,9 @@ void vfio_pci_core_unregister_device(struct vfio_pci_core_device *vdev)
 	vfio_pci_core_sriov_configure(vdev, 0);
 
 	vfio_unregister_group_dev(&vdev->vdev);
+
+	/* No user is left, and pdev devres is still alive here. */
+	vfio_pci_core_cxl_release(vdev);
 
 	vfio_pci_vf_uninit(vdev);
 	vfio_pci_vga_uninit(vdev);
