@@ -46,6 +46,7 @@ of interest to most developers working on device drivers.
    uio-howto
    vfio-mediated-device
    vfio
+   vfio-pci-cxl
    vfio-pci-device-specific-driver-acceptance
 
 Bus-level documentation
