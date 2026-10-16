@@ -14,6 +14,7 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/pci-p2pdma.h>
 #include <linux/range.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -223,6 +224,21 @@ static ssize_t vfio_cxl_mem_rw(struct vfio_pci_core_device *vdev,
 }
 
 /*
+ * The HDM region follows hdm_valid, not Memory Space Enable, so a dma-buf
+ * exported from it starts revoked while host access is unsafe and is
+ * re-armed with the region in vfio_cxl_rearm_hdm().
+ */
+static bool vfio_cxl_mem_revoked(struct vfio_pci_core_device *vdev,
+				 struct vfio_pci_region *region)
+{
+	struct vfio_cxl_state *cxl = vdev->cxl;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	return !cxl->hdm_valid || !cxl->cxlds.media_ready;
+}
+
+/*
  * The CXL regions carry no per-region state (region->data is the shared,
  * devm-managed vfio_cxl_state), so releasing a region is a no-op.
  */
@@ -235,6 +251,7 @@ static const struct vfio_pci_regops vfio_cxl_mem_regops = {
 	.rw = vfio_cxl_mem_rw,
 	.mmap = vfio_cxl_mem_mmap,
 	.release = vfio_cxl_region_release,
+	.revoked = vfio_cxl_mem_revoked,
 };
 
 static ssize_t vfio_cxl_comp_rw(struct vfio_pci_core_device *vdev,
@@ -458,6 +475,50 @@ vfio_cxl_create_memdev(struct pci_dev *pdev, const struct cxl_hdm_info *hdm,
 	cxl->cxlmd = cxlmd;
 	return cxl;
 }
+
+/*
+ * Resolve the physical range that backs a dma-buf export. The core exporter
+ * only knows BARs; teach it the HDM memory region so a guest IOAS can map the
+ * coherent window by fd (IOMMU_IOAS_MAP_FILE) instead of the removed PFNMAP
+ * work-around. Real BARs stay on the byte-identical core path.
+ */
+static int vfio_cxl_get_dmabuf_phys(struct vfio_pci_core_device *vdev,
+				    struct p2pdma_provider **provider,
+				    unsigned int region_index,
+				    struct phys_vec *phys_vec,
+				    struct vfio_region_dma_range *dma_ranges,
+				    size_t nr_ranges)
+{
+	struct vfio_cxl_state *cxl = vdev->cxl;
+
+	/* Real BARs go through the core P2P exporter unchanged. */
+	if (region_index < VFIO_PCI_NUM_REGIONS)
+		return vfio_pci_core_get_dmabuf_phys(vdev, provider,
+						     region_index, phys_vec,
+						     dma_ranges, nr_ranges);
+
+	/* Of the device regions, only the HDM memory window is exportable. */
+	if (region_index != cxl->mem_region_index)
+		return -EINVAL;
+
+	/*
+	 * The HDM window is coherent host memory, not BAR MMIO, so it has no
+	 * p2pdma provider of its own. Borrow BAR 0's: the P2P properties match
+	 * and the iommufd importer does not consume the provider. The sgt map
+	 * path (real peer DMA) is not supported for the HDM window.
+	 */
+	*provider = pcim_p2pdma_provider(vdev->pdev, 0);
+	if (!*provider)
+		return -EINVAL;
+
+	return vfio_pci_core_fill_phys_vec(phys_vec, dma_ranges, nr_ranges,
+					  cxl->hpa_range.start,
+					  range_len(&cxl->hpa_range));
+}
+
+static const struct vfio_pci_device_ops vfio_cxl_pci_dev_ops = {
+	.get_dmabuf_phys = vfio_cxl_get_dmabuf_phys,
+};
 
 /* CXL r4.0 sec 8.1.3.8.2: Range 1 Size Low Memory_Active_Timeout encodings */
 static const unsigned int vfio_cxl_mem_active_timeout_s[] = { 1, 4, 16, 64, 256 };
@@ -707,8 +768,21 @@ static int vfio_cxl_open_device(struct vfio_pci_core_device *vdev)
 	if (ret)
 		return ret;
 
-	/* Record where the HDM memory region landed, to revoke it later. */
+	/*
+	 * Record where the HDM memory region landed, to revoke it and to
+	 * resolve its dma-buf export.
+	 */
 	cxl->mem_region_index = VFIO_PCI_NUM_REGIONS + vdev->num_regions - 1;
+
+	/*
+	 * Override the device ops so a dma-buf export of the HDM memory region
+	 * resolves to the coherent host range. This is done at open, not init:
+	 * vfio_pci_probe() resets pci_ops after vfio_alloc_device() returns, so
+	 * an override installed during init would be clobbered. Only a CXL device
+	 * reaches this hook (cxl_ops is set on init success), so a device bound
+	 * without CXL support keeps the core ops.
+	 */
+	vdev->pci_ops = &vfio_cxl_pci_dev_ops;
 
 	ret = vfio_cxl_add_region(vdev, VFIO_REGION_SUBTYPE_CXL_COMP_REGS,
 				  &vfio_cxl_comp_regops, cxl->hdm_len,
