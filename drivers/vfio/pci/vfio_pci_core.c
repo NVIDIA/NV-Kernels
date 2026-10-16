@@ -318,10 +318,31 @@ static void vfio_pci_probe_power_state(struct vfio_pci_core_device *vdev)
  * by PM capability emulation and separately from pci_dev internal saved state
  * to avoid it being overwritten and consumed around other resets.
  */
+/*
+ * A provider whose device state does not survive low power is told before
+ * the device leaves D0 and after it is back in D0 with its config space
+ * restored. Both run with memory_lock held for write.
+ */
+static void vfio_pci_provider_power_down(struct vfio_pci_core_device *vdev)
+{
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	if (vdev->cxl_ops && vdev->cxl_ops->power_down)
+		vdev->cxl_ops->power_down(vdev);
+}
+
+void vfio_pci_provider_power_up(struct vfio_pci_core_device *vdev)
+{
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	if (vdev->cxl_ops && vdev->cxl_ops->power_up)
+		vdev->cxl_ops->power_up(vdev);
+}
+
 int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev, pci_power_t state)
 {
 	struct pci_dev *pdev = vdev->pdev;
-	bool needs_restore = false, needs_save = false;
+	bool needs_restore = false, needs_save = false, powered_down = false;
 	int ret;
 
 	/* Prevent changing power state for PFs with VFs enabled */
@@ -329,6 +350,11 @@ int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev, pci_power_t stat
 		lockdep_assert_held_write(&vdev->memory_lock);
 		if (vdev->sriov_active)
 			return -EBUSY;
+
+		if (pdev->current_state == PCI_D0) {
+			vfio_pci_provider_power_down(vdev);
+			powered_down = true;
+		}
 	}
 
 	if (vdev->needs_pm_restore) {
@@ -365,6 +391,14 @@ int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev, pci_power_t stat
 			pci_restore_state(pdev);
 		}
 	}
+
+	/*
+	 * The device stayed in D0: the transition failed, or a quirk keeps it
+	 * there. No later D0 transition will call power_up, so undo power_down
+	 * now.
+	 */
+	if (powered_down && pdev->current_state == PCI_D0)
+		vfio_pci_provider_power_up(vdev);
 
 	return ret;
 }
@@ -502,6 +536,8 @@ static int vfio_pci_core_runtime_suspend(struct device *dev)
 	 * (saved locally in 'vdev->pm_save').
 	 */
 	vfio_pci_set_power_state(vdev, PCI_D0);
+	/* The PCI core moves the device to low power once this returns. */
+	vfio_pci_provider_power_down(vdev);
 	up_write(&vdev->memory_lock);
 
 	/*
@@ -526,6 +562,8 @@ static int vfio_pci_core_runtime_resume(struct device *dev)
 	 * low power mode.
 	 */
 	down_write(&vdev->memory_lock);
+	/* The PCI core has restored the config space of the device. */
+	vfio_pci_provider_power_up(vdev);
 	if (vdev->pm_wake_eventfd_ctx) {
 		eventfd_signal(vdev->pm_wake_eventfd_ctx);
 		__vfio_pci_runtime_pm_exit(vdev);
