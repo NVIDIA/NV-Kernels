@@ -371,7 +371,7 @@ struct vfio_region_info_cap_type {
 #define VFIO_REGION_SUBTYPE_IBM_NVLINK2_ATSD	(1)
 
 /* CXL Type-2 device (0x1e98) sub-types for VFIO_REGION_TYPE_PCI_VENDOR_TYPE */
-/* CXL.mem HDM region of a Type-2 device, read and write */
+/* CXL.mem HDM region of a Type-2 device, read, write and mmap */
 #define VFIO_REGION_SUBTYPE_CXL_MEM		(1)
 
 /* sub-types for VFIO_REGION_TYPE_GFX */
