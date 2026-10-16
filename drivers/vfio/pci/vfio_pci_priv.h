@@ -141,6 +141,8 @@ int vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
 				  size_t argsz);
 void vfio_pci_dma_buf_cleanup(struct vfio_pci_core_device *vdev);
 void vfio_pci_dma_buf_move(struct vfio_pci_core_device *vdev, bool revoked);
+void vfio_pci_dma_buf_move_region(struct vfio_pci_core_device *vdev,
+				  unsigned int index, bool revoked);
 #else
 static inline int
 vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
@@ -154,6 +156,11 @@ static inline void vfio_pci_dma_buf_cleanup(struct vfio_pci_core_device *vdev)
 }
 static inline void vfio_pci_dma_buf_move(struct vfio_pci_core_device *vdev,
 					 bool revoked)
+{
+}
+static inline void
+vfio_pci_dma_buf_move_region(struct vfio_pci_core_device *vdev,
+			     unsigned int index, bool revoked)
 {
 }
 #endif
