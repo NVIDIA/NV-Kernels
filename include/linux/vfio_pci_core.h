@@ -108,6 +108,13 @@ struct vfio_cxl_ops {
 	 * saves it first, the close path keeps the open-time copy.
 	 */
 	int	(*reset)(struct vfio_pci_core_device *vdev);
+	/*
+	 * Optional. Called with memory_lock held for write before the device
+	 * leaves D0, and after it returns to D0 with its config space
+	 * restored. power_down may be called again while already powered down.
+	 */
+	void	(*power_down)(struct vfio_pci_core_device *vdev);
+	void	(*power_up)(struct vfio_pci_core_device *vdev);
 	/* Pinned per bound CXL device so vfio-cxl cannot unload under usage */
 	struct module *owner;
 };
