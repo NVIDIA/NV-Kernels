@@ -223,13 +223,50 @@ static const struct pci_device_id vfio_pci_table[] = {
 
 MODULE_DEVICE_TABLE(pci, vfio_pci_table);
 
+static void vfio_pci_reset_prepare(struct pci_dev *pdev)
+{
+	struct vfio_pci_core_device *vdev = dev_get_drvdata(&pdev->dev);
+
+	vfio_pci_core_reset_prepare(vdev);
+}
+
+static void vfio_pci_reset_done(struct pci_dev *pdev)
+{
+	struct vfio_pci_core_device *vdev = dev_get_drvdata(&pdev->dev);
+
+	vfio_pci_core_reset_done(vdev);
+}
+
+static pci_ers_result_t vfio_pci_error_detected(struct pci_dev *pdev,
+						pci_channel_state_t state)
+{
+	struct vfio_pci_core_device *vdev = dev_get_drvdata(&pdev->dev);
+
+	vfio_pci_core_error_detected(vdev);
+	return vfio_pci_core_aer_err_detected(pdev, state);
+}
+
+static void vfio_pci_error_resume(struct pci_dev *pdev)
+{
+	struct vfio_pci_core_device *vdev = dev_get_drvdata(&pdev->dev);
+
+	vfio_pci_core_error_resume(vdev);
+}
+
+static const struct pci_error_handlers vfio_pci_err_handlers = {
+	.error_detected = vfio_pci_error_detected,
+	.reset_prepare = vfio_pci_reset_prepare,
+	.reset_done = vfio_pci_reset_done,
+	.resume = vfio_pci_error_resume,
+};
+
 static struct pci_driver vfio_pci_driver = {
 	.name			= "vfio-pci",
 	.id_table		= vfio_pci_table,
 	.probe			= vfio_pci_probe,
 	.remove			= vfio_pci_remove,
 	.sriov_configure	= vfio_pci_sriov_configure,
-	.err_handler		= &vfio_pci_core_err_handlers,
+	.err_handler		= &vfio_pci_err_handlers,
 	.driver_managed_dma	= true,
 };
 
