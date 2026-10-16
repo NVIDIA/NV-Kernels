@@ -28698,6 +28698,7 @@ M:	Manish Honap <mhonap@nvidia.com>
 L:	kvm@vger.kernel.org
 L:	linux-cxl@vger.kernel.org
 S:	Supported
+F:	Documentation/driver-api/vfio-pci-cxl.rst
 F:	drivers/vfio/pci/cxl/
 
 VFIO DRIVER
