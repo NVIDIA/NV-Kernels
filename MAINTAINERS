@@ -6588,6 +6588,7 @@ F:	Documentation/userspace-api/fwctl/fwctl-cxl.rst
 F:	drivers/cxl/
 F:	drivers/pci/cxl.c
 F:	include/cxl/
+F:	include/uapi/cxl/
 F:	include/uapi/linux/cxl_mem.h
 F:	tools/testing/cxl/
 
