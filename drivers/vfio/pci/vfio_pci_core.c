@@ -1106,6 +1106,88 @@ static void vfio_pci_free_excluded_ranges(struct vfio_pci_core_device *vdev)
 	}
 }
 
+/* True when [start, start + len) on @bar overlaps a range with any of @flags. */
+static bool vfio_pci_bar_range_excluded(struct vfio_pci_core_device *vdev,
+					int bar, u64 start, u64 len, u32 flags)
+{
+	struct vfio_pci_excluded_range *range;
+
+	/* Only BARs have excluded ranges; a device-specific region has none. */
+	if (bar >= PCI_STD_NUM_BARS)
+		return false;
+
+	list_for_each_entry(range, &vdev->excluded_ranges[bar], entry) {
+		if (range->start >= start + len)
+			break;
+		if ((range->flags & flags) &&
+		    start < range->start + range->size)
+			return true;
+	}
+
+	return false;
+}
+
+/*
+ * Advertise a BAR with mmap-excluded ranges as the mmap-able areas between
+ * them. mmap is page granular, so each range is rounded out to whole pages;
+ * ranges that meet after rounding merge into one hole. The first walk counts
+ * the areas and the second fills them.
+ */
+static int vfio_pci_excluded_sparse_cap(struct vfio_pci_core_device *vdev,
+					int bar, struct vfio_info_cap *caps)
+{
+	struct vfio_region_info_cap_sparse_mmap *sparse __free(kfree) = NULL;
+	u64 bar_len = pci_resource_len(vdev->pdev, bar);
+	struct vfio_pci_excluded_range *range;
+	u32 nr_areas = 0;
+	bool holes = false;
+	u64 pos = 0;
+	u32 i = 0;
+
+	list_for_each_entry(range, &vdev->excluded_ranges[bar], entry) {
+		if (!(range->flags & VFIO_PCI_EXCLUDE_MMAP))
+			continue;
+		holes = true;
+		if (ALIGN_DOWN(range->start, PAGE_SIZE) > pos)
+			nr_areas++;
+		pos = max(pos, ALIGN(range->start + range->size, PAGE_SIZE));
+	}
+	if (!holes)
+		return 0;
+	if (pos < bar_len)
+		nr_areas++;
+
+	sparse = kzalloc_flex(*sparse, areas, nr_areas);
+	if (!sparse)
+		return -ENOMEM;
+
+	sparse->header.id = VFIO_REGION_INFO_CAP_SPARSE_MMAP;
+	sparse->header.version = 1;
+	sparse->nr_areas = nr_areas;
+
+	pos = 0;
+	list_for_each_entry(range, &vdev->excluded_ranges[bar], entry) {
+		u64 hole = ALIGN_DOWN(range->start, PAGE_SIZE);
+
+		if (!(range->flags & VFIO_PCI_EXCLUDE_MMAP))
+			continue;
+		if (hole > pos)
+			sparse->areas[i++] = (struct vfio_region_sparse_mmap_area) {
+				.offset = pos,
+				.size = hole - pos,
+			};
+		pos = max(pos, ALIGN(range->start + range->size, PAGE_SIZE));
+	}
+	if (pos < bar_len)
+		sparse->areas[i] = (struct vfio_region_sparse_mmap_area) {
+			.offset = pos,
+			.size = bar_len - pos,
+		};
+
+	return vfio_info_add_capability(caps, &sparse->header,
+					struct_size(sparse, areas, nr_areas));
+}
+
 int vfio_pci_core_register_dev_region(struct vfio_pci_core_device *vdev,
 				      unsigned int type, unsigned int subtype,
 				      const struct vfio_pci_regops *ops,
@@ -1254,6 +1336,10 @@ int vfio_pci_ioctl_get_region_info(struct vfio_device *core_vdev,
 				if (ret)
 					return ret;
 			}
+			ret = vfio_pci_excluded_sparse_cap(vdev, info->index,
+							   caps);
+			if (ret)
+				return ret;
 		}
 
 		break;
@@ -1945,6 +2031,11 @@ int vfio_pci_core_mmap(struct vfio_device *core_vdev, struct vm_area_struct *vma
 	req_start = pgoff << PAGE_SHIFT;
 
 	if (req_start + req_len > phys_len)
+		return -EINVAL;
+
+	/* An excluded sub-range is reachable only through its trap, not mmap. */
+	if (vfio_pci_bar_range_excluded(vdev, index, req_start, req_len,
+					VFIO_PCI_EXCLUDE_MMAP))
 		return -EINVAL;
 
 	/*
