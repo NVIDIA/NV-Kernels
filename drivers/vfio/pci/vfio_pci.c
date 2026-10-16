@@ -301,3 +301,12 @@ module_exit(vfio_pci_cleanup);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
+#if IS_MODULE(CONFIG_VFIO_CXL)
+/*
+ * Load the CXL Type-2 provider before this driver, so a CXL device can be
+ * served from its first probe. Requesting it from probe instead risks a
+ * deadlock: pci_call_probe() may run probe on a locality worker it waits for,
+ * under an async probe that modprobe's async_synchronize_full() waits for.
+ */
+MODULE_SOFTDEP("pre: vfio-cxl");
+#endif
