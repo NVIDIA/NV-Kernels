@@ -476,6 +476,15 @@ int vfio_pci_ioeventfd(struct vfio_pci_core_device *vdev, loff_t offset,
 	      pos >= vdev->msix_offset + vdev->msix_size))
 		return -EINVAL;
 
+	/*
+	 * The ioeventfd fire path writes the BAR directly, without the
+	 * excluded-range filter of vfio_pci_bar_rw(), so refuse a write-excluded
+	 * range here.
+	 */
+	if (vfio_pci_bar_range_excluded(vdev, bar, pos, count,
+					VFIO_PCI_EXCLUDE_WRITE))
+		return -EINVAL;
+
 	if (count == 8)
 		return -EINVAL;
 

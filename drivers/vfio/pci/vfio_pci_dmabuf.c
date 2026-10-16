@@ -260,6 +260,20 @@ int vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
 	if (ret)
 		goto err_free_ranges;
 
+	/*
+	 * A DMA mapping built from the dma-buf would reach a range that the
+	 * BAR keeps off mmap, so refuse such a range here as mmap does.
+	 */
+	for (u32 i = 0; i < get_dma_buf.nr_ranges; i++) {
+		if (vfio_pci_bar_range_excluded(vdev, get_dma_buf.region_index,
+						dma_ranges[i].offset,
+						dma_ranges[i].length,
+						VFIO_PCI_EXCLUDE_MMAP)) {
+			ret = -EINVAL;
+			goto err_free_ranges;
+		}
+	}
+
 	priv = kzalloc_obj(*priv);
 	if (!priv) {
 		ret = -ENOMEM;
