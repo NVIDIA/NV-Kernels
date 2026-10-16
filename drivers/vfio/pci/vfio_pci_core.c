@@ -2178,6 +2178,30 @@ static void vfio_pci_vga_uninit(struct vfio_pci_core_device *vdev)
 					      VGA_RSRC_LEGACY_MEM);
 }
 
+static const struct vfio_cxl_ops *vfio_pci_cxl_ops;
+static DECLARE_RWSEM(vfio_pci_cxl_ops_rwsem);
+
+int vfio_pci_core_register_cxl_ops(const struct vfio_cxl_ops *ops)
+{
+	guard(rwsem_write)(&vfio_pci_cxl_ops_rwsem);
+
+	if (vfio_pci_cxl_ops)
+		return -EBUSY;
+
+	vfio_pci_cxl_ops = ops;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(vfio_pci_core_register_cxl_ops);
+
+void vfio_pci_core_unregister_cxl_ops(const struct vfio_cxl_ops *ops)
+{
+	guard(rwsem_write)(&vfio_pci_cxl_ops_rwsem);
+
+	if (vfio_pci_cxl_ops == ops)
+		vfio_pci_cxl_ops = NULL;
+}
+EXPORT_SYMBOL_GPL(vfio_pci_core_unregister_cxl_ops);
+
 int vfio_pci_core_init_dev(struct vfio_device *core_vdev)
 {
 	struct vfio_pci_core_device *vdev =

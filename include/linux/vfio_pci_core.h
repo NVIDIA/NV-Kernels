@@ -66,6 +66,16 @@ struct vfio_pci_device_ops {
 			       size_t nr_ranges);
 };
 
+struct vfio_cxl_ops {
+	int	(*init)(struct vfio_pci_core_device *vdev);
+	void	(*release)(struct vfio_pci_core_device *vdev);
+	/* Pinned per bound CXL device so vfio-cxl cannot unload under usage */
+	struct module *owner;
+};
+
+int vfio_pci_core_register_cxl_ops(const struct vfio_cxl_ops *ops);
+void vfio_pci_core_unregister_cxl_ops(const struct vfio_cxl_ops *ops);
+
 #if IS_ENABLED(CONFIG_VFIO_PCI_DMABUF)
 int vfio_pci_core_fill_phys_vec(struct phys_vec *phys_vec,
 				struct vfio_region_dma_range *dma_ranges,
