@@ -29,6 +29,8 @@
  * @hpa_res: exclusive reservation of @hpa_range, held for the bind
  * @hdm: copy of the HDM state cached at PCI enumeration, taken at bind
  * @hdm_pfn_space: HDM-region pfn range registered with memory_failure()
+ * @hdm_regs: mapped HDM decoder registers, read live by the decoder region
+ * @hdm_len: length of the HDM decoder register block
  * @hdm_valid: true when host CPU access to the HDM range is safe; under memory_lock
  * @await_mem_active: the device reports Mem_HwInit_Mode, so wait for
  *	Memory_Active before host access reopens after a reset or low power
@@ -41,6 +43,8 @@ struct vfio_cxl_state {
 	struct resource *hpa_res;
 	struct cxl_hdm_info *hdm;
 	struct pfn_address_space hdm_pfn_space;
+	void __iomem *hdm_regs;
+	u32 hdm_len;
 	bool hdm_valid;
 	bool await_mem_active;
 	unsigned int mem_region_index;
@@ -214,6 +218,76 @@ static const struct vfio_pci_regops vfio_cxl_mem_regops = {
 	.release = vfio_cxl_region_release,
 };
 
+static ssize_t vfio_cxl_comp_rw(struct vfio_pci_core_device *vdev,
+				char __user *buf, size_t count, loff_t *ppos,
+				bool iswrite)
+{
+	struct vfio_cxl_state *cxl = vdev->cxl;
+	loff_t pos = *ppos & VFIO_PCI_OFFSET_MASK;
+	__le32 *tmp;
+
+	if (pos >= cxl->hdm_len)
+		return -EINVAL;
+
+	/*
+	 * Component registers allow only full-width accesses: a 32-bit
+	 * register as one 4-byte read or write (CXL r4.0 sec 8.2.3).
+	 */
+	if (pos % sizeof(u32) || count % sizeof(u32))
+		return -EINVAL;
+
+	count = min_t(size_t, count, cxl->hdm_len - pos);
+
+	/*
+	 * The physical decoder was committed before the guest saw the device
+	 * (firmware may also have locked it), so the guest never drives it:
+	 * absorb writes without forwarding them to hardware. The guest programs
+	 * a GPA that the VMM virtualizes; reads return the live registers, which
+	 * already report the decoder committed. BASE_LOW and BASE_HIGH carry the
+	 * host HPA, visible only to the trusted VMM that virtualizes it away from
+	 * the guest.
+	 */
+	if (iswrite) {
+		*ppos += count;
+		return count;
+	}
+
+	tmp = kmalloc(count, GFP_KERNEL);
+	if (!tmp)
+		return -ENOMEM;
+
+	/* The block is BAR MMIO, so it decodes only with memory enabled. */
+	scoped_guard(rwsem_read, &vdev->memory_lock) {
+		if (!__vfio_pci_memory_enabled(vdev)) {
+			kfree(tmp);
+			return -EIO;
+		}
+		/*
+		 * One readl() per register: memcpy_fromio() may split the
+		 * copy into byte or qword reads, and the decoder registers
+		 * take only aligned dword accesses. Return them in the
+		 * register byte order, as a raw copy would.
+		 */
+		for (size_t i = 0; i < count / sizeof(u32); i++)
+			tmp[i] = cpu_to_le32(readl(cxl->hdm_regs + pos +
+						   i * sizeof(u32)));
+	}
+
+	if (copy_to_user(buf, tmp, count)) {
+		kfree(tmp);
+		return -EFAULT;
+	}
+	kfree(tmp);
+
+	*ppos += count;
+	return count;
+}
+
+static const struct vfio_pci_regops vfio_cxl_comp_regops = {
+	.rw = vfio_cxl_comp_rw,
+	.release = vfio_cxl_region_release,
+};
+
 /*
  * Map a poisoned HDM-region pfn back to the file offset of each user mapping so
  * memory_failure() can find the mapping and signal its owner. The region is a
@@ -317,6 +391,20 @@ vfio_cxl_create_memdev(struct pci_dev *pdev, const struct cxl_hdm_info *hdm,
 		pci_err(pdev, "vfio-cxl: HDM decoder registers not found\n");
 		return ERR_PTR(-ENODEV);
 	}
+
+	/*
+	 * Map the HDM decoder registers so the decoder region can read them
+	 * live. The block location comes from the enumeration cache in
+	 * pdev->hdm, read through the copy in hdm; vfio-pci owns the BAR, so map
+	 * without claiming the block.
+	 */
+	cxl->hdm_regs = devm_ioremap(&pdev->dev,
+				     pci_resource_start(pdev, hdm->hdm_bar) +
+				     hdm->hdm_offset, hdm->hdm_size);
+	if (!cxl->hdm_regs)
+		return ERR_PTR(-ENOMEM);
+
+	cxl->hdm_len = hdm->hdm_size;
 
 	/*
 	 * A Type-2 accelerator has no mailbox and no media-ready register, so
@@ -564,6 +652,13 @@ static int vfio_cxl_open_device(struct vfio_pci_core_device *vdev)
 	/* Record where the HDM memory region landed, to revoke it later. */
 	cxl->mem_region_index = VFIO_PCI_NUM_REGIONS + vdev->num_regions - 1;
 
+	ret = vfio_cxl_add_region(vdev, VFIO_REGION_SUBTYPE_CXL_COMP_REGS,
+				  &vfio_cxl_comp_regops, cxl->hdm_len,
+				  VFIO_REGION_INFO_FLAG_READ |
+				  VFIO_REGION_INFO_FLAG_WRITE);
+	if (ret)
+		goto err_index;
+
 	/*
 	 * The HDM region is advertised mmap-able, so a fd holder can fault its
 	 * struct-page-less device memory in from the host CPU. Register it with
@@ -632,6 +727,28 @@ static void vfio_cxl_rearm_hdm(struct vfio_pci_core_device *vdev)
 }
 
 /*
+ * A CXL Reset or decoder restore that fails leaves Memory Space and Bus
+ * Master disabled (cxl_reset_save_disabled_state()). The user reads Command
+ * from the device, but vfio-pci-core gates BAR access, BAR mmap faults, BAR
+ * dma-bufs and the decoder register region on its own record of Memory
+ * Space. Match that record to the device, zapping the BAR mmaps and
+ * revoking the BAR dma-bufs as a user clear would; the user's next Memory
+ * Space write sets it again.
+ */
+static void vfio_cxl_sync_mem_enable(struct vfio_pci_core_device *vdev)
+{
+	u16 cmd;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	if (!pci_read_config_word(vdev->pdev, PCI_COMMAND, &cmd) &&
+	    !PCI_POSSIBLE_ERROR(cmd) && (cmd & PCI_COMMAND_MEMORY))
+		return;
+
+	vfio_pci_core_clear_memory_enable(vdev);
+}
+
+/*
  * vfio-cxl holds the HDM range, so the PCI core's cxl_reset method would
  * fail to request it. Run the same CXL Reset with that claim.
  */
@@ -674,10 +791,12 @@ static void vfio_cxl_power_up(struct vfio_pci_core_device *vdev)
 		ret = cxl_recover_state_after_pci_reset(pdev, cxl->hdm);
 	pci_dev_unlock(pdev);
 
-	if (ret)
+	if (ret) {
 		pci_warn(pdev, "vfio-cxl: HDM decoder restore failed: %d\n", ret);
-	else if (!vfio_cxl_await_mem_active(vdev))
+		vfio_cxl_sync_mem_enable(vdev);
+	} else if (!vfio_cxl_await_mem_active(vdev)) {
 		vfio_cxl_rearm_hdm(vdev);
+	}
 }
 
 static const struct vfio_cxl_ops vfio_cxl_ops = {
