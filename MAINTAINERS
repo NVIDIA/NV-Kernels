@@ -28700,6 +28700,7 @@ L:	linux-cxl@vger.kernel.org
 S:	Supported
 F:	Documentation/driver-api/vfio-pci-cxl.rst
 F:	drivers/vfio/pci/cxl/
+F:	tools/testing/selftests/vfio/vfio_cxl_type2_test.c
 
 VFIO DRIVER
 M:	Alex Williamson <alex@shazbot.org>
