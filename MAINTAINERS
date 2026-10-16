@@ -28693,6 +28693,13 @@ L:	kvm@vger.kernel.org
 S:	Maintained
 F:	drivers/vfio/cdx/*
 
+VFIO CXL DRIVER
+M:	Manish Honap <mhonap@nvidia.com>
+L:	kvm@vger.kernel.org
+L:	linux-cxl@vger.kernel.org
+S:	Supported
+F:	drivers/vfio/pci/cxl/
+
 VFIO DRIVER
 M:	Alex Williamson <alex@shazbot.org>
 L:	kvm@vger.kernel.org
