@@ -78,6 +78,7 @@ void vfio_config_free(struct vfio_pci_core_device *vdev);
 
 int vfio_pci_set_power_state(struct vfio_pci_core_device *vdev,
 			     pci_power_t state);
+void vfio_pci_provider_power_up(struct vfio_pci_core_device *vdev);
 
 void vfio_pci_zap_and_down_write_memory_lock(struct vfio_pci_core_device *vdev);
 int vfio_pci_try_reset_function(struct vfio_pci_core_device *vdev);
