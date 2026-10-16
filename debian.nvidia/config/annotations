@@ -195,6 +195,9 @@ CONFIG_PINCTRL_MT8901                           note<'LP: #2117784'>
 CONFIG_R8127                                    policy<{'amd64': 'n', 'arm64': 'm'}>
 CONFIG_R8127                                    note<'LP: #2109730'>
 
+CONFIG_RESCTRL_IOMMU                            policy<{'arm64': 'y'}>
+CONFIG_RESCTRL_IOMMU                            note<'Assign iommu_groups to resctrl groups for MPAM (LP: #2167008)'>
+
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  policy<{'arm64': 'n'}>
 CONFIG_SAMPLE_CORESIGHT_SYSCFG                  note<'Required for Grace enablement'>
 
