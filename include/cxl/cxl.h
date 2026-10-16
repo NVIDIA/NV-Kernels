@@ -154,6 +154,7 @@ struct cxl_pmu_reg_map {
  * @bar: PCI BAR containing the register block
  * @bar_offset: register block offset relative to @bar
  * @reg_type: see enum cxl_regloc_type
+ * @owned: driver-owned resource whose sub-blocks are mapped without re-requesting
  * @component_map: cxl_reg_map for component registers
  * @device_map: cxl_reg_maps for device registers
  * @pmu_map: cxl_reg_maps for CXL Performance Monitoring Units
@@ -166,6 +167,7 @@ struct cxl_register_map {
 	int bar;
 	resource_size_t bar_offset;
 	u8 reg_type;
+	struct resource *owned;
 	union {
 		struct cxl_component_reg_map component_map;
 		struct cxl_device_reg_map device_map;
