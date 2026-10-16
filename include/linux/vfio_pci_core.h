@@ -120,6 +120,9 @@ struct vfio_pci_core_device {
 	u8			*pci_config_map;
 	u8			*vconfig;
 	struct perm_bits	*msi_perm;
+	struct perm_bits	*cxl_perm;
+	u16			cxl_dvsec;
+	u16			cxl_dvsec_len;
 	spinlock_t		irqlock;
 	struct mutex		igate;
 	struct xarray		ctx;
