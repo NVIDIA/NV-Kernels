@@ -72,6 +72,35 @@ struct vfio_cxl_ops {
 	void	(*release)(struct vfio_pci_core_device *vdev);
 	int	(*open_device)(struct vfio_pci_core_device *vdev);
 	void	(*close_device)(struct vfio_pci_core_device *vdev);
+	/*
+	 * Optional. Called with memory_lock held for write when AER or DPC
+	 * recovery resumes the device, after reset_prepare was called for the
+	 * error. Config space is as the recovery left it.
+	 */
+	void	(*error_resume)(struct vfio_pci_core_device *vdev);
+	/*
+	 * Called around a PCI core reset of the device with memory_lock held
+	 * for write; reset_prepare also when AER or DPC recovery reports an
+	 * error. reset_done returns an error if the provider could not
+	 * restore the device; VFIO_DEVICE_PCI_HOT_RESET returns it, and for
+	 * any other reset the provider logs it.
+	 */
+	void	(*reset_prepare)(struct vfio_pci_core_device *vdev);
+	int	(*reset_done)(struct vfio_pci_core_device *vdev);
+	/*
+	 * Optional. Called with memory_lock held for write before a raw bus
+	 * reset the provider does not drive, after user mappings have been
+	 * revoked and before the reset starts, so the provider can complete
+	 * any cache maintenance the reset needs. A non-zero return aborts
+	 * the reset and is returned to the caller.
+	 */
+	int	(*reset_flush)(struct vfio_pci_core_device *vdev);
+	/*
+	 * Optional. Called with memory_lock held for write when a reset_flush()
+	 * was started but reset_done did not run, so the provider can put
+	 * back whatever the flush changed. A call after reset_done is a no-op.
+	 */
+	void	(*reset_flush_abort)(struct vfio_pci_core_device *vdev);
 	/* Pinned per bound CXL device so vfio-cxl cannot unload under usage */
 	struct module *owner;
 };
@@ -166,6 +195,9 @@ struct vfio_pci_core_device {
 	struct vfio_pci_core_device	*sriov_pf_core_dev;
 	struct notifier_block	nb;
 	struct rw_semaphore	memory_lock;
+	/* Task running VFIO_DEVICE_PCI_HOT_RESET while it holds memory_lock */
+	struct task_struct	*hot_reset_task;
+	int			reset_done_err;
 	struct list_head	dmabufs;
 	/*
 	 * Excluded BAR sub-ranges, one list per BAR, sorted by start and not
@@ -207,6 +239,10 @@ void vfio_pci_core_release_dev(struct vfio_device *core_vdev);
 int vfio_pci_core_register_device(struct vfio_pci_core_device *vdev);
 void vfio_pci_core_unregister_device(struct vfio_pci_core_device *vdev);
 extern const struct pci_error_handlers vfio_pci_core_err_handlers;
+void vfio_pci_core_reset_prepare(struct vfio_pci_core_device *vdev);
+void vfio_pci_core_reset_done(struct vfio_pci_core_device *vdev);
+void vfio_pci_core_error_detected(struct vfio_pci_core_device *vdev);
+void vfio_pci_core_error_resume(struct vfio_pci_core_device *vdev);
 int vfio_pci_core_sriov_configure(struct vfio_pci_core_device *vdev,
 				  int nr_virtfn);
 long vfio_pci_core_ioctl(struct vfio_device *core_vdev, unsigned int cmd,
