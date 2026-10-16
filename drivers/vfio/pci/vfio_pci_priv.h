@@ -44,6 +44,14 @@ ssize_t vfio_pci_config_rw_single(struct vfio_pci_core_device *vdev,
 ssize_t vfio_pci_bar_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 			size_t count, loff_t *ppos, bool iswrite);
 
+/* A BAR sub-range kept off direct access; see vfio_pci_core_add_excluded_range() */
+struct vfio_pci_excluded_range {
+	struct list_head	entry;
+	u64			start;
+	u64			size;
+	u32			flags;
+};
+
 #ifdef CONFIG_VFIO_PCI_VGA
 ssize_t vfio_pci_vga_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 			size_t count, loff_t *ppos, bool iswrite);

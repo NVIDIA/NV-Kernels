@@ -198,6 +198,57 @@ ssize_t vfio_pci_core_do_io_rw(struct vfio_pci_core_device *vdev, bool test_mem,
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_do_io_rw);
 
+/*
+ * Access @count bytes of @bar at @pos, walking the BAR's excluded ranges in
+ * order: a range excluded for this direction reads as -1 and drops writes,
+ * and the bytes around it reach the device. The MSI-X table is one such
+ * range, and a BAR can hold several, for example the MSI-X table and a CXL
+ * HDM decoder block.
+ */
+static ssize_t vfio_pci_bar_do_io_rw(struct vfio_pci_core_device *vdev,
+				     int bar, bool test_mem, void __iomem *io,
+				     char __user *buf, loff_t pos,
+				     size_t count, bool iswrite,
+				     enum vfio_pci_io_width max_width)
+{
+	u32 want = iswrite ? VFIO_PCI_EXCLUDE_WRITE : VFIO_PCI_EXCLUDE_READ;
+	struct vfio_pci_excluded_range *range;
+	ssize_t done = 0;
+	ssize_t ret;
+
+	list_for_each_entry(range, &vdev->excluded_ranges[bar], entry) {
+		u64 end = range->start + range->size;
+		size_t chunk;
+
+		if (!(range->flags & want) || end <= pos)
+			continue;
+		if (range->start >= pos + count)
+			break;
+
+		/* Up to the end of this range; do_io_rw() fills it. */
+		chunk = min_t(u64, count, end - pos);
+		ret = vfio_pci_core_do_io_rw(vdev, test_mem, io, buf, pos, chunk,
+					     range->start, end, iswrite,
+					     max_width);
+		if (ret < 0)
+			return done ?: ret;
+
+		done += ret;
+		pos += ret;
+		buf += ret;
+		count -= ret;
+		if (!count)
+			return done;
+	}
+
+	ret = vfio_pci_core_do_io_rw(vdev, test_mem, io, buf, pos, count, 0, 0,
+				     iswrite, max_width);
+	if (ret < 0)
+		return done ?: ret;
+
+	return done + ret;
+}
+
 ssize_t vfio_pci_bar_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 			size_t count, loff_t *ppos, bool iswrite)
 {
@@ -256,13 +307,15 @@ ssize_t vfio_pci_bar_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 		}
 	}
 
-	if (bar == vdev->msix_bar) {
-		x_start = vdev->msix_offset;
-		x_end = vdev->msix_offset + vdev->msix_size;
-	}
-
-	done = vfio_pci_core_do_io_rw(vdev, res->flags & IORESOURCE_MEM, io, buf, pos,
-				      count, x_start, x_end, iswrite, max_width);
+	if (bar == PCI_ROM_RESOURCE)
+		done = vfio_pci_core_do_io_rw(vdev, res->flags & IORESOURCE_MEM,
+					      io, buf, pos, count, x_start,
+					      x_end, iswrite, max_width);
+	else
+		done = vfio_pci_bar_do_io_rw(vdev, bar,
+					     res->flags & IORESOURCE_MEM, io,
+					     buf, pos, count, iswrite,
+					     max_width);
 
 	if (done >= 0)
 		*ppos += done;

@@ -588,6 +588,8 @@ static const struct dev_pm_ops vfio_pci_core_pm_ops = {
 			   NULL)
 };
 
+static void vfio_pci_free_excluded_ranges(struct vfio_pci_core_device *vdev);
+
 int vfio_pci_core_enable(struct vfio_pci_core_device *vdev)
 {
 	struct pci_dev *pdev = vdev->pdev;
@@ -644,6 +646,7 @@ int vfio_pci_core_enable(struct vfio_pci_core_device *vdev)
 
 	msix_pos = pdev->msix_cap;
 	if (msix_pos) {
+		u64 bar_len = 0;
 		u16 flags;
 		u32 table;
 
@@ -654,6 +657,30 @@ int vfio_pci_core_enable(struct vfio_pci_core_device *vdev)
 		vdev->msix_offset = table & PCI_MSIX_TABLE_OFFSET;
 		vdev->msix_size = ((flags & PCI_MSIX_FLAGS_QSIZE) + 1) * 16;
 		vdev->has_dyn_msix = pci_msix_can_alloc_dyn(pdev);
+
+		/*
+		 * Virtualize the MSI-X table through the excluded-range list:
+		 * reads fill -1 and writes are dropped so the guest never
+		 * reaches the hardware table directly. BAR access never goes
+		 * past the BAR, so only the part of the table inside the BAR
+		 * needs a range; a table placed outside its BAR needs none.
+		 */
+		if (vdev->msix_bar < PCI_STD_NUM_BARS)
+			bar_len = pci_resource_len(pdev, vdev->msix_bar);
+		if (vdev->msix_offset < bar_len) {
+			u64 len = min_t(u64, vdev->msix_size,
+					bar_len - vdev->msix_offset);
+
+			ret = vfio_pci_core_add_excluded_range(vdev, vdev->msix_bar,
+							       vdev->msix_offset, len,
+							       VFIO_PCI_EXCLUDE_READ |
+							       VFIO_PCI_EXCLUDE_WRITE);
+			if (ret) {
+				vfio_pci_free_excluded_ranges(vdev);
+				vfio_config_free(vdev);
+				goto out_free_zdev;
+			}
+		}
 	} else {
 		vdev->msix_bar = 0xFF;
 		vdev->has_dyn_msix = false;
@@ -740,6 +767,7 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 	vdev->region = NULL; /* don't krealloc a freed pointer */
 
 	vfio_config_free(vdev);
+	vfio_pci_free_excluded_ranges(vdev);
 
 	for (i = 0; i < PCI_STD_NUM_BARS; i++) {
 		bar = i + PCI_STD_RESOURCES;
@@ -1010,6 +1038,72 @@ static int msix_mmappable_cap(struct vfio_pci_core_device *vdev,
 	};
 
 	return vfio_info_add_capability(caps, &header, sizeof(header));
+}
+
+/**
+ * vfio_pci_core_add_excluded_range() - keep a BAR sub-range off direct access
+ * @vdev: vfio PCI device being opened
+ * @bar: BAR index, below PCI_STD_NUM_BARS
+ * @start: offset of the range in @bar
+ * @size: length of the range in bytes
+ * @flags: VFIO_PCI_EXCLUDE_* paths the range is excluded from
+ *
+ * Call only while the device is being opened, from vfio_pci_core_enable() or
+ * a provider's open hook; vfio_pci_core_disable() frees the ranges. Ranges on
+ * one BAR must not overlap and must lie inside the BAR.
+ *
+ * Return: 0 on success, -EINVAL for an invalid or overlapping range or one
+ * that ends past the BAR, or -ENOMEM.
+ */
+int vfio_pci_core_add_excluded_range(struct vfio_pci_core_device *vdev, int bar,
+				     u64 start, u64 size, u32 flags)
+{
+	const u32 valid = VFIO_PCI_EXCLUDE_MMAP | VFIO_PCI_EXCLUDE_READ |
+			  VFIO_PCI_EXCLUDE_WRITE;
+	struct vfio_pci_excluded_range *range, *pos;
+	struct list_head *head;
+
+	if (bar < 0 || bar >= PCI_STD_NUM_BARS || !size ||
+	    start + size < start || !flags || (flags & ~valid))
+		return -EINVAL;
+	if (start + size > pci_resource_len(vdev->pdev, bar))
+		return -EINVAL;
+
+	/* Keep the list sorted by start; find the first range after @start. */
+	head = &vdev->excluded_ranges[bar];
+	list_for_each_entry(pos, head, entry) {
+		if (start < pos->start + pos->size && start + size > pos->start)
+			return -EINVAL;
+		if (pos->start > start)
+			break;
+	}
+
+	range = kmalloc_obj(*range);
+	if (!range)
+		return -ENOMEM;
+
+	*range = (struct vfio_pci_excluded_range) {
+		.start = start,
+		.size = size,
+		.flags = flags,
+	};
+	list_add_tail(&range->entry, &pos->entry);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(vfio_pci_core_add_excluded_range);
+
+static void vfio_pci_free_excluded_ranges(struct vfio_pci_core_device *vdev)
+{
+	struct vfio_pci_excluded_range *range, *tmp;
+
+	for (int bar = 0; bar < PCI_STD_NUM_BARS; bar++) {
+		list_for_each_entry_safe(range, tmp, &vdev->excluded_ranges[bar],
+					 entry) {
+			list_del(&range->entry);
+			kfree(range);
+		}
+	}
 }
 
 int vfio_pci_core_register_dev_region(struct vfio_pci_core_device *vdev,
@@ -2359,6 +2453,8 @@ int vfio_pci_core_init_dev(struct vfio_device *core_vdev)
 	INIT_LIST_HEAD(&vdev->dmabufs);
 	init_rwsem(&vdev->memory_lock);
 	xa_init(&vdev->ctx);
+	for (int bar = 0; bar < PCI_STD_NUM_BARS; bar++)
+		INIT_LIST_HEAD(&vdev->excluded_ranges[bar]);
 
 	ret = vfio_pci_core_cxl_init(vdev);
 	if (ret)
@@ -2374,6 +2470,7 @@ void vfio_pci_core_release_dev(struct vfio_device *core_vdev)
 		container_of(core_vdev, struct vfio_pci_core_device, vdev);
 
 	vfio_pci_core_cxl_release(vdev);
+	vfio_pci_free_excluded_ranges(vdev);
 
 	mutex_destroy(&vdev->igate);
 	mutex_destroy(&vdev->ioeventfds_lock);
