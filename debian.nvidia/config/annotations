@@ -279,6 +279,9 @@ CONFIG_R8127                                    note<'LP: #2109730'>
 CONFIG_RESCTRL_FS				policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_RESCTRL_FS				note<'LP: #2122432'>
 
+CONFIG_RESCTRL_IOMMU                            policy<{'arm64': 'y'}>
+CONFIG_RESCTRL_IOMMU                            note<'Assign iommu_groups to resctrl groups for MPAM (LP: #2167008)'>
+
 CONFIG_RUST_FWCTL_ABSTRACTIONS                  policy<{'amd64': 'n', 'arm64': 'n'}>
 CONFIG_RUST_FWCTL_ABSTRACTIONS                  note<'Not needed; visible only because FWCTL is built in for CXL features'>
 
