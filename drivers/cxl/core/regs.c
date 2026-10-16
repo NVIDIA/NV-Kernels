@@ -177,6 +177,20 @@ void cxl_probe_device_regs(struct device *dev, void __iomem *base,
 }
 EXPORT_SYMBOL_NS_GPL(cxl_probe_device_regs, "CXL");
 
+static struct resource *devm_cxl_request_block(struct device *dev,
+					       resource_size_t addr,
+					       resource_size_t length)
+{
+	return devm_request_mem_region(dev, addr, length, dev_name(dev));
+}
+
+static void __iomem *devm_cxl_ioremap_block(struct device *dev,
+					    resource_size_t addr,
+					    resource_size_t length)
+{
+	return devm_ioremap(dev, addr, length);
+}
+
 void __iomem *devm_cxl_iomap_block(struct device *dev, resource_size_t addr,
 				   resource_size_t length)
 {
@@ -186,7 +200,7 @@ void __iomem *devm_cxl_iomap_block(struct device *dev, resource_size_t addr,
 	if (WARN_ON_ONCE(addr == CXL_RESOURCE_NONE))
 		return NULL;
 
-	res = devm_request_mem_region(dev, addr, length, dev_name(dev));
+	res = devm_cxl_request_block(dev, addr, length);
 	if (!res) {
 		resource_size_t end = addr + length - 1;
 
@@ -194,7 +208,7 @@ void __iomem *devm_cxl_iomap_block(struct device *dev, resource_size_t addr,
 		return NULL;
 	}
 
-	ret_val = devm_ioremap(dev, addr, length);
+	ret_val = devm_cxl_ioremap_block(dev, addr, length);
 	if (!ret_val)
 		dev_err(dev, "Failed to map region %pr\n", res);
 
