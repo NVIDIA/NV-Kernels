@@ -21,6 +21,13 @@ struct vfio_pci_dma_buf {
 	struct completion comp;
 	u32 region_index;
 	u8 revoked : 1;
+	/*
+	 * Set for a device-specific region (e.g. the CXL HDM window) that
+	 * borrows a BAR's p2pdma provider: mapping by physical address through
+	 * iommufd is safe, but a peer-DMA sgt map would translate with the
+	 * wrong provider bus offset.
+	 */
+	u8 no_peer2peer : 1;
 };
 
 static int vfio_pci_dma_buf_attach(struct dma_buf *dmabuf,
@@ -59,6 +66,15 @@ vfio_pci_dma_buf_map(struct dma_buf_attachment *attachment,
 
 	if (priv->revoked)
 		return ERR_PTR(-ENODEV);
+
+	/*
+	 * A borrowed-provider export can only be mapped by physical address
+	 * through iommufd, not as a peer-DMA sgt: dma_buf_phys_vec_to_sgt()
+	 * would translate the physical range with the borrowed provider's bus
+	 * offset and hand the peer a wrong address. Refuse it.
+	 */
+	if (priv->no_peer2peer)
+		return ERR_PTR(-EOPNOTSUPP);
 
 	ret = dma_buf_phys_vec_to_sgt(attachment, priv->provider,
 				      priv->phys_vec, priv->nr_ranges,
@@ -179,6 +195,15 @@ int vfio_pci_core_get_dmabuf_phys(struct vfio_pci_core_device *vdev,
 {
 	struct pci_dev *pdev = vdev->pdev;
 
+	/*
+	 * This resolver only handles PCI BARs. A device-specific region index
+	 * (>= PCI_STD_NUM_BARS) would index the per-BAR provider array
+	 * (p2p->mem[]) out of bounds in pcim_p2pdma_provider(), so reject it; a
+	 * driver that exports such a region installs its own get_dmabuf_phys.
+	 */
+	if (region_index >= PCI_STD_NUM_BARS)
+		return -EINVAL;
+
 	*provider = pcim_p2pdma_provider(pdev, region_index);
 	if (!*provider)
 		return -EINVAL;
@@ -219,6 +244,26 @@ static int validate_dmabuf_input(struct vfio_device_feature_dma_buf *dma_buf,
 	return 0;
 }
 
+/*
+ * A BAR dma-buf follows the memory enable bit. A device-specific region
+ * follows its own state, which its provider moves with
+ * vfio_pci_core_revoke_region() and vfio_pci_core_rearm_region(); start a
+ * new dma-buf in that state, since a memory enable change never moves it.
+ */
+static bool vfio_pci_dma_buf_start_revoked(struct vfio_pci_core_device *vdev,
+					   u32 index)
+{
+	struct vfio_pci_region *region;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	if (index < VFIO_PCI_NUM_REGIONS)
+		return !__vfio_pci_memory_enabled(vdev);
+
+	region = &vdev->region[index - VFIO_PCI_NUM_REGIONS];
+	return region->ops->revoked && region->ops->revoked(vdev, region);
+}
+
 int vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
 				  struct vfio_device_feature_dma_buf __user *arg,
 				  size_t argsz)
@@ -228,6 +273,7 @@ int vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
 	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
 	struct vfio_pci_dma_buf *priv;
 	size_t length;
+	u32 index;
 	int ret;
 
 	if (!vdev->pci_ops || !vdev->pci_ops->get_dmabuf_phys)
@@ -244,13 +290,22 @@ int vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
 	if (!get_dma_buf.nr_ranges || get_dma_buf.flags)
 		return -EINVAL;
 
+	index = get_dma_buf.region_index;
+
 	/*
-	 * For PCI the region_index is the BAR number like everything
-	 * else.  Check that PCI resources have been claimed for it.
+	 * A fixed region index is the BAR number; only a BAR can be exported
+	 * and its PCI resource must be claimed. A device-specific region (index
+	 * >= VFIO_PCI_NUM_REGIONS) has no BAR resource and is validated by the
+	 * device's get_dmabuf_phys instead, but the index must name a region
+	 * that exists.
 	 */
-	if (get_dma_buf.region_index >= VFIO_PCI_ROM_REGION_INDEX ||
-	    IS_ERR(vfio_pci_core_get_iomap(vdev, get_dma_buf.region_index)))
+	if (index < VFIO_PCI_NUM_REGIONS) {
+		if (index >= VFIO_PCI_ROM_REGION_INDEX ||
+		    IS_ERR(vfio_pci_core_get_iomap(vdev, index)))
+			return -ENODEV;
+	} else if (index - VFIO_PCI_NUM_REGIONS >= vdev->num_regions) {
 		return -ENODEV;
+	}
 
 	dma_ranges = memdup_array_user(&arg->dma_ranges, get_dma_buf.nr_ranges,
 				       sizeof(*dma_ranges));
@@ -266,7 +321,7 @@ int vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
 	 * BAR keeps off mmap, so refuse such a range here as mmap does.
 	 */
 	for (u32 i = 0; i < get_dma_buf.nr_ranges; i++) {
-		if (vfio_pci_bar_range_excluded(vdev, get_dma_buf.region_index,
+		if (vfio_pci_bar_range_excluded(vdev, index,
 						dma_ranges[i].offset,
 						dma_ranges[i].length,
 						VFIO_PCI_EXCLUDE_MMAP)) {
@@ -290,6 +345,12 @@ int vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
 	priv->nr_ranges = get_dma_buf.nr_ranges;
 	priv->size = length;
 	priv->region_index = get_dma_buf.region_index;
+	/*
+	 * A device-specific region borrows a BAR's p2pdma provider, so it can
+	 * only be mapped by physical address (iommufd), never as a peer-DMA
+	 * sgt. See vfio_pci_dma_buf_map().
+	 */
+	priv->no_peer2peer = index >= VFIO_PCI_NUM_REGIONS;
 	ret = vdev->pci_ops->get_dmabuf_phys(vdev, &priv->provider,
 					     get_dma_buf.region_index,
 					     priv->phys_vec, dma_ranges,
@@ -323,7 +384,7 @@ int vfio_pci_core_feature_dma_buf(struct vfio_pci_core_device *vdev, u32 flags,
 	INIT_LIST_HEAD(&priv->dmabufs_elm);
 	down_write(&vdev->memory_lock);
 	dma_resv_lock(priv->dmabuf->resv, NULL);
-	priv->revoked = !__vfio_pci_memory_enabled(vdev);
+	priv->revoked = vfio_pci_dma_buf_start_revoked(vdev, index);
 	list_add_tail(&priv->dmabufs_elm, &vdev->dmabufs);
 	dma_resv_unlock(priv->dmabuf->resv);
 	up_write(&vdev->memory_lock);

@@ -47,6 +47,15 @@ struct vfio_pci_regops {
 	int	(*add_capability)(struct vfio_pci_core_device *vdev,
 				  struct vfio_pci_region *region,
 				  struct vfio_info_cap *caps);
+	/*
+	 * Optional, for a device-specific region exported as a dma-buf.
+	 * Called with memory_lock held for write; returns true while the
+	 * region is revoked, so a new dma-buf starts in the state that
+	 * vfio_pci_core_revoke_region() and vfio_pci_core_rearm_region()
+	 * maintain. Without it, the dma-buf starts armed.
+	 */
+	bool	(*revoked)(struct vfio_pci_core_device *vdev,
+			   struct vfio_pci_region *region);
 };
 
 struct vfio_pci_region {
