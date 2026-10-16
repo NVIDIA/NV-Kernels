@@ -60,6 +60,16 @@ static bool disable_denylist;
 module_param(disable_denylist, bool, 0444);
 MODULE_PARM_DESC(disable_denylist, "Disable use of device denylist. Disabling the denylist allows binding to devices with known errata that may lead to exploitable stability or security issues when accessed by untrusted users.");
 
+#if IS_ENABLED(CONFIG_VFIO_CXL)
+/*
+ * A variant driver may instead set vdev->disable_cxl in its own init callback
+ * for per-device control without this module-wide parameter.
+ */
+static bool disable_cxl;
+module_param(disable_cxl, bool, 0644);
+MODULE_PARM_DESC(disable_cxl, "Disable CXL Type-2 extensions for all devices bound to vfio-pci.");
+#endif
+
 static bool vfio_pci_dev_in_denylist(struct pci_dev *pdev)
 {
 	switch (pdev->vendor) {
@@ -141,6 +151,9 @@ static int vfio_pci_init_dev(struct vfio_device *core_vdev)
 	vdev->disable_idle_d3 = disable_idle_d3;
 #ifdef CONFIG_VFIO_PCI_VGA
 	vdev->disable_vga = disable_vga;
+#endif
+#if IS_ENABLED(CONFIG_VFIO_CXL)
+	vdev->disable_cxl = disable_cxl;
 #endif
 
 	return vfio_pci_core_init_dev(core_vdev);

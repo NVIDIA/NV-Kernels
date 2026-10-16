@@ -2472,7 +2472,7 @@ static int vfio_pci_core_cxl_init(struct vfio_pci_core_device *vdev)
 	const struct vfio_cxl_ops *ops;
 	int ret;
 
-	if (!vfio_pci_is_cxl_type2(vdev->pdev))
+	if (vdev->disable_cxl || !vfio_pci_is_cxl_type2(vdev->pdev))
 		return 0;
 
 	ops = vfio_pci_get_cxl_ops();
