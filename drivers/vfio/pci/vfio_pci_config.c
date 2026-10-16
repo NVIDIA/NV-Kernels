@@ -910,7 +910,7 @@ static int vfio_exp_config_write(struct vfio_pci_core_device *vdev, int pos,
 		if (!ret && (cap & PCI_EXP_DEVCAP_FLR)) {
 			vfio_pci_zap_and_down_write_memory_lock(vdev);
 			vfio_pci_dma_buf_move(vdev, true);
-			pci_try_reset_function(vdev->pdev);
+			vfio_pci_try_reset_function(vdev);
 			if (__vfio_pci_memory_enabled(vdev))
 				vfio_pci_dma_buf_move(vdev, false);
 			up_write(&vdev->memory_lock);
@@ -995,7 +995,7 @@ static int vfio_af_config_write(struct vfio_pci_core_device *vdev, int pos,
 		if (!ret && (cap & PCI_AF_CAP_FLR) && (cap & PCI_AF_CAP_TP)) {
 			vfio_pci_zap_and_down_write_memory_lock(vdev);
 			vfio_pci_dma_buf_move(vdev, true);
-			pci_try_reset_function(vdev->pdev);
+			vfio_pci_try_reset_function(vdev);
 			if (__vfio_pci_memory_enabled(vdev))
 				vfio_pci_dma_buf_move(vdev, false);
 			up_write(&vdev->memory_lock);
@@ -1786,9 +1786,20 @@ static int vfio_cxl_dvsec_write(struct vfio_pci_core_device *vdev, int pos,
 	if (!(ctrl2 & PCI_DVSEC_CXL_DISABLE_CACHING))
 		status2 &= ~PCI_DVSEC_CXL_CACHE_INV;
 	if (ctrl2 & PCI_DVSEC_CXL_INIT_CXL_RST) {
+		int ret;
+
 		ctrl2 &= ~PCI_DVSEC_CXL_INIT_CXL_RST;
-		status2 &= ~PCI_DVSEC_CXL_RST_ERR;
-		status2 |= PCI_DVSEC_CXL_RST_DONE;
+
+		/* Run the real reset here and report its result in Status2. */
+		vfio_pci_zap_and_down_write_memory_lock(vdev);
+		vfio_pci_dma_buf_move(vdev, true);
+		ret = vfio_pci_try_reset_function(vdev);
+		if (__vfio_pci_memory_enabled(vdev))
+			vfio_pci_dma_buf_move(vdev, false);
+		up_write(&vdev->memory_lock);
+
+		status2 &= ~(PCI_DVSEC_CXL_RST_DONE | PCI_DVSEC_CXL_RST_ERR);
+		status2 |= ret ? PCI_DVSEC_CXL_RST_ERR : PCI_DVSEC_CXL_RST_DONE;
 	}
 
 	*pctrl2 = cpu_to_le16(ctrl2);
