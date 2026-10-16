@@ -57,6 +57,8 @@ static const guid_t nvidia_notify_dsm_guid =
 	GUID_INIT(0x7681541e, 0x8827, 0x4239, 0x8d, 0x9d, 0x36, 0xbe, 0x7f, 0xe1, 0x25, 0x42);
 
 #define NVIDIA_FFA_MAX_NOTIFICATIONS	64
+/* notif_id of a cookie whose setup or request failed; never matches a real ID */
+#define NVIDIA_FFA_NOTIF_ID_INVALID	0xFF
 
 /* Timeout for retrying transient failures from sync_send_receive2() */
 #define NVIDIA_FFA_SEND_TIMEOUT_MS	10
@@ -616,7 +618,7 @@ static void nvidia_ffa_notification_destroy(struct nvidia_ec_ffa_device *ec_ffa_
  */
 static int nvidia_ffa_create_notifications(struct nvidia_ec_ffa_device *ec_ffa_dev)
 {
-	int i, ret = 0;
+	int i, ret = 0, failed = 0;
 
 	if (!ec_ffa_dev->ffa_dev->ops ||
 	    !ec_ffa_dev->ffa_dev->ops->notifier_ops ||
@@ -648,7 +650,9 @@ static int nvidia_ffa_create_notifications(struct nvidia_ec_ffa_device *ec_ffa_d
 					"MSFT000C cookie=%u exceeds notification ID range\n",
 					n->cookie);
 				ret = -EINVAL;
-				break;
+				n->notif_id = NVIDIA_FFA_NOTIF_ID_INVALID;
+				failed++;
+				continue;
 			}
 			n->notif_id = (u8)n->cookie;
 		} else {
@@ -667,7 +671,9 @@ static int nvidia_ffa_create_notifications(struct nvidia_ec_ffa_device *ec_ffa_d
 					"No free notification IDs (cookie=%u)\n",
 					n->cookie);
 				ret = -ENOSPC;
-				break;
+				n->notif_id = NVIDIA_FFA_NOTIF_ID_INVALID;
+				failed++;
+				continue;
 			}
 			set_bit(id, nvidia_ffa_notif_id_map);
 			n->notif_id = (u8)id;
@@ -681,7 +687,9 @@ static int nvidia_ffa_create_notifications(struct nvidia_ec_ffa_device *ec_ffa_d
 				n->cookie, n->notif_id, ret);
 			if (!ffa_ec_legacy_spec)
 				clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
-			break;
+			n->notif_id = NVIDIA_FFA_NOTIF_ID_INVALID;
+			failed++;
+			continue;
 		}
 
 		ret = ec_ffa_dev->ffa_dev->ops->notifier_ops->notify_request(
@@ -689,34 +697,38 @@ static int nvidia_ffa_create_notifications(struct nvidia_ec_ffa_device *ec_ffa_d
 				nvidia_ffa_ec_service_notif_callback,
 				ec_ffa_dev->ffa_dev, n->notif_id);
 		if (ret) {
+			/*
+			 * Setup succeeded and firmware offers no teardown, so
+			 * the EC keeps this ID registered: leave it reserved in
+			 * the ID map instead of handing the same ID (and the
+			 * same failure) to the next cookie.
+			 */
 			nvidia_ffa_notification_destroy(ec_ffa_dev, n->notif_id);
-			if (!ffa_ec_legacy_spec)
-				clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
 			dev_err(&ec_ffa_dev->ffa_dev->dev,
 				"Failed to request notification cookie=%u notif_id=%u error=%d\n",
 				n->cookie, n->notif_id, ret);
-			break;
+			n->notif_id = NVIDIA_FFA_NOTIF_ID_INVALID;
+			failed++;
+			continue;
 		}
 	}
 
-	/* Remove already setup notifications in case of error */
-	if (ret) {
-		int j;
-
-		for (j = 0; j < i; j++) {
-			struct nvidia_ec_notification *n = &ec_ffa_dev->notifications[j];
-
-			ec_ffa_dev->ffa_dev->ops->notifier_ops->notify_relinquish(
-				ec_ffa_dev->ffa_dev, n->notif_id);
-			if (!ffa_ec_legacy_spec)
-				clear_bit(n->notif_id, nvidia_ffa_notif_id_map);
-			nvidia_ffa_notification_destroy(ec_ffa_dev, n->notif_id);
+	/*
+	 * A single cookie that cannot be set up or requested must not take
+	 * every other EC event down with it: keep what was bound and only
+	 * fail the probe when nothing could be bound at all.
+	 */
+	if (failed) {
+		dev_warn(&ec_ffa_dev->ffa_dev->dev,
+			 "%d of %d notifications not bound\n",
+			 failed, ec_ffa_dev->notification_count);
+		if (failed == ec_ffa_dev->notification_count) {
+			ec_ffa_dev->notification_count = 0;
+			return ret;
 		}
-
-		ec_ffa_dev->notification_count = 0;
 	}
 
-	return ret;
+	return 0;
 }
 
 /* Remove notifications for the FFA device. */
@@ -727,6 +739,8 @@ static void nvidia_ffa_remove_notifications(struct nvidia_ec_ffa_device *ec_ffa_
 	for (i = 0; i < ec_ffa_dev->notification_count; i++) {
 		struct nvidia_ec_notification *n = &ec_ffa_dev->notifications[i];
 
+		if (n->notif_id == NVIDIA_FFA_NOTIF_ID_INVALID)
+			continue;
 		ec_ffa_dev->ffa_dev->ops->notifier_ops->notify_relinquish(
 			ec_ffa_dev->ffa_dev, n->notif_id);
 		if (!ffa_ec_legacy_spec)
