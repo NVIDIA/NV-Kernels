@@ -1107,8 +1107,8 @@ static void vfio_pci_free_excluded_ranges(struct vfio_pci_core_device *vdev)
 }
 
 /* True when [start, start + len) on @bar overlaps a range with any of @flags. */
-static bool vfio_pci_bar_range_excluded(struct vfio_pci_core_device *vdev,
-					int bar, u64 start, u64 len, u32 flags)
+bool vfio_pci_bar_range_excluded(struct vfio_pci_core_device *vdev, int bar,
+				 u64 start, u64 len, u32 flags)
 {
 	struct vfio_pci_excluded_range *range;
 

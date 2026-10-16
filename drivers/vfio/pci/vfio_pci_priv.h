@@ -52,6 +52,9 @@ struct vfio_pci_excluded_range {
 	u32			flags;
 };
 
+bool vfio_pci_bar_range_excluded(struct vfio_pci_core_device *vdev, int bar,
+				 u64 start, u64 len, u32 flags);
+
 #ifdef CONFIG_VFIO_PCI_VGA
 ssize_t vfio_pci_vga_rw(struct vfio_pci_core_device *vdev, char __user *buf,
 			size_t count, loff_t *ppos, bool iswrite);
