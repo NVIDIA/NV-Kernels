@@ -45,6 +45,8 @@
  * @hdm_flushed_early: reset_flush() wrote the range back while it stayed
  *	revoked, so reset_prepare does not write it back again. Cleared with
  *	@hdm_revoked_early
+ * @hdm_needs_reset: a CXL Reset failed, so only a CXL Reset that succeeds
+ *	reopens host access; under memory_lock
  */
 struct vfio_cxl_state {
 	struct cxl_dev_state cxlds;
@@ -61,6 +63,7 @@ struct vfio_cxl_state {
 	bool hdm_open_at_prepare;
 	bool hdm_revoked_early;
 	bool hdm_flushed_early;
+	bool hdm_needs_reset;
 };
 
 /* The next reset must revoke and write back the range for itself. */
@@ -878,17 +881,81 @@ static void vfio_cxl_sync_mem_enable(struct vfio_pci_core_device *vdev)
 }
 
 /*
- * vfio-cxl holds the HDM range, so the PCI core's cxl_reset method would
- * fail to request it. Run the same CXL Reset with that claim.
+ * cxl_reset refuses a device whose CXL DVSEC Control has Cache_Enable or
+ * Mem_Enable clear (-ENOTTY). A CXL Reset that failed after the device reset
+ * may leave Control at its reset value, so every later reset would refuse and
+ * host access would never reopen. Put back the Control value taken at bind,
+ * when pci_cxl_reset_capable() required both enables, before the reset.
+ */
+static void vfio_cxl_restore_dvsec_ctrl(struct vfio_pci_core_device *vdev)
+{
+	const u16 enables = PCI_DVSEC_CXL_CACHE_ENABLE | PCI_DVSEC_CXL_MEM_ENABLE;
+	const struct cxl_hdm_info *hdm = vdev->cxl->hdm;
+	struct pci_dev *pdev = vdev->pdev;
+	u16 ctrl;
+
+	if (!hdm->dvsec_ctrl_valid || (hdm->dvsec_ctrl & enables) != enables)
+		return;
+
+	if (pci_read_config_word(pdev, hdm->dvsec + PCI_DVSEC_CXL_CTRL, &ctrl) ||
+	    PCI_POSSIBLE_ERROR(ctrl) || (ctrl & enables) == enables)
+		return;
+
+	pci_warn(pdev, "vfio-cxl: restoring CXL DVSEC control %#06x (was %#06x)\n",
+		 hdm->dvsec_ctrl, ctrl);
+	pci_write_config_word(pdev, hdm->dvsec + PCI_DVSEC_CXL_CTRL,
+			      hdm->dvsec_ctrl);
+}
+
+/*
+ * Run CXL Reset in place of a PCI function reset. An FLR leaves CXL.mem
+ * state and HDM contents intact (CXL r4.0 sec 9.5), so the vfio reset points
+ * route here. The reset clears or randomizes volatile device memory and
+ * restores the HDM decoder. The caller holds memory_lock and the PCI device
+ * lock. vfio-cxl holds the HDM range, so the PCI core's cxl_reset method
+ * would fail to request it; run the same CXL Reset with that claim.
  */
 static int vfio_cxl_reset(struct vfio_pci_core_device *vdev)
 {
+	struct pci_dev *pdev = vdev->pdev;
+	int ret;
+
+	/*
+	 * This reset supersedes any raw-reset bookkeeping: it drives its own
+	 * revoke, and on failure nothing rearms to clear the record.
+	 */
+	vfio_cxl_forget_early_prepare(vdev->cxl);
+
+	/* Host CPU access to the HDM range is unsafe until the decoder is back. */
+	vfio_cxl_revoke_hdm(vdev);
+
+	/* Only after a failure: see vfio_cxl_restore_dvsec_ctrl(). */
+	if (vdev->cxl->hdm_needs_reset)
+		vfio_cxl_restore_dvsec_ctrl(vdev);
+
 	/*
 	 * The reset restores PCI state from the saved copy. The caller provides
 	 * it: the try-reset helper saves the current state, and the close path
 	 * keeps the open-time state that vfio_pci_core_disable() loaded.
 	 */
-	return pci_cxl_reset_owned(vdev->pdev, vdev->cxl->hpa_res);
+	ret = pci_cxl_reset_owned(pdev, vdev->cxl->hpa_res);
+	if (!ret)
+		ret = vfio_cxl_await_mem_active(vdev);
+	if (ret) {
+		/*
+		 * Device memory may hold data the reset was meant to clear. Only
+		 * a later CXL Reset that succeeds reopens host access; a decoder
+		 * restore alone does not.
+		 */
+		vdev->cxl->hdm_needs_reset = true;
+		vfio_cxl_sync_mem_enable(vdev);
+		return ret;
+	}
+
+	vdev->cxl->hdm_needs_reset = false;
+	vfio_cxl_rearm_hdm(vdev);
+
+	return 0;
 }
 
 /*
@@ -931,6 +998,10 @@ static void vfio_cxl_power_up(struct vfio_pci_core_device *vdev)
 	int ret;
 
 	lockdep_assert_held_write(&vdev->memory_lock);
+
+	/* After a failed CXL Reset, only a CXL Reset reopens host access. */
+	if (cxl->hdm_needs_reset)
+		return;
 
 	/*
 	 * A D3 request that failed, or a quirk that kept the device in D0,
@@ -1086,9 +1157,15 @@ static void vfio_cxl_reset_prepare(struct vfio_pci_core_device *vdev)
 
 	ret = cpu_cache_invalidate_memregion(cxl->hpa_range.start,
 					     range_len(&cxl->hpa_range));
-	if (ret)
+	if (ret) {
 		pci_err(pdev, "vfio-cxl: failed to invalidate CPU cache before reset: %d\n",
 			ret);
+		/*
+		 * Dirty lines may outlive the decoder, so gate host access on
+		 * a CXL Reset that succeeds, the same way a failed reset does.
+		 */
+		cxl->hdm_needs_reset = true;
+	}
 }
 
 static int vfio_cxl_reset_done(struct vfio_pci_core_device *vdev)
@@ -1136,6 +1213,10 @@ static int vfio_cxl_reset_done(struct vfio_pci_core_device *vdev)
 		return 0;
 	}
 
+	/* After a failed CXL Reset, only a CXL Reset reopens host access. */
+	if (cxl->hdm_needs_reset)
+		return 0;
+
 	ret = vfio_cxl_await_mem_active(vdev);
 	if (ret)
 		return ret;
@@ -1159,8 +1240,11 @@ static void vfio_cxl_error_resume(struct vfio_pci_core_device *vdev)
 	if (pdev->current_state != PCI_D0)
 		return;
 
-	/* The region was closed before the error; keep it that way. */
-	if (!vdev->cxl->hdm_open_at_prepare)
+	/*
+	 * The region was closed before the error, or a CXL Reset failed while
+	 * recovery ran; keep it closed until a CXL Reset succeeds.
+	 */
+	if (!vdev->cxl->hdm_open_at_prepare || vdev->cxl->hdm_needs_reset)
 		return;
 
 	if (!vfio_cxl_hdm_intact(vdev)) {
