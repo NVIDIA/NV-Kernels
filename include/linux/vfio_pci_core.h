@@ -101,6 +101,13 @@ struct vfio_cxl_ops {
 	 * back whatever the flush changed. A call after reset_done is a no-op.
 	 */
 	void	(*reset_flush_abort)(struct vfio_pci_core_device *vdev);
+	/*
+	 * Reset the function in place of the PCI core; mandatory. Called with
+	 * the PCI device lock and memory_lock (for write) held. The caller
+	 * provides the saved PCI state the reset restores: the try-reset path
+	 * saves it first, the close path keeps the open-time copy.
+	 */
+	int	(*reset)(struct vfio_pci_core_device *vdev);
 	/* Pinned per bound CXL device so vfio-cxl cannot unload under usage */
 	struct module *owner;
 };

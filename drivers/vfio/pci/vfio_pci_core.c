@@ -605,6 +605,62 @@ static void vfio_pci_core_unmap_bars(struct vfio_pci_core_device *vdev)
 	}
 }
 
+/**
+ * vfio_pci_try_reset_function() - reset the function without blocking
+ * @vdev: vfio PCI device, with memory_lock held for write
+ *
+ * Reset through the PCI core, or let the provider reset a device it serves.
+ * The provider resets the device with its PCI device lock held, so take that
+ * lock here, without waiting, as pci_try_reset_function() does.
+ *
+ * Return: 0 on success, -EAGAIN when the device lock is contended, or the
+ * reset error. For a provider device a failed pci_save_state() is also
+ * returned, and the reset is not attempted: unlike pci_try_reset_function(),
+ * the provider's reset needs a valid saved state to restore.
+ */
+int vfio_pci_try_reset_function(struct vfio_pci_core_device *vdev)
+{
+	struct pci_dev *pdev = vdev->pdev;
+	int ret;
+
+	lockdep_assert_held_write(&vdev->memory_lock);
+
+	if (!vdev->cxl_ops)
+		return pci_try_reset_function(pdev);
+
+	if (!pci_dev_trylock(pdev))
+		return -EAGAIN;
+
+	/*
+	 * The provider restores PCI state from the saved copy, so save the
+	 * current state first, as pci_try_reset_function() does. The locked
+	 * variant on the close path must not: it resets with the state that
+	 * vfio_pci_core_disable() has just loaded.
+	 */
+	ret = pci_save_state(pdev);
+	if (!ret)
+		ret = vdev->cxl_ops->reset(vdev);
+	pci_dev_unlock(pdev);
+
+	return ret;
+}
+
+/*
+ * As vfio_pci_try_reset_function(), for a caller that holds the device lock.
+ * Only the close path calls this. It takes memory_lock with the device lock
+ * held, so user config access is blocked meanwhile: the order a sysfs reset
+ * uses. That cannot deadlock against a PCI_COMMAND write holding memory_lock
+ * because no user remains at close.
+ */
+static int vfio_pci_reset_function_locked(struct vfio_pci_core_device *vdev)
+{
+	if (!vdev->cxl_ops)
+		return __pci_reset_function_locked(vdev->pdev);
+
+	guard(rwsem_write)(&vdev->memory_lock);
+	return vdev->cxl_ops->reset(vdev);
+}
+
 static void vfio_pci_core_free_dev_regions(struct vfio_pci_core_device *vdev)
 {
 	for (int i = 0; i < vdev->num_regions; i++)
@@ -636,11 +692,14 @@ int vfio_pci_core_enable(struct vfio_pci_core_device *vdev)
 		goto out_power;
 
 	/* If reset fails because of the device lock, fail this path entirely */
-	ret = pci_try_reset_function(pdev);
+	down_write(&vdev->memory_lock);
+	ret = vfio_pci_try_reset_function(vdev);
+	up_write(&vdev->memory_lock);
 	if (ret == -EAGAIN)
 		goto out_disable_device;
 
-	vdev->reset_works = !ret;
+	/* A provider checks at bind that it can reset the device. */
+	vdev->reset_works = vdev->cxl_ops || !ret;
 	pci_save_state(pdev);
 	vdev->pci_saved_state = pci_store_saved_state(pdev);
 	if (!vdev->pci_saved_state)
@@ -846,7 +905,7 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 		if (bridge && !pci_dev_trylock(bridge))
 			goto out_restore_state;
 		if (pci_dev_trylock(pdev)) {
-			if (!__pci_reset_function_locked(pdev))
+			if (!vfio_pci_reset_function_locked(vdev))
 				vdev->needs_reset = false;
 			pci_dev_unlock(pdev);
 		}
@@ -1541,7 +1600,7 @@ static int vfio_pci_ioctl_reset(struct vfio_pci_core_device *vdev,
 	vfio_pci_set_power_state(vdev, PCI_D0);
 
 	vfio_pci_dma_buf_move(vdev, true);
-	ret = pci_try_reset_function(vdev->pdev);
+	ret = vfio_pci_try_reset_function(vdev);
 	if (__vfio_pci_memory_enabled(vdev))
 		vfio_pci_dma_buf_move(vdev, false);
 	up_write(&vdev->memory_lock);
@@ -2402,6 +2461,10 @@ static bool vfio_pci_cxl_load_requested;
 int vfio_pci_core_register_cxl_ops(const struct vfio_cxl_ops *ops)
 {
 	guard(rwsem_write)(&vfio_pci_cxl_ops_rwsem);
+
+	/* vfio-pci-core never resets a provider's device by itself. */
+	if (!ops->reset)
+		return -EINVAL;
 
 	if (vfio_pci_cxl_ops)
 		return -EBUSY;
