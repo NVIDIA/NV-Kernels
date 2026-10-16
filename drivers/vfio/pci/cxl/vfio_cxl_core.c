@@ -33,8 +33,9 @@ struct vfio_cxl_state {
  * Create the CXL device state and join the device to the CXL topology. The
  * caller groups these devres allocations, so return on the first error.
  */
-static struct vfio_cxl_state *vfio_cxl_create_memdev(struct pci_dev *pdev,
-						     u64 hdm_size)
+static struct vfio_cxl_state *
+vfio_cxl_create_memdev(struct pci_dev *pdev, const struct cxl_hdm_info *hdm,
+		       u64 hdm_size)
 {
 	struct vfio_cxl_state *cxl;
 	struct cxl_memdev *cxlmd;
@@ -58,6 +59,17 @@ static struct vfio_cxl_state *vfio_cxl_create_memdev(struct pci_dev *pdev,
 		pci_err(pdev, "vfio-cxl: no component registers\n");
 		return ERR_PTR(ret);
 	}
+
+	/*
+	 * vfio-pci-core requests the whole component-register BAR when the
+	 * guest opens the device. Declare that BAR owned so the CXL core
+	 * ioremaps the HDM and RAS sub-blocks without claiming them, and the
+	 * full-BAR request does not collide.
+	 */
+	ret = cxl_reg_map_set_owned_resource(&cxl->cxlds.reg_map,
+					     pci_resource_n(pdev, hdm->hdm_bar));
+	if (ret)
+		return ERR_PTR(ret);
 
 	if (!cxl->cxlds.reg_map.component_map.hdm_decoder.valid) {
 		pci_err(pdev, "vfio-cxl: HDM decoder registers not found\n");
@@ -133,7 +145,7 @@ static int vfio_cxl_init_device(struct vfio_pci_core_device *vdev)
 	if (!devres_open_group(&pdev->dev, NULL, GFP_KERNEL))
 		return -ENOMEM;
 
-	cxl = vfio_cxl_create_memdev(pdev, hdm_size);
+	cxl = vfio_cxl_create_memdev(pdev, hdm, hdm_size);
 	if (IS_ERR(cxl)) {
 		devres_release_group(&pdev->dev, NULL);
 		return PTR_ERR(cxl);
