@@ -3263,6 +3263,17 @@ Kernel parameters
 			"nested" is experimental and should be used with
 			extreme caution.
 
+	kvm-arm.nested_s2_mmus_per_vcpu=
+			[KVM,ARM,EARLY] Number of shadow stage-2 MMUs
+			allocated per vCPU for guests using nested
+			virtualization. A guest hypervisor running more
+			concurrent nested VMs than this many per vCPU forces
+			KVM to recycle shadow stage-2 MMUs, with a large
+			performance cost. Higher values use more host memory
+			per nested-capable VM.
+			Format: <integer> (1-64)
+			Default: 2
+
 	kvm-arm.vgic_v3_group0_trap=
 			[KVM,ARM,EARLY] Trap guest accesses to GICv3 group-0
 			system registers
