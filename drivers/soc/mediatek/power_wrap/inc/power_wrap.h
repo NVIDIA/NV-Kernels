@@ -12,6 +12,8 @@
 #include <linux/soc/mediatek/mtk-pwrap.h>
 
 #define PWRAP_MAX_COMP_NUM 20
+/* Platform id returned by the PLID method for MT8901. */
+#define PWRAP_PLID_MT8901 0x2
 /* Number of scalar constraint fields before the comp_states array */
 #define PWRAP_IDLE_CONSTRAINT_SCALARS  3
 
@@ -91,6 +93,8 @@ struct mtk_pwrap_device {
 	unsigned int dev_id;
 };
 
+struct pwrap_lps0;
+
 /* Driver private data */
 struct pwrap_driver_data {
 	struct device *dev;
@@ -99,7 +103,18 @@ struct pwrap_driver_data {
 	struct acpi_buffer acpi_path;
 	/* Platform id from the PLID method, 0 when unavailable */
 	unsigned long long plid;
+	struct pwrap_lps0 *lps0;
 };
+
+#ifdef CONFIG_SUSPEND
+extern const struct dev_pm_ops pwrap_lps0_pm_ops;
+int pwrap_lps0_init(struct pwrap_driver_data *priv);
+#else
+static inline int pwrap_lps0_init(struct pwrap_driver_data *priv)
+{
+	return 0;
+}
+#endif
 
 /* Create the sysfs debug/test nodes (non-fatal; group is devm-managed) */
 int pwrap_create_sys_files(struct platform_device *pdev);

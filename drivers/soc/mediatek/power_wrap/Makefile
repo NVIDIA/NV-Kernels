@@ -5,6 +5,7 @@ obj-y += power_wrap_drv.o
 power_wrap_drv-y += power_wrap.o
 power_wrap_drv-y += power_wrap_sysfs.o
 power_wrap_drv-y += acpiutil.o
+power_wrap_drv-$(CONFIG_SUSPEND) += power_wrap_lps0.o
 
 ccflags-y += -Wall
 ccflags-y += -I$(src)/inc
