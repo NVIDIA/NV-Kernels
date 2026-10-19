@@ -62,7 +62,6 @@ static struct pwrap_dev_ctrl dev_ctrl;
  * Windows maps it directly via MmMapIoSpaceEx(), so the Linux equivalent is
  * ioremap(0x12FC00, 4) + writel(0x1).
  */
-#define PWRAP_PLID_MT8901		0x2	/* SOC_MT8901 */
 #define PWRAP_DVFSRC_FLAG_ADDR	0x12FC00
 #define PWRAP_DVFSRC_FLAG_LEN	0x4
 #define PWRAP_DVFSRC_FLAG_VAL	0x1
@@ -919,6 +918,10 @@ static int mtk_pwrap_probe(struct platform_device *pdev)
 	/* Release the USB4 resources once xHCI has bound (see the hook note). */
 	pwrap_usb4_arm_release(dev);
 
+	ret = pwrap_lps0_init(priv);
+	if (ret)
+		dev_warn(dev, "failed to initialize sleep notifications: %d\n", ret);
+
 	return 0;
 }
 
@@ -933,6 +936,9 @@ MODULE_DEVICE_TABLE(acpi, mtk_pwrap_acpi_ids);
 static struct platform_driver mtk_pwrap_driver = {
 	.driver = {
 		.name = "mtk_pwrap",
+#ifdef CONFIG_SUSPEND
+		.pm = &pwrap_lps0_pm_ops,
+#endif
 #ifdef CONFIG_ACPI
 		.acpi_match_table = mtk_pwrap_acpi_ids,
 #endif /* CONFIG_ACPI */
