@@ -416,7 +416,7 @@ static int __cmd_test(int argc, const char *argv[], struct intlist *skiplist)
 {
 	struct test_suite *t;
 	unsigned int j, k;
-	int i = 0;
+	volatile int i = 0;
 	int width = list_script_max_width();
 	int err;
 
