@@ -2697,10 +2697,39 @@ static int acpi_lpi_sync_runtime_pm(struct cpumask *was_active)
 	return 0;
 }
 
+/*
+ * The consumer reference must be held whenever the CPU can run the idle loop.
+ * ONLINE_DYN callbacks run after a booting CPU starts idling and before a
+ * dying CPU stops, so take and drop the reference from the STARTING section,
+ * as cpuidle-psci does. STARTING callbacks run with IRQs disabled and cannot
+ * fail; the consumer device is IRQ-safe.
+ */
 static int acpi_idle_cpuhp_up(unsigned int cpu)
 {
 	struct acpi_idle_data *data;
 	int ret;
+
+	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_COORDINATED)
+		return 0;
+	if (READ_ONCE(acpi_lpi_system_sleep))
+		return 0;
+	if (cpumask_test_cpu(cpu, &acpi_lpi_excluded_cpus))
+		return 0;
+
+	data = per_cpu(acpi_idle_data, cpu);
+	if (!data || !data->domain_dev)
+		return 0;
+
+	ret = acpi_processor_lpi_runtime_get(data);
+	if (ret)
+		pr_warn("CPU%u: failed to resume LPI domain: %d\n", cpu, ret);
+
+	return 0;
+}
+
+static int acpi_idle_cpuhp_online(unsigned int cpu)
+{
+	struct acpi_idle_data *data;
 
 	if (READ_ONCE(acpi_lpi_lifecycle) != ACPI_LPI_COORDINATED)
 		return 0;
@@ -2712,14 +2741,9 @@ static int acpi_idle_cpuhp_up(unsigned int cpu)
 	    !data || !data->domain_dev) {
 		/* Publish the CPU only after shared-state entry is blocked. */
 		acpi_lpi_queue_rebuild(0);
-		return 0;
 	}
 
-	ret = acpi_processor_lpi_runtime_get(data);
-	if (ret)
-		pr_warn("CPU%u: failed to resume LPI domain: %d\n", cpu, ret);
-
-	return ret;
+	return 0;
 }
 
 static int acpi_idle_cpuhp_down(unsigned int cpu)
@@ -2879,12 +2903,20 @@ static int acpi_lpi_activate_locked(void)
 	register_syscore(&acpi_idle_syscore);
 	syscore_registered = true;
 
-	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
-					"acpi/idle:online",
+	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ACPI_LPI_STARTING,
+					"acpi/idle:starting",
 					acpi_idle_cpuhp_up,
 					acpi_idle_cpuhp_down);
 	if (ret < 0)
 		goto unregister_hooks;
+
+	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
+					"acpi/idle:online",
+					acpi_idle_cpuhp_online, NULL);
+	if (ret < 0) {
+		cpuhp_remove_state_nocalls(CPUHP_AP_ACPI_LPI_STARTING);
+		goto unregister_hooks;
+	}
 	hp_state = ret;
 
 	/* The CPUHP state now excludes CPU-set changes through publication. */
@@ -2963,6 +2995,7 @@ remove_cpuhp:
 			ret = cleanup_ret;
 	}
 	cpuhp_remove_state_nocalls_cpuslocked(hp_state);
+	cpuhp_remove_state_nocalls_cpuslocked(CPUHP_AP_ACPI_LPI_STARTING);
 	cpus_read_unlock();
 unregister_hooks:
 	if (syscore_registered)
@@ -3032,6 +3065,7 @@ static int acpi_lpi_deactivate_locked(void)
 	cpuidle_resume_and_unlock();
 
 	cpuhp_remove_state_nocalls_cpuslocked(acpi_lpi_cpuhp_state);
+	cpuhp_remove_state_nocalls_cpuslocked(CPUHP_AP_ACPI_LPI_STARTING);
 	acpi_lpi_cpuhp_state = CPUHP_INVALID;
 	cpus_read_unlock();
 
