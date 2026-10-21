@@ -13,12 +13,21 @@
 
 #define MPHY_GO_BIT				BIT(0)
 
+#define MPHY_HSRATE_SERIES_A			1
+#define MPHY_HSRATE_SERIES_B			2
+
+#define MPHY_TX_APB_TX_ATTRIBUTE_20_23		0x20
+#define TX_HSRATE_SERIES(x)			(((x) & 0x3) << 16)
+
 #define MPHY_RX_APB_CAPABILITY_88_8B		0x88
 #define RX_HS_G1_SYNC_LENGTH_CAPABILITY(x)	(((x) & 0x3f) << 24)
 
 #define MPHY_RX_APB_CAPABILITY_94_97		0x94
 #define RX_HS_G3_SYNC_LENGTH_CAPABILITY(x)	(((x) & 0x3f) << 8)
 #define RX_HS_G2_SYNC_LENGTH_CAPABILITY(x)	(((x) & 0x3f) << 0)
+
+#define MPHY_RX_APB_ATTRIBUTE_A0_A3		0xa0
+#define RX_HSRATE_SERIES(x)			(((x) & 0x3) << 16)
 
 #define MPHY_TX_APB_VENDOR0			0x100
 #define MPHY_TX_APB_VENDOR2			0x108
@@ -213,6 +222,45 @@ static int tegra_mphy_rx_power_off(struct phy *phy)
 	return 0;
 }
 
+static int tegra_mphy_hsrate_series(enum phy_mode mode)
+{
+	switch (mode) {
+	case PHY_MODE_UFS_HS_A:
+		return MPHY_HSRATE_SERIES_A;
+	case PHY_MODE_UFS_HS_B:
+		return MPHY_HSRATE_SERIES_B;
+	default:
+		return -EINVAL;
+	}
+}
+
+static int tegra_mphy_rx_set_mode(struct phy *phy, enum phy_mode mode, int submode)
+{
+	struct tegra_mphy_lane *lane = phy_get_drvdata(phy);
+	int series = tegra_mphy_hsrate_series(mode);
+	u32 value;
+	int err;
+
+	if (series < 0)
+		return series;
+
+	value = readl(lane->regs + MPHY_RX_APB_ATTRIBUTE_A0_A3);
+	value &= ~RX_HSRATE_SERIES(~0);
+	value |= RX_HSRATE_SERIES(series);
+	writel(value, lane->regs + MPHY_RX_APB_ATTRIBUTE_A0_A3);
+
+	value = readl(lane->rx_regs + MPHY_RX_APB_VENDOR2);
+	value |= MPHY_GO_BIT;
+	writel(value, lane->rx_regs + MPHY_RX_APB_VENDOR2);
+
+	err = readl_poll_timeout(lane->rx_regs + MPHY_RX_APB_VENDOR2, value,
+				 (value & MPHY_GO_BIT) == 0, 25, 5000);
+	if (err)
+		dev_err(&phy->dev, "failed to set RX rate series: %d\n", err);
+
+	return err;
+}
+
 static int tegra_mphy_rx_configure(struct phy *phy, union phy_configure_opts *opts)
 {
 	struct tegra_mphy_lane *lane = phy_get_drvdata(phy);
@@ -274,9 +322,37 @@ static int tegra_mphy_rx_calibrate(struct phy *phy)
 static const struct phy_ops tegra_mphy_rx_ops = {
 	.power_on = tegra_mphy_rx_power_on,
 	.power_off = tegra_mphy_rx_power_off,
+	.set_mode = tegra_mphy_rx_set_mode,
 	.configure = tegra_mphy_rx_configure,
 	.calibrate = tegra_mphy_rx_calibrate,
 };
+
+static int tegra_mphy_tx_set_mode(struct phy *phy, enum phy_mode mode, int submode)
+{
+	struct tegra_mphy_lane *lane = phy_get_drvdata(phy);
+	int series = tegra_mphy_hsrate_series(mode);
+	u32 value;
+	int err;
+
+	if (series < 0)
+		return series;
+
+	value = readl(lane->regs + MPHY_TX_APB_TX_ATTRIBUTE_20_23);
+	value &= ~TX_HSRATE_SERIES(~0);
+	value |= TX_HSRATE_SERIES(series);
+	writel(value, lane->regs + MPHY_TX_APB_TX_ATTRIBUTE_20_23);
+
+	value = readl(lane->tx_regs + MPHY_TX_APB_VENDOR0);
+	value |= MPHY_GO_BIT;
+	writel(value, lane->tx_regs + MPHY_TX_APB_VENDOR0);
+
+	err = readl_poll_timeout(lane->tx_regs + MPHY_TX_APB_VENDOR0, value,
+				 (value & MPHY_GO_BIT) == 0, 25, 5000);
+	if (err)
+		dev_err(&phy->dev, "failed to set TX rate series: %d\n", err);
+
+	return err;
+}
 
 static int tegra_mphy_tx_configure(struct phy *phy, union phy_configure_opts *opts)
 {
@@ -337,6 +413,7 @@ static int tegra_mphy_tx_calibrate(struct phy *phy)
 }
 
 static const struct phy_ops tegra_mphy_tx_ops = {
+	.set_mode = tegra_mphy_tx_set_mode,
 	.configure = tegra_mphy_tx_configure,
 	.calibrate = tegra_mphy_tx_calibrate,
 };
