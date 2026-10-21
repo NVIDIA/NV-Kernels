@@ -504,17 +504,10 @@ void do_secure_storage_access(struct pt_regs *regs)
 		page = phys_to_page(addr);
 		if (unlikely(!try_get_page(page)))
 			return;
-		rc = uv_convert_from_secure(page_to_phys(page));
-		if (!rc)
-			clear_bit(PG_arch_1, &page->flags);
+		rc = arch_make_page_accessible(page);
 		put_page(page);
-		/*
-		 * There are some valid fixup types for kernel
-		 * accesses to donated secure memory. zeropad is one
-		 * of them.
-		 */
 		if (rc)
-			return handle_fault_error_nolock(regs, 0);
+			BUG();
 	} else {
 		if (type == GMAP_FAULT) {
 			mm = current->mm;
