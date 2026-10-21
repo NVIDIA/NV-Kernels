@@ -336,6 +336,19 @@ int sspm_ci_set(u32 feature_id,
 }
 EXPORT_SYMBOL(sspm_ci_set);
 
+/*
+ * sspm_ci_available() - whether the SSPM mailbox is bound
+ *
+ * False until sspm_ci_probe() has mapped the mailbox, and on platforms whose
+ * firmware does not describe an SSPM device at all. Lets Power Wrap
+ * consumers tell "no transport" apart from a rejected command.
+ */
+bool sspm_ci_available(void)
+{
+	return READ_ONCE(sspm_mbox_iomap) != NULL;
+}
+EXPORT_SYMBOL_GPL(sspm_ci_available);
+
 #define SCMI_MESSAGE_HEADER_CORRELATE_MASK \
 	(SCMI_MESSAGE_HEADER_MESSAGE_ID_MASK | \
 	 SCMI_MESSAGE_HEADER_PROTOCOL_ID_MASK | \
