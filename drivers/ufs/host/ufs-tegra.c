@@ -402,6 +402,27 @@ static int ufs_tegra_mphy_calibrate_tx(struct ufs_hba *hba)
 	return phy_calibrate(ufs->mphy_l1_tx);
 }
 
+static int ufs_tegra_mphy_set_rate_series(struct ufs_hba *hba)
+{
+	struct ufs_tegra *ufs = ufshcd_get_variant(hba);
+	struct phy *phys[] = {
+		ufs->mphy_l0_tx, ufs->mphy_l1_tx, ufs->mphy_l0_rx, ufs->mphy_l1_rx,
+	};
+	enum phy_mode mode;
+	unsigned int i;
+	int err;
+
+	mode = ufs->host_params.hs_rate == PA_HS_MODE_B ? PHY_MODE_UFS_HS_B : PHY_MODE_UFS_HS_A;
+
+	for (i = 0; i < ARRAY_SIZE(phys); i++) {
+		err = phy_set_mode(phys[i], mode);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
 static int ufs_tegra_mphy_calibrate_rx(struct ufs_hba *hba)
 {
 	struct ufs_tegra *ufs = ufshcd_get_variant(hba);
@@ -571,6 +592,15 @@ static int ufs_tegra_link_startup_notify(struct ufs_hba *hba, enum ufs_notify_ch
 			if (err)
 				return err;
 		}
+
+		/*
+		 * Select the rate series the link will use in HS mode before
+		 * calibrating the receivers (T26x UFS programming guide, cold
+		 * boot step 8).
+		 */
+		err = ufs_tegra_mphy_set_rate_series(hba);
+		if (err)
+			return err;
 
 		err = ufs_tegra_mphy_calibrate_rx(hba);
 		if (err)
