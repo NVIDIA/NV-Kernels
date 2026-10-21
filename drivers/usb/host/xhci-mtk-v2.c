@@ -850,10 +850,22 @@ int xhci_mtk_prepare_hw(struct xhci_hcd *xhci)
 
 	dev_dbg(priv->dev, " %s\n", __func__);
 
+	/*
+	 * Platforms without Power Wrap device control for this controller
+	 * (no firmware entry, or no SSPM transport bound) report -ENODEV so
+	 * the caller can fall back to generic xHCI operation. A rejected
+	 * SCMI probe on a platform that has the transport stays fatal.
+	 */
+	if (!mtk_pwrap_dev_control_available((char *)priv->acpi_path.pointer)) {
+		dev_info(priv->dev, "no power wrap device control for %s\n",
+			 (char *)priv->acpi_path.pointer);
+		return -ENODEV;
+	}
+
 	// power up
 	priv->pwrap_cfg = mtk_pwrap_dev_probe((char *)priv->acpi_path.pointer);
 	if (!priv->pwrap_cfg) {
-		dev_err(priv->dev, "Not find power wrap config data\n");
+		dev_err(priv->dev, "power wrap probe failed\n");
 		return -EINVAL;
 	}
 
