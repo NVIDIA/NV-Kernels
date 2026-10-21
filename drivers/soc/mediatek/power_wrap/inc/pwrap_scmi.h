@@ -11,11 +11,16 @@
 #ifdef CONFIG_MTK_SSPM_CI
 int sspm_ci_set(u32 feature_id,
 	u32 p1, u32 p2, u32 p3, u32 p4, u32 p5);
+bool sspm_ci_available(void);
 #else
 static inline int sspm_ci_set(u32 feature_id,
 	u32 p1, u32 p2, u32 p3, u32 p4, u32 p5)
 {
 	return -ENODEV;
+}
+static inline bool sspm_ci_available(void)
+{
+	return false;
 }
 #endif /* CONFIG_MTK_SSPM_CI */
 
