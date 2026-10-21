@@ -263,11 +263,23 @@ int xhci_plat_probe(struct platform_device *pdev, struct device *sysdev, const s
 			goto disable_clk;
 
 		ret = xhci_mtk_prepare_hw(xhci);
-		if (ret) {
+		if (ret == -ENODEV) {
+			/*
+			 * No Power Wrap device control for this controller
+			 * on this platform. Run it as a plain xHCI controller,
+			 * as the PNP0D15 compatible ID did before the MediaTek
+			 * glue matched the _HID.
+			 */
+			dev_info(&pdev->dev,
+				 "no power wrap device control, using generic xHCI\n");
+			xhci_mtk_free_resources(pdev, xhci);
+			priv->is_mtk_v2 = 0;
+			wakeup_irq = -1;
+		} else if (ret) {
 			goto free_rscs;
+		} else {
+			mtk_hw_prepared = true;
 		}
-
-		mtk_hw_prepared = true;
 	}
 
 	device_set_wakeup_capable(&pdev->dev, true);
