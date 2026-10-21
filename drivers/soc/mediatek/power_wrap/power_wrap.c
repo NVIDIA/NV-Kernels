@@ -389,6 +389,25 @@ int mtk_pwrap_com_active(void *dev_cfg, u8 com_idx)
 EXPORT_SYMBOL_GPL(mtk_pwrap_com_active);
 
 /*
+ * Report whether Power Wrap device control is available for the device at
+ * @acpi_path: firmware describes a config entry for it and, for SCMI
+ * controlled devices, the SSPM transport is bound. Lets consumers tell
+ * "no device control on this platform" apart from a rejected SCMI command
+ * before calling mtk_pwrap_dev_probe().
+ */
+bool mtk_pwrap_dev_control_available(const char *acpi_path)
+{
+	struct pwrap_dev_config *cfg = pwrap_query_dev_config(acpi_path);
+
+	if (!cfg)
+		return false;
+	if (cfg->control_type == CTRL_BY_SCMI && !sspm_ci_available())
+		return false;
+	return true;
+}
+EXPORT_SYMBOL_GPL(mtk_pwrap_dev_control_available);
+
+/*
  * Probe dev_config by ACPI path, with SCMI log if needed.
  * Return pointer to struct pwrap_dev_config as void*, NULL otherwise.
  */
