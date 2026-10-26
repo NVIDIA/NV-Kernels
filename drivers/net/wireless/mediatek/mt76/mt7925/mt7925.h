@@ -279,6 +279,7 @@ int mt7925e_tx_prepare_skb(struct mt76_dev *mdev, void *txwi_ptr,
 
 void mt7925_tx_token_put(struct mt792x_dev *dev);
 bool mt7925_rx_check(struct mt76_dev *mdev, void *data, int len);
+bool mt7925_rx_check_duplicate(struct mt76_dev *mdev, struct sk_buff *skb);
 void mt7925_queue_rx_skb(struct mt76_dev *mdev, enum mt76_rxq_id q,
 			 struct sk_buff *skb, u32 *info);
 void mt7925_stats_work(struct work_struct *work);

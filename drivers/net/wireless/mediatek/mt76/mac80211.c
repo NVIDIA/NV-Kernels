@@ -1520,6 +1520,11 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 		struct sk_buff *nskb = skb_shinfo(skb)->frag_list;
 
 		mt76_check_ccmp_pn(skb);
+		if (dev->drv->rx_check_duplicate &&
+		    dev->drv->rx_check_duplicate(dev, skb)) {
+			dev_kfree_skb(skb);
+			continue;
+		}
 		skb_shinfo(skb)->frag_list = NULL;
 		mt76_rx_convert(dev, skb, &hw, &sta);
 		ieee80211_rx_list(hw, sta, skb, &list);

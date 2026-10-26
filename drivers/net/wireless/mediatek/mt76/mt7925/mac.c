@@ -3,12 +3,115 @@
 
 #include <linux/devcoredump.h>
 #include <linux/etherdevice.h>
+#include <linux/hex.h>
 #include <linux/timekeeping.h>
 #include "mt7925.h"
 #include "../dma.h"
 #include "regd.h"
 #include "mac.h"
 #include "mcu.h"
+#include "lldp_rx.h"
+
+static char *mt7925_lldp_seq_sources[8];
+static unsigned int mt7925_lldp_source_count;
+module_param_array_named(lldp_seq_sources, mt7925_lldp_seq_sources, charp,
+			 &mt7925_lldp_source_count, 0444);
+MODULE_PARM_DESC(lldp_seq_sources,
+	"Opt-in source MACs for separate duplicate checking of link-local 01:80:c2:00:00:0e frames");
+
+static atomic_long_t mt7925_lldp_checked = ATOMIC_LONG_INIT(0);
+static atomic_long_t mt7925_lldp_duplicates = ATOMIC_LONG_INIT(0);
+
+static int mt7925_lldp_counter_get(char *buffer, const struct kernel_param *kp)
+{
+	return scnprintf(buffer, PAGE_SIZE, "%ld\n",
+			 atomic_long_read((atomic_long_t *)kp->arg));
+}
+
+static const struct kernel_param_ops mt7925_lldp_counter_ops = {
+	.get = mt7925_lldp_counter_get,
+};
+module_param_cb(lldp_checked, &mt7925_lldp_counter_ops,
+		&mt7925_lldp_checked, 0444);
+module_param_cb(lldp_duplicates, &mt7925_lldp_counter_ops,
+		&mt7925_lldp_duplicates, 0444);
+
+static DEFINE_SPINLOCK(mt7925_lldp_lock);
+static struct mt7925_lldp_entry mt7925_lldp_cache[MT7925_LLDP_CACHE_SIZE];
+static unsigned int mt7925_lldp_next;
+
+struct mt7925_lldp_match {
+	struct mt7925_lldp_frame frame;
+	const u8 *transmitter;
+	bool found;
+};
+
+static void mt7925_lldp_vif_match(void *data, u8 *mac,
+				struct ieee80211_vif *vif)
+{
+	struct mt7925_lldp_match *match = data;
+	struct ieee80211_bss_conf *conf;
+	unsigned int link_id;
+
+	if (match->found || vif->type != NL80211_IFTYPE_STATION ||
+	    !ieee80211_vif_is_mld(vif) || !vif->cfg.assoc)
+		return;
+	for_each_vif_active_link(vif, conf, link_id) {
+		if (!conf->bssid ||
+		    !ether_addr_equal(conf->bssid, match->transmitter))
+			continue;
+		ether_addr_copy(match->frame.local_mld, vif->addr);
+		ether_addr_copy(match->frame.ap_mld, vif->cfg.ap_addr);
+		match->found = true;
+		return;
+	}
+}
+
+static bool mt7925_lldp_rx_duplicate(struct mt792x_dev *dev,
+				    struct sk_buff *skb)
+{
+	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
+	struct mt7925_lldp_match match = {};
+	struct ieee80211_hdr *hdr;
+	unsigned int hlen, i;
+	u8 source[ETH_ALEN];
+	bool duplicate;
+
+	for (i = 0; i < mt7925_lldp_source_count; i++) {
+		if (mac_pton(mt7925_lldp_seq_sources[i], source) &&
+		    is_valid_ether_addr(source) &&
+		    mt7925_lldp_candidate(skb, status->flag, source, &hlen))
+			break;
+	}
+	if (i == mt7925_lldp_source_count)
+		return false;
+	hdr = (struct ieee80211_hdr *)skb->data;
+	match.transmitter = hdr->addr2;
+	ieee80211_iterate_active_interfaces_atomic(dev->mt76.hw,
+		IEEE80211_IFACE_ITER_NORMAL, mt7925_lldp_vif_match, &match);
+	if (!match.found)
+		return false;
+
+	match.frame.dev = dev;
+	ether_addr_copy(match.frame.source, hdr->addr3);
+	match.frame.seq_ctrl = le16_to_cpu(hdr->seq_ctrl);
+	match.frame.payload = skb->data + hlen;
+	match.frame.len = skb->len - hlen;
+	spin_lock_bh(&mt7925_lldp_lock);
+	duplicate = mt7925_lldp_cache_duplicate(mt7925_lldp_cache,
+		&mt7925_lldp_next, &match.frame, jiffies);
+	spin_unlock_bh(&mt7925_lldp_lock);
+	atomic_long_inc(&mt7925_lldp_checked);
+	if (duplicate) {
+		atomic_long_inc(&mt7925_lldp_duplicates);
+		return true;
+	}
+	/* This frame has been checked against the separate bounded cache.
+	 * Keep its unrelated sequence space out of mac80211's SNS11 state.
+	 */
+	status->flag |= RX_FLAG_DUP_VALIDATED;
+	return false;
+}
 
 bool mt7925_mac_wtbl_update(struct mt792x_dev *dev, int idx, u32 mask)
 {
@@ -18,6 +121,30 @@ bool mt7925_mac_wtbl_update(struct mt792x_dev *dev, int idx, u32 mask)
 	return mt76_poll(dev, MT_WTBL_UPDATE, MT_WTBL_UPDATE_BUSY,
 			 0, 5000);
 }
+
+bool mt7925_rx_check_duplicate(struct mt76_dev *mdev, struct sk_buff *skb)
+{
+	struct mt792x_dev *dev = container_of(mdev, struct mt792x_dev, mt76);
+	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
+	bool duplicate;
+	int offset;
+
+	if (!mt7925_lldp_source_count ||
+	    (status->flag & (RX_FLAG_ONLY_MONITOR | RX_FLAG_8023)))
+		return false;
+
+	/* fill_rx saved the frame header before adding radiotap metadata. */
+	offset = skb_mac_header(skb) - skb->data;
+	if (offset < 0 || offset > skb_headlen(skb))
+		return false;
+
+	skb_pull(skb, offset);
+	duplicate = mt7925_lldp_rx_duplicate(dev, skb);
+	skb_push(skb, offset);
+
+	return duplicate;
+}
+EXPORT_SYMBOL_GPL(mt7925_rx_check_duplicate);
 
 static void mt7925_mac_sta_poll(struct mt792x_dev *dev)
 {

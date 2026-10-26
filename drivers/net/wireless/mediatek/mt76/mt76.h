@@ -558,6 +558,9 @@ struct mt76_driver_ops {
 
 	bool (*rx_check)(struct mt76_dev *dev, void *data, int len);
 
+	/* After PN checking, before status conversion; true discards the skb. */
+	bool (*rx_check_duplicate)(struct mt76_dev *dev, struct sk_buff *skb);
+
 	void (*rx_skb)(struct mt76_dev *dev, enum mt76_rxq_id q,
 		       struct sk_buff *skb, u32 *info);
 
