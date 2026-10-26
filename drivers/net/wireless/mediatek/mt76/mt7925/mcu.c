@@ -6,6 +6,23 @@
 #include "mt7925.h"
 #include "regd.h"
 #include "mcu.h"
+
+static atomic_long_t mt7925_bmc_hdr_programmed = ATOMIC_LONG_INIT(0);
+static atomic_long_t mt7925_bmc_hdr_errors = ATOMIC_LONG_INIT(0);
+
+static int mt7925_bmc_counter_get(char *buffer, const struct kernel_param *kp)
+{
+	return scnprintf(buffer, PAGE_SIZE, "%ld\n",
+			 atomic_long_read((atomic_long_t *)kp->arg));
+}
+
+static const struct kernel_param_ops mt7925_bmc_counter_ops = {
+	.get = mt7925_bmc_counter_get,
+};
+module_param_cb(bmc_hdr_programmed, &mt7925_bmc_counter_ops,
+		&mt7925_bmc_hdr_programmed, 0444);
+module_param_cb(bmc_hdr_errors, &mt7925_bmc_counter_ops,
+		&mt7925_bmc_hdr_errors, 0444);
 #include "mac.h"
 
 #define MT_STA_BFER			BIT(0)
@@ -2830,6 +2847,56 @@ void mt7925_mcu_del_dev(struct mt76_dev *mdev,
 			  &dev_req, sizeof(dev_req), true);
 }
 
+/* Each MLO BSS has its own broadcast WCID. The ordinary NULL-peer update
+ * programs only mvif->sta.deflink, leaving secondary BMC entries at firmware
+ * defaults. A translated group frame has no peer station and cannot enter
+ * mac80211's 802.3 receive path. Keep group headers for the normal receive
+ * checks, explicitly programming the WCID that belongs to this BSS.
+ */
+static int
+mt7925_mcu_bmc_hdr_trans(struct mt792x_dev *dev,
+			  struct ieee80211_bss_conf *link_conf)
+{
+	struct mt792x_vif *mvif = (struct mt792x_vif *)link_conf->vif->drv_priv;
+	struct mt792x_bss_conf *mconf = mt792x_link_conf_to_mconf(link_conf);
+	struct mt792x_link_sta *mlink;
+	struct sta_rec_hdr_trans *hdr_trans;
+	struct sk_buff *skb;
+	struct tlv *tlv;
+	int ret;
+
+	mlink = mt792x_sta_to_link(&mvif->sta, link_conf->link_id);
+	if (!mlink) {
+		ret = -EINVAL;
+		goto recover;
+	}
+	skb = __mt76_connac_mcu_alloc_sta_req(&dev->mt76, &mconf->mt76,
+					      &mlink->wcid,
+					      sizeof(struct sta_req_hdr) +
+					      sizeof(*hdr_trans));
+	if (IS_ERR(skb)) {
+		ret = PTR_ERR(skb);
+		goto recover;
+	}
+	tlv = mt76_connac_mcu_add_tlv(skb, STA_REC_HDR_TRANS, sizeof(*hdr_trans));
+	hdr_trans = (struct sta_rec_hdr_trans *)tlv;
+	hdr_trans->dis_rx_hdr_tran = true;
+	hdr_trans->to_ds = true;
+	ret = mt76_mcu_skb_send_msg(&dev->mt76, skb,
+				  MCU_UNI_CMD(STA_REC_UPDATE), true);
+	if (ret)
+		goto recover;
+
+	atomic_long_inc(&mt7925_bmc_hdr_programmed);
+	return 0;
+
+recover:
+	atomic_long_inc(&mt7925_bmc_hdr_errors);
+	/* Some station callbacks cannot return errors to mac80211. */
+	mt792x_reset(&dev->mt76);
+	return ret;
+}
+
 int mt7925_mcu_add_bss_info(struct mt792x_phy *phy,
 			    struct ieee80211_chanctx_conf *ctx,
 			    struct ieee80211_bss_conf *link_conf,
@@ -2841,6 +2908,7 @@ int mt7925_mcu_add_bss_info(struct mt792x_phy *phy,
 	struct mt792x_dev *dev = phy->dev;
 	struct mt792x_link_sta *mlink_bc;
 	struct sk_buff *skb;
+	int ret;
 
 	skb = __mt7925_mcu_alloc_bss_req(&dev->mt76, &mconf->mt76,
 					 MT7925_BSS_UPDATE_MAX_SIZE);
@@ -2868,8 +2936,13 @@ int mt7925_mcu_add_bss_info(struct mt792x_phy *phy,
 		mt7925_mcu_bss_mbssid_tlv(skb, link_conf, enable);
 	}
 
-	return mt76_mcu_skb_send_msg(&dev->mt76, skb,
-				     MCU_UNI_CMD(BSS_INFO_UPDATE), true);
+	ret = mt76_mcu_skb_send_msg(&dev->mt76, skb,
+				 MCU_UNI_CMD(BSS_INFO_UPDATE), true);
+	if (ret || !enable ||
+	    link_conf->vif->type != NL80211_IFTYPE_STATION ||
+	    !ieee80211_vif_is_mld(link_conf->vif))
+		return ret;
+	return mt7925_mcu_bmc_hdr_trans(dev, link_conf);
 }
 
 int mt7925_mcu_set_dbdc(struct mt76_phy *phy, bool enable)
