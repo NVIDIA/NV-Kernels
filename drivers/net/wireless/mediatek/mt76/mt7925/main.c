@@ -704,6 +704,8 @@ static int mt7925_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		err = mt7925_set_link_key(hw, cmd, vif, sta, key, vif->bss_conf.link_id);
 	}
 
+	if (!err && !(key->flags & IEEE80211_KEY_FLAG_PAIRWISE))
+		mt7925_mcast_compat_reset(dev, vif);
 	mt792x_mutex_release(dev);
 
 	return err;
@@ -1869,6 +1871,7 @@ static void mt7925_vif_cfg_changed(struct ieee80211_hw *hw,
 	mt792x_mutex_acquire(dev);
 
 	if (changed & BSS_CHANGED_ASSOC) {
+		mt7925_mcast_compat_reset(dev, vif);
 		mt7925_mcu_sta_update(dev, NULL, vif, true,
 				      MT76_STA_INFO_STATE_ASSOC);
 		mt7925_mcu_set_beacon_filter(dev, vif, vif->cfg.assoc);

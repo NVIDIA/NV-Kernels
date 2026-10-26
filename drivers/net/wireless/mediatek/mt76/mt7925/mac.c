@@ -11,6 +11,20 @@
 #include "mac.h"
 #include "mcu.h"
 #include "lldp_rx.h"
+#include "mcast_compat.h"
+
+static char *mt7925_mcast_compat_aps[8];
+static unsigned int mt7925_mcast_compat_ap_count;
+module_param_array_named(mcast_compat_ap_mlds, mt7925_mcast_compat_aps, charp,
+			 &mt7925_mcast_compat_ap_count, 0444);
+MODULE_PARM_DESC(mcast_compat_ap_mlds,
+	"Opt-in AP MLD MACs for bounded non-QoS multicast duplicate compatibility checking");
+static atomic_long_t mt7925_mcast_compat_checked = ATOMIC_LONG_INIT(0);
+static atomic_long_t mt7925_mcast_compat_duplicates = ATOMIC_LONG_INIT(0);
+static DEFINE_SPINLOCK(mt7925_mcast_compat_lock);
+static struct mt7925_mcast_compat_entry
+	mt7925_mcast_compat_cache[MT7925_MCAST_COMPAT_ENTRIES];
+static unsigned int mt7925_mcast_compat_next;
 
 static char *mt7925_lldp_seq_sources[8];
 static unsigned int mt7925_lldp_source_count;
@@ -31,6 +45,10 @@ static int mt7925_lldp_counter_get(char *buffer, const struct kernel_param *kp)
 static const struct kernel_param_ops mt7925_lldp_counter_ops = {
 	.get = mt7925_lldp_counter_get,
 };
+module_param_cb(mcast_compat_checked, &mt7925_lldp_counter_ops,
+		&mt7925_mcast_compat_checked, 0444);
+module_param_cb(mcast_compat_duplicates, &mt7925_lldp_counter_ops,
+		&mt7925_mcast_compat_duplicates, 0444);
 module_param_cb(lldp_checked, &mt7925_lldp_counter_ops,
 		&mt7925_lldp_checked, 0444);
 module_param_cb(lldp_duplicates, &mt7925_lldp_counter_ops,
@@ -122,6 +140,66 @@ bool mt7925_mac_wtbl_update(struct mt792x_dev *dev, int idx, u32 mask)
 			 0, 5000);
 }
 
+void mt7925_mcast_compat_reset(struct mt792x_dev *dev, struct ieee80211_vif *vif)
+{
+	if (!mt7925_mcast_compat_ap_count)
+		return;
+	spin_lock_bh(&mt7925_mcast_compat_lock);
+	mt7925_mcast_compat_clear(mt7925_mcast_compat_cache, dev, vif->addr);
+	spin_unlock_bh(&mt7925_mcast_compat_lock);
+}
+
+static bool mt7925_mcast_compat_rx_duplicate(struct mt792x_dev *dev,
+					  struct sk_buff *skb)
+{
+	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
+	struct mt7925_lldp_match match = {};
+	struct mt7925_mcast_compat_frame frame = {};
+	struct ieee80211_hdr *hdr;
+	unsigned int hlen, i;
+	u8 ap[ETH_ALEN];
+	bool enabled = false, duplicate;
+
+	if (!mt7925_mcast_compat_ap_count ||
+	    !mt7925_mcast_compat_candidate(skb, status->flag, &hlen))
+		return false;
+	hdr = (struct ieee80211_hdr *)skb->data;
+	match.transmitter = hdr->addr2;
+	ieee80211_iterate_active_interfaces_atomic(dev->mt76.hw,
+		IEEE80211_IFACE_ITER_NORMAL, mt7925_lldp_vif_match, &match);
+	if (!match.found)
+		return false;
+	for (i = 0; i < mt7925_mcast_compat_ap_count; i++) {
+		if (mac_pton(mt7925_mcast_compat_aps[i], ap) &&
+		    is_valid_ether_addr(ap) &&
+		    ether_addr_equal(ap, match.frame.ap_mld)) {
+			enabled = true;
+			break;
+		}
+	}
+	if (!enabled)
+		return false;
+	frame.dev = dev;
+	ether_addr_copy(frame.local_mld, match.frame.local_mld);
+	ether_addr_copy(frame.ap_mld, match.frame.ap_mld);
+	ether_addr_copy(frame.source, hdr->addr3);
+	ether_addr_copy(frame.destination, hdr->addr1);
+	frame.seq_ctrl = le16_to_cpu(hdr->seq_ctrl);
+	frame.len = skb->len - hlen;
+	frame.payload = skb->data + hlen;
+	spin_lock_bh(&mt7925_mcast_compat_lock);
+	duplicate = mt7925_mcast_compat_duplicate(mt7925_mcast_compat_cache,
+		&mt7925_mcast_compat_next, &frame, jiffies);
+	spin_unlock_bh(&mt7925_mcast_compat_lock);
+	atomic_long_inc(&mt7925_mcast_compat_checked);
+	if (duplicate) {
+		atomic_long_inc(&mt7925_mcast_compat_duplicates);
+		return true;
+	}
+	status->flag |= RX_FLAG_DUP_VALIDATED;
+	return false;
+}
+
 bool mt7925_rx_check_duplicate(struct mt76_dev *mdev, struct sk_buff *skb)
 {
 	struct mt792x_dev *dev = container_of(mdev, struct mt792x_dev, mt76);
@@ -129,7 +207,7 @@ bool mt7925_rx_check_duplicate(struct mt76_dev *mdev, struct sk_buff *skb)
 	bool duplicate;
 	int offset;
 
-	if (!mt7925_lldp_source_count ||
+	if ((!mt7925_lldp_source_count && !mt7925_mcast_compat_ap_count) ||
 	    (status->flag & (RX_FLAG_ONLY_MONITOR | RX_FLAG_8023)))
 		return false;
 
@@ -139,7 +217,8 @@ bool mt7925_rx_check_duplicate(struct mt76_dev *mdev, struct sk_buff *skb)
 		return false;
 
 	skb_pull(skb, offset);
-	duplicate = mt7925_lldp_rx_duplicate(dev, skb);
+	duplicate = mt7925_lldp_rx_duplicate(dev, skb) ||
+		    mt7925_mcast_compat_rx_duplicate(dev, skb);
 	skb_push(skb, offset);
 
 	return duplicate;

@@ -264,6 +264,7 @@ int mt7925_mcu_set_rxfilter(struct mt792x_dev *dev, u32 fif,
 			    u8 bit_op, u32 bit_map);
 
 int mt7925_mac_init(struct mt792x_dev *dev);
+void mt7925_mcast_compat_reset(struct mt792x_dev *dev, struct ieee80211_vif *vif);
 int mt7925_mac_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
 		       struct ieee80211_sta *sta);
 bool mt7925_mac_wtbl_update(struct mt792x_dev *dev, int idx, u32 mask);
