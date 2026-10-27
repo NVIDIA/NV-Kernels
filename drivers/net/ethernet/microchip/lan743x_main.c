@@ -3458,6 +3458,14 @@ return_error:
 	return ret;
 }
 
+static int lan743x_netdev_stop(struct net_device *netdev)
+{
+	if (!netif_device_present(netdev))
+		return 0;
+
+	return lan743x_netdev_close(netdev);
+}
+
 static netdev_tx_t lan743x_netdev_xmit_frame(struct sk_buff *skb,
 					     struct net_device *netdev)
 {
@@ -3564,7 +3572,7 @@ static int lan743x_netdev_set_mac_address(struct net_device *netdev,
 
 static const struct net_device_ops lan743x_netdev_ops = {
 	.ndo_open		= lan743x_netdev_open,
-	.ndo_stop		= lan743x_netdev_close,
+	.ndo_stop		= lan743x_netdev_stop,
 	.ndo_start_xmit		= lan743x_netdev_xmit_frame,
 	.ndo_eth_ioctl		= lan743x_netdev_ioctl,
 	.ndo_set_rx_mode	= lan743x_netdev_set_multicast,
@@ -3858,15 +3866,20 @@ static void lan743x_pcidev_shutdown(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct lan743x_adapter *adapter = netdev_priv(netdev);
+	bool present;
 
 	rtnl_lock();
+	present = netif_device_present(netdev);
 	netif_device_detach(netdev);
 
 	/* close netdev when netdev is at running state.
 	 * For instance, it is true when system goes to sleep by pm-suspend
 	 * However, it is false when system goes to sleep by suspend GUI menu
+	 *
+	 * If the device is not present then netdev has already been closed.
+	 * This can be true if a previous resume failed.
 	 */
-	if (netif_running(netdev))
+	if (present && netif_running(netdev))
 		lan743x_netdev_close(netdev);
 	rtnl_unlock();
 
@@ -4049,7 +4062,6 @@ static int lan743x_pm_resume(struct device *dev)
 	if (ret) {
 		netif_err(adapter, probe, adapter->netdev,
 			  "lan743x_hardware_init returned %d\n", ret);
-		lan743x_pci_cleanup(adapter);
 		return ret;
 	}
 
@@ -4082,10 +4094,23 @@ static int lan743x_pm_resume(struct device *dev)
 	 * For instance, it is true when system wakesup after pm-suspend
 	 * However, it is false when system wakes up after suspend GUI menu
 	 */
-	if (netif_running(netdev))
-		lan743x_netdev_open(netdev);
+	if (netif_running(netdev)) {
+		ret = lan743x_netdev_open(netdev);
+		if (ret) {
+			netdev_err(netdev, "failed to reopen after resume: %d\n",
+				   ret);
+			dev_close(netdev);
+		}
+	}
 
 	netif_device_attach(netdev);
+
+	/* ndo_set_rx_mode is skipped while the device is detached */
+	if (netif_running(netdev)) {
+		netif_addr_lock_bh(netdev);
+		lan743x_rfe_set_multicast(adapter);
+		netif_addr_unlock_bh(netdev);
+	}
 	rtnl_unlock();
 
 	return 0;
