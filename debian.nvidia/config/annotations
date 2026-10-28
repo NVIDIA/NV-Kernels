@@ -45,6 +45,9 @@ CONFIG_ARM_LFA                                  note<'LP: #2138342'>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      policy<{'arm64': 'y'}>
 CONFIG_ARM_SMMU_V3_IOMMUFD                      note<'LP: #2095028'>
 
+CONFIG_ARM_SMMU_V3_KEXEC                        policy<{'arm64': 'y'}>
+CONFIG_ARM_SMMU_V3_KEXEC                        note<'Required for SMMUv3 kdump stream table adoption'>
+
 CONFIG_CMA_SIZE_MBYTES                          policy<{'amd64': '0', 'arm64': '0'}>
 CONFIG_CMA_SIZE_MBYTES                          note<'LP: #2150898'>
 
