@@ -605,6 +605,9 @@ static void iwl_mvm_del_ba(struct iwl_mvm *mvm, int queue,
 		goto out;
 
 	/* pick any STA ID to find the pointer */
+	if (WARN_ON_ONCE(!ba_data->sta_mask))
+		goto out;
+
 	sta_id = ffs(ba_data->sta_mask) - 1;
 	sta = rcu_dereference(mvm->fw_id_to_mac_id[sta_id]);
 	if (WARN_ON_ONCE(IS_ERR_OR_NULL(sta)))
@@ -648,6 +651,9 @@ static void iwl_mvm_release_frames_from_notif(struct iwl_mvm *mvm,
 	}
 
 	/* pick any STA ID to find the pointer */
+	if (WARN_ON_ONCE(!ba_data->sta_mask))
+		goto out;
+
 	sta_id = ffs(ba_data->sta_mask) - 1;
 	sta = rcu_dereference(mvm->fw_id_to_mac_id[sta_id]);
 	if (WARN_ON_ONCE(IS_ERR_OR_NULL(sta)))

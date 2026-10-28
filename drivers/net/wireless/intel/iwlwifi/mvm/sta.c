@@ -278,6 +278,9 @@ static void iwl_mvm_rx_agg_session_expired(struct timer_list *t)
 	}
 
 	/* Timer expired */
+	if (WARN_ON_ONCE(!ba_data->sta_mask))
+		goto unlock;
+
 	sta_id = ffs(ba_data->sta_mask) - 1; /* don't care which one */
 	sta = rcu_dereference(ba_data->mvm->fw_id_to_mac_id[sta_id]);
 
