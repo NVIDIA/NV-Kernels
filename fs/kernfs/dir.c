@@ -30,6 +30,8 @@ static char kernfs_pr_cont_buf[PATH_MAX];	/* protected by pr_cont_lock */
 
 #define rb_to_kn(X) rb_entry((X), struct kernfs_node, rb)
 
+static void kernfs_activate_one(struct kernfs_node *kn);
+
 static bool __kernfs_active(struct kernfs_node *kn)
 {
 	return atomic_read(&kn->active) >= 0;
@@ -846,7 +848,6 @@ int kernfs_add_one(struct kernfs_node *kn)
 	}
 
 	up_write(&root->kernfs_iattr_rwsem);
-	up_write(&root->kernfs_rwsem);
 
 	/*
 	 * Activate the new node unless CREATE_DEACTIVATED is requested.
@@ -854,9 +855,15 @@ int kernfs_add_one(struct kernfs_node *kn)
 	 * activating the node with kernfs_activate().  A node which hasn't
 	 * been activated is not visible to userland and its removal won't
 	 * trigger deactivation.
+	 *
+	 * @kn has no children yet, so kernfs_activate() would walk only @kn.
+	 * Do it here rather than dropping the write lock and taking it again
+	 * for every new node.
 	 */
-	if (!(kernfs_root(kn)->flags & KERNFS_ROOT_CREATE_DEACTIVATED))
-		kernfs_activate(kn);
+	if (!(root->flags & KERNFS_ROOT_CREATE_DEACTIVATED))
+		kernfs_activate_one(kn);
+
+	up_write(&root->kernfs_rwsem);
 	return 0;
 
 out_unlock:
@@ -1162,23 +1169,18 @@ struct kernfs_node *kernfs_create_empty_dir(struct kernfs_node *parent,
 static int kernfs_dop_revalidate(struct inode *dir, const struct qstr *name,
 				 struct dentry *dentry, unsigned int flags)
 {
-	struct kernfs_node *kn, *parent;
-	struct kernfs_root *root;
+	struct kernfs_node *parent = dir->i_private;
+	struct kernfs_node *kn;
+	const char *kn_name;
 
 	if (flags & LOOKUP_RCU)
 		return -ECHILD;
 
 	/* Negative hashed dentry? */
 	if (d_really_is_negative(dentry)) {
-		/* If the kernfs parent node has changed discard and
-		 * proceed to ->lookup.
-		 *
-		 * There's nothing special needed here when getting the
-		 * dentry parent, even if a concurrent rename is in
-		 * progress. That's because the dentry is negative so
-		 * it can only be the target of the rename and it will
-		 * be doing a d_move() not a replace. Consequently the
-		 * dentry d_parent won't change over the d_move().
+		/*
+		 * If the kernfs parent node has changed discard and proceed to
+		 * ->lookup.
 		 *
 		 * Also kernfs negative dentries transitioning from
 		 * negative to positive during revalidate won't happen
@@ -1186,50 +1188,41 @@ static int kernfs_dop_revalidate(struct inode *dir, const struct qstr *name,
 		 * changes and the lookup re-done so that a new positive
 		 * dentry can be properly created.
 		 */
-		root = kernfs_root_from_sb(dentry->d_sb);
-		down_read(&root->kernfs_rwsem);
-		parent = kernfs_dentry_node(dentry->d_parent);
-		if (parent) {
-			if (kernfs_dir_changed(parent, dentry)) {
-				up_read(&root->kernfs_rwsem);
-				return 0;
-			}
-		}
-		up_read(&root->kernfs_rwsem);
-
-		/* The kernfs parent node hasn't changed, leave the
-		 * dentry negative and return success.
-		 */
-		return 1;
+		return !kernfs_dir_changed(parent, dentry);
 	}
 
 	kn = kernfs_dentry_node(dentry);
-	root = kernfs_root(kn);
-	down_read(&root->kernfs_rwsem);
+
+	guard(rcu)();
 
 	/* The kernfs node has been deactivated */
-	if (!kernfs_active(kn))
-		goto out_bad;
+	if (!__kernfs_active(kn))
+		return 0;
 
-	parent = kernfs_parent(kn);
 	/* The kernfs node has been moved? */
-	if (kernfs_dentry_node(dentry->d_parent) != parent)
-		goto out_bad;
+	if (kernfs_parent(kn) != parent)
+		return 0;
 
 	/* The kernfs node has been renamed */
-	if (strcmp(dentry->d_name.name, kernfs_rcu_name(kn)) != 0)
-		goto out_bad;
+	kn_name = kernfs_rcu_name(kn);
+	if (name->len != strlen(kn_name) ||
+	    memcmp(name->name, kn_name, name->len))
+		return 0;
 
-	/* The kernfs node has been moved to a different namespace */
-	if (parent && kernfs_ns_enabled(parent) &&
-	    kernfs_ns_id(kernfs_info(dentry->d_sb)->ns) != kernfs_ns_id(kn->ns))
-		goto out_bad;
+	/*
+	 * The kernfs node has been moved to a different namespace.
+	 *
+	 * KERNFS_NS is set by kernfs_enable_ns() while @parent still has no
+	 * children, so it cannot change while a child of @parent is being
+	 * revalidated. The other bits in that word, KERNFS_ACTIVATED and
+	 * KERNFS_REMOVING, are updated under kernfs_rwsem and are not read
+	 * here, so racing with them is intentional and harmless.
+	 */
+	if (data_race(kernfs_ns_enabled(parent)) &&
+	    kernfs_info(dir->i_sb)->ns != READ_ONCE(kn->ns))
+		return 0;
 
-	up_read(&root->kernfs_rwsem);
 	return 1;
-out_bad:
-	up_read(&root->kernfs_rwsem);
-	return 0;
 }
 
 const struct dentry_operations kernfs_dops = {
@@ -1825,7 +1818,7 @@ int kernfs_rename_ns(struct kernfs_node *kn, struct kernfs_node *new_parent,
 
 		rcu_assign_pointer(kn->__parent, new_parent);
 
-		kn->ns = new_ns;
+		WRITE_ONCE(kn->ns, new_ns);
 		if (new_name)
 			rcu_assign_pointer(kn->name, new_name);
 
@@ -1833,7 +1826,7 @@ int kernfs_rename_ns(struct kernfs_node *kn, struct kernfs_node *new_parent,
 		kernfs_put(old_parent);
 	} else {
 		/* name assignment is RCU protected, parent is the same */
-		kn->ns = new_ns;
+		WRITE_ONCE(kn->ns, new_ns);
 		if (new_name)
 			rcu_assign_pointer(kn->name, new_name);
 	}
