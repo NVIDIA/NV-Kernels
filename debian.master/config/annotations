@@ -11082,7 +11082,6 @@ CONFIG_ROCKER                                   policy<{'amd64': 'm', 'arm64': '
 CONFIG_RODATA_FULL_DEFAULT_ENABLED              policy<{'arm64': 'y'}>
 CONFIG_ROHM_BM1390                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_ROHM_BU27008                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
-CONFIG_ROHM_BU27034                             policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_ROMFS_BACKED_BY_BLOCK                    policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y'}>
 CONFIG_ROMFS_BACKED_BY_BOTH                     policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': '-'}>
 CONFIG_ROMFS_BACKED_BY_MTD                      policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': '-'}>
