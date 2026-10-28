@@ -3299,6 +3299,12 @@ static int lan743x_phylink_connect(struct lan743x_adapter *adapter)
 	struct phy_device *phydev;
 	int ret;
 
+	/* A fixed link set up by an earlier open is still in place */
+	if (!phylink_expects_phy(adapter->phylink)) {
+		phylink_start(adapter->phylink);
+		return 0;
+	}
+
 	if (dn)
 		ret = phylink_of_phy_connect(adapter->phylink, dn, 0);
 
