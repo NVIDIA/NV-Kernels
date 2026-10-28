@@ -944,8 +944,8 @@ struct arm_smmu_device {
 #define ARM_SMMU_FEAT_BBML2		(1 << 24)
 #define ARM_SMMU_FEAT_HAFT		(1 << 25)
 #define ARM_SMMU_FEAT_DS		(1 << 26)
-#define ARM_SMMU_FEAT_MPAM		(1 << 25)
 #define ARM_SMMU_FEAT_EVTQ		(1 << 27)
+#define ARM_SMMU_FEAT_MPAM		(1 << 28)
 	u32				features;
 
 #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
