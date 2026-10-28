@@ -67,7 +67,7 @@ mt7925_lldp_cache_duplicate(struct mt7925_lldp_entry *cache, unsigned int *next,
 	return false;
 }
 
-/* Select complete, hardware-decrypted frames to the link-local destination
+/* Select complete, hardware-decrypted LLDP frames to the link-local destination
  * from the configured bridge source.
  */
 static bool
@@ -80,7 +80,7 @@ mt7925_lldp_candidate(struct sk_buff *skb, u32 flags, const u8 *source,
 	if (skb->len < 24 || skb->len != skb_headlen(skb) ||
 	    !(flags & RX_FLAG_DECRYPTED) || !(flags & RX_FLAG_IV_STRIPPED) ||
 	    (flags & (RX_FLAG_ONLY_MONITOR | RX_FLAG_FAILED_FCS_CRC |
-		      RX_FLAG_MMIC_ERROR | RX_FLAG_8023)))
+		      RX_FLAG_FAILED_PLCP_CRC | RX_FLAG_MMIC_ERROR | RX_FLAG_8023)))
 		return false;
 
 	hdr = (struct ieee80211_hdr *)skb->data;
@@ -97,9 +97,10 @@ mt7925_lldp_candidate(struct sk_buff *skb, u32 flags, const u8 *source,
 	*hlen = ieee80211_hdrlen(hdr->frame_control);
 	if (skb->len < *hlen + 8 || skb->len - *hlen > MT7925_LLDP_PAYLOAD_MAX)
 		return false;
-	/* Do not interpret encrypted or aggregated payloads as a control frame. */
-	if (skb->data[*hlen] != 0xaa || skb->data[*hlen + 1] != 0xaa ||
-	    skb->data[*hlen + 2] != 3)
+	/* Require RFC 1042 encapsulation and the LLDP EtherType. */
+	if (memcmp(skb->data + *hlen, rfc1042_header, sizeof(rfc1042_header)) ||
+	    get_unaligned_be16(skb->data + *hlen + sizeof(rfc1042_header)) !=
+	    ETH_P_LLDP)
 		return false;
 	if (ieee80211_is_data_qos(hdr->frame_control) &&
 	    (*ieee80211_get_qos_ctl(hdr) & IEEE80211_QOS_CTL_A_MSDU_PRESENT))

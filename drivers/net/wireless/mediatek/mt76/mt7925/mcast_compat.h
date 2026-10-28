@@ -93,7 +93,8 @@ mt7925_mcast_compat_candidate(struct sk_buff *skb, u32 flags,
 	if (skb->len < 32 || skb->len != skb_headlen(skb) ||
 	    !(flags & RX_FLAG_DECRYPTED) || !(flags & RX_FLAG_IV_STRIPPED) ||
 	    (flags & (RX_FLAG_ONLY_MONITOR | RX_FLAG_FAILED_FCS_CRC |
-		      RX_FLAG_MMIC_ERROR | RX_FLAG_8023 | RX_FLAG_DUP_VALIDATED)))
+		      RX_FLAG_FAILED_PLCP_CRC | RX_FLAG_MMIC_ERROR |
+		      RX_FLAG_8023 | RX_FLAG_DUP_VALIDATED)))
 		return false;
 	hdr = (struct ieee80211_hdr *)skb->data;
 	if (!ieee80211_is_data_present(hdr->frame_control) ||
