@@ -270,6 +270,9 @@ CONFIG_PID_IN_CONTEXTIDR                        note<'Required for Grace enablem
 CONFIG_PINCTRL_MT8901                           policy<{'arm64': 'y'}>
 CONFIG_PINCTRL_MT8901                           note<'LP: #2117784'>
 
+CONFIG_PREFERRED_CPU                            policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_PREFERRED_CPU                            note<'Selected by the opt-in steal governor module'>
+
 CONFIG_R8127                                    policy<{'amd64': 'n', 'arm64': 'm'}>
 CONFIG_R8127                                    note<'LP: #2109730'>
 
@@ -311,6 +314,9 @@ CONFIG_SOUNDWIRE_MTK_MT8901_CLK                 note<'MT8901 SoundWire clock/pow
 
 CONFIG_SPI_TEGRA210_QUAD                        policy<{'arm64': 'y'}>
 CONFIG_SPI_TEGRA210_QUAD                        note<'Ensures the TPM is available before the IMA driver initializes'>
+
+CONFIG_STEAL_GOVERNOR                           policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_STEAL_GOVERNOR                           note<'Guest steal-time policy; enable explicitly by loading the module'>
 
 CONFIG_TCG_ARM_CRB_FFA                          policy<{'arm64': 'y'}>
 CONFIG_TCG_ARM_CRB_FFA                          note<'LP: #2111511'>
