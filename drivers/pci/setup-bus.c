@@ -1038,6 +1038,20 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 				continue;
 			}
 #endif
+
+			/*
+			 * A zero-size bridge window adds nothing to the required
+			 * size, only its optional size, and its alignment still
+			 * applies through add_align.
+			 */
+			if (realloc_head && !r_size &&
+			    i >= PCI_BRIDGE_RESOURCES && i <= PCI_BRIDGE_RESOURCE_END) {
+				children_add_size += get_res_add_size(realloc_head, r);
+				add_align = max3(add_align, pci_resource_alignment(dev, r),
+						 get_res_add_align(realloc_head, r));
+				continue;
+			}
+
 			/*
 			 * aligns[0] is for 1MB (since bridge memory
 			 * windows are always at least 1MB aligned), so
