@@ -828,7 +828,7 @@ static resource_size_t calculate_memsize(resource_size_t size,
 	if (old_size == 1)
 		old_size = 0;
 
-	size = max(size, add_size) + children_add_size;
+	size = max(size + children_add_size, add_size);
 	return ALIGN(max(size, old_size), align);
 }
 
@@ -1038,6 +1038,20 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 				continue;
 			}
 #endif
+
+			/*
+			 * A zero-size bridge window adds nothing to the required
+			 * size, only its optional size, and its alignment still
+			 * applies through add_align.
+			 */
+			if (realloc_head && !r_size &&
+			    i >= PCI_BRIDGE_RESOURCES && i <= PCI_BRIDGE_RESOURCE_END) {
+				children_add_size += get_res_add_size(realloc_head, r);
+				add_align = max3(add_align, pci_resource_alignment(dev, r),
+						 get_res_add_align(realloc_head, r));
+				continue;
+			}
+
 			/*
 			 * aligns[0] is for 1MB (since bridge memory
 			 * windows are always at least 1MB aligned), so
@@ -1089,11 +1103,12 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 	b_res->start = min_align;
 	b_res->end = size0 + min_align - 1;
 	b_res->flags |= IORESOURCE_STARTALIGN;
-	if (bus->self && size1 > size0 && realloc_head) {
-		add_to_list(realloc_head, bus->self, b_res, size1-size0, add_align);
+	if (bus->self && realloc_head && (size1 > size0 || add_align > min_align)) {
+		add_size = size1 > size0 ? size1 - size0 : 0;
+		add_to_list(realloc_head, bus->self, b_res, add_size, add_align);
 		pci_info(bus->self, "bridge window %pR to %pR add_size %llx add_align %llx\n",
 			   b_res, &bus->busn_res,
-			   (unsigned long long) (size1 - size0),
+			   (unsigned long long) add_size,
 			   (unsigned long long) add_align);
 	}
 	return 0;
