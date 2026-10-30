@@ -32,6 +32,23 @@ static int __init sched_debug_setup(char *str)
 }
 early_param("sched_verbose", sched_debug_setup);
 
+#ifdef CONFIG_SCHED_SMT
+static bool sched_smt_asym_packing __read_mostly = IS_ENABLED(CONFIG_ARM64);
+
+static int __init setup_sched_smt_asym_packing(char *str)
+{
+	if (!strcmp(str, "on"))
+		sched_smt_asym_packing = true;
+	else if (!strcmp(str, "off"))
+		sched_smt_asym_packing = false;
+	else
+		return 0;
+
+	return 1;
+}
+__setup("sched_smt_asym_packing=", setup_sched_smt_asym_packing);
+#endif
+
 static inline bool sched_debug(void)
 {
 	return sched_debug_verbose;
@@ -683,23 +700,7 @@ DEFINE_PER_CPU(struct sched_domain __rcu *, sd_asym_packing);
 DEFINE_PER_CPU(struct sched_domain __rcu *, sd_asym_cpucapacity);
 
 DEFINE_STATIC_KEY_FALSE(sched_asym_cpucapacity);
-DEFINE_STATIC_KEY_FALSE(sched_smt_asym_packing);
 DEFINE_STATIC_KEY_FALSE(sched_cluster_active);
-
-static bool has_asym_smt_domain(int cpu)
-{
-	struct sched_domain *sd;
-
-	for_each_domain(cpu, sd) {
-		if (!(sd->flags & SD_SHARE_CPUCAPACITY))
-			break;
-
-		if (sd->flags & SD_ASYM_PACKING)
-			return true;
-	}
-
-	return false;
-}
 
 static void update_top_cache_domain(int cpu)
 {
@@ -1970,6 +1971,10 @@ sd_init(struct sched_domain_topology_level *tl,
 	if (WARN_ONCE(sd_flags & ~TOPOLOGY_SD_FLAGS,
 		      "wrong sd_flags in topology description\n"))
 		sd_flags &= TOPOLOGY_SD_FLAGS;
+#ifdef CONFIG_SCHED_SMT
+	if (sched_smt_asym_packing && (sd_flags & SD_SHARE_CPUCAPACITY))
+		sd_flags |= SD_ASYM_PACKING;
+#endif
 	sd_flags |= asym_cpu_capacity_classify(sd_span, cpu_map);
 
 	*sd = (struct sched_domain){
@@ -3104,7 +3109,6 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 	struct rq *rq = NULL;
 	int i, ret = -ENOMEM;
 	bool has_asym = false;
-	bool has_asym_smt = false;
 	bool has_cluster = false;
 
 	if (WARN_ON(cpumask_empty(cpu_map)))
@@ -3223,9 +3227,6 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 
 		cpu_attach_domain(sd, d.rd, i);
 
-		if (has_asym_smt_domain(i))
-			has_asym_smt = true;
-
 		if (lowest_flag_domain(i, SD_CLUSTER))
 			has_cluster = true;
 	}
@@ -3233,9 +3234,6 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 
 	if (has_asym)
 		static_branch_inc_cpuslocked(&sched_asym_cpucapacity);
-
-	if (has_asym_smt)
-		static_branch_inc_cpuslocked(&sched_smt_asym_packing);
 
 	if (has_cluster)
 		static_branch_inc_cpuslocked(&sched_cluster_active);
@@ -3337,23 +3335,10 @@ int __init sched_init_domains(const struct cpumask *cpu_map)
 static void detach_destroy_domains(const struct cpumask *cpu_map)
 {
 	unsigned int cpu = cpumask_any(cpu_map);
-	bool has_asym_smt = false;
 	int i;
-
-	rcu_read_lock();
-	for_each_cpu(i, cpu_map) {
-		if (has_asym_smt_domain(i)) {
-			has_asym_smt = true;
-			break;
-		}
-	}
-	rcu_read_unlock();
 
 	if (rcu_access_pointer(per_cpu(sd_asym_cpucapacity, cpu)))
 		static_branch_dec_cpuslocked(&sched_asym_cpucapacity);
-
-	if (has_asym_smt)
-		static_branch_dec_cpuslocked(&sched_smt_asym_packing);
 
 	if (static_branch_unlikely(&sched_cluster_active))
 		static_branch_dec_cpuslocked(&sched_cluster_active);

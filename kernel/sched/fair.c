@@ -8821,7 +8821,7 @@ static inline int select_idle_smt_cpu(struct task_struct *p, int cpu)
 	int best = cpu;
 	int sibling;
 
-	if (!sched_smt_asym_active())
+	if (!sched_smt_active())
 		return cpu;
 
 	sd = rcu_dereference_all(cpu_rq(cpu)->sd);
