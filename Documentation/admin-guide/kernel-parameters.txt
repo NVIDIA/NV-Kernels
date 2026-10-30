@@ -6824,8 +6824,11 @@ Kernel parameters
 			Format: <bool>
 
 	sched_smt_asym_packing= [KNL,SMP]
-			Format: on
+			Format: { on | off }
 			Force asymmetric packing at the SMT scheduling domain.
+			Default: on for arm64, off for other architectures.
+			Use "off" to preserve the topology provided by the
+			architecture or firmware.
 			Idle CPU selection prefers siblings with a higher
 			arch_asym_cpu_priority(). The default implementation
 			prefers lower-numbered logical CPUs, but architecture
