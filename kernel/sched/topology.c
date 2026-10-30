@@ -29,6 +29,23 @@ static int __init sched_debug_setup(char *str)
 }
 early_param("sched_verbose", sched_debug_setup);
 
+#ifdef CONFIG_SCHED_SMT
+static bool sched_smt_asym_packing __read_mostly = IS_ENABLED(CONFIG_ARM64);
+
+static int __init setup_sched_smt_asym_packing(char *str)
+{
+	if (!strcmp(str, "on"))
+		sched_smt_asym_packing = true;
+	else if (!strcmp(str, "off"))
+		sched_smt_asym_packing = false;
+	else
+		return 0;
+
+	return 1;
+}
+__setup("sched_smt_asym_packing=", setup_sched_smt_asym_packing);
+#endif
+
 static inline bool sched_debug(void)
 {
 	return sched_debug_verbose;
@@ -665,7 +682,7 @@ DEFINE_PER_CPU(struct sched_domain __rcu *, sd_llc);
 DEFINE_PER_CPU(int, sd_llc_size);
 DEFINE_PER_CPU(int, sd_llc_id);
 DEFINE_PER_CPU(int, sd_share_id);
-DEFINE_PER_CPU(struct sched_domain_shared __rcu *, sd_llc_shared);
+DEFINE_PER_CPU(struct sched_domain_shared __rcu *, sd_balance_shared);
 DEFINE_PER_CPU(struct sched_domain __rcu *, sd_numa);
 DEFINE_PER_CPU(struct sched_domain __rcu *, sd_asym_packing);
 DEFINE_PER_CPU(struct sched_domain __rcu *, sd_asym_cpucapacity);
@@ -712,7 +729,7 @@ static void update_top_cache_domain(int cpu)
 	per_cpu(sd_llc_size, cpu) = size;
 	per_cpu(sd_llc_id, cpu) = id;
 
-	rcu_assign_pointer(per_cpu(sd_llc_shared, cpu), sds);
+	rcu_assign_pointer(per_cpu(sd_balance_shared, cpu), sds);
 
 	sd = lowest_flag_domain(cpu, SD_CLUSTER);
 	if (sd)
@@ -750,6 +767,13 @@ cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
 
 		if (sd_parent_degenerate(tmp, parent)) {
 			tmp->parent = parent->parent;
+
+			/* Pick reference to parent->shared. */
+			if (parent->shared) {
+				WARN_ON_ONCE(tmp->shared);
+				tmp->shared = parent->shared;
+				parent->shared = NULL;
+			}
 
 			if (parent->parent) {
 				parent->parent->child = tmp;
@@ -1671,6 +1695,10 @@ sd_init(struct sched_domain_topology_level *tl,
 	if (WARN_ONCE(sd_flags & ~TOPOLOGY_SD_FLAGS,
 		      "wrong sd_flags in topology description\n"))
 		sd_flags &= TOPOLOGY_SD_FLAGS;
+#ifdef CONFIG_SCHED_SMT
+	if (sched_smt_asym_packing && (sd_flags & SD_SHARE_CPUCAPACITY))
+		sd_flags |= SD_ASYM_PACKING;
+#endif
 	sd_flags |= asym_cpu_capacity_classify(sd_span, cpu_map);
 
 	*sd = (struct sched_domain){
@@ -2560,8 +2588,47 @@ static void init_sched_domain_shared(struct sched_domain *sd)
 	int sd_id = cpumask_first(sched_domain_span(sd));
 
 	sd->shared = *per_cpu_ptr(sdd->sds, sd_id);
+	/*
+	 * nr_busy_cpus is consumed only by the NOHZ kick path via
+	 * sd_balance_shared; on the asym-capacity path it is initialized but
+	 * never read.
+	 */
 	atomic_set(&sd->shared->nr_busy_cpus, sd->span_weight);
 	atomic_inc(&sd->shared->ref);
+}
+
+/*
+ * For asymmetric CPU capacity, attach sched_domain_shared on the innermost
+ * SD_ASYM_CPUCAPACITY_FULL ancestor of @cpu's base domain when that ancestor is
+ * not an overlapping NUMA-built domain (then LLC should claim shared).
+ *
+ * A CPU may lack any FULL ancestor (e.g., exclusive cpuset symmetric island),
+ * then LLC must claim shared instead.
+ *
+ * Note: SD_ASYM_CPUCAPACITY_FULL is only set when all CPU capacity values
+ * are present in the domain span, so the asym domain we attach to cannot
+ * degenerate into a single-capacity group. The relevant edge cases are instead
+ * covered by the caveats above.
+ *
+ * Return true if this CPU's asym path claimed sd->shared, false otherwise.
+ */
+static bool claim_asym_sched_domain_shared(struct s_data *d, int cpu)
+{
+	struct sched_domain *sd = *per_cpu_ptr(d->sd, cpu);
+	struct sched_domain *sd_asym;
+
+	if (!sd)
+		return false;
+
+	sd_asym = sd;
+	while (sd_asym && !(sd_asym->flags & SD_ASYM_CPUCAPACITY_FULL))
+		sd_asym = sd_asym->parent;
+
+	if (!sd_asym || (sd_asym->flags & SD_NUMA))
+		return false;
+
+	init_sched_domain_shared(sd_asym);
+	return true;
 }
 
 /*
@@ -2622,43 +2689,16 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 	}
 
 	for_each_cpu(i, cpu_map) {
-		struct sched_domain *sd_asym = NULL;
 		bool asym_claimed = false;
 
 		sd = *per_cpu_ptr(d.sd, i);
 		if (!sd)
 			continue;
 
-		/*
-		 * In case of ASYM_CPUCAPACITY, attach sd->shared to
-		 * sd_asym_cpucapacity for wakeup stat tracking.
-		 *
-		 * Caveats:
-		 *
-		 * 1) has_asym is system-wide, but a given CPU may still
-		 *    lack an SD_ASYM_CPUCAPACITY_FULL ancestor (e.g., an
-		 *    exclusive cpuset carving out a symmetric capacity island).
-		 *    Such CPUs must fall through to the LLC seeding path below.
-		 *
-		 * 2) Skip the asym attach if the asym ancestor is an
-		 *    overlapping domain (SD_NUMA). On those topologies let the
-		 *    LLC path own the shared object instead.
-		 *
-		 * XXX: This assumes SD_ASYM_CPUCAPACITY_FULL domain
-		 * always has more than one group else it is prone to
-		 * degeneration.
-		 */
-		sd_asym = sd;
-		while (sd_asym && !(sd_asym->flags & SD_ASYM_CPUCAPACITY_FULL))
-			sd_asym = sd_asym->parent;
-
-		if (sd_asym && !(sd_asym->flags & SD_NUMA)) {
-			init_sched_domain_shared(sd_asym);
-			asym_claimed = true;
-		}
+		if (has_asym)
+			asym_claimed = claim_asym_sched_domain_shared(&d, i);
 
 		/* First, find the topmost SD_SHARE_LLC domain */
-		sd = *per_cpu_ptr(d.sd, i);
 		while (sd->parent && (sd->parent->flags & SD_SHARE_LLC))
 			sd = sd->parent;
 
