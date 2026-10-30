@@ -29,6 +29,20 @@ static int __init sched_debug_setup(char *str)
 }
 early_param("sched_verbose", sched_debug_setup);
 
+#ifdef CONFIG_SCHED_SMT
+static bool sched_smt_asym_packing __read_mostly;
+
+static int __init setup_sched_smt_asym_packing(char *str)
+{
+	if (strcmp(str, "on"))
+		return 0;
+
+	sched_smt_asym_packing = true;
+	return 1;
+}
+__setup("sched_smt_asym_packing=", setup_sched_smt_asym_packing);
+#endif
+
 static inline bool sched_debug(void)
 {
 	return sched_debug_verbose;
@@ -1669,6 +1683,10 @@ sd_init(struct sched_domain_topology_level *tl,
 	if (WARN_ONCE(sd_flags & ~TOPOLOGY_SD_FLAGS,
 			"wrong sd_flags in topology description\n"))
 		sd_flags &= TOPOLOGY_SD_FLAGS;
+#ifdef CONFIG_SCHED_SMT
+	if (sched_smt_asym_packing && (sd_flags & SD_SHARE_CPUCAPACITY))
+		sd_flags |= SD_ASYM_PACKING;
+#endif
 
 	*sd = (struct sched_domain){
 		.min_interval		= sd_weight,
