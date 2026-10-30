@@ -107,6 +107,10 @@ static int mtk_pinmux_gpio_request_enable(struct pinctrl_dev *pctldev,
 	struct mtk_pinctrl *hw = pinctrl_dev_get_drvdata(pctldev);
 	const struct mtk_pin_desc *desc;
 
+	/* Virtual GPIOs have no pad to mux. */
+	if (mtk_is_virt_gpio(hw, pin))
+		return 0;
+
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[pin];
 
 	return mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_MODE,
@@ -119,6 +123,10 @@ static int mtk_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
 {
 	struct mtk_pinctrl *hw = pinctrl_dev_get_drvdata(pctldev);
 	const struct mtk_pin_desc *desc;
+
+	/* Virtual GPIOs are only used for interrupts, so they are always inputs. */
+	if (mtk_is_virt_gpio(hw, pin))
+		return input ? 0 : -EINVAL;
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[pin];
 
@@ -944,6 +952,14 @@ static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
 	if (!hw->eint ||
 	    pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE ||
 	    desc->eint.eint_n == EINT_NA)
+		return -ENOTSUPP;
+
+	/*
+	 * Not every EINT has debounce hardware, the virtual GPIOs among them.
+	 * Report that as unsupported so gpiolib treats the request as optional
+	 * rather than warning about an -EINVAL from the EINT driver.
+	 */
+	if (!hw->eint->pins[desc->eint.eint_n].debounce)
 		return -ENOTSUPP;
 
 	debounce = pinconf_to_config_argument(config);
