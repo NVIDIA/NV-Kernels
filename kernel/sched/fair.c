@@ -12848,8 +12848,7 @@ static void set_cpu_sd_state_busy(int cpu)
 		return;
 	sd->nohz_idle = 0;
 
-	if (sd->shared)
-		atomic_inc(&sd->shared->nr_busy_cpus);
+	atomic_inc(&sd->shared->nr_busy_cpus);
 }
 
 void nohz_balance_exit_idle(struct rq *rq)
@@ -12874,8 +12873,7 @@ static void set_cpu_sd_state_idle(int cpu)
 		return;
 	sd->nohz_idle = 1;
 
-	if (sd->shared)
-		atomic_dec(&sd->shared->nr_busy_cpus);
+	atomic_dec(&sd->shared->nr_busy_cpus);
 }
 
 /*
