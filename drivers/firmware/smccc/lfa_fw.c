@@ -46,6 +46,8 @@
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/nmi.h>
+#include <linux/of.h>
+#include <linux/of_irq.h>
 #include <linux/psci.h>
 #include <linux/rwsem.h>
 #include <linux/stop_machine.h>
@@ -182,6 +184,7 @@ static struct kset *lfa_kset;
 static struct workqueue_struct *fw_comps_update_wq;
 static struct work_struct fw_comps_update_work;
 static struct attribute *component_default_attrs[LFA_ATTR_NR_IMAGES + 1];
+static unsigned int lfa_irq;
 
 /*
  * A successful component activation might change the number of available
@@ -913,6 +916,31 @@ static void lfa_remove_acpi(struct device *dev)
 }
 #endif
 
+static irqreturn_t lfa_irq_handler_thread(int irq, void *dev_id)
+{
+	activate_pending_components();
+
+	return IRQ_HANDLED;
+}
+
+static int lfa_register_dt(struct device *dev)
+{
+	struct device_node *np;
+
+	np = of_find_compatible_node(NULL, NULL, "arm,lfa");
+	if (!np)
+		return -ENODEV;
+
+	lfa_irq = irq_of_parse_and_map(np, 0);
+	of_node_put(np);
+	if (!lfa_irq)
+		return -ENODEV;
+
+	return devm_request_threaded_irq(dev, lfa_irq, NULL,
+					 lfa_irq_handler_thread, IRQF_COND_ONESHOT,
+					 NULL, NULL);
+}
+
 static bool lfa_smccc_has_all_functions(void)
 {
 	struct arm_smccc_1_2_regs regs = { 0 }, res;
@@ -980,6 +1008,10 @@ static int lfa_smccc_probe(struct arm_smccc_device *sdev)
 		err = lfa_register_acpi(&sdev->dev);
 		if (!err)
 			pr_info("registered LFA ACPI notification\n");
+	} else {
+		err = lfa_register_dt(&sdev->dev);
+		if (!err)
+			pr_info("registered LFA DT notification interrupt\n");
 	}
 
 	/*
@@ -999,6 +1031,7 @@ static void lfa_smccc_remove(struct arm_smccc_device *sdev)
 {
 	if (!acpi_disabled)
 		lfa_remove_acpi(&sdev->dev);
+	devm_free_irq(&sdev->dev, lfa_irq, NULL);
 	clean_fw_components_tree();
 	flush_workqueue(fw_comps_update_wq);
 	destroy_workqueue(fw_comps_update_wq);
