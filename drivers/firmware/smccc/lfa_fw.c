@@ -148,6 +148,7 @@ enum component_attr_names {
 	LFA_ATTR_FORCE_CPU_RENDEZVOUS,
 	LFA_ATTR_ACTIVATE,
 	LFA_ATTR_CANCEL,
+	LFA_ATTR_AUTO_ACTIVATE,
 	LFA_ATTR_NR_IMAGES
 };
 
@@ -162,6 +163,7 @@ struct fw_component {
 	bool cpu_rendezvous;
 	bool cpu_rendezvous_forced;
 	bool use_cpu_rendezvous;
+	bool auto_activate;
 	struct kobj_attribute comp_attrs[LFA_ATTR_NR_IMAGES];
 };
 
@@ -306,6 +308,7 @@ static int update_fw_components_node(char *fw_uuid, int seq_id,
 
 	comp->kobj.kset = lfa_kset;
 	comp->cpu_rendezvous_forced = true;
+	comp->auto_activate = false;
 	set_component_flags(comp, seq_id, comp_flags, reg_current_ver,
 			    reg_pending_ver);
 	if (kobject_init_and_add(&comp->kobj, &component_ktype, NULL,
@@ -718,6 +721,28 @@ static ssize_t cancel_store(struct kobject *kobj, struct kobj_attribute *attr,
 	return count;
 }
 
+static ssize_t auto_activate_store(struct kobject *kobj,
+				   struct kobj_attribute *attr,
+				   const char *buf, size_t count)
+{
+	struct fw_component *comp = kobj_to_fw_component(kobj);
+	int ret;
+
+	ret = kstrtobool(buf, &comp->auto_activate);
+	if (ret)
+		return ret;
+
+	return count;
+}
+
+static ssize_t auto_activate_show(struct kobject *kobj,
+				  struct kobj_attribute *attr, char *buf)
+{
+	struct fw_component *comp = kobj_to_fw_component(kobj);
+
+	return sysfs_emit(buf, "%d\n", comp->auto_activate);
+}
+
 static struct kobj_attribute comp_attrs_group[LFA_ATTR_NR_IMAGES] = {
 	[LFA_ATTR_CURRENT_VERSION]	= __ATTR_RO(current_version),
 	[LFA_ATTR_PENDING_VERSION]	= __ATTR_RO(pending_version),
@@ -727,7 +752,8 @@ static struct kobj_attribute comp_attrs_group[LFA_ATTR_NR_IMAGES] = {
 	[LFA_ATTR_CPU_RENDEZVOUS]	= __ATTR_RO(cpu_rendezvous),
 	[LFA_ATTR_FORCE_CPU_RENDEZVOUS]	= __ATTR_RW(force_cpu_rendezvous),
 	[LFA_ATTR_ACTIVATE]		= __ATTR_WO(activate),
-	[LFA_ATTR_CANCEL]		= __ATTR_WO(cancel)
+	[LFA_ATTR_CANCEL]		= __ATTR_WO(cancel),
+	[LFA_ATTR_AUTO_ACTIVATE]	= __ATTR_RW(auto_activate),
 };
 
 static void init_component_default_attrs(void)
@@ -759,11 +785,11 @@ static void clean_fw_components_tree(void)
 
 /*
  * Iterate over all FW components and trigger activation of all activatible and
- * pending components.
- * Since we would need to re-enumerate the list of all components after a
- * successful activation, and this could trigger infinite loops if a firmware
- * component still appears as pending, we create an array of update candidates
- * first, then activate each one of them.
+ * pending components, but only if automatic activation for that component is
+ * allowed. Since we would need to re-enumerate the list of all components
+ * after a successful activation, and this could trigger infinite loops if a
+ * firmware component still appears as pending, we create an array of update
+ * candidates first, then activate each one of them.
  */
 static void activate_pending_components(void)
 {
@@ -791,7 +817,8 @@ static void activate_pending_components(void)
 			continue; /* Invalid FW component */
 
 		_update_fw_component_pending(comp);
-		if (comp->activation_capable && comp->activation_pending) {
+		if (comp->activation_capable && comp->activation_pending &&
+		    comp->auto_activate) {
 			kobject_get(&comp->kobj);
 			all_comps[nr_comps++] = comp;
 		}
