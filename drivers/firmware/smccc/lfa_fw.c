@@ -1018,7 +1018,7 @@ static int lfa_smccc_probe(struct arm_smccc_device *sdev)
 	 * An ACPI notification or an interrupt are optional, but we must
 	 * handle errors that occurred during their setup.
 	 */
-	if (err != -ENODEV) {
+	if (err && err != -ENODEV) {
 		kset_unregister(lfa_kset);
 		destroy_workqueue(fw_comps_update_wq);
 		return err;
