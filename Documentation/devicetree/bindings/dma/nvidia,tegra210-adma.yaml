@@ -20,6 +20,7 @@ properties:
           - nvidia,tegra210-adma
           - nvidia,tegra186-adma
           - nvidia,tegra264-adma
+          - nvidia,tegra268-adma
       - items:
           - enum:
               - nvidia,tegra234-adma
@@ -105,8 +106,20 @@ allOf:
         compatible:
           contains:
             enum:
+              - nvidia,tegra268-adma
+    then:
+      properties:
+        interrupts:
+          maxItems: 10
+
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
               - nvidia,tegra186-adma
               - nvidia,tegra264-adma
+              - nvidia,tegra268-adma
     then:
       anyOf:
         - properties:
