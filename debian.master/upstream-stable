@@ -3,4 +3,5 @@
     linux-6.18.y = v6.18.60
     linux-7.0.y = v7.0.14
     linux-7.1.y = v7.1.13
-    linux-7.2.y = v7.2.14
+    linux-7.2.y = v7.2.15
+    linux-7.3.y = v7.3.1
