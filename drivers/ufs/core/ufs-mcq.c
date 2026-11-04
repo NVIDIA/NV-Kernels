@@ -327,6 +327,8 @@ void ufshcd_mcq_compl_all_cqes_lock(struct ufs_hba *hba,
 		entries--;
 	}
 
+	ufshcd_mcq_update_cq_tail_slot(hwq);
+	hwq->cq_head_slot = hwq->cq_tail_slot;
 	spin_unlock_irqrestore(&hwq->cq_lock, flags);
 }
 
