@@ -101,6 +101,7 @@ struct tegra_adma;
  * @ch_reg_size: Size of DMA channel register space.
  * @nr_channels: Number of DMA channels available.
  * @ch_fifo_size_mask: Mask for FIFO size field.
+ * @ch_fifo_size: FIFO size for devices with uniform channel FIFO size.
  * @sreq_index_offset: Slave channel index offset.
  * @max_page: Maximum ADMA Channel Page.
  * @set_global_pg_config: Global page programming.
@@ -125,6 +126,7 @@ struct tegra_adma_chip_data {
 	unsigned int ch_reg_size;
 	unsigned int nr_channels;
 	unsigned int ch_fifo_size_mask;
+	unsigned int ch_fifo_size;
 	unsigned int sreq_index_offset;
 	unsigned int max_page;
 	void (*set_global_pg_config)(struct tegra_adma *tdma);
@@ -725,18 +727,28 @@ static int tegra_adma_set_xfer_params(struct tegra_adma_chan *tdc,
 	 *
 	 * ADMA FIFO size is set as per below (based on default ADMAIF channel
 	 * FIFO sizes):
+	 * For Tegra264:
+	 *    fifo_size = ch_fifo_size
+	 * For devices prior to Tegra264:
 	 *    fifo_size = 0x2 (sreq_index > sreq_index_offset)
 	 *    fifo_size = 0x3 (sreq_index <= sreq_index_offset)
 	 *
 	 */
-	if (tdc->sreq_index > cdata->sreq_index_offset)
+	if (cdata->ch_fifo_size) {
 		ch_regs->fifo_ctrl =
-			ADMA_CH_REG_FIELD_VAL(2, cdata->ch_fifo_size_mask,
+			ADMA_CH_REG_FIELD_VAL(cdata->ch_fifo_size,
+					      cdata->ch_fifo_size_mask,
 					      fifo_size_shift);
-	else
-		ch_regs->fifo_ctrl =
-			ADMA_CH_REG_FIELD_VAL(3, cdata->ch_fifo_size_mask,
-					      fifo_size_shift);
+	} else {
+		if (tdc->sreq_index > cdata->sreq_index_offset)
+			ch_regs->fifo_ctrl =
+				ADMA_CH_REG_FIELD_VAL(2, cdata->ch_fifo_size_mask,
+						      fifo_size_shift);
+		else
+			ch_regs->fifo_ctrl =
+				ADMA_CH_REG_FIELD_VAL(3, cdata->ch_fifo_size_mask,
+						      fifo_size_shift);
+	}
 
 	ch_regs->tc = desc->period_len & ADMA_CH_TC_COUNT_MASK;
 
@@ -1018,7 +1030,7 @@ static const struct tegra_adma_chip_data tegra264_chip_data = {
 	.ch_reg_size		= 0x100,
 	.nr_channels		= 64,
 	.ch_fifo_size_mask	= 0x7f,
-	.sreq_index_offset	= 0,
+	.ch_fifo_size		= 2,
 	.max_page		= 10,
 	.set_global_pg_config	= tegra264_adma_global_page_config,
 };
