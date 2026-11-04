@@ -5,6 +5,7 @@
  * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
  */
 
+#include <linux/bits.h>
 #include <linux/clk.h>
 #include <linux/iopoll.h>
 #include <linux/module.h>
@@ -279,6 +280,8 @@ static void tegra186_adma_global_page_config(struct tegra_adma *tdma)
 static void tegra264_adma_global_page_config(struct tegra_adma *tdma)
 {
 	u32 global_page_offset = tdma->ch_page_no * TEGRA264_ADMA_GLOBAL_PAGE_OFFSET;
+	u64 ch_mask = GENMASK_ULL(tdma->cdata->nr_channels - 1, 0);
+	u64 req_mask = GENMASK_ULL(tdma->cdata->ch_req_max, 0);
 
 	/* If the default page (page1) is not used, then clear page1 registers */
 	if (tdma->ch_page_no) {
@@ -291,12 +294,18 @@ static void tegra264_adma_global_page_config(struct tegra_adma *tdma)
 	}
 
 	/* Program global registers for selected page */
-	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_CHGRP_0 + global_page_offset, 0xffffffff);
-	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_CHGRP_1 + global_page_offset, 0xffffffff);
-	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_RX_REQ_0 + global_page_offset, 0xffffffff);
-	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_RX_REQ_1 + global_page_offset, 0x1);
-	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_TX_REQ_0 + global_page_offset, 0xffffffff);
-	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_TX_REQ_1 + global_page_offset, 0x1);
+	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_CHGRP_0 + global_page_offset,
+		   lower_32_bits(ch_mask));
+	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_CHGRP_1 + global_page_offset,
+		   upper_32_bits(ch_mask));
+	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_RX_REQ_0 + global_page_offset,
+		   lower_32_bits(req_mask));
+	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_RX_REQ_1 + global_page_offset,
+		   upper_32_bits(req_mask));
+	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_TX_REQ_0 + global_page_offset,
+		   lower_32_bits(req_mask));
+	tdma_write(tdma, TEGRA264_ADMA_GLOBAL_PAGE_TX_REQ_1 + global_page_offset,
+		   upper_32_bits(req_mask));
 }
 
 static int tegra_adma_init(struct tegra_adma *tdma)
@@ -727,7 +736,7 @@ static int tegra_adma_set_xfer_params(struct tegra_adma_chan *tdc,
 	 *
 	 * ADMA FIFO size is set as per below (based on default ADMAIF channel
 	 * FIFO sizes):
-	 * For Tegra264:
+	 * For Tegra264 and Tegra268:
 	 *    fifo_size = ch_fifo_size
 	 * For devices prior to Tegra264:
 	 *    fifo_size = 0x2 (sreq_index > sreq_index_offset)
@@ -1035,10 +1044,36 @@ static const struct tegra_adma_chip_data tegra264_chip_data = {
 	.set_global_pg_config	= tegra264_adma_global_page_config,
 };
 
+static const struct tegra_adma_chip_data tegra268_chip_data = {
+	.adma_get_burst_config	= tegra186_adma_get_burst_config,
+	.global_reg_offset	= 0,
+	.global_int_clear	= 0x800c,
+	.global_ch_fifo_base	= ADMA_GLOBAL_CH_FIFO_CTRL,
+	.global_ch_config_base	= ADMA_GLOBAL_CH_CONFIG,
+	.ch_req_tx_shift	= 26,
+	.ch_req_rx_shift	= 20,
+	.ch_dir_shift		= 10,
+	.ch_mode_shift		= 7,
+	.ch_base_offset		= 0x10000,
+	.ch_tc_offset_diff	= 4,
+	.ch_config		= ADMA_GLOBAL_CH_CONFIG_WEIGHT_FOR_WRR(1) |
+				  ADMA_GLOBAL_CH_CONFIG_OUTSTANDING_REQS(8),
+	.ch_req_mask		= 0x3f,
+	.ch_dir_mask		= 7,
+	.ch_req_max		= 5,
+	.ch_reg_size		= 0x100,
+	.nr_channels		= 10,
+	.ch_fifo_size_mask	= 0x7f,
+	.ch_fifo_size		= 5,
+	.max_page		= 6,
+	.set_global_pg_config	= tegra264_adma_global_page_config,
+};
+
 static const struct of_device_id tegra_adma_of_match[] = {
 	{ .compatible = "nvidia,tegra210-adma", .data = &tegra210_chip_data },
 	{ .compatible = "nvidia,tegra186-adma", .data = &tegra186_chip_data },
 	{ .compatible = "nvidia,tegra264-adma", .data = &tegra264_chip_data },
+	{ .compatible = "nvidia,tegra268-adma", .data = &tegra268_chip_data },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, tegra_adma_of_match);
