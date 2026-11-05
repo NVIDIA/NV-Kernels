@@ -188,7 +188,7 @@ int cxl_hdm_unpack_decoder(struct cxl_decoder_config *config, int id,
 
 	return 0;
 }
-EXPORT_SYMBOL_FOR_MODULES(cxl_hdm_unpack_decoder, "cxl_core");
+EXPORT_SYMBOL_FOR_MODULES(cxl_hdm_unpack_decoder, "cxl_core,cxl_hdm_unpack_kunit");
 
 int cxl_hdm_read_decoder(struct cxl_decoder_config *config, void __iomem *hdm,
 			 int id, u32 ctrl)
