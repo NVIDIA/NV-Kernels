@@ -966,7 +966,7 @@ static int cxl_endpoint_decoder_clear_reset_flags(struct device *dev, void *data
 		return 0;
 
 	cxled = to_cxl_endpoint_decoder(dev);
-	cxled->cxld.flags &= ~CXL_DECODER_F_RESET_MASK;
+	cxled->cxld.config.flags &= ~CXL_DECODER_F_RESET_MASK;
 
 	return 0;
 }

@@ -773,7 +773,7 @@ static int map_targets(struct device *dev, void *data)
  * id into the low bits.
  *
  * The key is formed as:
- *     ((unsigned long)port->uport_dev << 4) | cxld->id
+ *     ((unsigned long)port->uport_dev << 4) | cxld->config.id
  *
  * The low bits hold the decoder id (which must fit in 4 bits) while
  * the remaining bits identify the upstream port. This key is only used
@@ -783,9 +783,9 @@ static unsigned long cxld_registry_index(struct cxl_decoder *cxld)
 {
 	struct cxl_port *port = to_cxl_port(cxld->dev.parent);
 
-	dev_WARN_ONCE(&port->dev, cxld->id >= 16,
-		      "decoder id:%d out of range\n", cxld->id);
-	return (((unsigned long)port->uport_dev) << 4) | cxld->id;
+	dev_WARN_ONCE(&port->dev, cxld->config.id >= 16,
+		      "decoder id:%d out of range\n", cxld->config.id);
+	return (((unsigned long)port->uport_dev) << 4) | cxld->config.id;
 }
 
 struct cxl_test_decoder {
@@ -801,14 +801,15 @@ static struct cxl_test_decoder *cxld_registry_find(struct cxl_decoder *cxld)
 	return xa_load(&decoder_registry, cxld_registry_index(cxld));
 }
 
-#define dbg_cxld(port, msg, cxld)                                                       \
-	do {                                                                            \
-		struct cxl_decoder *___d = (cxld);                                      \
-		dev_dbg((port)->uport_dev,                                              \
+#define dbg_cxld(port, msg, cxld)                                      \
+	do {                                                              \
+		struct cxl_decoder *___d = (cxld);                        \
+		const struct cxl_decoder_config *___c = &___d->config;    \
+		dev_dbg((port)->uport_dev,                                \
 			"decoder%d: %s range: %#llx-%#llx iw: %d ig: %d flags: %#lx\n", \
-			___d->id, msg, ___d->hpa_range.start,                           \
-			___d->hpa_range.end + 1, ___d->interleave_ways,                 \
-			___d->interleave_granularity, ___d->flags);                     \
+			___c->id, msg, ___c->hpa_range.start,               \
+			___c->hpa_range.end + 1, ___c->interleave_ways,     \
+			___c->interleave_granularity, ___c->flags);         \
 	} while (0)
 
 static int mock_decoder_commit(struct cxl_decoder *cxld);
@@ -817,12 +818,7 @@ static void init_disabled_mock_decoder(struct cxl_decoder *cxld);
 
 static void cxld_copy(struct cxl_decoder *a, struct cxl_decoder *b)
 {
-	a->id = b->id;
-	a->hpa_range = b->hpa_range;
-	a->interleave_ways = b->interleave_ways;
-	a->interleave_granularity = b->interleave_granularity;
-	a->target_type = b->target_type;
-	a->flags = b->flags;
+	a->config = b->config;
 	a->commit = mock_decoder_commit;
 	a->reset = mock_decoder_reset;
 }
@@ -847,7 +843,7 @@ static int cxld_registry_restore(struct cxl_decoder *cxld,
 		struct cxl_switch_decoder *cxlsd =
 			to_cxl_switch_decoder(&cxld->dev);
 
-		if (!(td->cxlsd.cxld.flags & CXL_DECODER_F_ENABLE))
+		if (!(td->cxlsd.cxld.config.flags & CXL_DECODER_F_ENABLE))
 			return 0;
 
 		dbg_cxld(port, "restore", &td->cxlsd.cxld);
@@ -860,13 +856,13 @@ static int cxld_registry_restore(struct cxl_decoder *cxld,
 			cxld->target_map[i] = td->cxlsd.cxld.target_map[i];
 		}
 
-		port->commit_end = cxld->id;
+		port->commit_end = cxld->config.id;
 
 	} else {
 		struct cxl_endpoint_decoder *cxled =
 			to_cxl_endpoint_decoder(&cxld->dev);
 
-		if (!(td->cxled.cxld.flags & CXL_DECODER_F_ENABLE))
+		if (!(td->cxled.cxld.config.flags & CXL_DECODER_F_ENABLE))
 			return 0;
 
 		dbg_cxld(port, "restore", &td->cxled.cxld);
@@ -881,7 +877,7 @@ static int cxld_registry_restore(struct cxl_decoder *cxld,
 			init_disabled_mock_decoder(cxld);
 			return rc;
 		}
-		port->commit_end = cxld->id;
+		port->commit_end = cxld->config.id;
 	}
 
 	return 0;
@@ -915,7 +911,7 @@ static void __cxld_registry_save(struct cxl_test_decoder *td,
 		td->cxled.state = cxled->state;
 		td->cxled.skip = cxled->skip;
 
-		if (!(cxld->flags & CXL_DECODER_F_ENABLE)) {
+		if (!(cxld->config.flags & CXL_DECODER_F_ENABLE)) {
 			td->dpa_range.start = 0;
 			td->dpa_range.end = -1;
 		} else if (cxled->dpa_res) {
@@ -952,9 +948,9 @@ static void cxld_registry_update(struct cxl_decoder *cxld)
 static int mock_decoder_commit(struct cxl_decoder *cxld)
 {
 	struct cxl_port *port = to_cxl_port(cxld->dev.parent);
-	int id = cxld->id;
+	int id = cxld->config.id;
 
-	if (cxld->flags & CXL_DECODER_F_ENABLE)
+	if (cxld->config.flags & CXL_DECODER_F_ENABLE)
 		return 0;
 
 	dev_dbg(&port->dev, "%s commit\n", dev_name(&cxld->dev));
@@ -967,7 +963,7 @@ static int mock_decoder_commit(struct cxl_decoder *cxld)
 	}
 
 	port->commit_end++;
-	cxld->flags |= CXL_DECODER_F_ENABLE;
+	cxld->config.flags |= CXL_DECODER_F_ENABLE;
 	if (is_endpoint_decoder(&cxld->dev)) {
 		struct cxl_endpoint_decoder *cxled =
 			to_cxl_endpoint_decoder(&cxld->dev);
@@ -982,9 +978,9 @@ static int mock_decoder_commit(struct cxl_decoder *cxld)
 static void mock_decoder_reset(struct cxl_decoder *cxld)
 {
 	struct cxl_port *port = to_cxl_port(cxld->dev.parent);
-	int id = cxld->id;
+	int id = cxld->config.id;
 
-	if ((cxld->flags & CXL_DECODER_F_ENABLE) == 0)
+	if ((cxld->config.flags & CXL_DECODER_F_ENABLE) == 0)
 		return;
 
 	dev_dbg(&port->dev, "%s reset\n", dev_name(&cxld->dev));
@@ -994,7 +990,7 @@ static void mock_decoder_reset(struct cxl_decoder *cxld)
 		dev_dbg(&port->dev,
 			"%s: out of order reset, expected decoder%d.%d\n",
 			dev_name(&cxld->dev), port->id, port->commit_end);
-	cxld->flags &= ~CXL_DECODER_F_ENABLE;
+	cxld->config.flags &= ~CXL_DECODER_F_ENABLE;
 
 	if (is_endpoint_decoder(&cxld->dev)) {
 		struct cxl_endpoint_decoder *cxled =
@@ -1005,7 +1001,7 @@ static void mock_decoder_reset(struct cxl_decoder *cxld)
 	}
 	if (decoder_reset_preserve_registry)
 		dev_dbg(port->uport_dev, "decoder%d: skip registry update\n",
-			cxld->id);
+			cxld->config.id);
 	else
 		cxld_registry_update(cxld);
 }
@@ -1030,12 +1026,12 @@ static struct cxl_test_decoder *cxld_registry_new(struct cxl_decoder *cxld)
 
 static void init_disabled_mock_decoder(struct cxl_decoder *cxld)
 {
-	cxld->hpa_range.start = 0;
-	cxld->hpa_range.end = -1;
-	cxld->interleave_ways = 1;
-	cxld->interleave_granularity = 0;
-	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
-	cxld->flags = 0;
+	cxld->config.hpa_range.start = 0;
+	cxld->config.hpa_range.end = -1;
+	cxld->config.interleave_ways = 1;
+	cxld->config.interleave_granularity = 0;
+	cxld->config.target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->config.flags = 0;
 	cxld->commit = mock_decoder_commit;
 	cxld->reset = mock_decoder_reset;
 
@@ -1058,14 +1054,14 @@ static void init_disabled_mock_decoder(struct cxl_decoder *cxld)
 
 static void default_mock_decoder(struct cxl_decoder *cxld)
 {
-	cxld->hpa_range = (struct range){
+	cxld->config.hpa_range = (struct range){
 		.start = 0,
 		.end = -1,
 	};
 
-	cxld->interleave_ways = 1;
-	cxld->interleave_granularity = 256;
-	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->config.interleave_ways = 1;
+	cxld->config.interleave_granularity = 256;
+	cxld->config.target_type = CXL_DECODER_HOSTONLYMEM;
 	cxld->commit = mock_decoder_commit;
 	cxld->reset = mock_decoder_reset;
 
@@ -1080,7 +1076,7 @@ static int match_decoder_by_index(struct device *dev, const void *data)
 	if (!is_switch_decoder(dev))
 		return 0;
 	cxld = to_cxl_decoder(dev);
-	return cxld->id == target_id;
+	return cxld->config.id == target_id;
 }
 
 /*
@@ -1093,11 +1089,11 @@ static void size_zero_mock_decoder_ep(struct cxl_decoder *cxld, u64 base)
 {
 	struct cxl_endpoint_decoder *cxled = to_cxl_endpoint_decoder(&cxld->dev);
 
-	cxld->hpa_range = DEFINE_RANGE(base, base - 1);
-	cxld->interleave_ways = 2;
-	cxld->interleave_granularity = 4096;
-	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
-	cxld->flags = CXL_DECODER_F_ENABLE | CXL_DECODER_F_LOCK;
+	cxld->config.hpa_range = DEFINE_RANGE(base, base - 1);
+	cxld->config.interleave_ways = 2;
+	cxld->config.interleave_granularity = 4096;
+	cxld->config.target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->config.flags = CXL_DECODER_F_ENABLE | CXL_DECODER_F_LOCK;
 	cxled->state = CXL_DECODER_STATE_AUTO;
 	/* decoder[0] reserved [0, size/2), empty decoders sit at that watermark */
 	devm_cxl_dpa_reserve(cxled, mock_auto_region_size / 2, 0, 0);
@@ -1108,11 +1104,11 @@ static void size_zero_mock_decoder_ep(struct cxl_decoder *cxld, u64 base)
 static void size_zero_mock_decoder_sw(struct cxl_decoder *cxld, u64 base,
 				      int level)
 {
-	cxld->flags = CXL_DECODER_F_ENABLE | CXL_DECODER_F_LOCK;
-	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
-	cxld->interleave_ways = level == 0 ? 2 : 1;
-	cxld->interleave_granularity = 4096;
-	cxld->hpa_range = DEFINE_RANGE(base, base - 1);
+	cxld->config.flags = CXL_DECODER_F_ENABLE | CXL_DECODER_F_LOCK;
+	cxld->config.target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->config.interleave_ways = level == 0 ? 2 : 1;
+	cxld->config.interleave_granularity = 4096;
+	cxld->config.hpa_range = DEFINE_RANGE(base, base - 1);
 	cxld->commit = mock_decoder_commit;
 	cxld->reset = mock_decoder_reset;
 }
@@ -1147,7 +1143,7 @@ static enum cxld_init_type get_decoder_init_type(struct cxl_decoder *cxld,
 	 * See 'cxl list -BMPu -m cxl_mem.0,cxl_mem.4'
 	 */
 	if (!is_endpoint_decoder(&cxld->dev) || !hb0 || pdev->id % 4 ||
-	    pdev->id > 4 || cxld->id > (mock_zero_size_decoders ? 2 : 0))
+	    pdev->id > 4 || cxld->config.id > (mock_zero_size_decoders ? 2 : 0))
 		return MOCK_DECODER_INIT_DEFAULT;
 
 	return type2_test ? MOCK_DECODER_INIT_TYPE2_AUTO :
@@ -1159,9 +1155,9 @@ static bool mock_decoder_handle_saved(struct cxl_decoder *cxld, struct cxl_test_
 	bool enabled;
 
 	if (is_switch_decoder(&cxld->dev))
-		enabled = td->cxlsd.cxld.flags & CXL_DECODER_F_ENABLE;
+		enabled = td->cxlsd.cxld.config.flags & CXL_DECODER_F_ENABLE;
 	else
-		enabled = td->cxled.cxld.flags & CXL_DECODER_F_ENABLE;
+		enabled = td->cxled.cxld.config.flags & CXL_DECODER_F_ENABLE;
 
 	if (enabled)
 		return !cxld_registry_restore(cxld, td);
@@ -1183,19 +1179,19 @@ static void mock_init_hdm_type2_cxled(struct cxl_endpoint_decoder *cxled,
 	int id = 0;
 
 	base = window->base_hpa;
-	cxld->hpa_range = (struct range) {
+	cxld->config.hpa_range = (struct range) {
 		.start = base,
 		.end = base + mock_auto_region_size - 1,
 	};
 
-	cxld->interleave_ways = 1;
-	eig_to_granularity(window->granularity, &cxld->interleave_granularity);
-	cxld->target_type = CXL_DECODER_DEVMEM;
-	cxld->flags = CXL_DECODER_F_ENABLE;
+	cxld->config.interleave_ways = 1;
+	eig_to_granularity(window->granularity, &cxld->config.interleave_granularity);
+	cxld->config.target_type = CXL_DECODER_DEVMEM;
+	cxld->config.flags = CXL_DECODER_F_ENABLE;
 	cxled->state = CXL_DECODER_STATE_AUTO;
-	port->commit_end = cxld->id;
+	port->commit_end = cxld->config.id;
 	devm_cxl_dpa_reserve(cxled, 0,
-			     mock_auto_region_size / cxld->interleave_ways, 0);
+			     mock_auto_region_size / cxld->config.interleave_ways, 0);
 	cxld->commit = mock_decoder_commit;
 	cxld->reset = mock_decoder_reset;
 
@@ -1216,13 +1212,13 @@ static void mock_init_hdm_type2_cxled(struct cxl_endpoint_decoder *cxled,
 
 	cxlsd = to_cxl_switch_decoder(dev);
 	cxld = &cxlsd->cxld;
-	cxld->target_type = CXL_DECODER_DEVMEM;
-	cxld->flags = CXL_DECODER_F_ENABLE;
+	cxld->config.target_type = CXL_DECODER_DEVMEM;
+	cxld->config.flags = CXL_DECODER_F_ENABLE;
 	root_port->commit_end = 0;
-	cxld->interleave_ways = 1;
-	cxld->interleave_granularity = 4096;
+	cxld->config.interleave_ways = 1;
+	cxld->config.interleave_granularity = 4096;
 	cxld->target_map[0] = dport->port_id;
-	cxld->hpa_range = (struct range) {
+	cxld->config.hpa_range = (struct range) {
 		.start = base,
 		.end = base + mock_auto_region_size - 1,
 	};
@@ -1258,7 +1254,7 @@ static void mock_init_hdm_type3_cxled(struct cxl_endpoint_decoder *cxled,
 	int i;
 
 	/* Simulate missing cxl_mem.4 configuration */
-	if (hb0 && pdev->id == 4 && cxld->id == 0 && fail_autoassemble) {
+	if (hb0 && pdev->id == 4 && cxld->config.id == 0 && fail_autoassemble) {
 		default_mock_decoder(cxld);
 		return;
 	}
@@ -1274,25 +1270,25 @@ static void mock_init_hdm_type3_cxled(struct cxl_endpoint_decoder *cxled,
 	 * points at a zero-size decoder, exercising the zero-size
 	 * reservation and poison-by-endpoint code paths.
 	 */
-	if (cxld->id == 1 || cxld->id == 2) {
+	if (cxld->config.id == 1 || cxld->config.id == 2) {
 		size_zero_mock_decoder_ep(cxld, base);
-		port->commit_end = cxld->id;
+		port->commit_end = cxld->config.id;
 		WARN_ON_ONCE(!cxld_registry_new(cxld));
 		return;
 	}
-	cxld->hpa_range = (struct range) {
+	cxld->config.hpa_range = (struct range) {
 		.start = base,
 		.end = base + mock_auto_region_size - 1,
 	};
 
-	cxld->interleave_ways = 2;
-	eig_to_granularity(window->granularity, &cxld->interleave_granularity);
-	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
-	cxld->flags = CXL_DECODER_F_ENABLE;
+	cxld->config.interleave_ways = 2;
+	eig_to_granularity(window->granularity, &cxld->config.interleave_granularity);
+	cxld->config.target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->config.flags = CXL_DECODER_F_ENABLE;
 	cxled->state = CXL_DECODER_STATE_AUTO;
-	port->commit_end = cxld->id;
+	port->commit_end = cxld->config.id;
 	devm_cxl_dpa_reserve(cxled, 0,
-			     mock_auto_region_size / cxld->interleave_ways, 0);
+			     mock_auto_region_size / cxld->config.interleave_ways, 0);
 	cxld->commit = mock_decoder_commit;
 	cxld->reset = mock_decoder_reset;
 
@@ -1326,19 +1322,19 @@ static void mock_init_hdm_type3_cxled(struct cxl_endpoint_decoder *cxled,
 			cxlsd->cxld.target_map[0] = dport->port_id;
 		}
 		cxld = &cxlsd->cxld;
-		cxld->target_type = CXL_DECODER_HOSTONLYMEM;
-		cxld->flags = CXL_DECODER_F_ENABLE;
+		cxld->config.target_type = CXL_DECODER_HOSTONLYMEM;
+		cxld->config.flags = CXL_DECODER_F_ENABLE;
 		iter->commit_end = 0;
 		/*
 		 * Switch targets 2 endpoints, while host bridge targets
 		 * one root port
 		 */
 		if (i == 0)
-			cxld->interleave_ways = 2;
+			cxld->config.interleave_ways = 2;
 		else
-			cxld->interleave_ways = 1;
-		cxld->interleave_granularity = 4096;
-		cxld->hpa_range = (struct range) {
+			cxld->config.interleave_ways = 1;
+		cxld->config.interleave_granularity = 4096;
+		cxld->config.hpa_range = (struct range) {
 			.start = base,
 			.end = base + mock_auto_region_size - 1,
 		};

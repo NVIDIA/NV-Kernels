@@ -40,7 +40,7 @@ static int discover_region(struct device *dev, void *unused)
 		return 0;
 
 	cxled = to_cxl_endpoint_decoder(dev);
-	if ((cxled->cxld.flags & CXL_DECODER_F_ENABLE) == 0)
+	if ((cxled->cxld.config.flags & CXL_DECODER_F_ENABLE) == 0)
 		return 0;
 
 	if (cxled->state != CXL_DECODER_STATE_AUTO)
@@ -56,7 +56,7 @@ static int discover_region(struct device *dev, void *unused)
 	rc = cxl_add_to_region(cxled);
 	if (rc)
 		dev_dbg(dev, "failed to add to region: %#llx-%#llx\n",
-			cxled->cxld.hpa_range.start, cxled->cxld.hpa_range.end);
+			cxled->cxld.config.hpa_range.start, cxled->cxld.config.hpa_range.end);
 
 	return 0;
 }
