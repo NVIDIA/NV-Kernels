@@ -15,6 +15,7 @@
 #include <linux/iommu.h>
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
+#include <linux/memregion.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 
@@ -22,6 +23,13 @@
 #include <cxl/pci.h>
 
 #include "pci.h"
+
+struct cxl_pci_cache {
+	struct cxl_hdm_quiesce quiesce;
+	u16 saved_ctrl2;
+	/* A cache-policy write was attempted and may need undoing. */
+	bool cache_disabled;
+};
 
 /* Find the CXL Device DVSEC and read its capability register. */
 static int cxl_pci_device_dvsec(struct pci_dev *pdev, u16 *dvsec, u16 *cap)
@@ -335,6 +343,23 @@ static int cxl_reset_restore_cache_policy(struct pci_dev *pdev, int dvsec,
 	return rc;
 }
 
+/* Shared range reservation, host invalidation, and device cache writeback. */
+static int cxl_reset_cache_prepare(struct pci_dev *pdev, int dvsec, u16 cap,
+				   const struct cxl_hdm_info *snapshot,
+				   struct cxl_pci_cache *cache)
+	__must_hold(cxl_region_quiesce)
+{
+	int rc;
+
+	rc = cxl_hdm_quiesce_prepare(&cache->quiesce, snapshot);
+	if (rc)
+		return rc;
+
+	/* Track an attempted change so partial failures still restore policy. */
+	cache->cache_disabled = true;
+	return cxl_reset_disable_cache(pdev, dvsec, cap);
+}
+
 static int cxl_reset_wait_done(struct pci_dev *pdev, int dvsec, u16 cap)
 {
 	unsigned long deadline;
@@ -389,7 +414,9 @@ static int cxl_clear_memory(struct pci_dev *pdev, int dvsec, bool initiate)
 				      PCI_DVSEC_CXL_RST_MEM_CLR_EN);
 }
 
-static int __cxl_reset_execute(struct pci_dev *pdev, int dvsec, u16 cap)
+static int __cxl_reset_execute(struct pci_dev *pdev, int dvsec, u16 cap,
+			      struct cxl_hdm_quiesce *q)
+	__must_hold(cxl_region_quiesce)
 {
 	int rc, rc2;
 
@@ -414,27 +441,59 @@ static int __cxl_reset_execute(struct pci_dev *pdev, int dvsec, u16 cap)
 		pci_err(pdev, "failed to clear CXL Reset Memory Clear: %d\n", rc2);
 	rc = rc ?: rc2;
 
+	rc2 = cxl_hdm_quiesce_flush(q);
+	if (rc2)
+		pci_err(pdev, "failed to invalidate CPU cache after CXL reset: %d\n", rc2);
+	rc = rc ?: rc2;
+
 	pci_dev_reset_iommu_done(pdev);
 	return rc;
 }
 
-static int cxl_reset_execute(struct pci_dev *pdev, int dvsec, u16 cap)
+static int cxl_reset_quiesced(struct pci_dev *pdev, int dvsec, u16 cap)
+	__must_hold(cxl_region_quiesce)
 {
-	u16 saved_ctrl2;
+	struct cxl_hdm_info *snapshot __free(kfree) = NULL;
+	struct cxl_pci_cache cache = {};
 	int rc, rc2;
 
-	rc = pci_read_config_word(pdev, dvsec + PCI_DVSEC_CXL_CTRL2, &saved_ctrl2);
+	rc = pci_read_config_word(pdev, dvsec + PCI_DVSEC_CXL_CTRL2,
+				  &cache.saved_ctrl2);
 	if (rc)
 		return pcibios_err_to_errno(rc);
-	if (PCI_POSSIBLE_ERROR(saved_ctrl2))
+	if (PCI_POSSIBLE_ERROR(cache.saved_ctrl2))
 		return -ENODEV;
 
-	rc = cxl_reset_disable_cache(pdev, dvsec, cap);
+	snapshot = cxl_hdm_cache_snapshot(&pdev->hdm);
+	if (IS_ERR(snapshot)) {
+		pci_err(pdev, "CXL HDM decoder state unavailable: %ld\n",
+			PTR_ERR(snapshot));
+		return PTR_ERR(snapshot);
+	}
+
+	rc = cxl_reset_cache_prepare(pdev, dvsec, cap, snapshot, &cache);
+	if (rc && !cache.cache_disabled) {
+		pci_err(pdev, "failed to prepare CXL reset ranges: %d\n", rc);
+		cxl_hdm_quiesce_destroy(&cache.quiesce);
+		return rc;
+	}
 	if (!rc)
-		rc = __cxl_reset_execute(pdev, dvsec, cap);
+		rc = __cxl_reset_execute(pdev, dvsec, cap, &cache.quiesce);
 	/* Restore cache policy after any attempt to disable caching. */
-	rc2 = cxl_reset_restore_cache_policy(pdev, dvsec, saved_ctrl2);
+	rc2 = cxl_reset_restore_cache_policy(pdev, dvsec, cache.saved_ctrl2);
+	cxl_hdm_quiesce_destroy(&cache.quiesce);
 	return rc ?: rc2;
+}
+
+static int cxl_reset_execute(struct pci_dev *pdev, int dvsec, u16 cap)
+{
+	int rc;
+
+	cxl_region_quiesce_lock();
+	rc = cxl_reset_quiesced(pdev, dvsec, cap);
+	cxl_region_quiesce_unlock();
+
+	return rc;
 }
 
 int cxl_reset_function(struct pci_dev *pdev, bool probe)
@@ -462,6 +521,18 @@ int cxl_reset_function(struct pci_dev *pdev, bool probe)
 
 	if (probe)
 		return 0;
+
+	/* The cache is owned by @pdev and does not require a bound CXL driver. */
+	if (!pdev->hdm)
+		return -ENOTTY;
+
+	/* Memory decoded through DVSEC ranges has no HPA ranges to quiesce. */
+	if (cxl_hdm_cache_dvsec_decode(&pdev->hdm))
+		return -ENOTTY;
+
+	if (!cpu_cache_has_invalidate_memregion() &&
+	    !IS_ENABLED(CONFIG_CXL_REGION_INVALIDATION_TEST))
+		return -ENOTTY;
 
 	return cxl_reset_execute(pdev, dvsec, cap);
 }

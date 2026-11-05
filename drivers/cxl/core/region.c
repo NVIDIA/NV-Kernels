@@ -12,6 +12,7 @@
 #include <linux/idr.h>
 #include <linux/memory-tiers.h>
 #include <linux/string_choices.h>
+#include <cxl/hdm.h>
 #include <cxlmem.h>
 #include <cxl.h>
 #include "core.h"
@@ -3854,6 +3855,19 @@ int cxl_add_to_region(struct cxl_endpoint_decoder *cxled)
 
 	if (IS_ERR(cxlrd))
 		return PTR_ERR(cxlrd);
+
+	/*
+	 * Translation setup may have marked the decoder as Normalized
+	 * Addressing, after the PCI cache was filled. Record it for reset.
+	 */
+	if (cxled->cxld.config.flags & CXL_DECODER_F_NORMALIZED_ADDRESSING) {
+		struct pci_dev *pdev __free(pci_dev_put) =
+			cxl_port_get_uport_pci_dev(cxled_to_port(cxled));
+
+		if (pdev)
+			cxl_hdm_cache_set_normalized(pdev,
+						     cxled->cxld.config.id);
+	}
 
 	/*
 	 * Ensure that, if multiple threads race to construct_region()
