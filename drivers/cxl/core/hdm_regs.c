@@ -116,3 +116,77 @@ void cxl_commit_start_switch(const struct cxl_decoder_config *config,
 	writel(ctrl, hdm + CXL_HDM_DECODER0_CTRL_OFFSET(id));
 }
 EXPORT_SYMBOL_FOR_MODULES(cxl_commit_start_switch, "cxl_core");
+
+int cxl_hdm_unpack_decoder(struct cxl_decoder_config *config, int id,
+			   u32 ctrl, u64 base, u64 size)
+{
+	bool committed = FIELD_GET(CXL_HDM_DECODER0_CTRL_COMMITTED, ctrl);
+	enum cxl_decoder_type target_type = 0;
+	int interleave_granularity;
+	unsigned long flags = 0;
+	struct range hpa_range;
+	int interleave_ways;
+	u64 end;
+	int rc;
+
+	if (!committed)
+		size = 0;
+	if (base == U64_MAX || size == U64_MAX)
+		return -ENXIO;
+	/* A zero-size decoder maps no HPA; its range is empty at @base. */
+	end = base - 1;
+	if (size && check_add_overflow(base, size - 1, &end))
+		return -ENXIO;
+
+	hpa_range = (struct range) {
+		.start = base,
+		.end = end,
+	};
+
+	if (committed) {
+		flags |= CXL_DECODER_F_ENABLE;
+		if (ctrl & CXL_HDM_DECODER0_CTRL_LOCK)
+			flags |= CXL_DECODER_F_LOCK;
+		if (FIELD_GET(CXL_HDM_DECODER0_CTRL_HOSTONLY, ctrl))
+			target_type = CXL_DECODER_HOSTONLYMEM;
+		else
+			target_type = CXL_DECODER_DEVMEM;
+	}
+
+	rc = eiw_to_ways(FIELD_GET(CXL_HDM_DECODER0_CTRL_IW_MASK, ctrl),
+			 &interleave_ways);
+	if (rc)
+		return rc;
+	rc = eig_to_granularity(FIELD_GET(CXL_HDM_DECODER0_CTRL_IG_MASK, ctrl),
+				&interleave_granularity);
+	if (rc)
+		return rc;
+
+	*config = (struct cxl_decoder_config) {
+		.id = id,
+		.hpa_range = hpa_range,
+		.interleave_ways = interleave_ways,
+		.interleave_granularity = interleave_granularity,
+		.target_type = target_type,
+		.flags = flags,
+	};
+
+	return 0;
+}
+EXPORT_SYMBOL_FOR_MODULES(cxl_hdm_unpack_decoder, "cxl_core");
+
+int cxl_hdm_read_decoder(struct cxl_decoder_config *config, void __iomem *hdm,
+			 int id, u32 ctrl)
+{
+	u64 lo, hi, base, size;
+
+	lo = readl(hdm + CXL_HDM_DECODER0_BASE_LOW_OFFSET(id));
+	hi = readl(hdm + CXL_HDM_DECODER0_BASE_HIGH_OFFSET(id));
+	base = (hi << 32) | lo;
+	lo = readl(hdm + CXL_HDM_DECODER0_SIZE_LOW_OFFSET(id));
+	hi = readl(hdm + CXL_HDM_DECODER0_SIZE_HIGH_OFFSET(id));
+	size = (hi << 32) | lo;
+
+	return cxl_hdm_unpack_decoder(config, id, ctrl, base, size);
+}
+EXPORT_SYMBOL_FOR_MODULES(cxl_hdm_read_decoder, "cxl_core");
