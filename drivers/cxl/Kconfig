@@ -213,6 +213,16 @@ config CXL_REGION
 
 	  If unsure say 'y'
 
+config CXL_KUNIT_TEST
+	tristate "KUnit tests for CXL" if !KUNIT_ALL_TESTS
+	depends on KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Build the KUnit tests for the CXL subsystem. When built as modules,
+	  each test suite is its own module.
+
+	  If unsure, say N.
+
 config CXL_REGION_INVALIDATION_TEST
 	bool "CXL: Region Cache Management Bypass (TEST)"
 	depends on CXL_REGION
