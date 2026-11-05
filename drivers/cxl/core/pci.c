@@ -231,10 +231,10 @@ static int dvsec_range_allowed(struct device *dev, const void *arg)
 
 	cxld = to_cxl_decoder(dev);
 
-	if (!(cxld->flags & CXL_DECODER_F_RAM))
+	if (!(cxld->config.flags & CXL_DECODER_F_RAM))
 		return 0;
 
-	return range_contains(&cxld->hpa_range, dev_range);
+	return range_contains(&cxld->config.hpa_range, dev_range);
 }
 
 static void disable_hdm(void *_cxlhdm)
@@ -668,12 +668,12 @@ static int __cxl_endpoint_decoder_reset_detected(struct device *dev, void *data)
 		return 0;
 
 	cxld = to_cxl_decoder(dev);
-	if ((cxld->flags & CXL_DECODER_F_ENABLE) == 0)
+	if ((cxld->config.flags & CXL_DECODER_F_ENABLE) == 0)
 		return 0;
 
 	cxlhdm = dev_get_drvdata(&port->dev);
 	hdm = cxlhdm->regs.hdm_decoder;
-	ctrl = readl(hdm + CXL_HDM_DECODER0_CTRL_OFFSET(cxld->id));
+	ctrl = readl(hdm + CXL_HDM_DECODER0_CTRL_OFFSET(cxld->config.id));
 
 	return !FIELD_GET(CXL_HDM_DECODER0_CTRL_COMMITTED, ctrl);
 }

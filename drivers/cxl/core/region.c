@@ -502,8 +502,8 @@ static int set_interleave_ways(struct cxl_region *cxlr, int val)
 	 * Even for x3, x6, and x12 interleaves the region interleave must be a
 	 * power of 2 multiple of the host bridge interleave.
 	 */
-	if (!is_power_of_2(val / cxld->interleave_ways) ||
-	    (val % cxld->interleave_ways)) {
+	if (!is_power_of_2(val / cxld->config.interleave_ways) ||
+	    (val % cxld->config.interleave_ways)) {
 		dev_dbg(&cxlr->dev, "invalid interleave: %d\n", val);
 		return -EINVAL;
 	}
@@ -580,7 +580,7 @@ static int set_interleave_granularity(struct cxl_region *cxlr, int val)
 	 * with a granularity greater than the root interleave result in invalid
 	 * DPA translations (invalid to support).
 	 */
-	if (cxld->interleave_ways > 1 && val != cxld->interleave_granularity)
+	if (cxld->config.interleave_ways > 1 && val != cxld->config.interleave_granularity)
 		return -EINVAL;
 
 	lockdep_assert_held_write(&cxl_rwsem.region);
@@ -880,7 +880,7 @@ static int check_commit_order(struct device *dev, void *data)
 	 * order shutdown has occurred, block further allocations until
 	 * that is resolved
 	 */
-	if (((cxld->flags & CXL_DECODER_F_ENABLE) == 0))
+	if (((cxld->config.flags & CXL_DECODER_F_ENABLE) == 0))
 		return -EBUSY;
 	return 0;
 }
@@ -896,7 +896,7 @@ static int match_free_decoder(struct device *dev, const void *data)
 
 	cxld = to_cxl_decoder(dev);
 
-	if (cxld->id != port->commit_end + 1)
+	if (cxld->config.id != port->commit_end + 1)
 		return 0;
 
 	if (cxld->region) {
@@ -942,7 +942,7 @@ static int match_auto_decoder(struct device *dev, const void *data)
 		return 0;
 
 	cxld = to_cxl_decoder(dev);
-	r = &cxld->hpa_range;
+	r = &cxld->config.hpa_range;
 
 	if (spa_maps_hpa(p, r))
 		return 1;
@@ -1003,10 +1003,10 @@ static bool auto_order_ok(struct cxl_port *port, struct cxl_region *cxlr_iter,
 	 * starting address has the lesser id.
 	 */
 	dev_dbg(&cxld->dev, "check for HPA violation %s:%d < %s:%d\n",
-		dev_name(&cxld->dev), cxld->id,
-		dev_name(&cxld_iter->dev), cxld_iter->id);
+		dev_name(&cxld->dev), cxld->config.id,
+		dev_name(&cxld_iter->dev), cxld_iter->config.id);
 
-	if (cxld_iter->id > cxld->id)
+	if (cxld_iter->config.id > cxld->config.id)
 		return true;
 
 	return false;
@@ -1137,11 +1137,11 @@ static int cxl_rr_assign_decoder(struct cxl_port *port, struct cxl_region *cxlr,
 	 */
 	dev_WARN_ONCE(&cxlr->dev,
 		      port == cxled_to_port(cxled) &&
-			      cxld->target_type != cxlr->type,
+			      cxld->config.target_type != cxlr->type,
 		      "%s:%s mismatch decoder type %d -> %d\n",
 		      dev_name(&cxled_to_memdev(cxled)->dev),
-		      dev_name(&cxld->dev), cxld->target_type, cxlr->type);
-	cxld->target_type = cxlr->type;
+		      dev_name(&cxld->dev), cxld->config.target_type, cxlr->type);
+	cxld->config.target_type = cxlr->type;
 	cxl_rr->decoder = cxld;
 	return 0;
 }
@@ -1162,12 +1162,12 @@ static void cxl_region_setup_flags(struct cxl_region *cxlr,
 			set_bit(CXL_REGION_F_LOCK, &cxlr->flags);
 	}
 
-	if (cxld->flags & CXL_DECODER_F_LOCK) {
+	if (cxld->config.flags & CXL_DECODER_F_LOCK) {
 		set_bit(CXL_REGION_F_LOCK, &cxlr->flags);
 		clear_bit(CXL_REGION_F_NEEDS_RESET, &cxlr->flags);
 	}
 
-	if (cxld->flags & CXL_DECODER_F_NORMALIZED_ADDRESSING)
+	if (cxld->config.flags & CXL_DECODER_F_NORMALIZED_ADDRESSING)
 		set_bit(CXL_REGION_F_NORMALIZED_ADDRESSING, &cxlr->flags);
 }
 
@@ -1500,9 +1500,9 @@ static int cxl_port_setup_targets(struct cxl_port *port,
 	 */
 
 	/* Start with the root decoders selector and distance. */
-	selector = get_selector(cxlrd->cxlsd.cxld.interleave_ways,
-				cxlrd->cxlsd.cxld.interleave_granularity);
-	distance = cxlrd->cxlsd.cxld.interleave_ways;
+	selector = get_selector(cxlrd->cxlsd.cxld.config.interleave_ways,
+				cxlrd->cxlsd.cxld.config.interleave_granularity);
+	distance = cxlrd->cxlsd.cxld.config.interleave_ways;
 	if (!is_power_of_2(distance))
 		distance /= 3;
 
@@ -1512,11 +1512,11 @@ static int cxl_port_setup_targets(struct cxl_port *port,
 		struct cxl_decoder *cxld_iter = cxl_rr_iter->decoder;
 		u64 cxld_sel;
 
-		if (cxld_iter->interleave_ways == 1)
+		if (cxld_iter->config.interleave_ways == 1)
 			continue;
 
-		cxld_sel = get_selector(cxld_iter->interleave_ways,
-					cxld_iter->interleave_granularity);
+		cxld_sel = get_selector(cxld_iter->config.interleave_ways,
+					cxld_iter->config.interleave_granularity);
 
 		if (cxld_sel & selector) {
 			dev_dbg(&cxlr->dev, "%s:%s: overlapping selectors: %#llx:%#llx\n",
@@ -1559,7 +1559,7 @@ static int cxl_port_setup_targets(struct cxl_port *port,
 	}
 
 	if (test_bit(CXL_REGION_F_AUTO, &cxlr->flags))
-		ig = cxld->interleave_granularity;
+		ig = cxld->config.interleave_granularity;
 	else
 		/*
 		 * Set the interleave granularity with each interleave
@@ -1591,9 +1591,9 @@ static int cxl_port_setup_targets(struct cxl_port *port,
 	}
 
 	if (test_bit(CXL_REGION_F_AUTO, &cxlr->flags)) {
-		if (cxld->interleave_ways != iw ||
-		    !spa_maps_hpa(p, &cxld->hpa_range) ||
-		    ((cxld->flags & CXL_DECODER_F_ENABLE) == 0)) {
+		if (cxld->config.interleave_ways != iw ||
+		    !spa_maps_hpa(p, &cxld->config.hpa_range) ||
+		    ((cxld->config.flags & CXL_DECODER_F_ENABLE) == 0)) {
 			dev_err(&cxlr->dev,
 				"%s:%s %s expected iw: %d ig: %d %pr\n",
 				dev_name(port->uport_dev), dev_name(&port->dev),
@@ -1601,10 +1601,10 @@ static int cxl_port_setup_targets(struct cxl_port *port,
 			dev_err(&cxlr->dev,
 				"%s:%s %s got iw: %d ig: %d state: %s %#llx:%#llx\n",
 				dev_name(port->uport_dev), dev_name(&port->dev),
-				__func__, cxld->interleave_ways,
-				cxld->interleave_granularity,
-				str_enabled_disabled(cxld->flags & CXL_DECODER_F_ENABLE),
-				cxld->hpa_range.start, cxld->hpa_range.end);
+				__func__, cxld->config.interleave_ways,
+				cxld->config.interleave_granularity,
+				str_enabled_disabled(cxld->config.flags & CXL_DECODER_F_ENABLE),
+				cxld->config.hpa_range.start, cxld->config.hpa_range.end);
 			return -ENXIO;
 		}
 	} else {
@@ -1617,9 +1617,9 @@ static int cxl_port_setup_targets(struct cxl_port *port,
 			return rc;
 		}
 
-		cxld->interleave_ways = iw;
-		cxld->interleave_granularity = ig;
-		cxld->hpa_range = (struct range) {
+		cxld->config.interleave_ways = iw;
+		cxld->config.interleave_granularity = ig;
+		cxld->config.hpa_range = (struct range) {
 			.start = p->res->start,
 			.end = p->res->end,
 		};
@@ -1672,7 +1672,7 @@ static void cxl_port_reset_targets(struct cxl_port *port,
 	cxl_rr->nr_targets_set = 0;
 
 	cxld = cxl_rr->decoder;
-	cxld->hpa_range = (struct range) {
+	cxld->config.hpa_range = (struct range) {
 		.start = 0,
 		.end = -1,
 	};
@@ -1819,7 +1819,7 @@ static int cxl_region_attach_position(struct cxl_region *cxlr,
 	struct cxl_memdev *cxlmd = cxled_to_memdev(cxled);
 	struct cxl_switch_decoder *cxlsd = &cxlrd->cxlsd;
 	struct cxl_decoder *cxld = &cxlsd->cxld;
-	int iw = cxld->interleave_ways;
+	int iw = cxld->config.interleave_ways;
 	struct cxl_port *iter;
 	int rc;
 
@@ -1917,7 +1917,7 @@ static int match_switch_decoder_by_range(struct device *dev,
 		return 0;
 
 	cxlsd = to_cxl_switch_decoder(dev);
-	r1 = &cxlsd->cxld.hpa_range;
+	r1 = &cxlsd->cxld.config.hpa_range;
 
 	if (is_root_decoder(dev))
 		return range_contains(r1, r2);
@@ -1944,7 +1944,7 @@ static int find_pos_and_ways(struct cxl_port *port, struct range *range,
 		return rc;
 	}
 	cxlsd = to_cxl_switch_decoder(dev);
-	*ways = cxlsd->cxld.interleave_ways;
+	*ways = cxlsd->cxld.config.interleave_ways;
 
 	for (int i = 0; i < *ways; i++) {
 		if (cxlsd->target[i] == port->parent_dport) {
@@ -2120,10 +2120,10 @@ static int cxl_region_attach(struct cxl_region *cxlr,
 		return -ENXIO;
 	}
 
-	if (cxled->cxld.target_type != cxlr->type) {
+	if (cxled->cxld.config.target_type != cxlr->type) {
 		dev_dbg(&cxlr->dev, "%s:%s type mismatch: %d vs %d\n",
 			dev_name(&cxlmd->dev), dev_name(&cxled->cxld.dev),
-			cxled->cxld.target_type, cxlr->type);
+			cxled->cxld.config.target_type, cxlr->type);
 		return -ENXIO;
 	}
 
@@ -2209,9 +2209,9 @@ static int cxl_region_attach(struct cxl_region *cxlr,
 		cxl_region_shared_upstream_bandwidth_update(cxlr);
 	}
 
-	cxled->cxld.interleave_ways = p->interleave_ways;
-	cxled->cxld.interleave_granularity = p->interleave_granularity;
-	cxled->cxld.hpa_range = (struct range) {
+	cxled->cxld.config.interleave_ways = p->interleave_ways;
+	cxled->cxld.config.interleave_granularity = p->interleave_granularity;
+	cxled->cxld.config.hpa_range = (struct range) {
 		.start = p->res->start,
 		.end = p->res->end,
 	};
@@ -2335,7 +2335,7 @@ __cxl_decoder_detach(struct cxl_region *cxlr,
 	}
 	p->targets[cxled->pos] = NULL;
 	p->nr_targets--;
-	cxled->cxld.hpa_range = (struct range) {
+	cxled->cxld.config.hpa_range = (struct range) {
 		.start = 0,
 		.end = -1,
 	};
@@ -3007,7 +3007,7 @@ static int poison_by_decoder(struct device *dev, void *arg)
 	}
 
 	/* Iterate until commit_end is reached */
-	if (cxled->cxld.id == ctx->port->commit_end) {
+	if (cxled->cxld.config.id == ctx->port->commit_end) {
 		ctx->offset = cxled->dpa_res->end + 1;
 		ctx->part = cxled->part;
 		return 1;
@@ -3330,10 +3330,10 @@ static u64 restore_parent(u64 addr, u64 pos, u64 gran, u64 ways)
 static u64 unaligned_dpa_to_hpa(struct cxl_decoder *cxld,
 				struct cxl_region_params *p, int pos, u64 dpa)
 {
-	int ways_port = p->interleave_ways / cxld->interleave_ways;
+	int ways_port = p->interleave_ways / cxld->config.interleave_ways;
 	int gran_port = p->interleave_granularity;
-	int gran_hb = cxld->interleave_granularity;
-	int ways_hb = cxld->interleave_ways;
+	int gran_hb = cxld->config.interleave_granularity;
+	int ways_hb = cxld->config.interleave_ways;
 	int pos_port, pos_hb, gran_shift;
 	u64 hpa_port = 0;
 
@@ -3380,7 +3380,7 @@ static bool region_is_unaligned_mod3(struct cxl_region *cxlr)
 	struct cxl_root_decoder *cxlrd = to_cxl_root_decoder(cxlr->dev.parent);
 	struct cxl_decoder *cxld = &cxlrd->cxlsd.cxld;
 	struct cxl_region_params *p = &cxlr->params;
-	int hbiw = cxld->interleave_ways;
+	int hbiw = cxld->config.interleave_ways;
 	u64 rem;
 
 	if (is_power_of_2(hbiw))
@@ -3495,8 +3495,8 @@ static int unaligned_region_offset_to_dpa_result(struct cxl_region *cxlr,
 	 * a dpa_offset independent of the target device and then enumerate
 	 * and test that dpa_offset against each candidate endpoint decoder.
 	 */
-	gran = cxld->interleave_granularity;
-	interleave_width = gran * cxld->interleave_ways;
+	gran = cxld->config.interleave_granularity;
+	interleave_width = gran * cxld->config.interleave_ways;
 	interleave_index = div64_u64(offset, interleave_width);
 	gran_offset = do_div(tmp, gran);
 
@@ -3596,7 +3596,7 @@ static int match_root_decoder(struct device *dev, const void *data)
 		return 0;
 
 	cxlrd = to_cxl_root_decoder(dev);
-	r1 = &cxlrd->cxlsd.cxld.hpa_range;
+	r1 = &cxlrd->cxlsd.cxld.config.hpa_range;
 
 	return range_contains(r1, r2);
 }
@@ -3801,7 +3801,7 @@ static struct cxl_region *construct_region(struct cxl_root_decoder *cxlrd,
 	do {
 		cxlr = __create_region(cxlrd, cxlds->part[part].mode,
 				       atomic_read(&cxlrd->region_id),
-				       cxled->cxld.target_type);
+				       cxled->cxld.config.target_type);
 	} while (IS_ERR(cxlr) && PTR_ERR(cxlr) == -EBUSY);
 
 	if (IS_ERR(cxlr)) {
@@ -3844,9 +3844,9 @@ int cxl_add_to_region(struct cxl_endpoint_decoder *cxled)
 
 	ctx = (struct cxl_region_context) {
 		.cxled = cxled,
-		.hpa_range = cxled->cxld.hpa_range,
-		.interleave_ways = cxled->cxld.interleave_ways,
-		.interleave_granularity = cxled->cxld.interleave_granularity,
+		.hpa_range = cxled->cxld.config.hpa_range,
+		.interleave_ways = cxled->cxld.config.interleave_ways,
+		.interleave_granularity = cxled->cxld.config.interleave_granularity,
 	};
 
 	struct cxl_root_decoder *cxlrd __free(put_cxl_root_decoder) =
