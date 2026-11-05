@@ -6,6 +6,7 @@
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/pci-doe.h>
+#include <cxl/hdm.h>
 #include <cxl/pci.h>
 #include <linux/aer.h>
 #include <cxlpci.h>
@@ -179,6 +180,29 @@ int cxl_await_media_ready(struct cxl_dev_state *cxlds)
 	return 0;
 }
 EXPORT_SYMBOL_NS_GPL(cxl_await_media_ready, "CXL");
+
+/**
+ * cxl_hdm_check_decoder_count() - check enumeration against the PCI HDM cache
+ * @cxlhdm: HDM capability containing the decoder count to check
+ *
+ * Take cxl_rwsem.dpa for read while comparing the cached count. Call only
+ * for hardware HDM decoders, since DVSEC-emulated ranges do not describe
+ * the HDM registers represented by the cache.
+ *
+ * Return: 0 if the counts match or no upstream PCI device or cache exists,
+ * or -ENXIO if the cached and enumerated decoder counts differ.
+ */
+int cxl_hdm_check_decoder_count(struct cxl_hdm *cxlhdm)
+{
+	struct pci_dev *pdev __free(pci_dev_put) =
+		cxl_port_get_uport_pci_dev(cxlhdm->port);
+
+	if (!pdev)
+		return 0;
+
+	return cxl_hdm_cache_check_decoder_count(pdev, cxlhdm->decoder_count);
+}
+EXPORT_SYMBOL_NS_GPL(cxl_hdm_check_decoder_count, "CXL");
 
 static int cxl_set_mem_enable(struct cxl_dev_state *cxlds, u16 val)
 {

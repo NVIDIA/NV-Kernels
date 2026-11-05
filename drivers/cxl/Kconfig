@@ -6,6 +6,7 @@ menuconfig CXL_BUS
 	select FW_UPLOAD
 	select PCI_DOE
 	select FIRMWARE_TABLE
+	select CXL_RESET
 	select NUMA_KEEP_MEMINFO if NUMA_MEMBLKS
 	select FWCTL if CXL_FEATURES
 	help
@@ -244,3 +245,7 @@ config CXL_ATL
 	depends on ACPI_PRMT && AMD_NB
 
 endif
+
+# CXL_BUS requires the PCI HDM cache and built-in state helpers, even when modular.
+config CXL_RESET
+	bool
