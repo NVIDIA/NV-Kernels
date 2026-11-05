@@ -5035,6 +5035,7 @@ done:
 static int cxl_reset_bus_function(struct pci_dev *dev, bool probe)
 {
 	struct cxl_hdm_info *snapshot __free(kfree) = NULL;
+	struct cxl_pci_cache *cache;
 	struct pci_dev *bridge;
 	u16 dvsec, reg, val;
 	u16 command;
@@ -5062,14 +5063,15 @@ static int cxl_reset_bus_function(struct pci_dev *dev, bool probe)
 	if (rc)
 		return -ENOTTY;
 
-	snapshot = pci_cxl_reset_prepare(dev);
+	snapshot = pci_cxl_reset_prepare(dev, &cache);
 	if (IS_ERR(snapshot))
 		return PTR_ERR(snapshot);
 
 	rc = pci_dev_reset_iommu_prepare(dev);
 	if (rc) {
 		pci_err(dev, "failed to stop IOMMU for a PCI reset: %d\n", rc);
-		return rc;
+		return cxl_restore_state_after_pci_reset(dev, snapshot, cache,
+							 false, rc, &command);
 	}
 
 	if (reg & PCI_DVSEC_CXL_PORT_CTL_UNMASK_SBR) {
@@ -5086,8 +5088,9 @@ static int cxl_reset_bus_function(struct pci_dev *dev, bool probe)
 		pci_write_config_word(bridge, dvsec + PCI_DVSEC_CXL_PORT_CTL,
 				      reg);
 
-	if (!rc && snapshot)
-		rc = cxl_restore_state_after_pci_reset(dev, snapshot, &command);
+	/* Reset-helper failure does not prove that no hardware reset occurred. */
+	rc = cxl_restore_state_after_pci_reset(dev, snapshot, cache, true, rc,
+					       &command);
 
 	pci_dev_reset_iommu_done(dev);
 

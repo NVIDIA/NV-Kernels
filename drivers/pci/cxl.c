@@ -393,74 +393,174 @@ static int pci_cxl_restore_state(struct pci_dev *pdev,
 	return cxl_restore_state(pdev, snapshot);
 }
 
+static int cxl_reset_restore_cache_policy(struct pci_dev *pdev, int dvsec,
+					  u16 saved_ctrl2);
+static int cxl_reset_cache_prepare(struct pci_dev *pdev, int dvsec, u16 cap,
+				   const struct cxl_hdm_info *snapshot,
+				   struct cxl_pci_cache *cache);
+
 /**
- * pci_cxl_reset_prepare() - allocate HDM state storage ahead of a bus reset
+ * pci_cxl_reset_prepare() - prepare HDM state and caches before a bus reset
  * @pdev: device about to be reset
+ * @cachep: receives cache state owning the region quiesce on success
  *
- * Copy the cached HDM state before the reset, so that restoring cannot fail
- * for lack of memory. The decoder settings are refreshed when the state is
- * restored.
+ * Capture HDM state under the region quiesce, reserve its ranges, and complete
+ * host and device cache maintenance. Hold the quiesce through reset and
+ * cxl_restore_state_after_pci_reset(), which consumes *@cachep.
  *
- * Return: storage for cxl_restore_state_after_pci_reset(), to be freed with
- * kfree(); NULL when @pdev has no cached HDM state; or an ERR_PTR() on
- * failure.
+ * Return: snapshot to be freed with kfree(), NULL when no cached HDM state is
+ * present, or an ERR_PTR() on failure. A cached device without a valid DVSEC
+ * snapshot is rejected because its cache-maintenance scope is unknown.
+ * Only a successful non-NULL snapshot returns with the region quiesce held
+ * and *@cachep set. The caller must pass both to
+ * cxl_restore_state_after_pci_reset() even if reset is never attempted.
+ * The snapshot remains caller-owned. All other returns leave the quiesce
+ * unheld and *@cachep NULL.
  */
-struct cxl_hdm_info *pci_cxl_reset_prepare(struct pci_dev *pdev)
+struct cxl_hdm_info *pci_cxl_reset_prepare(struct pci_dev *pdev,
+					struct cxl_pci_cache **cachep)
 {
 	struct cxl_hdm_info *snapshot;
+	struct cxl_pci_cache *cache;
+	u16 dvsec, cap, command;
+	int rc;
 
 	device_lock_assert(&pdev->dev);
-	snapshot = cxl_hdm_cache_snapshot(&pdev->hdm);
-	if (IS_ERR(snapshot))
-		return PTR_ERR(snapshot) == -ENXIO ? NULL : snapshot;
+	*cachep = NULL;
+	if (!pdev->hdm)
+		return NULL;
 
+	rc = cxl_pci_device_dvsec(pdev, &dvsec, &cap);
+	if (rc == -ENOTTY)
+		return ERR_PTR(-ENODEV);
+	if (rc)
+		return ERR_PTR(rc);
 	/* Raw reset callers may not have saved the PCI state needed for restore. */
 	if (!pdev->state_saved) {
 		pci_err(pdev, "CXL bus reset requires saved PCI state\n");
-		kfree(snapshot);
 		return ERR_PTR(-EINVAL);
 	}
 
+	cache = kzalloc_obj(*cache);
+	if (!cache)
+		return ERR_PTR(-ENOMEM);
+	cxl_region_quiesce_lock();
+	snapshot = cxl_hdm_cache_snapshot(&pdev->hdm);
+	if (IS_ERR(snapshot)) {
+		rc = PTR_ERR(snapshot);
+		goto unlock;
+	}
+	if (!snapshot->dvsec_ctrl_valid) {
+		rc = -ENXIO;
+		goto free_snapshot;
+	}
+	if (cxl_hdm_cache_dvsec_decode(&pdev->hdm) ||
+	    (snapshot->dvsec_ctrl & PCI_DVSEC_CXL_CACHE_ENABLE &&
+	     !(cap & PCI_DVSEC_CXL_CACHE_WBI_CAPABLE))) {
+		rc = -EOPNOTSUPP;
+		goto free_snapshot;
+	}
+
+	if (cap & PCI_DVSEC_CXL_CACHE_CAPABLE) {
+		rc = pci_read_config_word(pdev, dvsec + PCI_DVSEC_CXL_CTRL2,
+					  &cache->saved_ctrl2);
+		if (rc || PCI_POSSIBLE_ERROR(cache->saved_ctrl2)) {
+			rc = rc ? pcibios_err_to_errno(rc) : -ENODEV;
+			goto free_snapshot;
+		}
+	}
+
+	rc = cxl_reset_cache_prepare(pdev, dvsec, cap, snapshot, cache);
+	if (rc) {
+		if (cache->cache_disabled)
+			goto finish;
+		pci_err(pdev, "failed to prepare CXL bus reset ranges: %d\n", rc);
+		cxl_hdm_quiesce_destroy(&cache->quiesce);
+		goto free_snapshot;
+	}
+	if (!pci_wait_for_pending_transaction(pdev)) {
+		rc = -ETIMEDOUT;
+		goto finish;
+	}
+	*cachep = cache;
 	return snapshot;
+
+finish:
+	rc = cxl_restore_state_after_pci_reset(pdev, snapshot, cache, false, rc,
+					       &command);
+	kfree(snapshot);
+	return ERR_PTR(rc);
+free_snapshot:
+	kfree(snapshot);
+unlock:
+	cxl_region_quiesce_unlock();
+	kfree(cache);
+	return ERR_PTR(rc);
 }
 
 /**
- * cxl_restore_state_after_pci_reset() - restore CXL state after a bus reset
+ * cxl_restore_state_after_pci_reset() - finish a prepared reset and release its quiesce
  * @pdev: device that was reset
  * @snapshot: storage from pci_cxl_reset_prepare()
+ * @cache: quiesce state from pci_cxl_reset_prepare()
+ * @reset_attempted: reset helper was invoked and may have affected hardware
+ * @rc: preparation or PCI reset result
  * @command: returns the saved PCI_COMMAND value to apply once the IOMMU is
  *	     restored
  *
- * Under the region quiesce, refresh the decoder settings in @snapshot from the
- * cache and restore: first the PCI configuration needed to reach HDM MMIO,
- * then the HDM decoder and CXL Device DVSEC state. Leave @pdev disabled on
- * failure.
+ * Restore state through pci_cxl_restore_state(), complete host invalidation,
+ * and restore the cache policy changed by planned-reset preparation. When
+ * @reset_attempted is false, undo preparation without changing the saved PCI
+ * command, unless cleanup itself fails. After an attempted reset, keep caching
+ * and the device disabled if state restoration or host invalidation fails.
+ * A reset-helper error does not prove that hardware was untouched.
+ * Unplanned recovery uses pci_cxl_restore_state() directly and owns its own
+ * quiesce and cache-maintenance sequencing.
  *
  * Bus mastering stays off, because the caller has not yet restored IOMMU
  * translation and a DMA request now would hit the blocking domain. The caller
  * calls cxl_restore_command_after_pci_reset() once the IOMMU is restored.
  *
- * Refresh the decoders now rather than rely on the copy taken before the
- * reset: a region commit or teardown during the reset has updated the cache,
- * and restoring older decoders would leave the device decoding ranges the
- * CXL core considers free.
+ * The quiesce blocks region commit and teardown throughout reset. Complete
+ * host cache invalidation before PCI operation resumes, then release the
+ * quiesce and free @cache on every exit. @snapshot remains caller-owned.
  */
 int cxl_restore_state_after_pci_reset(struct pci_dev *pdev,
-				      struct cxl_hdm_info *snapshot,
-				      u16 *command)
+				      const struct cxl_hdm_info *snapshot,
+				      struct cxl_pci_cache *cache,
+				      bool reset_attempted, int rc, u16 *command)
 {
-	int rc;
+	int rc2, policy_rc = 0;
 
+	*command = 0;
+	if (!cache)
+		return rc;
 	device_lock_assert(&pdev->dev);
-	cxl_region_quiesce_lock();
-
-	rc = cxl_hdm_cache_copy_decoders(&pdev->hdm, snapshot);
-	if (!rc)
+	if (reset_attempted && !rc)
 		rc = pci_cxl_restore_state(pdev, snapshot, command);
-	if (rc)
-		cxl_reset_save_disabled_state(pdev);
 
+	/* Complete host invalidation before ending IOMMU exclusion. */
+	rc2 = cxl_hdm_quiesce_flush(&cache->quiesce);
+	if (rc2)
+		pci_err(pdev, "failed to invalidate CPU cache after CXL bus reset: %d\n", rc2);
+	/* Undo preparation on abort; enable caching after reset only if safe. */
+	if (cache->cache_disabled && (!reset_attempted || (!rc && !rc2)))
+		policy_rc = cxl_reset_restore_cache_policy(pdev, snapshot->dvsec,
+							  cache->saved_ctrl2);
+	if (reset_attempted) {
+		rc = rc ?: rc2 ?: policy_rc;
+		if (rc)
+			cxl_reset_save_disabled_state(pdev);
+	} else {
+		/* An aborted reset alone must not poison the saved PCI command. */
+		if (rc2 || policy_rc)
+			cxl_reset_save_disabled_state(pdev);
+		rc = rc ?: rc2 ?: policy_rc;
+	}
+
+	cxl_hdm_quiesce_destroy(&cache->quiesce);
 	cxl_region_quiesce_unlock();
+	kfree(cache);
 	return rc;
 }
 
@@ -594,7 +694,7 @@ static int cxl_reset_cache_prepare(struct pci_dev *pdev, int dvsec, u16 cap,
 	int rc;
 
 	rc = cxl_hdm_quiesce_prepare(&cache->quiesce, snapshot);
-	if (rc)
+	if (rc || !(cap & PCI_DVSEC_CXL_CACHE_CAPABLE))
 		return rc;
 
 	/* Track an attempted change so partial failures still restore policy. */
@@ -659,7 +759,7 @@ static int cxl_clear_memory(struct pci_dev *pdev, int dvsec, bool initiate)
 static int __cxl_reset_execute(struct pci_dev *pdev, int dvsec, u16 cap,
 			      const struct cxl_hdm_info *snapshot,
 			      struct cxl_hdm_quiesce *q,
-			      u16 *command)
+			      u16 *command, bool *attempted)
 	__must_hold(cxl_region_quiesce)
 {
 	int rc, rc2;
@@ -675,6 +775,12 @@ static int __cxl_reset_execute(struct pci_dev *pdev, int dvsec, u16 cap,
 		return rc;
 	}
 
+	/*
+	 * Everything above can still be rolled back. From the reset command
+	 * onwards the device state is in doubt, so the caller must not
+	 * re-enable caching or the device on a failure.
+	 */
+	*attempted = true;
 	rc = cxl_clear_memory(pdev, dvsec, true);
 	if (!rc)
 		rc = cxl_reset_wait_done(pdev, dvsec, cap);
@@ -704,7 +810,8 @@ static int cxl_reset_quiesced(struct pci_dev *pdev, int dvsec, u16 cap)
 {
 	struct cxl_hdm_info *snapshot __free(kfree) = NULL;
 	struct cxl_pci_cache cache = {};
-	u16 command;
+	bool reset_attempted = false;
+	u16 command = 0;
 	int rc, rc2;
 
 	rc = pci_read_config_word(pdev, dvsec + PCI_DVSEC_CXL_CTRL2,
@@ -729,15 +836,22 @@ static int cxl_reset_quiesced(struct pci_dev *pdev, int dvsec, u16 cap)
 	}
 	if (!rc)
 		rc = __cxl_reset_execute(pdev, dvsec, cap, snapshot, &cache.quiesce,
-					 &command);
-	/* Restore cache policy after any attempt to disable caching. */
-	rc2 = cxl_reset_restore_cache_policy(pdev, dvsec, cache.saved_ctrl2);
+					 &command, &reset_attempted);
+	/* Undo preparation on abort; enable caching after reset only if safe. */
+	rc2 = 0;
+	if (cache.cache_disabled && (!reset_attempted || !rc))
+		rc2 = cxl_reset_restore_cache_policy(pdev, dvsec, cache.saved_ctrl2);
 	cxl_hdm_quiesce_destroy(&cache.quiesce);
-	if (rc)
-		return rc;
-	if (rc2) {
+
+	if (!reset_attempted) {
+		/* An aborted reset alone must not poison the saved PCI command. */
+		if (rc2)
+			cxl_reset_save_disabled_state(pdev);
+		return rc ?: rc2;
+	}
+	if (rc || rc2) {
 		cxl_reset_save_disabled_state(pdev);
-		return rc2;
+		return rc ?: rc2;
 	}
 
 	return cxl_reset_save_restored_state(pdev, command);
