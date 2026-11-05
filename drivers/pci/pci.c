@@ -5038,6 +5038,13 @@ static int cxl_reset_bus_function(struct pci_dev *dev, bool probe)
 	u16 dvsec, reg, val;
 	int rc;
 
+	/*
+	 * Reject VFs and multifunction devices before walking the bridge's
+	 * capabilities: every VF behind the same bridge would repeat the walk.
+	 */
+	if (dev->is_virtfn || dev->multifunction || pci_num_vf(dev))
+		return -ENOTTY;
+
 	bridge = pci_upstream_bridge(dev);
 	if (!bridge)
 		return -ENOTTY;
