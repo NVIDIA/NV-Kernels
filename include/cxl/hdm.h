@@ -26,6 +26,7 @@ struct cxl_endpoint_decoder_settings {
  * @hdm_offset: offset of the HDM decoder capability in @hdm_bar
  * @hdm_size: size of the HDM decoder register block
  * @global_ctrl: HDM decoder global control register
+ * @dvsec: config space offset of the CXL Device DVSEC
  * @dvsec_ctrl: CXL DVSEC control register
  * @dvsec_ctrl_valid: whether @dvsec_ctrl contains valid state
  * @settings: per-endpoint-decoder programming state
@@ -39,13 +40,21 @@ struct cxl_hdm_info {
 	resource_size_t hdm_offset;
 	resource_size_t hdm_size;
 	u32 global_ctrl;
+	u16 dvsec;
 	u16 dvsec_ctrl;
 	bool dvsec_ctrl_valid;
 	struct cxl_endpoint_decoder_settings settings[] __counted_by(decoder_count);
 };
+struct device;
 
+int cxl_hdm_decoder_count_mapped(struct device *dev, void __iomem *hdm,
+				 resource_size_t size);
+int cxl_hdm_read_state(struct device *dev, void __iomem *hdm,
+		       struct cxl_hdm_info *info);
+void cxl_hdm_cache_set_dvsec_ctrl(struct pci_dev *pdev, u16 ctrl);
 void cxl_hdm_cache_refresh_decoder(struct pci_dev *pdev, void __iomem *hdm,
 				   struct cxl_endpoint_decoder *cxled);
 int cxl_hdm_cache_check_decoder_count(struct pci_dev *pdev, int count);
+void cxl_hdm_cache_release(struct cxl_hdm_info **slot);
 
 #endif /* __CXL_HDM_H__ */

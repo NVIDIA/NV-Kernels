@@ -209,22 +209,31 @@ static int cxl_set_mem_enable(struct cxl_dev_state *cxlds, u16 val)
 	struct pci_dev *pdev = to_pci_dev(cxlds->dev);
 	int d = cxlds->cxl_dvsec;
 	u16 ctrl;
-	int rc;
+	int rc, ret = 1;
 
 	rc = pci_read_config_word(pdev, d + PCI_DVSEC_CXL_CTRL, &ctrl);
 	if (rc)
 		return pcibios_err_to_errno(rc);
+	/* An all-ones read must not be written back or cached. */
+	if (PCI_POSSIBLE_ERROR(ctrl))
+		return -ENODEV;
 
-	if ((ctrl & PCI_DVSEC_CXL_MEM_ENABLE) == val)
-		return 1;
-	ctrl &= ~PCI_DVSEC_CXL_MEM_ENABLE;
-	ctrl |= val;
+	if ((ctrl & PCI_DVSEC_CXL_MEM_ENABLE) != val) {
+		ctrl &= ~PCI_DVSEC_CXL_MEM_ENABLE;
+		ctrl |= val;
 
-	rc = pci_write_config_word(pdev, d + PCI_DVSEC_CXL_CTRL, ctrl);
-	if (rc)
-		return pcibios_err_to_errno(rc);
+		rc = pci_write_config_word(pdev, d + PCI_DVSEC_CXL_CTRL, ctrl);
+		if (rc)
+			return pcibios_err_to_errno(rc);
+		ret = 0;
+	}
 
-	return 0;
+	/*
+	 * Refresh the PCI-core cache from the live register even when
+	 * MEM_ENABLE already matched: a reset restores the cached value.
+	 */
+	cxl_hdm_cache_set_dvsec_ctrl(pdev, ctrl);
+	return ret;
 }
 
 static void clear_mem_enable(void *cxlds)
@@ -314,7 +323,7 @@ int cxl_dvsec_rr_decode(struct cxl_dev_state *cxlds,
 	 * capable, there is no point in continuing to enable CXL.mem.
 	 */
 	hdm_count = FIELD_GET(PCI_DVSEC_CXL_HDM_COUNT, cap);
-	if (!hdm_count || hdm_count > 2)
+	if (!cxl_dvsec_hdm_count_valid(hdm_count))
 		return -EINVAL;
 
 	/*
