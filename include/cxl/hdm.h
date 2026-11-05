@@ -54,6 +54,8 @@ int cxl_hdm_decoder_count_mapped(struct device *dev, void __iomem *hdm,
 				 resource_size_t size);
 int cxl_hdm_read_state(struct device *dev, void __iomem *hdm,
 		       struct cxl_hdm_info *info);
+int cxl_hdm_restore_state(void __iomem *hdm,
+			  const struct cxl_hdm_info *snapshot);
 void cxl_hdm_cache_set_dvsec_ctrl(struct pci_dev *pdev, u16 ctrl);
 void cxl_hdm_cache_refresh_decoder(struct pci_dev *pdev, void __iomem *hdm,
 				   struct cxl_endpoint_decoder *cxled);
