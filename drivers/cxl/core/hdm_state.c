@@ -182,6 +182,37 @@ struct cxl_hdm_info *cxl_hdm_cache_snapshot(struct cxl_hdm_info *const *slot)
 	return copy;
 }
 
+/**
+ * cxl_hdm_cache_copy_decoders() - refresh the decoders of a snapshot
+ * @slot: cache pointer owned by the device
+ * @dst: snapshot of the same device from cxl_hdm_cache_snapshot()
+ *
+ * Copy only the per-decoder settings, which region commit and teardown keep
+ * current. Leave the rest of @dst, including global and DVSEC control, as
+ * captured: a refresh during a reset may have read those registers from a
+ * device that returned all-ones.
+ *
+ * Return: 0 on success, -ENXIO when nothing is published, or -EINVAL when
+ * @dst holds a different number of decoders.
+ */
+int cxl_hdm_cache_copy_decoders(struct cxl_hdm_info *const *slot,
+				struct cxl_hdm_info *dst)
+{
+	struct cxl_hdm_info *info;
+
+	lockdep_assert_held_write(&cxl_rwsem.region);
+	guard(rwsem_read)(&cxl_rwsem.dpa);
+	info = *slot;
+	if (!info)
+		return -ENXIO;
+	if (info->decoder_count != dst->decoder_count)
+		return -EINVAL;
+
+	memcpy(dst->settings, info->settings,
+	       flex_array_size(info, settings, info->decoder_count));
+	return 0;
+}
+
 void cxl_region_quiesce_lock(void)
 	__acquires(cxl_region_quiesce)
 	__context_unsafe(token maps to cxl_rwsem.region)

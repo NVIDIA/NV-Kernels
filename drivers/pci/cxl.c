@@ -393,6 +393,91 @@ static int pci_cxl_restore_state(struct pci_dev *pdev,
 	return cxl_restore_state(pdev, snapshot);
 }
 
+/**
+ * pci_cxl_reset_prepare() - allocate HDM state storage ahead of a bus reset
+ * @pdev: device about to be reset
+ *
+ * Copy the cached HDM state before the reset, so that restoring cannot fail
+ * for lack of memory. The decoder settings are refreshed when the state is
+ * restored.
+ *
+ * Return: storage for cxl_restore_state_after_pci_reset(), to be freed with
+ * kfree(); NULL when @pdev has no cached HDM state; or an ERR_PTR() on
+ * failure.
+ */
+struct cxl_hdm_info *pci_cxl_reset_prepare(struct pci_dev *pdev)
+{
+	struct cxl_hdm_info *snapshot;
+
+	device_lock_assert(&pdev->dev);
+	snapshot = cxl_hdm_cache_snapshot(&pdev->hdm);
+	if (IS_ERR(snapshot))
+		return PTR_ERR(snapshot) == -ENXIO ? NULL : snapshot;
+
+	/* Raw reset callers may not have saved the PCI state needed for restore. */
+	if (!pdev->state_saved) {
+		pci_err(pdev, "CXL bus reset requires saved PCI state\n");
+		kfree(snapshot);
+		return ERR_PTR(-EINVAL);
+	}
+
+	return snapshot;
+}
+
+/**
+ * cxl_restore_state_after_pci_reset() - restore CXL state after a bus reset
+ * @pdev: device that was reset
+ * @snapshot: storage from pci_cxl_reset_prepare()
+ * @command: returns the saved PCI_COMMAND value to apply once the IOMMU is
+ *	     restored
+ *
+ * Under the region quiesce, refresh the decoder settings in @snapshot from the
+ * cache and restore: first the PCI configuration needed to reach HDM MMIO,
+ * then the HDM decoder and CXL Device DVSEC state. Leave @pdev disabled on
+ * failure.
+ *
+ * Bus mastering stays off, because the caller has not yet restored IOMMU
+ * translation and a DMA request now would hit the blocking domain. The caller
+ * calls cxl_restore_command_after_pci_reset() once the IOMMU is restored.
+ *
+ * Refresh the decoders now rather than rely on the copy taken before the
+ * reset: a region commit or teardown during the reset has updated the cache,
+ * and restoring older decoders would leave the device decoding ranges the
+ * CXL core considers free.
+ */
+int cxl_restore_state_after_pci_reset(struct pci_dev *pdev,
+				      struct cxl_hdm_info *snapshot,
+				      u16 *command)
+{
+	int rc;
+
+	device_lock_assert(&pdev->dev);
+	cxl_region_quiesce_lock();
+
+	rc = cxl_hdm_cache_copy_decoders(&pdev->hdm, snapshot);
+	if (!rc)
+		rc = pci_cxl_restore_state(pdev, snapshot, command);
+	if (rc)
+		cxl_reset_save_disabled_state(pdev);
+
+	cxl_region_quiesce_unlock();
+	return rc;
+}
+
+/**
+ * cxl_restore_command_after_pci_reset() - re-enable the device after a bus reset
+ * @pdev: device that was reset
+ * @command: PCI_COMMAND value from cxl_restore_state_after_pci_reset()
+ *
+ * Call after the IOMMU is restored: this can enable bus mastering. Save the
+ * restored PCI state, and leave @pdev disabled on failure.
+ */
+int cxl_restore_command_after_pci_reset(struct pci_dev *pdev, u16 command)
+{
+	device_lock_assert(&pdev->dev);
+	return cxl_reset_save_restored_state(pdev, command);
+}
+
 /*
  * CXL r4.0 sec 9.7.2 defines the reset completion timeout encodings.
  * Sec 9.7.3 leaves config-space access behavior undefined for 100 ms after

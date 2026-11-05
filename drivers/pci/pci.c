@@ -5034,8 +5034,10 @@ done:
 
 static int cxl_reset_bus_function(struct pci_dev *dev, bool probe)
 {
+	struct cxl_hdm_info *snapshot __free(kfree) = NULL;
 	struct pci_dev *bridge;
 	u16 dvsec, reg, val;
+	u16 command;
 	int rc;
 
 	/*
@@ -5060,6 +5062,10 @@ static int cxl_reset_bus_function(struct pci_dev *dev, bool probe)
 	if (rc)
 		return -ENOTTY;
 
+	snapshot = pci_cxl_reset_prepare(dev);
+	if (IS_ERR(snapshot))
+		return PTR_ERR(snapshot);
+
 	rc = pci_dev_reset_iommu_prepare(dev);
 	if (rc) {
 		pci_err(dev, "failed to stop IOMMU for a PCI reset: %d\n", rc);
@@ -5080,7 +5086,15 @@ static int cxl_reset_bus_function(struct pci_dev *dev, bool probe)
 		pci_write_config_word(bridge, dvsec + PCI_DVSEC_CXL_PORT_CTL,
 				      reg);
 
+	if (!rc && snapshot)
+		rc = cxl_restore_state_after_pci_reset(dev, snapshot, &command);
+
 	pci_dev_reset_iommu_done(dev);
+
+	/* Enable bus mastering only once the IOMMU translates again. */
+	if (!rc && snapshot)
+		rc = cxl_restore_command_after_pci_reset(dev, command);
+
 	return rc;
 }
 
