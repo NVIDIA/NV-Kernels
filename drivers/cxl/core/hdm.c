@@ -815,7 +815,7 @@ static int cxl_decoder_commit(struct cxl_decoder *cxld)
 	scoped_guard(rwsem_read, &cxl_rwsem.dpa)
 		setup_hw_decoder(cxld, hdm);
 
-	rc = cxld_await_commit(hdm, cxld->config.id);
+	rc = cxld_await_commit(hdm, cxld->config.id, true);
 	if (rc) {
 		dev_dbg(&port->dev, "%s: error %d committing decoder\n",
 			dev_name(&cxld->dev), rc);

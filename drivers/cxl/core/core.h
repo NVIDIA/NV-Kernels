@@ -145,7 +145,7 @@ void cxl_commit_start_endpoint(const struct cxl_endpoint_decoder_settings *setti
 			       void __iomem *hdm);
 void cxl_commit_start_switch(const struct cxl_decoder_config *config,
 			     u64 targets, void __iomem *hdm);
-int cxld_await_commit(void __iomem *hdm, int id);
+int cxld_await_commit(void __iomem *hdm, int id, bool committed);
 
 int cxl_hdm_unpack_decoder(struct cxl_decoder_config *config, int id,
 			   u32 ctrl, u64 base, u64 size);
