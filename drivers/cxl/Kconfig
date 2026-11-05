@@ -226,7 +226,8 @@ config CXL_REGION_INVALIDATION_TEST
 	  invalidation mechanism. For example usage of wbinvd is restricted to
 	  bare metal x86. However, for testing purposes toggling this option
 	  can disable that data integrity safety and proceed with enabling
-	  regions when there might be conflicting contents in the CPU cache.
+	  regions or performing CXL reset when there might be conflicting
+	  contents in the CPU cache.
 
 	  If unsure, or if this kernel is meant for production environments,
 	  say N.
