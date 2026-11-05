@@ -129,7 +129,7 @@ static ssize_t start_show(struct device *dev, struct device_attribute *attr,
 {
 	struct cxl_decoder *cxld = to_cxl_decoder(dev);
 
-	return sysfs_emit(buf, "%#llx\n", cxld->hpa_range.start);
+	return sysfs_emit(buf, "%#llx\n", cxld->config.hpa_range.start);
 }
 static DEVICE_ATTR_ADMIN_RO(start);
 
@@ -138,7 +138,7 @@ static ssize_t size_show(struct device *dev, struct device_attribute *attr,
 {
 	struct cxl_decoder *cxld = to_cxl_decoder(dev);
 
-	return sysfs_emit(buf, "%#llx\n", range_len(&cxld->hpa_range));
+	return sysfs_emit(buf, "%#llx\n", range_len(&cxld->config.hpa_range));
 }
 static DEVICE_ATTR_RO(size);
 
@@ -149,7 +149,7 @@ static ssize_t name##_show(struct device *dev,                       \
 	struct cxl_decoder *cxld = to_cxl_decoder(dev);              \
                                                                      \
 	return sysfs_emit(buf, "%s\n",                               \
-			  (cxld->flags & (flag)) ? "1" : "0");       \
+			  (cxld->config.flags & (flag)) ? "1" : "0");       \
 }                                                                    \
 static DEVICE_ATTR_RO(name)
 
@@ -164,7 +164,7 @@ static ssize_t target_type_show(struct device *dev,
 {
 	struct cxl_decoder *cxld = to_cxl_decoder(dev);
 
-	switch (cxld->target_type) {
+	switch (cxld->config.target_type) {
 	case CXL_DECODER_DEVMEM:
 		return sysfs_emit(buf, "accelerator\n");
 	case CXL_DECODER_HOSTONLYMEM:
@@ -180,14 +180,14 @@ static ssize_t emit_target_list(struct cxl_switch_decoder *cxlsd, char *buf)
 	ssize_t offset = 0;
 	int i, rc = 0;
 
-	for (i = 0; i < cxld->interleave_ways; i++) {
+	for (i = 0; i < cxld->config.interleave_ways; i++) {
 		struct cxl_dport *dport = cxlsd->target[i];
 		struct cxl_dport *next = NULL;
 
 		if (!dport)
 			break;
 
-		if (i + 1 < cxld->interleave_ways)
+		if (i + 1 < cxld->config.interleave_ways)
 			next = cxlsd->target[i + 1];
 		rc = sysfs_emit_at(buf, offset, "%d%s", dport->port_id,
 				   next ? "," : "");
@@ -314,7 +314,7 @@ static ssize_t interleave_granularity_show(struct device *dev,
 {
 	struct cxl_decoder *cxld = to_cxl_decoder(dev);
 
-	return sysfs_emit(buf, "%d\n", cxld->interleave_granularity);
+	return sysfs_emit(buf, "%d\n", cxld->config.interleave_granularity);
 }
 
 static DEVICE_ATTR_RO(interleave_granularity);
@@ -324,7 +324,7 @@ static ssize_t interleave_ways_show(struct device *dev,
 {
 	struct cxl_decoder *cxld = to_cxl_decoder(dev);
 
-	return sysfs_emit(buf, "%d\n", cxld->interleave_ways);
+	return sysfs_emit(buf, "%d\n", cxld->config.interleave_ways);
 }
 
 static DEVICE_ATTR_RO(interleave_ways);
@@ -368,14 +368,14 @@ static bool can_create_pmem(struct cxl_root_decoder *cxlrd)
 {
 	unsigned long flags = CXL_DECODER_F_TYPE3 | CXL_DECODER_F_PMEM;
 
-	return (cxlrd->cxlsd.cxld.flags & flags) == flags;
+	return (cxlrd->cxlsd.cxld.config.flags & flags) == flags;
 }
 
 static bool can_create_ram(struct cxl_root_decoder *cxlrd)
 {
 	unsigned long flags = CXL_DECODER_F_TYPE3 | CXL_DECODER_F_RAM;
 
-	return (cxlrd->cxlsd.cxld.flags & flags) == flags;
+	return (cxlrd->cxlsd.cxld.config.flags & flags) == flags;
 }
 
 static umode_t cxl_root_decoder_visible(struct kobject *kobj, struct attribute *a, int n)
@@ -450,7 +450,7 @@ static void __cxl_decoder_release(struct cxl_decoder *cxld)
 {
 	struct cxl_port *port = to_cxl_port(cxld->dev.parent);
 
-	ida_free(&port->decoder_ida, cxld->id);
+	ida_free(&port->decoder_ida, cxld->config.id);
 	put_device(&port->dev);
 }
 
@@ -1646,7 +1646,7 @@ static int update_decoder_targets(struct device *dev, void *data)
 	cxld = &cxlsd->cxld;
 	guard(rwsem_write)(&cxl_rwsem.region);
 
-	for (i = 0; i < cxld->interleave_ways; i++) {
+	for (i = 0; i < cxld->config.interleave_ways; i++) {
 		if (cxld->target_map[i] == dport->port_id) {
 			cxlsd->target[i] = dport;
 			dev_dbg(dev, "dport%d found in target list, index %d\n",
@@ -1952,7 +1952,7 @@ static int decoder_populate_targets(struct cxl_switch_decoder *cxlsd,
 		return 0;
 
 	guard(rwsem_write)(&cxl_rwsem.region);
-	for (i = 0; i < cxlsd->cxld.interleave_ways; i++) {
+	for (i = 0; i < cxlsd->cxld.config.interleave_ways; i++) {
 		struct cxl_dport *dport = find_dport(port, cxld->target_map[i]);
 
 		if (!dport) {
@@ -1988,7 +1988,7 @@ static int cxl_decoder_init(struct cxl_port *port, struct cxl_decoder *cxld)
 
 	/* need parent to stick around to release the id */
 	get_device(&port->dev);
-	cxld->id = rc;
+	cxld->config.id = rc;
 
 	dev = &cxld->dev;
 	device_initialize(dev);
@@ -1998,10 +1998,10 @@ static int cxl_decoder_init(struct cxl_port *port, struct cxl_decoder *cxld)
 	dev->bus = &cxl_bus_type;
 
 	/* Pre initialize an "empty" decoder */
-	cxld->interleave_ways = 1;
-	cxld->interleave_granularity = PAGE_SIZE;
-	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
-	cxld->hpa_range = (struct range) {
+	cxld->config.interleave_ways = 1;
+	cxld->config.interleave_granularity = PAGE_SIZE;
+	cxld->config.target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->config.hpa_range = (struct range) {
 		.start = 0,
 		.end = -1,
 	};
@@ -2172,7 +2172,7 @@ int cxl_decoder_add_locked(struct cxl_decoder *cxld)
 	if (WARN_ON_ONCE(IS_ERR(cxld)))
 		return PTR_ERR(cxld);
 
-	if (cxld->interleave_ways < 1)
+	if (cxld->config.interleave_ways < 1)
 		return -EINVAL;
 
 	dev = &cxld->dev;
@@ -2182,14 +2182,14 @@ int cxl_decoder_add_locked(struct cxl_decoder *cxld)
 		struct cxl_switch_decoder *cxlsd = to_cxl_switch_decoder(dev);
 
 		rc = decoder_populate_targets(cxlsd, port);
-		if (rc && (cxld->flags & CXL_DECODER_F_ENABLE)) {
+		if (rc && (cxld->config.flags & CXL_DECODER_F_ENABLE)) {
 			dev_err(&port->dev,
 				"Failed to populate active decoder targets\n");
 			return rc;
 		}
 	}
 
-	rc = dev_set_name(dev, "decoder%d.%d", port->id, cxld->id);
+	rc = dev_set_name(dev, "decoder%d.%d", port->id, cxld->config.id);
 	if (rc)
 		return rc;
 

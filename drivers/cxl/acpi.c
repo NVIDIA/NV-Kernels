@@ -109,16 +109,16 @@ static int cxl_parse_cxims(union acpi_subtable_headers *header, void *arg,
 		return rc;
 
 	/* Does this CXIMS entry apply to the given CXL Window? */
-	if (hbig != cxld->interleave_granularity)
+	if (hbig != cxld->config.interleave_granularity)
 		return 0;
 
 	/* IW 1,3 do not use xormaps and skip this parsing entirely */
-	if (is_power_of_2(cxld->interleave_ways))
+	if (is_power_of_2(cxld->config.interleave_ways))
 		/* 2, 4, 8, 16 way */
-		nr_maps = ilog2(cxld->interleave_ways);
+		nr_maps = ilog2(cxld->config.interleave_ways);
 	else
 		/* 6, 12 way */
-		nr_maps = ilog2(cxld->interleave_ways / 3);
+		nr_maps = ilog2(cxld->config.interleave_ways / 3);
 
 	if (cxims->nr_xormaps < nr_maps) {
 		dev_dbg(dev, "CXIMS nr_xormaps[%d] expected[%d]\n",
@@ -363,7 +363,7 @@ static int add_or_reset_cxl_resource(struct resource *parent, struct resource *r
 static void cxl_setup_extended_linear_cache(struct cxl_root_decoder *cxlrd)
 {
 	struct cxl_decoder *cxld = &cxlrd->cxlsd.cxld;
-	struct range *hpa = &cxld->hpa_range;
+	struct range *hpa = &cxld->config.hpa_range;
 	resource_size_t size = range_len(hpa);
 	resource_size_t start = hpa->start;
 	resource_size_t cache_size;
@@ -436,13 +436,13 @@ static int __cxl_parse_cfmws(struct acpi_cedt_cfmws *cfmws,
 		return PTR_ERR(cxlrd);
 
 	cxld = &cxlrd->cxlsd.cxld;
-	cxld->flags = cfmws_to_decoder_flags(cfmws->restrictions);
-	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
-	cxld->hpa_range = (struct range) {
+	cxld->config.flags = cfmws_to_decoder_flags(cfmws->restrictions);
+	cxld->config.target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->config.hpa_range = (struct range) {
 		.start = cfmws->base_hpa,
 		.end = cfmws->base_hpa + cfmws->window_size - 1,
 	};
-	cxld->interleave_ways = ways;
+	cxld->config.interleave_ways = ways;
 	for (i = 0; i < ways; i++)
 		cxld->target_map[i] = cfmws->interleave_targets[i];
 	/*
@@ -451,7 +451,7 @@ static int __cxl_parse_cfmws(struct acpi_cedt_cfmws *cfmws,
 	 */
 	if (ways == 1)
 		ig = CXL_DECODER_MIN_GRANULARITY;
-	cxld->interleave_granularity = ig;
+	cxld->config.interleave_granularity = ig;
 
 	if (cfmws->interleave_arithmetic == ACPI_CEDT_CFMWS_ARITHMETIC_XOR) {
 		if (ways != 1 && ways != 3) {
@@ -752,7 +752,7 @@ static int add_root_nvdimm_bridge(struct device *match, void *data)
 		return 0;
 
 	cxld = to_cxl_decoder(match);
-	if (!(cxld->flags & CXL_DECODER_F_PMEM))
+	if (!(cxld->config.flags & CXL_DECODER_F_PMEM))
 		return 0;
 
 	cxl_nvb = devm_cxl_add_nvdimm_bridge(host, root_port);
@@ -869,8 +869,8 @@ static int pair_cxl_resource(struct device *dev, void *data)
 		struct cxl_root_decoder *cxlrd = to_cxl_root_decoder(dev);
 		struct cxl_decoder *cxld = &cxlrd->cxlsd.cxld;
 		struct resource res = {
-			.start = cxld->hpa_range.start,
-			.end = cxld->hpa_range.end,
+			.start = cxld->config.hpa_range.start,
+			.end = cxld->config.hpa_range.end,
 			.flags = IORESOURCE_MEM,
 		};
 

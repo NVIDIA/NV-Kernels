@@ -36,15 +36,31 @@ enum cxl_decoder_type {
 #define CXL_DECODER_MAX_INTERLEAVE 16
 
 /**
- * struct cxl_decoder - Common CXL HDM Decoder Attributes
- * @dev: this decoder's device
+ * struct cxl_decoder_config - common CXL decoder configuration and state
  * @id: kernel device name id
  * @hpa_range: Host physical address range mapped by this decoder
  * @interleave_ways: number of cxl_dports in this decode
  * @interleave_granularity: data stride per dport
  * @target_type: accelerator vs expander (type2 vs type3) selector
- * @region: currently assigned region for this decoder
  * @flags: memory type capabilities and locking
+ *
+ * This is not a complete snapshot of the hardware registers. Switch target
+ * lists and endpoint DPA skip values are not tracked in this common structure.
+ */
+struct cxl_decoder_config {
+	int id;
+	struct range hpa_range;
+	int interleave_ways;
+	int interleave_granularity;
+	enum cxl_decoder_type target_type;
+	unsigned long flags;
+};
+
+/**
+ * struct cxl_decoder - Common CXL HDM Decoder Attributes
+ * @dev: this decoder's device
+ * @config: common decoder configuration and state
+ * @region: currently assigned region for this decoder
  * @target_map: cached copy of hardware port-id list, available at init
  *              before all @dport objects have been instantiated. While
  *              dport id is 8bit, CFMWS interleave targets are 32bits.
@@ -53,13 +69,8 @@ enum cxl_decoder_type {
 */
 struct cxl_decoder {
 	struct device dev;
-	int id;
-	struct range hpa_range;
-	int interleave_ways;
-	int interleave_granularity;
-	enum cxl_decoder_type target_type;
+	struct cxl_decoder_config config;
 	struct cxl_region *region;
-	unsigned long flags;
 	u32 target_map[CXL_DECODER_MAX_INTERLEAVE];
 	int (*commit)(struct cxl_decoder *cxld);
 	void (*reset)(struct cxl_decoder *cxld);
