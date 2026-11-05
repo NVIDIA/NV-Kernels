@@ -3727,6 +3727,9 @@ static int mpam_force_unknown_msc_set(const char *_str,
 	char *tok, *iter;
 	char *str __free(kfree) = kstrdup(_str, GFP_KERNEL);
 
+	if (!str)
+		return -ENOMEM;
+
 	iter = str;
 	do {
 		tok = strsep(&iter, ",");
@@ -3743,21 +3746,34 @@ static int mpam_force_unknown_msc_set(const char *_str,
 static int mpam_force_unknown_msc_get(char *buffer,
 				      const struct kernel_param *kp)
 {
-	unsigned long index, count = 0;
-	int result = 0;
+	unsigned long index;
+	size_t len = 0;
+	bool first = true;
 	void *entry;
 
+	/*
+	 * sysfs gives this getter a PAGE_SIZE buffer and treats a returned
+	 * length >= PAGE_SIZE as a bad count. Format each id into tmp first so
+	 * a partial id is never written to buffer. Reserve two bytes beyond
+	 * the id text: one for the trailing '\n' and one for the NUL.
+	 */
 	xa_for_each(&mpam_force_unkown_msc, index, entry) {
-		if (count)
-			result += sprintf(buffer + result, ",");
+		char tmp[32];
+		int n;
 
-		result += sprintf(buffer + result, "%lu", index);
-		count += 1;
+		n = scnprintf(tmp, sizeof(tmp), "%s%lu",
+			      first ? "" : ",", index);
+		if (len + n + 2 > PAGE_SIZE)
+			break;
+		memcpy(buffer + len, tmp, n);
+		len += n;
+		first = false;
 	}
 
-	result += sprintf(buffer + result, "\n");
+	buffer[len++] = '\n';
+	buffer[len] = '\0';
 
-	return result;
+	return len;
 }
 static const struct kernel_param_ops mpam_force_unknown_msc_ops = {
 	.set = mpam_force_unknown_msc_set,
