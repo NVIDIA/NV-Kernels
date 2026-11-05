@@ -7,6 +7,8 @@
 #include <cxl/mailbox.h>
 #include <linux/rwsem.h>
 
+struct cxl_endpoint_decoder_settings;
+
 extern const struct device_type cxl_nvdimm_bridge_type;
 extern const struct device_type cxl_nvdimm_type;
 extern const struct device_type cxl_pmu_type;
@@ -138,6 +140,12 @@ struct cxl_rwsem {
 };
 
 extern struct cxl_rwsem cxl_rwsem;
+
+void cxl_commit_start_endpoint(const struct cxl_endpoint_decoder_settings *settings,
+			       void __iomem *hdm);
+void cxl_commit_start_switch(const struct cxl_decoder_config *config,
+			     u64 targets, void __iomem *hdm);
+int cxld_await_commit(void __iomem *hdm, int id);
 
 int cxl_memdev_init(void);
 void cxl_memdev_exit(void);
