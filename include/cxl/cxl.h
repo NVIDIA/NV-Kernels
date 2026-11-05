@@ -26,6 +26,7 @@ enum cxl_devtype {
 };
 
 struct cxl_region;
+struct cxl_hdm_info;
 
 enum cxl_decoder_type {
 	CXL_DECODER_DEVMEM = 2,
