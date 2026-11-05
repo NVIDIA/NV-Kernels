@@ -564,25 +564,12 @@ static unsigned char cdat_checksum(void *buf, size_t size)
  */
 void read_cdat_data(struct cxl_port *port)
 {
-	struct device *uport = port->uport_dev;
+	struct pci_dev *pdev = cxl_port_get_uport_pci_dev(port);
 	struct device *dev = &port->dev;
 	struct pci_doe_mb *doe_mb;
-	struct pci_dev *pdev = NULL;
-	struct cxl_memdev *cxlmd;
 	struct cdat_doe_rsp *buf;
 	size_t table_length, length;
 	int rc;
-
-	if (is_cxl_memdev(uport)) {
-		struct device *host;
-
-		cxlmd = to_cxl_memdev(uport);
-		host = cxlmd->dev.parent;
-		if (dev_is_pci(host))
-			pdev = to_pci_dev(host);
-	} else if (dev_is_pci(uport)) {
-		pdev = to_pci_dev(uport);
-	}
 
 	if (!pdev)
 		return;
@@ -591,14 +578,14 @@ void read_cdat_data(struct cxl_port *port)
 				      CXL_DOE_PROTOCOL_TABLE_ACCESS);
 	if (!doe_mb) {
 		dev_dbg(dev, "No CDAT mailbox\n");
-		return;
+		goto out;
 	}
 
 	port->cdat_available = true;
 
 	if (cxl_cdat_get_length(dev, doe_mb, &length)) {
 		dev_dbg(dev, "No CDAT length\n");
-		return;
+		goto out;
 	}
 
 	/*
@@ -624,12 +611,13 @@ void read_cdat_data(struct cxl_port *port)
 
 	port->cdat.table = buf->data;
 	port->cdat.length = length;
-
-	return;
+	goto out;
 err:
 	/* Don't leave table data allocated on error */
 	devm_kfree(dev, buf);
 	dev_err(dev, "Failed to read/validate CDAT.\n");
+out:
+	pci_dev_put(pdev);
 }
 EXPORT_SYMBOL_NS_GPL(read_cdat_data, "CXL");
 
