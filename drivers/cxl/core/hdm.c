@@ -938,11 +938,11 @@ static int init_hdm_decoder(struct cxl_port *port, struct cxl_decoder *cxld,
 			    u64 *dpa_base, struct cxl_endpoint_dvsec_info *info)
 {
 	struct cxl_endpoint_decoder *cxled = NULL;
-	u64 size, base, skip, dpa_size, lo, hi;
-	bool committed;
+	u64 size, skip, dpa_size, lo, hi;
+	struct cxl_decoder_config config;
 	u32 remainder;
-	int i, rc;
 	u32 ctrl;
+	int i, rc;
 	union {
 		u64 value;
 		unsigned char target_id[8];
@@ -953,41 +953,25 @@ static int init_hdm_decoder(struct cxl_port *port, struct cxl_decoder *cxld,
 							which, info);
 
 	ctrl = readl(hdm + CXL_HDM_DECODER0_CTRL_OFFSET(which));
-	lo = readl(hdm + CXL_HDM_DECODER0_BASE_LOW_OFFSET(which));
-	hi = readl(hdm + CXL_HDM_DECODER0_BASE_HIGH_OFFSET(which));
-	base = (hi << 32) + lo;
-	lo = readl(hdm + CXL_HDM_DECODER0_SIZE_LOW_OFFSET(which));
-	hi = readl(hdm + CXL_HDM_DECODER0_SIZE_HIGH_OFFSET(which));
-	size = (hi << 32) + lo;
-	committed = !!(ctrl & CXL_HDM_DECODER0_CTRL_COMMITTED);
+	rc = cxl_hdm_read_decoder(&config, hdm, which, ctrl);
+	if (rc) {
+		dev_warn(&port->dev,
+			 "decoder%d.%d: Invalid decoder configuration (ctrl: %#x): %d\n",
+			 port->id, cxld->config.id, ctrl, rc);
+		return rc;
+	}
+
+	config.id = cxld->config.id;
 	cxld->commit = cxl_decoder_commit;
 	cxld->reset = cxl_decoder_reset;
-
-	if (!committed)
-		size = 0;
-	if (base == U64_MAX || size == U64_MAX) {
-		dev_warn(&port->dev, "decoder%d.%d: Invalid resource range\n",
-			 port->id, cxld->config.id);
-		return -ENXIO;
-	}
+	cxld->config = config;
+	size = range_len(&cxld->config.hpa_range);
 
 	if (info)
 		cxled = to_cxl_endpoint_decoder(&cxld->dev);
-	cxld->config.hpa_range = (struct range) {
-		.start = base,
-		.end = base + size - 1,
-	};
 
 	/* decoders are enabled if committed */
-	if (committed) {
-		cxld->config.flags |= CXL_DECODER_F_ENABLE;
-		if (ctrl & CXL_HDM_DECODER0_CTRL_LOCK)
-			cxld->config.flags |= CXL_DECODER_F_LOCK;
-		if (FIELD_GET(CXL_HDM_DECODER0_CTRL_HOSTONLY, ctrl))
-			cxld->config.target_type = CXL_DECODER_HOSTONLYMEM;
-		else
-			cxld->config.target_type = CXL_DECODER_DEVMEM;
-
+	if (cxld->config.flags & CXL_DECODER_F_ENABLE) {
 		guard(rwsem_write)(&cxl_rwsem.region);
 		if (cxld->config.id != cxl_num_decoders_committed(port)) {
 			dev_warn(&port->dev,
@@ -1021,23 +1005,6 @@ static int init_hdm_decoder(struct cxl_port *port, struct cxl_decoder *cxld,
 			writel(ctrl, hdm + CXL_HDM_DECODER0_CTRL_OFFSET(which));
 		}
 	}
-	rc = eiw_to_ways(FIELD_GET(CXL_HDM_DECODER0_CTRL_IW_MASK, ctrl),
-			  &cxld->config.interleave_ways);
-	if (rc) {
-		dev_warn(&port->dev,
-			 "decoder%d.%d: Invalid interleave ways (ctrl: %#x)\n",
-			 port->id, cxld->config.id, ctrl);
-		return rc;
-	}
-	rc = eig_to_granularity(FIELD_GET(CXL_HDM_DECODER0_CTRL_IG_MASK, ctrl),
-				 &cxld->config.interleave_granularity);
-	if (rc) {
-		dev_warn(&port->dev,
-			 "decoder%d.%d: Invalid interleave granularity (ctrl: %#x)\n",
-			 port->id, cxld->config.id, ctrl);
-		return rc;
-	}
-
 	dev_dbg(&port->dev, "decoder%d.%d: range: %#llx-%#llx iw: %d ig: %d\n",
 		port->id, cxld->config.id, cxld->config.hpa_range.start, cxld->config.hpa_range.end,
 		cxld->config.interleave_ways, cxld->config.interleave_granularity);
@@ -1052,7 +1019,7 @@ static int init_hdm_decoder(struct cxl_port *port, struct cxl_decoder *cxld,
 		return 0;
 	}
 
-	if (!committed)
+	if (!(cxld->config.flags & CXL_DECODER_F_ENABLE))
 		return 0;
 
 	dpa_size = div_u64_rem(size, cxld->config.interleave_ways, &remainder);
