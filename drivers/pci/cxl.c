@@ -501,6 +501,9 @@ int cxl_reset_function(struct pci_dev *pdev, bool probe)
 	u16 dvsec, cap, ctrl;
 	int rc;
 
+	if (pdev->is_virtfn || pdev->multifunction || pci_num_vf(pdev))
+		return -ENOTTY;
+
 	rc = cxl_pci_device_dvsec(pdev, &dvsec, &cap);
 	if (rc)
 		return rc;
