@@ -7,6 +7,7 @@
  *         Weiyi Hsieh <weiyi.hsieh@mediatek.com>
  */
 
+#include <linux/acpi.h>
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/property.h>
@@ -547,6 +548,49 @@ static int soc_card_dai_links_create(struct snd_soc_card *card)
 	return ret;
 }
 
+/*
+ * The amplifier firmware (cs35l56) is selected by a system name. On x86 the
+ * ASoC core derives it from the sound card's PCI subsystem ID. The MT8901
+ * card has no PCI parent, but the firmware publishes the OEM subsystem ID as
+ * ACPI _SUB on the SoundWire controller node or on the AFE node, written in
+ * SUBSYS order: device first, vendor last ("8E6A103C" is vendor 0x103c,
+ * device 0x8e6a). Hand it to the card so the codec drivers build the same
+ * "<vendor><device>" names as on x86.
+ */
+static void mt8901_card_set_ssid(struct snd_soc_card *card)
+{
+	struct device *dev = card->dev;
+	struct acpi_device *adev;
+	const char *sub = ERR_PTR(-ENODEV);
+	unsigned long val;
+
+	if (dev->parent && ACPI_HANDLE(dev->parent))
+		sub = acpi_get_subsystem_id(ACPI_HANDLE(dev->parent));
+
+	if (IS_ERR(sub)) {
+		adev = acpi_dev_get_first_match_dev("NVDA9022", NULL, -1);
+		if (adev) {
+			sub = acpi_get_subsystem_id(adev->handle);
+			acpi_dev_put(adev);
+		}
+	}
+
+	if (IS_ERR(sub)) {
+		dev_dbg(dev, "no ACPI _SUB for the audio card: %ld\n", PTR_ERR(sub));
+		return;
+	}
+
+	if (strlen(sub) == 8 && !kstrtoul(sub, 16, &val)) {
+		snd_soc_card_set_pci_ssid(card, val & 0xffff, val >> 16);
+		dev_dbg(dev, "card SSID %04lx%04lx from ACPI _SUB %s\n",
+			val & 0xffff, val >> 16, sub);
+	} else {
+		dev_warn(dev, "unexpected ACPI _SUB format '%s', no card SSID\n", sub);
+	}
+
+	kfree(sub);
+}
+
 static int mt8901_card_probe(struct platform_device *pdev)
 {
 	struct snd_soc_acpi_mach *mach = dev_get_platdata(&pdev->dev);
@@ -574,6 +618,7 @@ static int mt8901_card_probe(struct platform_device *pdev)
 	card->num_dapm_routes = ARRAY_SIZE(mt8901_card_routes);
 
 	snd_soc_card_set_drvdata(card, ctx);
+	mt8901_card_set_ssid(card);
 
 	if (quirk_override != -1) {
 		dev_info(card->dev, "Overriding quirk 0x%lx => 0x%x\n",
