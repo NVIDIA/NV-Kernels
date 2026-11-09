@@ -916,6 +916,29 @@ static void cppc_cpufreq_put_cpu_data(struct cpufreq_policy *policy)
 	policy->driver_data = NULL;
 }
 
+/*
+ * Return the non-boost performance ceiling. This is the OSPM Nominal
+ * Performance the driver last requested, or the platform-reported Nominal
+ * Performance if none was requested.
+ *
+ * The register is write-only, so the requested value comes from the
+ * software-tracked state rather than from hardware.
+ */
+static u32 cppc_cpufreq_effective_nominal(struct cpufreq_policy *policy)
+{
+	const struct cppc_policy_state *st = cppc_cpufreq_policy_state(policy);
+	struct cppc_cpudata *cpu_data = policy->driver_data;
+	u64 ospm_nominal;
+
+	ospm_nominal = st->regs[CPPC_SAVED_OSPM_NOMINAL_PERF][CPPC_SAVED_REQUESTED];
+
+	/* U64_MAX means OSPM has not selected a nominal level. */
+	if (ospm_nominal == U64_MAX)
+		return cpu_data->perf_caps.nominal_perf;
+
+	return (u32)ospm_nominal;
+}
+
 static int cppc_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
 	unsigned int cpu = policy->cpu;
@@ -975,9 +998,14 @@ static int cppc_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
 	/*
 	 * If 'highest_perf' is greater than 'nominal_perf', we assume CPU Boost
-	 * is supported.
+	 * is supported. A writable OSPM Nominal Performance register can also
+	 * open a boost range at runtime by lowering the nominal, so assume
+	 * boost is supported in that case too, letting the core register its
+	 * QoS request up front.
 	 */
-	if (caps->highest_perf > caps->nominal_perf)
+	if (caps->highest_perf > caps->nominal_perf ||
+	    (caps->highest_perf > caps->lowest_perf &&
+	     cppc_ospm_nominal_perf_supported(cpu)))
 		policy->boost_supported = true;
 
 	/*
@@ -1281,11 +1309,12 @@ static int cppc_cpufreq_set_boost(struct cpufreq_policy *policy, int state)
 {
 	struct cppc_cpudata *cpu_data = policy->driver_data;
 	struct cppc_perf_caps *caps = &cpu_data->perf_caps;
+	u32 nominal = cppc_cpufreq_effective_nominal(policy);
 
 	if (state)
 		policy->cpuinfo.max_freq = cppc_perf_to_khz(caps, caps->highest_perf);
 	else
-		policy->cpuinfo.max_freq = cppc_perf_to_khz(caps, caps->nominal_perf);
+		policy->cpuinfo.max_freq = cppc_perf_to_khz(caps, nominal);
 
 	return 0;
 }
@@ -1495,6 +1524,41 @@ static int cppc_get_perf_limited_filtered(int cpu, u64 *perf_limited)
 CPPC_CPUFREQ_ATTR_RW_U64(perf_limited, cppc_get_perf_limited_filtered,
 			 cppc_set_perf_limited)
 
+/*
+ * While boost is disabled, the nominal is the ceiling. Set cpuinfo.max_freq to
+ * it and update the core's boost_freq_req to match. The core only syncs
+ * boost_freq_req when boost is enabled or disabled, so a plain nominal change
+ * must update it here. Without that, raising the nominal again would leave the
+ * stale request capping the policy.
+ *
+ * Refresh the limits directly rather than leave it to the QoS notifier, which
+ * only schedules the update, so the new ceiling is in place once the write
+ * returns. The sysfs store path holds policy->rwsem, which the refresh needs.
+ */
+static void cppc_cpufreq_update_nominal_limits(struct cpufreq_policy *policy)
+{
+	struct cppc_cpudata *cpu_data = policy->driver_data;
+	u32 nominal;
+	int ret;
+
+	if (policy->boost_enabled)
+		return;
+
+	nominal = cppc_cpufreq_effective_nominal(policy);
+	policy->cpuinfo.max_freq = cppc_perf_to_khz(&cpu_data->perf_caps,
+						    nominal);
+
+	if (freq_qos_request_active(&policy->boost_freq_req)) {
+		ret = freq_qos_update_request(&policy->boost_freq_req,
+					      policy->cpuinfo.max_freq);
+		if (ret < 0)
+			pr_debug("Failed to update boost limit on CPU%u (%d)\n",
+				 policy->cpu, ret);
+	}
+
+	refresh_frequency_limits(policy);
+}
+
 static ssize_t show_ospm_nominal_freq(struct cpufreq_policy *policy, char *buf)
 {
 	const struct cppc_policy_state *st = cppc_cpufreq_policy_state(policy);
@@ -1552,6 +1616,8 @@ static ssize_t store_ospm_nominal_freq(struct cpufreq_policy *policy,
 	st->regs[CPPC_SAVED_OSPM_NOMINAL_PERF][CPPC_SAVED_REQUESTED] = perf;
 	st->regs[CPPC_SAVED_OSPM_NOMINAL_PERF][CPPC_SAVED_FIRMWARE] =
 		cpu_data->perf_caps.nominal_perf;
+
+	cppc_cpufreq_update_nominal_limits(policy);
 
 	return count;
 }
