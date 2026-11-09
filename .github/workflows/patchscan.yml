@@ -8,6 +8,7 @@ on:
       - 24.04_linux-nvidia-6.17-next
       - 26.04_linux-nvidia-bos
       - 26.04_linux-nvidia
+      - 26.04_linux-nvidia-7.3-next
   workflow_dispatch:
     inputs:
       pr_number:

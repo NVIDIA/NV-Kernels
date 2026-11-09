@@ -154,7 +154,9 @@ class ValidatePrPatchIdTest(unittest.TestCase):
         local = self._git("rev-parse", "HEAD")
         return parent, local, upstream
 
-    def _build_duplicate_context_conflict_case(self):
+    def _build_duplicate_context_conflict_case(
+            self, upstream_payload="X", local_payload="X", executable=False,
+            symlink_change=False):
         """Same +/- edit under repeated context that misleads LCS alignment.
 
         Upstream parent [A,B,C,D,S,A,B,C,D] inserts X before the first D.
@@ -163,11 +165,21 @@ class ValidatePrPatchIdTest(unittest.TestCase):
         conflicts. Ambiguous C/D anchors must reject.
         """
         self._write_fixture(["A", "B", "C", "D", "S", "A", "B", "C", "D"])
+        if symlink_change:
+            (self.repo / "fixture-link").symlink_to("old-target")
+            self._git("add", "fixture-link")
         self.base = self._commit("fixture: duplicate conflict base", LOCAL_SOB)
 
         self._git("checkout", "-b", "upstream-topic", self.base)
         self._set_identity("Upstream Author", "upstream@example.com")
-        self._write_fixture(["A", "B", "C", "X", "D", "S", "A", "B", "C", "D"])
+        self._write_fixture(
+            ["A", "B", "C", upstream_payload, "D", "S", "A", "B", "C", "D"])
+        if executable:
+            (self.repo / "fixture.txt").chmod(0o755)
+        if symlink_change:
+            (self.repo / "fixture-link").unlink()
+            (self.repo / "fixture-link").symlink_to("new-target")
+            self._git("add", "fixture-link")
         upstream = self._commit(SUBJECT, UPSTREAM_SOB)
         self._git("update-ref", "refs/remotes/upstream/linux", upstream)
 
@@ -178,7 +190,13 @@ class ValidatePrPatchIdTest(unittest.TestCase):
         parent = self._git("rev-parse", "HEAD")
 
         self._write_fixture(
-            ["A1", "B1", "C1", "D1", "T", "A", "B", "C", "L", "X", "D"])
+            ["A1", "B1", "C1", "D1", "T", "A", "B", "C", "L", local_payload, "D"])
+        if executable:
+            (self.repo / "fixture.txt").chmod(0o755)
+        if symlink_change:
+            (self.repo / "fixture-link").unlink()
+            (self.repo / "fixture-link").symlink_to("new-target")
+            self._git("add", "fixture-link")
         self._commit(
             SUBJECT,
             "{}\n\n(cherry picked from commit {})\n{}".format(
@@ -252,6 +270,20 @@ if mode == "show-failure" and args and args[0] == "show":
     sys.stdout.buffer.write(result.stdout)
     sys.stderr.buffer.write(result.stderr)
     sys.exit(1)
+
+if mode in ("zero-id-empty", "zero-id-malformed"):
+    if (args and args[0] == "show" and "--unified=0" in args and
+            args[-1] in os.environ["VALIDATE_PR_ZERO_ID_COMMIT"].split(",")):
+        sys.stdout.write("zero-id-target\\n")
+        sys.exit(0)
+    if args[:2] == ["patch-id", "--stable"]:
+        patch = sys.stdin.buffer.read()
+        if patch == b"zero-id-target\\n":
+            if mode == "zero-id-malformed":
+                sys.stdout.write("not-a-patch-id not-a-commit-id\\n")
+            sys.exit(0)
+        result = subprocess.run([real_git, *args], input=patch)
+        sys.exit(result.returncode)
 
 if (args[:2] == ["patch-id", "--stable"] and
         mode in ("patch-id-malformed", "patch-id-extra-line")):
@@ -381,6 +413,222 @@ sys.exit(result.returncode)
                 return cells[3].strip()
         self.fail("no digest row for {}:\n{}".format(
             local[:12], self._output(result)))
+
+    def _build_annotated_backport_case(self, **kwargs):
+        parent, local, upstream = self._build_duplicate_context_conflict_case(
+            **kwargs)
+        message = self._git("log", "-1", "--format=%B").replace(
+            "(cherry picked from commit {})".format(upstream),
+            "(backported from commit {})\n"
+            "[local: adjusted for divergent neighboring code]".format(upstream))
+        self._git("commit", "--amend", "-F", "-", input_text=message)
+        return parent, self._git("rev-parse", "HEAD"), upstream
+
+    def test_accepts_annotated_sha_backport_with_unprovable_placement(self):
+        parent, local, upstream = self._build_annotated_backport_case()
+        self.assertNotEqual(self._patch_id(local), self._patch_id(upstream))
+        self.assertEqual(self._patch_id(local, zero_context=True),
+                         self._patch_id(upstream, zero_context=True))
+        self.assertTrue(self._merge_tree_conflicts(parent, local, upstream))
+
+        result = self._validate(parent, local)
+
+        self.assertEqual(result.returncode, 0, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "noted")
+
+    def test_rejects_annotation_hiding_string_literal_whitespace_change(self):
+        parent, local, upstream = self._build_annotated_backport_case(
+            upstream_payload='return "a b";', local_payload='return "ab";')
+        self.assertEqual(self._patch_id(local, zero_context=True),
+                         self._patch_id(upstream, zero_context=True))
+
+        result = self._validate(parent, local)
+
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "MISMATCH")
+
+    def test_annotation_does_not_waive_file_mode_changes(self):
+        parent, local, upstream = self._build_annotated_backport_case(
+            executable=True)
+        self.assertEqual(self._patch_id(local, zero_context=True),
+                         self._patch_id(upstream, zero_context=True))
+
+        result = self._validate(parent, local)
+
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "MISMATCH")
+
+    def test_annotation_does_not_waive_symlink_target_changes(self):
+        parent, local, upstream = self._build_annotated_backport_case(
+            symlink_change=True)
+        self.assertEqual(self._patch_id(local, zero_context=True),
+                         self._patch_id(upstream, zero_context=True))
+
+        result = self._validate(parent, local)
+
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "MISMATCH")
+
+    def test_accepts_annotated_backport_in_unchanged_executable_file(self):
+        (self.repo / "fixture.txt").chmod(0o755)
+        parent, local, _upstream = self._build_annotated_backport_case()
+
+        result = self._validate(parent, local)
+
+        self.assertEqual(result.returncode, 0, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "noted")
+
+    def test_accepts_crlf_backport_explanation(self):
+        parent, _local, upstream = self._build_annotated_backport_case()
+        trailer = ("(backported from commit {})\n"
+                   "[local: adjusted for divergent neighboring code]\n").format(
+                       upstream)
+        message = self._git("log", "-1", "--format=%B").replace(
+            trailer, trailer.replace("\n", "\r\n"))
+        self._git("commit", "--amend", "--cleanup=verbatim", "-F", "-",
+                  input_text=message)
+        local = self._git("rev-parse", "HEAD")
+        raw = subprocess.check_output(
+            ["git", "cat-file", "commit", local], cwd=self.repo)
+        self.assertIn(b"[local: adjusted for divergent neighboring code]\r\n", raw)
+
+        result = self._validate(parent, local)
+
+        self.assertEqual(result.returncode, 0, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "noted")
+
+    def test_rejects_mixed_cherry_pick_and_backport_provenance(self):
+        parent, _local, upstream = self._build_annotated_backport_case()
+        message = self._git("log", "-1", "--format=%B")
+        for source in (upstream, self.base, "not-a-sha"):
+            with self.subTest(source=source):
+                mixed = message.replace(
+                    "(backported from commit ",
+                    "(cherry picked from commit {})\n"
+                    "(backported from commit ".format(source), 1)
+                self._git("commit", "--amend", "-F", "-", input_text=mixed)
+                local = self._git("rev-parse", "HEAD")
+                result = self._validate(parent, local)
+                self.assertEqual(result.returncode, 1, self._output(result))
+                self.assertEqual(self._patch_id_status(result, local), "MISMATCH")
+
+    def test_rejects_duplicate_backport_provenance(self):
+        parent, _local, upstream = self._build_annotated_backport_case()
+        message = self._git("log", "-1", "--format=%B")
+        for source in (upstream, self.base):
+            with self.subTest(source=source):
+                duplicate = message.replace(
+                    "(backported from commit ",
+                    "(backported from commit {})\n"
+                    "(backported from commit ".format(source), 1)
+                self._git("commit", "--amend", "-F", "-", input_text=duplicate)
+                local = self._git("rev-parse", "HEAD")
+                result = self._validate(parent, local)
+                self.assertEqual(result.returncode, 1, self._output(result))
+                self.assertEqual(self._patch_id_status(result, local), "MISMATCH")
+
+    def test_rejects_annotated_backport_with_different_payload(self):
+        parent, _local, _upstream = self._build_annotated_backport_case()
+        lines = self._read_fixture()
+        lines[lines.index("X")] = "unrelated-payload"
+        self._write_fixture(lines)
+        self._git("add", "fixture.txt")
+        self._git("commit", "--amend", "--no-edit")
+        local = self._git("rev-parse", "HEAD")
+        result = self._validate(parent, local)
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "MISMATCH")
+
+    def test_rejects_annotated_backport_with_invalid_zero_context_id(self):
+        parent, local, upstream = self._build_annotated_backport_case()
+        for mode in ("zero-id-empty", "zero-id-malformed"):
+            for commit in (local, upstream, local + "," + upstream):
+                with self.subTest(mode=mode, commit=commit):
+                    env = self._fake_git_env(mode)
+                    env["VALIDATE_PR_ZERO_ID_COMMIT"] = commit
+                    result = self._validate(parent, local, env=env)
+                    self.assertEqual(result.returncode, 1, self._output(result))
+                    self.assertEqual(self._patch_id_status(result, local), "MISMATCH")
+
+    def test_requires_nonblank_annotation_attached_to_backport(self):
+        parent, _local, _upstream = self._build_annotated_backport_case()
+        message = self._git("log", "-1", "--format=%B")
+        for note in ("[local:]", "[local:  \t]",
+                     "\n[local: unrelated bracket elsewhere]"):
+            with self.subTest(note=note):
+                modified = message.replace(
+                    "[local: adjusted for divergent neighboring code]", note)
+                self._git("commit", "--amend", "-F", "-", input_text=modified)
+                local = self._git("rev-parse", "HEAD")
+                result = self._validate(parent, local)
+                self.assertEqual(result.returncode, 1, self._output(result))
+                self.assertEqual(self._patch_id_status(result, local), "MISMATCH")
+
+    def test_accepts_explanation_with_surrounding_whitespace(self):
+        parent, _local, _upstream = self._build_annotated_backport_case()
+        message = self._git("log", "-1", "--format=%B").replace(
+            "[local: adjusted for divergent neighboring code]",
+            "[local: \t adjusted for divergent neighboring code \t]")
+        self._git("commit", "--amend", "-F", "-", input_text=message)
+        local = self._git("rev-parse", "HEAD")
+        result = self._validate(parent, local)
+        self.assertEqual(result.returncode, 0, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "noted")
+
+    def test_rejects_unannotated_sha_backport_with_unprovable_placement(self):
+        parent, local, _upstream = self._build_annotated_backport_case()
+        message = self._git("log", "-1", "--format=%B").replace(
+            "[local: adjusted for divergent neighboring code]\n", "")
+        self._git("commit", "--amend", "-F", "-", input_text=message)
+        result = self._validate(parent, self._git("rev-parse", "HEAD"))
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertIn("patch-ID mismatch with upstream", result.stdout)
+
+    def test_rejects_annotated_cherry_pick_with_unprovable_placement(self):
+        parent, local, _upstream = self._build_annotated_backport_case()
+        message = self._git("log", "-1", "--format=%B").replace(
+            "(backported from commit ", "(cherry picked from commit ")
+        self._git("commit", "--amend", "-F", "-", input_text=message)
+        result = self._validate(parent, self._git("rev-parse", "HEAD"))
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertIn("patch-ID mismatch with upstream", result.stdout)
+
+    def test_annotated_sha_backport_does_not_bypass_invalid_patch_id(self):
+        parent, local, _upstream = self._build_annotated_backport_case()
+        result = self._validate(parent, local, "patch-id-malformed")
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertIn("patch-ID mismatch with upstream", result.stdout)
+
+    def test_annotated_sha_backport_does_not_bypass_unresolved_sha(self):
+        parent, local, upstream = self._build_annotated_backport_case()
+        message = self._git("log", "-1", "--format=%B").replace(
+            upstream, "deadbeef" * 5)
+        self._git("commit", "--amend", "-F", "-", input_text=message)
+        result = self._validate(parent, self._git("rev-parse", "HEAD"))
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertIn("cannot resolve upstream SHA", result.stdout)
+
+    def test_annotated_sha_backport_does_not_bypass_subject_check(self):
+        parent, local, _upstream = self._build_annotated_backport_case()
+        message = self._git("log", "-1", "--format=%B").replace(
+            SUBJECT, "fixture: different subject", 1)
+        self._git("commit", "--amend", "-F", "-", input_text=message)
+        local = self._git("rev-parse", "HEAD")
+        result = self._validate(parent, local)
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "noted")
+        self.assertIn("subject differs from upstream", result.stdout)
+
+    def test_annotated_sha_backport_does_not_bypass_sob_check(self):
+        parent, local, _upstream = self._build_annotated_backport_case()
+        message = self._git("log", "-1", "--format=%B").replace(
+            UPSTREAM_SOB + "\n", "")
+        self._git("commit", "--amend", "-F", "-", input_text=message)
+        local = self._git("rev-parse", "HEAD")
+        result = self._validate(parent, local)
+        self.assertEqual(result.returncode, 1, self._output(result))
+        self.assertEqual(self._patch_id_status(result, local), "noted")
+        self.assertIn("SoB chain problem", result.stdout)
 
     def test_accepts_context_only_replay(self):
         parent, local = self._build_case("context")
