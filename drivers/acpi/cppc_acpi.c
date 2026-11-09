@@ -463,6 +463,7 @@ static bool cpc_reg_is_writable(unsigned int reg_idx)
 	case AUTO_SEL_ENABLE:
 	case AUTO_ACT_WINDOW:
 	case ENERGY_PERF:
+	case OSPM_NOMINAL_PERF:
 		return true;
 	default:
 		return false;
@@ -1193,7 +1194,19 @@ static bool cpc_disable_new_sysmem_writer(struct cpc_desc *cpc_desc,
 
 	pr_warn_once("CPU%d: ignoring optional _CPC register %u sharing CPU%d Performance Limited access unit\n",
 		     cpc_desc->cpu_id, reg_idx, status_cpu);
+
+	/*
+	 * Keep a write-only range reserved. Its readback is undefined, so the
+	 * overlap checks must still reject another field that reads these bits
+	 * or writes them back through read-modify-write.
+	 */
+	if (cpc_reg_is_write_only(cpc_desc, reg_idx)) {
+		reg->cpc_entry.read_unsupported = true;
+		reg->cpc_entry.write_unsupported = true;
+		return false;
+	}
 	cpc_disable_reg(cpc_desc, reg_idx);
+
 	return true;
 }
 
@@ -3231,6 +3244,49 @@ int cppc_set_epp(int cpu, u64 epp_val)
 	return cppc_set_reg_val(cpu, ENERGY_PERF, epp_val);
 }
 EXPORT_SYMBOL_GPL(cppc_set_epp);
+
+/**
+ * cppc_set_ospm_nominal_perf() - Write OSPM Nominal Performance register.
+ * @cpu: CPU on which to write register.
+ * @ospm_nominal_perf: Value to write to the OSPM Nominal Performance register.
+ *
+ * OSPM Nominal Performance conveys the desired nominal performance level
+ * at which the platform may run. Per ACPI 6.6, s8.4.6.1.2.6, the value
+ * must lie within [Lowest Performance, Nominal Performance] and may be
+ * set independently of Minimum, Maximum and Desired performance. The
+ * caller is responsible for validating the range.
+ *
+ * Return: 0 on success, -EOPNOTSUPP if the platform does not implement the
+ * register as writable, or another negative error code.
+ */
+int cppc_set_ospm_nominal_perf(int cpu, u64 ospm_nominal_perf)
+{
+	return cppc_set_reg_val(cpu, OSPM_NOMINAL_PERF, ospm_nominal_perf);
+}
+EXPORT_SYMBOL_GPL(cppc_set_ospm_nominal_perf);
+
+/**
+ * cppc_ospm_nominal_perf_supported() - Check OSPM Nominal Performance support.
+ * @cpu: CPU to query.
+ *
+ * The OSPM Nominal Performance register is write-only, so its value
+ * cannot be read back. This only reports whether the platform implements
+ * it as a writable register.
+ *
+ * Context: Process context.
+ * Return: true if the register is supported, false otherwise.
+ */
+bool cppc_ospm_nominal_perf_supported(int cpu)
+{
+	struct cpc_desc *cpc_desc;
+
+	guard(mutex)(&cpc_desc_lock);
+	cpc_desc = per_cpu(cpc_desc_ptr, cpu);
+
+	return cpc_desc &&
+	       cpc_is_writable(&cpc_desc->cpc_regs[OSPM_NOMINAL_PERF]);
+}
+EXPORT_SYMBOL_GPL(cppc_ospm_nominal_perf_supported);
 
 /**
  * cppc_get_auto_act_window() - Read autonomous activity window register.
