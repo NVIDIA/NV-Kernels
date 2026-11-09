@@ -34,11 +34,13 @@ static struct cpufreq_driver cppc_cpufreq_driver;
  * reapplied from online() across CPU hotplug, and the firmware value is
  * restored from offline().
  *
- * Autonomous Selection (auto_sel) is kept first, as the registers after it
- * only have meaning while it is enabled.
+ * Autonomous Selection (auto_sel) splits the list: the registers before it are
+ * independent of it, and those after it have meaning only while autonomous
+ * selection is enabled. Place a new register on the matching side.
  */
 enum cppc_saved_reg_id {
-	CPPC_SAVED_AUTO_SEL,
+	CPPC_SAVED_OSPM_NOMINAL_PERF,
+	CPPC_SAVED_AUTO_SEL,	/* Entries below need auto_sel enabled. */
 	CPPC_SAVED_EPP,
 	CPPC_SAVED_AUTO_ACT_WINDOW,
 	CPPC_NR_SAVED_REGS,
@@ -51,6 +53,11 @@ struct cppc_saved_reg {
 };
 
 static const struct cppc_saved_reg cppc_saved_regs[CPPC_NR_SAVED_REGS] = {
+	/* The register is write-only, so the driver tracks the requested value. */
+	[CPPC_SAVED_OSPM_NOMINAL_PERF] = {
+		.name = "ospm_nominal_perf",
+		.set = cppc_set_ospm_nominal_perf,
+	},
 	[CPPC_SAVED_AUTO_SEL] = {
 		.name = "auto_sel",
 		.get = cppc_get_auto_sel,
@@ -83,6 +90,9 @@ enum cppc_saved_type {
  *   CPPC_SAVED_REQUESTED - value the OS asked for, reapplied at online().
  *                          It starts as the firmware value and changes only
  *                          when a write from the OS succeeds.
+ *
+ * A write-only register cannot be read back. init() leaves both values unset,
+ * and its store handler sets them.
  */
 struct cppc_policy_state {
 	u64 regs[CPPC_NR_SAVED_REGS][CPPC_NR_SAVED_TYPES];
@@ -135,11 +145,19 @@ static int cppc_cpufreq_save_firmware_regs(struct cpufreq_policy *policy)
 	int i, ret;
 
 	for (i = 0; i < CPPC_NR_SAVED_REGS; i++) {
-		ret = cppc_saved_regs[i].get(cpu, &val);
-		if (ret == -EOPNOTSUPP)
+		const struct cppc_saved_reg *reg = &cppc_saved_regs[i];
+
+		if (!reg->get) {
+			/* A write-only register has no value to read. */
 			val = U64_MAX;
-		else if (ret)
-			return ret;
+		} else {
+			ret = reg->get(cpu, &val);
+			/* Leave a register the platform does not implement unset. */
+			if (ret == -EOPNOTSUPP)
+				val = U64_MAX;
+			else if (ret)
+				return ret;
+		}
 
 		st->regs[i][CPPC_SAVED_FIRMWARE] = val;
 		st->regs[i][CPPC_SAVED_REQUESTED] = val;
@@ -197,6 +215,12 @@ static void cppc_cpufreq_apply_saved_regs(struct cpufreq_policy *policy,
 	unsigned int cpu = policy->cpu;
 	u64 auto_sel, val;
 	int i;
+
+	/* Registers before auto_sel do not depend on it. */
+	for (i = 0; i < CPPC_SAVED_AUTO_SEL; i++) {
+		val = st->regs[i][saved_type];
+		cppc_cpufreq_write_saved_reg(cpu, i, val, saved_type);
+	}
 
 	auto_sel = st->regs[CPPC_SAVED_AUTO_SEL][saved_type];
 
@@ -1471,11 +1495,73 @@ static int cppc_get_perf_limited_filtered(int cpu, u64 *perf_limited)
 CPPC_CPUFREQ_ATTR_RW_U64(perf_limited, cppc_get_perf_limited_filtered,
 			 cppc_set_perf_limited)
 
+static ssize_t show_ospm_nominal_freq(struct cpufreq_policy *policy, char *buf)
+{
+	const struct cppc_policy_state *st = cppc_cpufreq_policy_state(policy);
+	struct cppc_cpudata *cpu_data = policy->driver_data;
+	u64 perf;
+
+	if (!cppc_ospm_nominal_perf_supported(policy->cpu))
+		return -EOPNOTSUPP;
+
+	/* The register cannot be read back, so report the tracked request. */
+	perf = st->regs[CPPC_SAVED_OSPM_NOMINAL_PERF][CPPC_SAVED_REQUESTED];
+	if (perf == U64_MAX)
+		return sysfs_emit(buf, "<unset>\n");
+
+	return sysfs_emit(buf, "%u\n",
+			  cppc_perf_to_khz(&cpu_data->perf_caps, perf));
+}
+
+static ssize_t store_ospm_nominal_freq(struct cpufreq_policy *policy,
+				       const char *buf, size_t count)
+{
+	struct cppc_cpudata *cpu_data = policy->driver_data;
+	struct cppc_policy_state *st;
+	unsigned int freq_khz;
+	u32 perf;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &freq_khz);
+	if (ret)
+		return ret;
+
+	perf = cppc_khz_to_perf(&cpu_data->perf_caps, freq_khz);
+	if (perf < cpu_data->perf_caps.lowest_perf ||
+	    perf > cpu_data->perf_caps.nominal_perf)
+		return -EINVAL;
+
+	ret = cppc_set_ospm_nominal_perf(policy->cpu, perf);
+	if (ret)
+		return ret;
+
+	/*
+	 * The OS can write this register but cannot read it back.
+	 *
+	 * The register lets the OS ask for a nominal level below the platform
+	 * Nominal Performance. offline() and driver unload write the platform
+	 * Nominal in place of the requested value. This removes the lower
+	 * level the OS asked for. The value from before the first OS write
+	 * cannot be read, so the driver cannot restore it. online() writes
+	 * the requested value again.
+	 *
+	 * Set both values here and not at init(). The driver then writes the
+	 * register only after the OS has set it.
+	 */
+	st = cppc_cpufreq_policy_state(policy);
+	st->regs[CPPC_SAVED_OSPM_NOMINAL_PERF][CPPC_SAVED_REQUESTED] = perf;
+	st->regs[CPPC_SAVED_OSPM_NOMINAL_PERF][CPPC_SAVED_FIRMWARE] =
+		cpu_data->perf_caps.nominal_perf;
+
+	return count;
+}
+
 cpufreq_freq_attr_ro(freqdomain_cpus);
 cpufreq_freq_attr_rw(auto_select);
 cpufreq_freq_attr_rw(auto_act_window);
 cpufreq_freq_attr_rw(energy_performance_preference_val);
 cpufreq_freq_attr_rw(perf_limited);
+cpufreq_freq_attr_rw(ospm_nominal_freq);
 
 static struct freq_attr *cppc_cpufreq_attr[] = {
 	&freqdomain_cpus,
@@ -1483,6 +1569,7 @@ static struct freq_attr *cppc_cpufreq_attr[] = {
 	&auto_act_window,
 	&energy_performance_preference_val,
 	&perf_limited,
+	&ospm_nominal_freq,
 	NULL,
 };
 
