@@ -336,8 +336,12 @@ def _unique_adjacent_anchor(upstream_parent, local_parent,
 
 
 def _edits_have_unique_placement(upstream_parent, upstream_result,
-                                 local_parent, local_result):
-    """Prove same ordered edit payload with unambiguous adjacent anchors."""
+                                 local_parent, local_result, require_anchors=True):
+    """Compare exact ordered edits, requiring adjacent anchors by default.
+
+    Ambiguous repeated-line grouping can reject valid edits. Relaxing this
+    ceiling requires Git-aligned exact hunk comparison.
+    """
     upstream_edits = _parent_to_result_edits(upstream_parent, upstream_result)
     local_edits = _parent_to_result_edits(local_parent, local_result)
     if (upstream_edits is None or local_edits is None or
@@ -349,6 +353,8 @@ def _edits_have_unique_placement(upstream_parent, upstream_result,
     if ([(removed, inserted) for removed, inserted, _, _ in upstream_edits] !=
             [(removed, inserted) for removed, inserted, _, _ in local_edits]):
         return False
+    if not require_anchors:
+        return True
     for (_, _, up_i1, up_i2), (_, _, loc_i1, loc_i2) in zip(
             upstream_edits, local_edits):
         if not _unique_adjacent_anchor(
@@ -357,14 +363,17 @@ def _edits_have_unique_placement(upstream_parent, upstream_result,
     return True
 
 
-def is_equivalent_by_anchored_edits(local_commit, upstream_commit):
+def is_equivalent_by_anchored_edits(local_commit, upstream_commit,
+                                    require_anchors=True):
     """Prove context-only equivalence when three-way replay conflicts.
 
     Zero-context patch-ID equality is assumed by the caller. For every touched
     path, require identical ordered removed/inserted edit payloads and at least
     one immediately adjacent context sequence that is unique in both parents and
     present on the same side of the matching local edit. Fail closed when
-    placement is ambiguous or blobs cannot be compared as text.
+    placement is ambiguous or blobs cannot be compared as text. An annotated
+    backport may explicitly waive anchors, but still requires exact edit payloads
+    and unchanged regular-file modes.
     """
     if len(local_commit.parents) != 1 or len(upstream_commit.parents) != 1:
         return False
@@ -385,8 +394,18 @@ def is_equivalent_by_anchored_edits(local_commit, upstream_commit):
         # Fail closed on adds/deletes/renames/binary/undecodable blobs.
         if None in (up_before, up_after, loc_before, loc_after):
             return False
+        if not require_anchors:
+            try:
+                modes = [revision.tree[path].mode for revision in (
+                    upstream_parent, upstream_commit, local_parent, local_commit)]
+            except (KeyError, git.exc.GitError, OSError, ValueError):
+                return False
+            if (any(mode not in (0o100644, 0o100755) for mode in modes) or
+                    modes[0] != modes[1] or modes[2] != modes[3]):
+                return False
         if not _edits_have_unique_placement(
-                up_before, up_after, loc_before, loc_after):
+                up_before, up_after, loc_before, loc_after,
+                require_anchors=require_anchors):
             return False
     return True
 
@@ -894,9 +913,30 @@ def build_digest(commits, repo, upstream_remote=None):
         else:
             pid_status = 'MISMATCH'
             pid_error  = True
-            errors.append(
-                "E: {} (\"{}\"): patch-ID mismatch with upstream {}".format(
-                    local_sha12, subject_of(commit)[:40], upstream_sha12))
+            if (local_pid and upstream_pid and
+                    '(cherry picked from commit' not in commit.message and
+                    commit.message.count('(backported from commit') == 1 and
+                    re.search(
+                        r'^\(backported from commit [a-fA-F0-9]+\)\r?\n'
+                        r'\[[\w][\w .\-]*:[^\S\r\n]*[^\s\]]'
+                        r'[^\r\n]*\][^\S\r\n]*\r?$',
+                        commit.message, re.MULTILINE)):
+                # An explanation may waive placement proof, not changed lines.
+                local_zero = get_patch_id(commit, zero_context=True)
+                upstream_zero = get_patch_id(upstream, zero_context=True)
+                if local_zero and local_zero == upstream_zero:
+                    try:
+                        exact_edits = is_equivalent_by_anchored_edits(
+                            commit, upstream, require_anchors=False)
+                    except (OSError, subprocess.SubprocessError, UnicodeError):
+                        exact_edits = False
+                    if exact_edits:
+                        pid_status = 'noted'
+                        pid_error = False
+            if pid_error:
+                errors.append(
+                    "E: {} (\"{}\"): patch-ID mismatch with upstream {}".format(
+                        local_sha12, subject_of(commit)[:40], upstream_sha12))
 
         # Subject
         local_subj    = subject_of(commit)
