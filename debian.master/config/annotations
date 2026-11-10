@@ -3628,6 +3628,12 @@ CONFIG_CRYPTO_KDF800108_CTR                     policy<{'amd64': 'y', 'arm64': '
 CONFIG_CRYPTO_KEYWRAP                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
 CONFIG_CRYPTO_KPP                               policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CRYPTO_KPP2                              policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
+CONFIG_CRYPTO_KRB5                              policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
+CONFIG_CRYPTO_KRB5                              note<'required for CephX aes256k (CVE-2025-30156) support in libceph'>
+CONFIG_CRYPTO_KRB5ENC                           policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm', 's390x': 'm'}>
+CONFIG_CRYPTO_KRB5ENC                           note<'selected by CRYPTO_KRB5'>
+CONFIG_CRYPTO_KRB5_SELFTESTS                    policy<{'amd64': 'n', 'arm64': 'n', 'armhf': 'n', 'ppc64el': 'n', 'riscv64': 'n', 's390x': 'n'}>
+CONFIG_CRYPTO_KRB5_SELFTESTS                    note<'enable in validation builds; disabled in shipping configuration'>
 CONFIG_CRYPTO_LIB_AES                           policy<{'amd64': 'y', 'arm64': 'y', 'armhf': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
 CONFIG_CRYPTO_LIB_ARC4                          policy<{'amd64': 'm', 'arm64': 'm', 'armhf': 'm', 'ppc64el': 'm', 'riscv64': 'm'}>
 CONFIG_CRYPTO_LIB_BLAKE2S_GENERIC               policy<{'amd64': 'y', 'arm64': 'y', 'ppc64el': 'y', 'riscv64': 'y', 's390x': 'y'}>
