@@ -220,15 +220,23 @@ static ssize_t rfc8009_encrypt(const struct krb5_enctype *krb5,
 			goto error;
 	}
 
-	/* We need to include the starting IV in the hash. */
+	/*
+	 * RFC8009 authenticates the starting initialization vector (IV)
+	 * along with the ciphertext. Use its actual length, 16 bytes for
+	 * AES, rather than krb5_aead_ivsize(), which rounds storage up for
+	 * alignment (e.g. to 64 bytes on armhf). Hashing the extra zero
+	 * bytes changes the authentication tag and makes peers reject it.
+	 * Keep the rounded size for allocation and buffer placement above,
+	 * but use crypto_aead_ivsize() for both associated-data lengths.
+	 */
 	sg_init_table(bsg, 2);
-	sg_set_buf(&bsg[0], ad, krb5_aead_ivsize(aead));
+	sg_set_buf(&bsg[0], ad, crypto_aead_ivsize(aead));
 	sg_chain(bsg, 2, sg);
 
 	/* Hash and encrypt the message. */
 	aead_request_set_tfm(req, aead);
 	aead_request_set_callback(req, 0, NULL, NULL);
-	aead_request_set_ad(req, krb5_aead_ivsize(aead));
+	aead_request_set_ad(req, crypto_aead_ivsize(aead));
 	aead_request_set_crypt(req, bsg, bsg, secure_len, iv);
 	ret = crypto_aead_encrypt(req);
 	if (ret < 0)
@@ -276,15 +284,19 @@ static int rfc8009_decrypt(const struct krb5_enctype *krb5,
 	iv = buffer + krb5_aead_size(aead);
 	ad = buffer + krb5_aead_size(aead) + krb5_aead_ivsize(aead);
 
-	/* We need to include the starting IV in the hash. */
+	/*
+	 * Authenticate the same IV bytes as encryption, not the alignment
+	 * padding in its allocation. Both lengths must describe the actual
+	 * IV so a correctly generated peer tag can be verified.
+	 */
 	sg_init_table(bsg, 2);
-	sg_set_buf(&bsg[0], ad, krb5_aead_ivsize(aead));
+	sg_set_buf(&bsg[0], ad, crypto_aead_ivsize(aead));
 	sg_chain(bsg, 2, sg);
 
 	/* Decrypt the message and verify its checksum. */
 	aead_request_set_tfm(req, aead);
 	aead_request_set_callback(req, 0, NULL, NULL);
-	aead_request_set_ad(req, krb5_aead_ivsize(aead));
+	aead_request_set_ad(req, crypto_aead_ivsize(aead));
 	aead_request_set_crypt(req, bsg, bsg, *_len, iv);
 	ret = crypto_aead_decrypt(req);
 	if (ret < 0)
