@@ -18,3 +18,4 @@ do_tools_bpftool = true
 do_tools_rtla = true
 
 do_dtbs		= true
+do_linux_main_modules_depends = false

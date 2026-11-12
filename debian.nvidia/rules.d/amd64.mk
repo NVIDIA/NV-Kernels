@@ -18,3 +18,4 @@ do_tools_hyperv	= false
 do_tools_rtla = true
 do_tools_acpidbg = true
 do_lib_rust     = false
+do_linux_main_modules_depends = false
