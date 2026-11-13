@@ -44,11 +44,9 @@ struct tls_crypto_info_keys {
 };
 
 static void tls_crypto_info_init(uint16_t tls_version, uint16_t cipher_type,
-				 struct tls_crypto_info_keys *tls12,
-				 char key_generation)
+				 struct tls_crypto_info_keys *tls12)
 {
-	memset(tls12, key_generation, sizeof(*tls12));
-	memset(tls12, 0, sizeof(struct tls_crypto_info));
+	memset(tls12, 0, sizeof(*tls12));
 
 	switch (cipher_type) {
 	case TLS_CIPHER_CHACHA20_POLY1305:
@@ -277,7 +275,7 @@ TEST_F(tls_basic, recseq_wrap)
 	if (self->notls)
 		SKIP(return, "no TLS support");
 
-	tls_crypto_info_init(TLS_1_2_VERSION, TLS_CIPHER_AES_GCM_128, &tls12, 0);
+	tls_crypto_info_init(TLS_1_2_VERSION, TLS_CIPHER_AES_GCM_128, &tls12);
 	memset(&tls12.aes128.rec_seq, 0xff, sizeof(tls12.aes128.rec_seq));
 
 	ASSERT_EQ(setsockopt(self->fd, SOL_TLS, TLS_TX, &tls12, tls12.len), 0);
@@ -393,7 +391,7 @@ FIXTURE_SETUP(tls)
 		SKIP(return, "Unsupported cipher in FIPS mode");
 
 	tls_crypto_info_init(variant->tls_version, variant->cipher_type,
-			     &tls12, 0);
+			     &tls12);
 
 	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls);
 
@@ -1119,7 +1117,7 @@ TEST_F(tls, bidir)
 		struct tls_crypto_info_keys tls12;
 
 		tls_crypto_info_init(variant->tls_version, variant->cipher_type,
-				     &tls12, 0);
+				     &tls12);
 
 		ret = setsockopt(self->fd, SOL_TLS, TLS_RX, &tls12,
 				 tls12.len);
@@ -1558,7 +1556,7 @@ TEST_F(tls, getsockopt)
 	EXPECT_EQ(get.crypto_info.cipher_type, variant->cipher_type);
 
 	/* get the full crypto_info */
-	tls_crypto_info_init(variant->tls_version, variant->cipher_type, &expect, 0);
+	tls_crypto_info_init(variant->tls_version, variant->cipher_type, &expect);
 	len = expect.len;
 	memrnd(&get, sizeof(get));
 	EXPECT_EQ(getsockopt(self->fd, SOL_TLS, TLS_TX, &get, &len), 0);
@@ -2155,7 +2153,7 @@ FIXTURE_SETUP(tls_err)
 	int ret;
 
 	tls_crypto_info_init(variant->tls_version, TLS_CIPHER_AES_GCM_128,
-			     &tls12, 0);
+			     &tls12);
 
 	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls);
 	ulp_sock_pair(_metadata, &self->fd2, &self->cfd2, &self->notls);
@@ -2577,7 +2575,7 @@ TEST(tls_v6ops) {
 	int sfd, ret, fd;
 	socklen_t len, len2;
 
-	tls_crypto_info_init(TLS_1_2_VERSION, TLS_CIPHER_AES_GCM_128, &tls12, 0);
+	tls_crypto_info_init(TLS_1_2_VERSION, TLS_CIPHER_AES_GCM_128, &tls12);
 
 	addr.sin6_family = AF_INET6;
 	addr.sin6_addr = in6addr_any;
@@ -2636,7 +2634,7 @@ TEST(prequeue) {
 	len = sizeof(addr);
 	memrnd(buf, sizeof(buf));
 
-	tls_crypto_info_init(TLS_1_2_VERSION, TLS_CIPHER_AES_GCM_256, &tls12, 0);
+	tls_crypto_info_init(TLS_1_2_VERSION, TLS_CIPHER_AES_GCM_256, &tls12);
 
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
