@@ -1515,6 +1515,74 @@ static void ieee80211_rx_reorder_ampdu(struct ieee80211_rx_data *rx,
 	__skb_queue_tail(frames, skb);
 }
 
+VISIBLE_IF_MAC80211_KUNIT bool
+ieee80211_mcast_dup_check(struct ieee80211_mcast_dup_cache *cache,
+			  const struct ethhdr *ehdr, u16 sn, int link_id,
+			  u64 now)
+{
+	struct ieee80211_mcast_dup_entry *entry;
+	u16 link;
+
+	if (!cache || link_id < 0 || link_id >= IEEE80211_MLD_MAX_NUM_LINKS)
+		return false;
+
+	/* A stale 32-bit timestamp must not become recent after a full wrap. */
+	if (cache->epoch != upper_32_bits(now)) {
+		memset(cache->entries, 0, sizeof(cache->entries));
+		cache->epoch = upper_32_bits(now);
+	}
+
+	entry = &cache->entries[sn];
+	link = BIT(link_id);
+
+	/* Like HSR/PRP, remember SNs actually seen rather than a high-water mark. */
+	if (entry->links &&
+	    (u32)(now - entry->seen) < IEEE80211_MCAST_DUP_TIMEOUT &&
+	    ether_addr_equal(entry->sa, ehdr->h_source) &&
+	    ether_addr_equal(entry->da, ehdr->h_dest)) {
+		/*
+		 * Same-link SN reuse makes the generation of later copies
+		 * uncertain. Fail open until the original entry expires;
+		 * neither duplicates nor reuse extend its lifetime.
+		 */
+		if (entry->ambiguous)
+			return false;
+		if (entry->links & link) {
+			entry->ambiguous = true;
+			return false;
+		}
+
+		entry->links |= link;
+		return true;
+	}
+
+	entry->seen = lower_32_bits(now);
+	entry->links = link;
+	entry->ambiguous = false;
+	ether_addr_copy(entry->sa, ehdr->h_source);
+	ether_addr_copy(entry->da, ehdr->h_dest);
+	return false;
+}
+EXPORT_SYMBOL_IF_MAC80211_KUNIT(ieee80211_mcast_dup_check);
+
+void ieee80211_mcast_dup_reset(struct ieee80211_sub_if_data *sdata)
+{
+	struct ieee80211_mcast_dup_cache *cache;
+
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
+
+	if (sdata->vif.type != NL80211_IFTYPE_STATION)
+		return;
+
+	cache = sdata_dereference(sdata->u.mgd.mcast_dup_cache, sdata);
+	if (!cache)
+		return;
+
+	spin_lock_bh(&sdata->local->rx_path_lock);
+	memset(cache->entries, 0, sizeof(cache->entries));
+	spin_unlock_bh(&sdata->local->rx_path_lock);
+}
+
 static ieee80211_rx_result debug_noinline
 ieee80211_rx_h_check_dup(struct ieee80211_rx_data *rx)
 {
@@ -1542,24 +1610,9 @@ ieee80211_rx_h_check_dup(struct ieee80211_rx_data *rx)
 	if (!rx->sta)
 		return RX_CONTINUE;
 
-	if (unlikely(is_multicast_ether_addr(hdr->addr1))) {
-		struct ieee80211_sub_if_data *sdata = rx->sdata;
-		u16 sn = ieee80211_get_sn(hdr);
-
-		if (!ieee80211_is_data_present(hdr->frame_control))
-			return RX_CONTINUE;
-
-		if (!ieee80211_vif_is_mld(&sdata->vif) ||
-		    sdata->vif.type != NL80211_IFTYPE_STATION)
-			return RX_CONTINUE;
-
-		if (sdata->u.mgd.mcast_seq_last != IEEE80211_SN_MODULO &&
-		    ieee80211_sn_less_eq(sn, sdata->u.mgd.mcast_seq_last))
-			return RX_DROP_U_DUP;
-
-		sdata->u.mgd.mcast_seq_last = sn;
+	/* MLO group copies are checked after crypto and frame acceptance. */
+	if (unlikely(is_multicast_ether_addr(hdr->addr1)))
 		return RX_CONTINUE;
-	}
 
 	if (unlikely(ieee80211_has_retry(hdr->frame_control) &&
 		     rx->sta->last_seq_ctrl[rx->seqno_idx] == hdr->seq_ctrl)) {
@@ -3276,15 +3329,24 @@ ieee80211_rx_h_data(struct ieee80211_rx_data *rx)
 	struct ieee80211_local *local = rx->local;
 	struct net_device *dev = sdata->dev;
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)rx->skb->data;
+	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(rx->skb);
 	__le16 fc = hdr->frame_control;
 	ieee80211_rx_result res;
 	bool port_control;
+	u16 sn;
+	bool check_mcast;
 
 	if (unlikely(!ieee80211_is_data(hdr->frame_control)))
 		return RX_CONTINUE;
 
 	if (unlikely(!ieee80211_is_data_present(hdr->frame_control)))
 		return RX_DROP_U_NULL_DATA;
+
+	check_mcast = is_multicast_ether_addr(hdr->addr1) && rx->sta &&
+		      sdata->vif.type == NL80211_IFTYPE_STATION &&
+		      ieee80211_vif_is_mld(&sdata->vif) &&
+		      !(status->flag & RX_FLAG_DUP_VALIDATED);
+	sn = ieee80211_get_sn(hdr);
 
 	/* Send unexpected-4addr-frame event to hostapd */
 	if (ieee80211_has_a4(hdr->frame_control) &&
@@ -3307,6 +3369,12 @@ ieee80211_rx_h_data(struct ieee80211_rx_data *rx)
 
 	if (!ieee80211_frame_allowed(rx, fc))
 		return RX_DROP_U_PORT_CONTROL;
+
+	if (check_mcast &&
+	    ieee80211_mcast_dup_check(rcu_dereference(sdata->u.mgd.mcast_dup_cache),
+				      (void *)rx->skb->data, sn, rx->link_id,
+				      get_jiffies_64()))
+		return RX_DROP_U_DUP;
 
 	/* directly handle TDLS channel switch requests/responses */
 	if (unlikely(((struct ethhdr *)rx->skb->data)->h_proto ==

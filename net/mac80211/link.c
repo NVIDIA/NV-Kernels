@@ -438,11 +438,14 @@ int ieee80211_vif_set_links(struct ieee80211_sub_if_data *sdata,
 			    u16 new_links, u16 dormant_links)
 {
 	struct link_container *links[IEEE80211_MLD_MAX_NUM_LINKS];
+	u16 old_links = sdata->vif.valid_links;
 	int ret;
 
 	ret = ieee80211_vif_update_links(sdata, links, new_links,
 					 dormant_links);
 	ieee80211_free_links(sdata, links);
+	if (!ret && old_links != new_links)
+		ieee80211_mcast_dup_reset(sdata);
 
 	return ret;
 }
