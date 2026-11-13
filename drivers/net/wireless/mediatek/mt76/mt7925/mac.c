@@ -3,12 +3,109 @@
 
 #include <linux/devcoredump.h>
 #include <linux/etherdevice.h>
+#include <linux/hex.h>
 #include <linux/timekeeping.h>
 #include "mt7925.h"
 #include "../dma.h"
 #include "regd.h"
 #include "mac.h"
 #include "mcu.h"
+
+static u8 mt7925_mcast_compat_aps[8][ETH_ALEN] __aligned(2);
+static unsigned int mt7925_mcast_compat_ap_count;
+
+static int mt7925_mcast_ap_set(const char *val, const struct kernel_param *kp)
+{
+	u8 addr[ETH_ALEN] __aligned(2);
+
+	if (strlen(val) != 3 * ETH_ALEN - 1 || !mac_pton(val, addr) ||
+	    !is_valid_ether_addr(addr))
+		return -EINVAL;
+
+	ether_addr_copy(kp->arg, addr);
+	return 0;
+}
+
+static int mt7925_mcast_ap_get(char *buffer, const struct kernel_param *kp)
+{
+	return scnprintf(buffer, PAGE_SIZE, "%pM\n", kp->arg);
+}
+
+static const struct kernel_param_ops mt7925_mcast_ap_ops = {
+	.set = mt7925_mcast_ap_set,
+	.get = mt7925_mcast_ap_get,
+};
+
+static struct kparam_array mt7925_mcast_compat_array = {
+	.max = ARRAY_SIZE(mt7925_mcast_compat_aps),
+	.num = &mt7925_mcast_compat_ap_count,
+	.ops = &mt7925_mcast_ap_ops,
+	.elemsize = ETH_ALEN,
+	.elem = mt7925_mcast_compat_aps,
+};
+module_param_cb(mcast_compat_ap_mlds, &param_array_ops,
+		&mt7925_mcast_compat_array, 0444);
+MODULE_PARM_DESC(mcast_compat_ap_mlds, "AP MLDs with unreliable multicast sequence numbers");
+
+struct mt7925_mcast_match {
+	const u8 *transmitter;
+	bool enabled;
+};
+
+static void mt7925_mcast_vif_match(void *data, u8 *mac, struct ieee80211_vif *vif)
+{
+	struct mt7925_mcast_match *match = data;
+	struct ieee80211_bss_conf *conf;
+	unsigned int i, link_id;
+
+	if (match->enabled || vif->type != NL80211_IFTYPE_STATION ||
+	    !ieee80211_vif_is_mld(vif) || !vif->cfg.assoc)
+		return;
+
+	for (i = 0; i < mt7925_mcast_compat_ap_count; i++)
+		if (ether_addr_equal(vif->cfg.ap_addr, mt7925_mcast_compat_aps[i]))
+			break;
+	if (i == mt7925_mcast_compat_ap_count)
+		return;
+
+	for_each_vif_active_link(vif, conf, link_id) {
+		if (conf->bssid &&
+		    ether_addr_equal(conf->bssid, match->transmitter)) {
+			match->enabled = true;
+			return;
+		}
+	}
+}
+
+static void mt7925_mcast_compat_rx(struct mt792x_dev *dev, struct sk_buff *skb)
+{
+	struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
+	struct mt7925_mcast_match match = {};
+	struct ieee80211_hdr *hdr;
+
+	if (!mt7925_mcast_compat_ap_count || skb_headlen(skb) < 24 ||
+	    !(status->flag & RX_FLAG_DECRYPTED) ||
+	    (status->flag & (RX_FLAG_ONLY_MONITOR | RX_FLAG_FAILED_FCS_CRC |
+			    RX_FLAG_FAILED_PLCP_CRC | RX_FLAG_MMIC_ERROR |
+			    RX_FLAG_8023)))
+		return;
+
+	hdr = (struct ieee80211_hdr *)skb->data;
+	if (!ieee80211_is_data_present(hdr->frame_control) ||
+	    !ieee80211_has_fromds(hdr->frame_control) ||
+	    ieee80211_has_tods(hdr->frame_control) ||
+	    !ieee80211_has_protected(hdr->frame_control) ||
+	    !is_multicast_ether_addr(hdr->addr1) ||
+	    skb_headlen(skb) < ieee80211_hdrlen(hdr->frame_control))
+		return;
+
+	match.transmitter = hdr->addr2;
+	ieee80211_iterate_active_interfaces_atomic(dev->mt76.hw,
+						   IEEE80211_IFACE_ITER_NORMAL,
+						   mt7925_mcast_vif_match, &match);
+	if (match.enabled)
+		status->flag |= RX_FLAG_DUP_VALIDATED;
+}
 
 bool mt7925_mac_wtbl_update(struct mt792x_dev *dev, int idx, u32 mask)
 {
@@ -589,6 +686,7 @@ mt7925_mac_fill_rx(struct mt792x_dev *dev, struct sk_buff *skb)
 			qos_ctl = *ieee80211_get_qos_ctl(hdr);
 		}
 		skb_set_mac_header(skb, (unsigned char *)hdr - skb->data);
+		mt7925_mcast_compat_rx(dev, skb);
 	} else {
 		status->flag |= RX_FLAG_8023;
 	}
