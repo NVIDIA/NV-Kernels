@@ -424,6 +424,54 @@ struct cxl_hdm_info *pci_cxl_hdm_snapshot(struct pci_dev *pdev)
 EXPORT_SYMBOL_FOR_MODULES(pci_cxl_hdm_snapshot, "vfio-cxl");
 
 /**
+ * cxl_recover_state_after_pci_reset() - restore HDM state outside a prepared reset
+ * @pdev: device whose decoder is gone
+ * @snapshot: HDM state from pci_cxl_hdm_snapshot()
+ *
+ * Restore the decoder for a driver that owns the HDM range and found it gone
+ * outside a reset this file prepared: a low power transition that lost it, or
+ * a secondary bus reset driven by the PCI core rather than by
+ * cxl_reset_bus_function().
+ *
+ * Take and release the region quiesce within this call rather than hold it
+ * across the window, as the prepared sequence does. A bus reset runs
+ * reset_prepare() for every device on the bus before resetting any of them,
+ * so a caller that acquired the quiesce there would block a second CXL
+ * endpoint behind the same bridge; a low power caller would hold it for as
+ * long as the device stays suspended.
+ *
+ * Refresh the decoder settings in @snapshot from the cache first. A region
+ * commit or teardown since the snapshot was taken has updated the cache, and
+ * restoring older decoders would leave the device decoding ranges the CXL
+ * core considers free. Global and DVSEC control stay as captured.
+ *
+ * The caller has saved PCI state and keeps the device isolated. Apply the
+ * PCI command here, unlike the prepared sequence, which defers it until the
+ * caller has restored IOMMU translation. Leave @pdev disabled on failure.
+ */
+int cxl_recover_state_after_pci_reset(struct pci_dev *pdev,
+				      struct cxl_hdm_info *snapshot)
+{
+	u16 command;
+	int rc;
+
+	device_lock_assert(&pdev->dev);
+	cxl_region_quiesce_lock();
+
+	rc = cxl_hdm_cache_copy_decoders(&pdev->hdm, snapshot);
+	if (!rc)
+		rc = pci_cxl_restore_state(pdev, snapshot, &command);
+	if (rc)
+		cxl_reset_save_disabled_state(pdev);
+	else
+		rc = cxl_reset_save_restored_state(pdev, command);
+
+	cxl_region_quiesce_unlock();
+	return rc;
+}
+EXPORT_SYMBOL_FOR_MODULES(cxl_recover_state_after_pci_reset, "vfio-cxl");
+
+/**
  * pci_cxl_reset_prepare() - allocate HDM state storage ahead of a bus reset
  * @pdev: device about to be reset
  * @cachep: receives cache state owning the region quiesce on success

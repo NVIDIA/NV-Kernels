@@ -33,6 +33,8 @@ struct cxl_hdm_info;
 struct cxl_pci_cache;
 #ifdef CONFIG_CXL_RESET
 struct cxl_hdm_info *pci_cxl_hdm_snapshot(struct pci_dev *pdev);
+int cxl_recover_state_after_pci_reset(struct pci_dev *pdev,
+				      struct cxl_hdm_info *snapshot);
 struct cxl_hdm_info *pci_cxl_reset_prepare(struct pci_dev *pdev,
 					struct cxl_pci_cache **cachep);
 int cxl_restore_state_after_pci_reset(struct pci_dev *pdev,
@@ -46,6 +48,13 @@ int pci_cxl_reset_owned(struct pci_dev *pdev, const struct resource *owned);
 static inline struct cxl_hdm_info *pci_cxl_hdm_snapshot(struct pci_dev *pdev)
 {
 	return NULL;
+}
+
+static inline int
+cxl_recover_state_after_pci_reset(struct pci_dev *pdev,
+				  struct cxl_hdm_info *snapshot)
+{
+	return -ENOTTY;
 }
 
 static inline struct cxl_hdm_info *
