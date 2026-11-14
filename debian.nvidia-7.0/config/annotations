@@ -29,6 +29,7 @@ CONFIG_CC_HAS_KASAN_SW_TAGS                     policy<{'amd64': '-', 'arm64': '
 CONFIG_CC_HAS_MIN_FUNCTION_ALIGNMENT            policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CC_HAS_MULTIDIMENSIONAL_NONSTRING        policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CC_HAS_SANE_FUNCTION_ALIGNMENT           policy<{'amd64': '-', 'arm64': '-'}>
+CONFIG_CC_OPT_INLINE_MEMSET                     policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_CC_VERSION_TEXT                          policy<{'amd64': '"x86_64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"', 'arm64': '"aarch64-linux-gnu-gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0"'}>
 CONFIG_CPUFREQ_DT_RUST                          policy<{'arm64': '-'}>
 CONFIG_DRM_PANIC_SCREEN_QR_CODE                 policy<{'amd64': '-', 'arm64': '-'}>
@@ -43,6 +44,7 @@ CONFIG_MODULE_SIG_KEY_TYPE_MLDSA_87             policy<{'amd64': '-', 'arm64': '
 CONFIG_OPENSSL_SUPPORTS_ML_DSA                  policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_PAHOLE_VERSION                           policy<{'amd64': '125', 'arm64': '125'}>
 CONFIG_RELR                                     policy<{'arm64': '-'}>
+CONFIG_RUSTC_HAS_APXF                           policy<{'amd64': '-'}>
 CONFIG_RUSTC_HAS_COERCE_POINTEE                 policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_RUSTC_HAS_FILE_AS_C_STR                  policy<{'amd64': '-', 'arm64': '-'}>
 CONFIG_RUSTC_HAS_FILE_WITH_NUL                  policy<{'amd64': '-', 'arm64': '-'}>
