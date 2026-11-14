@@ -42,6 +42,8 @@
 #define CPPC_AUTO_ACT_WINDOW_SIG_CARRY_THRESH 129
 
 #define CPPC_EPP_PERFORMANCE_PREF		0x00
+#define CPPC_EPP_BALANCE_PERFORMANCE_PREF	0x80
+#define CPPC_EPP_BALANCE_POWER_PREF		0xC0
 #define CPPC_EPP_ENERGY_EFFICIENCY_PREF		0xFF
 
 #define CPPC_PERF_LIMITED_DESIRED_EXCURSION	BIT(0)
@@ -72,10 +74,15 @@ struct cpc_register_resource {
 		struct {
 			struct cpc_reg reg;
 			bool use_rmw_lock;
+			bool read_unsupported;
+			bool write_unsupported;
 		};
 		u64 int_value;
 	} cpc_entry;
 };
+
+struct cpc_sysmem_node;
+struct cpc_non_mmio_node;
 
 /* Container to hold the CPC details for each CPU */
 struct cpc_desc {
@@ -84,10 +91,12 @@ struct cpc_desc {
 	int cpu_id;
 	int write_cmd_status;
 	int write_cmd_id;
-	/* Lock used for RMW operations in cpc_write() */
+	/* Serialize partial SystemMemory writes within this descriptor. */
 	raw_spinlock_t rmw_lock;
 	struct cpc_register_resource cpc_regs[MAX_CPC_REG_ENT];
 	struct acpi_psd_package domain_info;
+	struct cpc_sysmem_node *sysmem_nodes;
+	struct cpc_non_mmio_node *non_mmio_nodes;
 	struct kobject kobj;
 };
 
@@ -141,6 +150,8 @@ struct cppc_perf_ctrls {
 	u32 desired_perf;
 	u32 energy_perf;
 	bool auto_sel;
+	/* Allow an explicit zero minimum; otherwise zero omits the update. */
+	bool min_perf_valid;
 };
 
 struct cppc_perf_fb_ctrs {
@@ -156,6 +167,7 @@ struct cppc_cpudata {
 	struct cppc_perf_fb_ctrs perf_fb_ctrs;
 	unsigned int shared_type;
 	cpumask_var_t shared_cpu_map;
+	bool perf_limits_valid;
 };
 
 #ifdef CONFIG_ACPI_CPPC_LIB
@@ -185,10 +197,13 @@ extern int cpc_write_ffh(int cpunum, struct cpc_reg *reg, u64 val);
 extern int cppc_get_epp_perf(int cpunum, u64 *epp_perf);
 extern int cppc_set_epp_perf(int cpu, struct cppc_perf_ctrls *perf_ctrls, bool enable);
 extern int cppc_set_epp(int cpu, u64 epp_val);
+extern int cppc_set_ospm_nominal_perf(int cpu, u64 ospm_nominal_perf);
+extern bool cppc_ospm_nominal_perf_supported(int cpu);
 extern int cppc_get_auto_act_window(int cpu, u64 *auto_act_window);
 extern int cppc_set_auto_act_window(int cpu, u64 auto_act_window);
-extern int cppc_get_auto_sel(int cpu, bool *enable);
-extern int cppc_set_auto_sel(int cpu, bool enable);
+extern int cppc_get_auto_sel(int cpu, u64 *enable);
+bool cppc_auto_sel_is_immutable(int cpu);
+extern int cppc_set_auto_sel(int cpu, u64 enable);
 extern int cppc_get_perf_limited(int cpu, u64 *perf_limited);
 extern int cppc_set_perf_limited(int cpu, u64 bits_to_clear);
 extern int amd_get_highest_perf(unsigned int cpu, u32 *highest_perf);
@@ -279,6 +294,14 @@ static inline int cppc_set_epp(int cpu, u64 epp_val)
 {
 	return -EOPNOTSUPP;
 }
+static inline int cppc_set_ospm_nominal_perf(int cpu, u64 ospm_nominal_perf)
+{
+	return -EOPNOTSUPP;
+}
+static inline bool cppc_ospm_nominal_perf_supported(int cpu)
+{
+	return false;
+}
 static inline int cppc_get_auto_act_window(int cpu, u64 *auto_act_window)
 {
 	return -EOPNOTSUPP;
@@ -287,11 +310,17 @@ static inline int cppc_set_auto_act_window(int cpu, u64 auto_act_window)
 {
 	return -EOPNOTSUPP;
 }
-static inline int cppc_get_auto_sel(int cpu, bool *enable)
+static inline int cppc_get_auto_sel(int cpu, u64 *enable)
 {
 	return -EOPNOTSUPP;
 }
-static inline int cppc_set_auto_sel(int cpu, bool enable)
+
+static inline bool cppc_auto_sel_is_immutable(int cpu)
+{
+	return false;
+}
+
+static inline int cppc_set_auto_sel(int cpu, u64 enable)
 {
 	return -EOPNOTSUPP;
 }
