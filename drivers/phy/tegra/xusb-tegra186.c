@@ -27,6 +27,10 @@
 
 #define RPD_CTRL_SHIFT			0
 #define RPD_CTRL_MASK			0x1f
+#define REC_OS_PADX_SHIFT(x)		(17 + (x) * 4)
+#define REC_OS_PAD_MASK			0xf
+#define SQ_OS_PADX_SHIFT(x)		((x) * 8)
+#define SQ_OS_PAD_MASK			0xff
 
 /* XUSB PADCTL registers */
 #define XUSB_PADCTL_USB2_PAD_MUX	0x4
@@ -80,6 +84,10 @@
 #define  USB2_OTG_PD_DR				BIT(2)
 #define  TERM_RANGE_ADJ(x)			(((x) & 0xf) << 3)
 #define  RPD_CTRL(x)				(((x) & 0x1f) << 26)
+
+#define XUSB_PADCTL_USB2_OTG_PADX_CTL3(x)	(0x94 + (x) * 0x40)
+#define  REC_OS(x)				(((x) & 0xf) << 9)
+#define  SQ_OS(x)				(((x) & 0xff) << 14)
 
 #define XUSB_PADCTL_USB2_BIAS_PAD_CTL0		0x284
 #define  BIAS_PAD_PD				BIT(11)
@@ -255,6 +263,8 @@ struct tegra_xusb_fuse_calibration {
 	u32 hs_squelch;
 	u32 *hs_term_range_adj;
 	u32 rpd_ctrl;
+	u32 *sq_os;
+	u32 *rec_os;
 };
 
 struct tegra186_xusb_padctl_context {
@@ -935,6 +945,15 @@ static int tegra186_utmi_phy_power_on(struct phy *phy)
 	value |= RPD_CTRL(priv->calib.rpd_ctrl);
 	padctl_writel(padctl, value, XUSB_PADCTL_USB2_OTG_PADX_CTL1(index));
 
+	if (priv->calib.rec_os && priv->calib.sq_os) {
+		value = padctl_readl(padctl, XUSB_PADCTL_USB2_OTG_PADX_CTL3(index));
+		value &= ~REC_OS(~0);
+		value |= REC_OS(priv->calib.rec_os[index]);
+		value &= ~SQ_OS(~0);
+		value |= SQ_OS(priv->calib.sq_os[index]);
+		padctl_writel(padctl, value, XUSB_PADCTL_USB2_OTG_PADX_CTL3(index));
+	}
+
 	tegra186_utmi_pad_power_on(phy);
 
 	return 0;
@@ -1520,6 +1539,43 @@ tegra186_xusb_read_fuse_calibration(struct tegra186_xusb_padctl *padctl)
 
 	padctl->calib.hs_term_range_adj = hs_term_range_adj;
 
+	if (soc->has_rec_sq_offsets) {
+		u32 *sq_os, *rec_os;
+
+		sq_os = devm_kcalloc(dev, count, sizeof(u32), GFP_KERNEL);
+		if (!sq_os)
+			return -ENOMEM;
+
+		rec_os = devm_kcalloc(dev, count, sizeof(u32), GFP_KERNEL);
+		if (!rec_os)
+			return -ENOMEM;
+
+		for (i = 0; i < 3; i++)
+			rec_os[i] = (value >> REC_OS_PADX_SHIFT(i)) & REC_OS_PAD_MASK;
+
+		err = tegra_fuse_readl(TEGRA_FUSE_USB_CALIB_EXT3_0, &value);
+		if (err)
+			return dev_err_probe(dev, err,
+					     "failed to read EXT3 calibration fuse\n");
+
+		dev_dbg(dev, "FUSE_USB_CALIB_EXT3_0 %#x\n", value);
+
+		rec_os[3] = value & REC_OS_PAD_MASK;
+
+		err = tegra_fuse_readl(TEGRA_FUSE_USB_CALIB_EXT2_0, &value);
+		if (err)
+			return dev_err_probe(dev, err,
+					     "failed to read EXT2 calibration fuse\n");
+
+		dev_dbg(dev, "FUSE_USB_CALIB_EXT2_0 %#x\n", value);
+
+		for (i = 0; i < count; i++)
+			sq_os[i] = (value >> SQ_OS_PADX_SHIFT(i)) & SQ_OS_PAD_MASK;
+
+		padctl->calib.rec_os = rec_os;
+		padctl->calib.sq_os = sq_os;
+	}
+
 	return 0;
 }
 
@@ -1795,6 +1851,7 @@ const struct tegra_xusb_padctl_soc tegra264_xusb_padctl_soc = {
 	.trk_hw_mode = true,
 	.supports_lp_cfg_en = true,
 	.has_per_pad_term = true,
+	.has_rec_sq_offsets = true,
 };
 EXPORT_SYMBOL_GPL(tegra264_xusb_padctl_soc);
 
