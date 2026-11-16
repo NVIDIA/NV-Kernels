@@ -4042,17 +4042,19 @@ static int __maybe_unused tegra_xudc_resume(struct device *dev)
 	unsigned long flags;
 	int err;
 
-	err = tegra_xudc_unpowergate(xudc);
-	if (err < 0)
-		return err;
+	if (!pm_runtime_status_suspended(dev)) {
+		err = tegra_xudc_unpowergate(xudc);
+		if (err < 0)
+			return err;
+	}
+
+	pm_runtime_enable(dev);
 
 	spin_lock_irqsave(&xudc->lock, flags);
 	xudc->suspended = false;
 	if (xudc->device_mode != xudc->current_device_mode)
 		schedule_work(&xudc->usb_role_sw_work);
 	spin_unlock_irqrestore(&xudc->lock, flags);
-
-	pm_runtime_enable(dev);
 
 	return 0;
 }
