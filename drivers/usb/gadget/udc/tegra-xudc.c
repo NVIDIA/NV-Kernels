@@ -642,7 +642,7 @@ static void tegra_xudc_limit_port_speed(struct tegra_xudc *xudc)
 	val = xudc_readl(xudc, SSPX_CORE_CNT65);
 	val &= ~(SSPX_CORE_CNT65_TX_SCD_END_TRPT_MID_MASK);
 	val |= SSPX_CORE_CNT65_TX_SCD_END_TRPT_MID(0x4B0);
-	xudc_writel(xudc, val, SSPX_CORE_CNT66);
+	xudc_writel(xudc, val, SSPX_CORE_CNT65);
 
 	val = xudc_readl(xudc, SSPX_CORE_CNT66);
 	val &= ~(SSPX_CORE_CNT66_TX_SCD_BIT0_TRPT_MID_MASK);
@@ -678,7 +678,7 @@ static void tegra_xudc_restore_port_speed(struct tegra_xudc *xudc)
 	val = xudc_readl(xudc, SSPX_CORE_CNT65);
 	val &= ~(SSPX_CORE_CNT65_TX_SCD_END_TRPT_MID_MASK);
 	val |= SSPX_CORE_CNT65_TX_SCD_END_TRPT_MID(0xE10);
-	xudc_writel(xudc, val, SSPX_CORE_CNT66);
+	xudc_writel(xudc, val, SSPX_CORE_CNT65);
 
 	val = xudc_readl(xudc, SSPX_CORE_CNT66);
 	val &= ~(SSPX_CORE_CNT66_TX_SCD_BIT0_TRPT_MID_MASK);
