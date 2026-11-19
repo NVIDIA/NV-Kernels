@@ -6,11 +6,65 @@
 
 include "../../debian.nvidia/config/annotations"
 
+CONFIG_ACPI_APEI_EINJ                           policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_ACPI_APEI_EINJ                           note<'Override debian.master m to y; ACPI_APEI_EINJ_CXL depends on CXL_BUS <= ACPI_APEI_EINJ and would be forced off once CXL_BUS is built in'>
+
+CONFIG_ARM_SMCCC_CACHE                          policy<{'amd64': '-', 'arm64': 'y'}>
+CONFIG_ARM_SMCCC_CACHE                          note<'SMCCC cache clean/invalidate provider required by CXL Reset; arm64 only, depends on HAVE_ARM_SMCCC_DISCOVERY'>
+
+CONFIG_CXL_ACPI                                 policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_ACPI                                 note<'Override debian.master m to y; required for DEV_DAX_HMEM=y'>
+
+CONFIG_CXL_BUS                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_BUS                                  note<'Enable CXL bus support built-in; required for CXL Type-2 device and RAS support'>
+
+CONFIG_CXL_MEM                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_MEM                                  note<'Auto-selected by CXL_PCI; required for CXL memory expansion and Type-2 device support'>
+
+CONFIG_CXL_MEM_RAW_COMMANDS                     policy<{'amd64': 'n', 'arm64': 'y'}>
+CONFIG_CXL_MEM_RAW_COMMANDS                     note<'Enable CXL raw commands for memory devices'>
+
+CONFIG_CXL_PCI                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_PCI                                  note<'Enable CXL PCI management built-in; auto-selects CXL_MEM; required for CXL Type-2 device support'>
+
+CONFIG_CXL_PMEM                                 policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_PMEM                                 note<'Override debian.master m to y; required for CXL_ACPI=y'>
+
+CONFIG_CXL_PORT                                 policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_PORT                                 note<'Required for CXL port enumeration; defaults to CXL_BUS value'>
+
+CONFIG_CXL_RESET                                policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_CXL_RESET                                note<'Hidden bool selected by CXL_BUS; PCI core CXL Reset sequencing and HDM state save/restore'>
+
+CONFIG_DEV_DAX                                  policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX                                  note<'Override debian.master m to y; required built-in for DEV_DAX_CXL=y'>
+
+CONFIG_DEV_DAX_CXL                              policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_CXL                              note<'Override debian.master m to y; CXL RAM region DAX access; depends on CXL_BUS+CXL_REGION+DEV_DAX'>
+
+CONFIG_DEV_DAX_FSDEV                            policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_FSDEV                            note<'Override debian.master m to y; follows DEV_DAX'>
+
+CONFIG_DEV_DAX_HMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_HMEM                             note<'Override debian.master m to y; required for DEV_DAX_CXL=y'>
+
+CONFIG_DEV_DAX_KMEM                             policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_DEV_DAX_KMEM                             note<'Override debian.master m to y; map CXL DAX devices as System-RAM'>
+
+CONFIG_FWCTL                                    policy<{'amd64': 'y', 'arm64': 'y'}>
+CONFIG_FWCTL                                    note<'Selected by CXL_BUS when CXL_FEATURES is enabled; required for CXL feature mailbox access'>
+
 CONFIG_PREFERRED_CPU                            policy<{'amd64': 'y', 'arm64': 'y'}>
 CONFIG_PREFERRED_CPU                            note<'Selected by the opt-in steal governor module'>
 
+CONFIG_RUST_FWCTL_ABSTRACTIONS                  policy<{'amd64': 'n', 'arm64': 'n'}>
+CONFIG_RUST_FWCTL_ABSTRACTIONS                  note<'Not needed; visible only because FWCTL is built in for CXL features'>
+
 CONFIG_STEAL_GOVERNOR                           policy<{'amd64': 'm', 'arm64': 'm'}>
 CONFIG_STEAL_GOVERNOR                           note<'Guest steal-time policy; enable explicitly by loading the module'>
+
+CONFIG_VFIO_CXL                                 policy<{'amd64': 'm', 'arm64': 'm'}>
+CONFIG_VFIO_CXL                                 note<'VFIO CXL Type-2 device passthrough; depends on CXL_BUS+CXL_MEM, selects VFIO_PCI_CORE'>
 
 
 # ---- Annotations without notes ----
