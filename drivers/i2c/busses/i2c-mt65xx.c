@@ -1396,8 +1396,19 @@ static int mtk_i2c_parse_fw(struct mtk_i2c *i2c)
 
 	ret = device_property_read_u32(i2c->dev, "clock-frequency",
 				       &i2c->speed_hz);
-	if (ret < 0)
-		i2c->speed_hz = I2C_MAX_STANDARD_MODE_FREQ;
+	if (ret < 0) {
+		/*
+		 * ACPI platforms describe the bus speed in the I2cSerialBus
+		 * resources of the peripherals rather than on the controller.
+		 * Use the slowest speed declared on this bus before falling
+		 * back to standard mode.
+		 */
+		i2c->speed_hz = 0;
+		if (has_acpi_companion(i2c->dev))
+			i2c->speed_hz = i2c_acpi_find_bus_speed(i2c->dev);
+		if (!i2c->speed_hz)
+			i2c->speed_hz = I2C_MAX_STANDARD_MODE_FREQ;
+	}
 
 	ret = device_property_read_u32(i2c->dev, "clock-div",
 				       &i2c->clk_src_div);
