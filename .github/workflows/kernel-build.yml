@@ -11,6 +11,7 @@ on:
           - linux-nvidia-6.6
           - linux-nvidia-6.12
           - linux-nvidia-6.18
+          - 24.04_linux-nvidia-7.0-next
   workflow_call:
     inputs:
       build_ref:
@@ -27,10 +28,16 @@ jobs:
         include:
           - runs-on: ubuntu-latest
             config: defconfig
+            arch: x86_64
+            page_size: 4096
           - runs-on: ubuntu-24.04-arm
             config: config_4k
+            arch: aarch64
+            page_size: 4096
           - runs-on: ubuntu-24.04-arm
             config: config_64k
+            arch: aarch64
+            page_size: 65536
     steps:
       - name: Checkout kernel ref
         uses: actions/checkout@v4
@@ -38,10 +45,10 @@ jobs:
           ref: ${{ inputs.build_ref }}
           fetch-depth: 0
 
-      - name: Fetch config files from github-actions branch
+      - name: Fetch config and boot check files from github-actions branch
         run: |
           git fetch origin github-actions
-          git checkout origin/github-actions -- .github/workflows/config_4k .github/workflows/config_64k
+          git checkout origin/github-actions -- .github/workflows/config_4k .github/workflows/config_64k .github/scripts/verify-kernel-boot.sh
 
       - name: Install Dependencies
         run: |
@@ -86,7 +93,8 @@ jobs:
 
       - name: Boot test
         run: |
-          vng -v -m 4G -- uname -a
+          vng -v -m 4G -- bash .github/scripts/verify-kernel-boot.sh \
+            "${{ matrix.arch }}" "${{ matrix.page_size }}"
 
       - name: Run kselftests
         run: |

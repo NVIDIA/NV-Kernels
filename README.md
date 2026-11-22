@@ -37,9 +37,18 @@ Builds and tests kernels with the following matrix:
 
 Includes boot tests via QEMU and runs kselftests for mm, dma, iommu, and locking subsystems.
 
+The boot check asserts the running guest's architecture and page size against
+the matrix entry, so a 4K kernel cannot pass the 64K boot test. It can also be
+run directly inside a guest with
+`bash .github/scripts/verify-kernel-boot.sh aarch64 4096`.
+QEMU checks do not establish support for a physical laptop's firmware or devices.
+
 **Triggers:**
 - Manual dispatch (select branch to build)
 - Automatically after successful rebase
+
+Manual dispatch also accepts `24.04_linux-nvidia-7.0-next` to exercise the
+Ubuntu 24.04 NVIDIA kernel tree alongside the stable kernel branches.
 
 ## Branch Structure
 
