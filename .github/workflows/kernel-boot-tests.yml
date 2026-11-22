@@ -1,0 +1,30 @@
+name: Kernel boot verifier tests
+
+'on':
+  pull_request:
+    branches:
+      - github-actions
+    paths:
+      - .github/scripts/verify-kernel-boot.sh
+      - .github/scripts/test_verify_kernel_boot.py
+      - .github/workflows/kernel-build.yml
+      - .github/workflows/kernel-boot-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out workflow changes
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Check shell syntax
+        run: bash -n .github/scripts/verify-kernel-boot.sh
+
+      - name: Test boot verifier
+        run: python3 .github/scripts/test_verify_kernel_boot.py -v

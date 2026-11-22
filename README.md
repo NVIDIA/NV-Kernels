@@ -42,6 +42,8 @@ the matrix entry, so a 4K kernel cannot pass the 64K boot test. It can also be
 run directly inside a guest with
 `bash .github/scripts/verify-kernel-boot.sh aarch64 4096`.
 QEMU checks do not establish support for a physical laptop's firmware or devices.
+Configs and the verifier are fetched from the executing workflow's commit
+(`github.workflow_sha`), including when testing an unmerged workflow branch.
 
 **Triggers:**
 - Manual dispatch (select branch to build)
@@ -49,6 +51,14 @@ QEMU checks do not establish support for a physical laptop's firmware or devices
 
 Manual dispatch also accepts `24.04_linux-nvidia-7.0-next` to exercise the
 Ubuntu 24.04 NVIDIA kernel tree alongside the stable kernel branches.
+
+### kernel-boot-tests.yml
+
+Tests the boot verifier when its script, tests, or kernel workflows change in
+a PR targeting `github-actions`. It checks successful guest values, mismatched
+architecture/page size, missing arguments, and failed page-size queries without
+building a kernel. It can also be dispatched manually. Run the same tests locally
+on Linux with `python3 .github/scripts/test_verify_kernel_boot.py -v`.
 
 ## Branch Structure
 
