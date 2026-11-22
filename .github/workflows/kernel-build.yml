@@ -95,8 +95,10 @@ jobs:
 
       - name: Boot test
         run: |
+          expected_release=$(cat include/config/kernel.release)
+          : "${expected_release:?Build did not produce a kernel release}"
           vng -v -m 4G -- bash .github/scripts/verify-kernel-boot.sh \
-            "${{ matrix.arch }}" "${{ matrix.page_size }}"
+            "${{ matrix.arch }}" "${{ matrix.page_size }}" "$expected_release"
 
       - name: Run kselftests
         run: |

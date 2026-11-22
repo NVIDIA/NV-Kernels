@@ -11,11 +11,15 @@ VERIFIER = Path(__file__).with_name("verify-kernel-boot.sh")
 
 class VerifyKernelBootTests(unittest.TestCase):
     def run_verifier(self, *arguments, arch="aarch64", page_size="4096",
-                     getconf_status=0):
+                     getconf_status=0, release="7.0.0-test"):
         with tempfile.TemporaryDirectory() as directory:
             tools = Path(directory)
             uname = tools / "uname"
-            uname.write_text(f"#!/bin/sh\nprintf '%s\\n' '{arch}'\n")
+            uname.write_text(
+                "#!/bin/sh\ncase \"$1\" in\n"
+                f"  -r) printf '%s\\n' '{release}' ;;\n"
+                f"  *) printf '%s\\n' '{arch}' ;;\n"
+                "esac\n")
             uname.chmod(0o755)
             getconf = tools / "getconf"
             getconf.write_text(
@@ -66,6 +70,23 @@ class VerifyKernelBootTests(unittest.TestCase):
         result = self.run_verifier(
             "aarch64", "4096", getconf_status=7)
         self.assertEqual(result.returncode, 7)
+
+    def test_matching_kernel_release(self):
+        result = self.run_verifier("aarch64", "4096", "7.0.0-test")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "Kernel release: expected=7.0.0-test actual=7.0.0-test",
+            result.stdout)
+
+    def test_stale_kernel_with_matching_architecture_and_page_size(self):
+        result = self.run_verifier(
+            "aarch64", "4096", "7.0.0-test", release="6.8.0-stale")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Architecture: expected=aarch64 actual=aarch64", result.stdout)
+        self.assertIn("Page size: expected=4096 actual=4096", result.stdout)
+        self.assertIn(
+            "Kernel release: expected=7.0.0-test actual=6.8.0-stale",
+            result.stdout)
 
 
 if __name__ == "__main__":
