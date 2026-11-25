@@ -1515,13 +1515,33 @@ static void ieee80211_rx_reorder_ampdu(struct ieee80211_rx_data *rx,
 	__skb_queue_tail(frames, skb);
 }
 
+/*
+ * Extend an SN to a position that stays distinct across SN wraps. As with
+ * a high-water mark, an SN less than half the SN space ahead of the newest
+ * one moves the head forward. Any other SN is placed behind the head.
+ */
+static u32 ieee80211_mcast_dup_pos(struct ieee80211_mcast_dup_cache *cache,
+				   u16 sn)
+{
+	if (!cache->started) {
+		cache->started = true;
+		cache->head = sn;
+	} else if (ieee80211_sn_less(cache->head, sn)) {
+		cache->head += ieee80211_sn_sub(sn, cache->head);
+	}
+
+	return cache->head - ieee80211_sn_sub(cache->head, sn);
+}
+
 VISIBLE_IF_MAC80211_KUNIT bool
 ieee80211_mcast_dup_check(struct ieee80211_mcast_dup_cache *cache,
-			  const struct ethhdr *ehdr, u16 sn, int link_id,
-			  u64 now)
+			  const struct ethhdr *ehdr, u16 sn, bool retry,
+			  int link_id, u64 now, u32 timeout)
 {
-	struct ieee80211_mcast_dup_entry *entry;
+	struct ieee80211_mcast_dup_entry *bucket, *entry = NULL, *victim = NULL;
+	u32 pos, max_dist = 0;
 	u16 link;
+	int i;
 
 	if (!cache || link_id < 0 || link_id >= IEEE80211_MLD_MAX_NUM_LINKS)
 		return false;
@@ -1532,55 +1552,79 @@ ieee80211_mcast_dup_check(struct ieee80211_mcast_dup_cache *cache,
 		cache->epoch = upper_32_bits(now);
 	}
 
-	entry = &cache->entries[sn];
+	pos = ieee80211_mcast_dup_pos(cache, sn);
+	bucket = cache->entries[pos % IEEE80211_MCAST_DUP_BUCKETS];
 	link = BIT(link_id);
 
-	/* Like HSR/PRP, remember SNs actually seen rather than a high-water mark. */
-	if (entry->links &&
-	    (u32)(now - entry->seen) < IEEE80211_MCAST_DUP_TIMEOUT &&
-	    ether_addr_equal(entry->sa, ehdr->h_source) &&
-	    ether_addr_equal(entry->da, ehdr->h_dest)) {
-		/*
-		 * Same-link SN reuse makes the generation of later copies
-		 * uncertain. Fail open until the original entry expires;
-		 * neither duplicates nor reuse extend its lifetime.
-		 */
-		if (entry->ambiguous)
-			return false;
-		if (entry->links & link) {
-			entry->ambiguous = true;
-			return false;
+	for (i = 0; i < IEEE80211_MCAST_DUP_WAYS; i++) {
+		struct ieee80211_mcast_dup_entry *e = &bucket[i];
+		u32 dist = U32_MAX;
+
+		if (e->links && (u32)(now - e->seen) < timeout) {
+			if (e->pos == pos &&
+			    ether_addr_equal(e->sa, ehdr->h_source) &&
+			    ether_addr_equal(e->da, ehdr->h_dest)) {
+				entry = e;
+				break;
+			}
+			dist = cache->head - e->pos;
 		}
 
-		entry->links |= link;
-		return true;
+		if (!victim || dist > max_dist) {
+			victim = e;
+			max_dist = dist;
+		}
 	}
 
-	entry->seen = lower_32_bits(now);
-	entry->links = link;
-	entry->ambiguous = false;
-	ether_addr_copy(entry->sa, ehdr->h_source);
-	ether_addr_copy(entry->da, ehdr->h_dest);
-	return false;
+	if (!entry) {
+		/*
+		 * Replace an empty or expired entry, else the one furthest
+		 * behind the head, whose copies on other links have most likely
+		 * arrived already. Losing an entry lets a late copy through.
+		 */
+		victim->seen = lower_32_bits(now);
+		victim->pos = pos;
+		victim->links = link;
+		victim->ambiguous = false;
+		ether_addr_copy(victim->sa, ehdr->h_source);
+		ether_addr_copy(victim->da, ehdr->h_dest);
+		return false;
+	}
+
+	/*
+	 * A same-link repeat is a copy if marked as a retransmission.
+	 * Otherwise the sender reused the position, and later copies cannot
+	 * be told apart: fail open until the entry expires. Neither copies nor
+	 * reuse extend its lifetime.
+	 */
+	if (entry->ambiguous)
+		return false;
+	if (entry->links & link) {
+		if (retry)
+			return true;
+		entry->ambiguous = true;
+		return false;
+	}
+
+	entry->links |= link;
+	return true;
 }
 EXPORT_SYMBOL_IF_MAC80211_KUNIT(ieee80211_mcast_dup_check);
 
-void ieee80211_mcast_dup_reset(struct ieee80211_sub_if_data *sdata)
+static u32 ieee80211_mcast_dup_timeout(struct ieee80211_link_data *link)
 {
-	struct ieee80211_mcast_dup_cache *cache;
+	/* bounded so that the conversion below cannot overflow */
+	u32 dtim_tu = min_t(u32, link->conf->beacon_int * link->conf->dtim_period,
+			    U16_MAX);
+	/*
+	 * An AP may hold group frames until each link's DTIM beacon, so the
+	 * copy received here can trail an earlier one by this link's DTIM
+	 * interval.
+	 */
+	u32 timeout = IEEE80211_MCAST_DUP_TIMEOUT +
+		      usecs_to_jiffies(ieee80211_tu_to_usec(dtim_tu));
 
-	lockdep_assert_wiphy(sdata->local->hw.wiphy);
-
-	if (sdata->vif.type != NL80211_IFTYPE_STATION)
-		return;
-
-	cache = sdata_dereference(sdata->u.mgd.mcast_dup_cache, sdata);
-	if (!cache)
-		return;
-
-	spin_lock_bh(&sdata->local->rx_path_lock);
-	memset(cache->entries, 0, sizeof(cache->entries));
-	spin_unlock_bh(&sdata->local->rx_path_lock);
+	return min_t(u32, timeout, IEEE80211_MCAST_DUP_TIMEOUT_MAX);
 }
 
 static ieee80211_rx_result debug_noinline
@@ -3343,7 +3387,7 @@ ieee80211_rx_h_data(struct ieee80211_rx_data *rx)
 		return RX_DROP_U_NULL_DATA;
 
 	check_mcast = is_multicast_ether_addr(hdr->addr1) && rx->sta &&
-		      sdata->vif.type == NL80211_IFTYPE_STATION &&
+		      rx->link && sdata->vif.type == NL80211_IFTYPE_STATION &&
 		      ieee80211_vif_is_mld(&sdata->vif) &&
 		      !(status->flag & RX_FLAG_DUP_VALIDATED);
 	sn = ieee80211_get_sn(hdr);
@@ -3372,8 +3416,10 @@ ieee80211_rx_h_data(struct ieee80211_rx_data *rx)
 
 	if (check_mcast &&
 	    ieee80211_mcast_dup_check(rcu_dereference(sdata->u.mgd.mcast_dup_cache),
-				      (void *)rx->skb->data, sn, rx->link_id,
-				      get_jiffies_64()))
+				      (void *)rx->skb->data, sn,
+				      ieee80211_has_retry(fc), rx->link_id,
+				      get_jiffies_64(),
+				      ieee80211_mcast_dup_timeout(rx->link)))
 		return RX_DROP_U_DUP;
 
 	/* directly handle TDLS channel switch requests/responses */

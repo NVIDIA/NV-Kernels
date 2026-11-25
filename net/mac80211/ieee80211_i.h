@@ -2895,14 +2895,12 @@ ieee80211_uhr_cap_ie_to_sta_uhr_cap(struct ieee80211_sub_if_data *sdata,
 				    u8 uhr_cap_len,
 				    struct link_sta_info *link_sta);
 
-void ieee80211_mcast_dup_reset(struct ieee80211_sub_if_data *sdata);
-
 #if IS_ENABLED(CONFIG_MAC80211_KUNIT_TEST)
 #define EXPORT_SYMBOL_IF_MAC80211_KUNIT(sym) EXPORT_SYMBOL_IF_KUNIT(sym)
 #define VISIBLE_IF_MAC80211_KUNIT
 bool ieee80211_mcast_dup_check(struct ieee80211_mcast_dup_cache *cache,
-			       const struct ethhdr *ehdr, u16 sn, int link_id,
-			       u64 now);
+			       const struct ethhdr *ehdr, u16 sn, bool retry,
+			       int link_id, u64 now, u32 timeout);
 ieee80211_rx_result
 ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx);
 int ieee80211_calc_chandef_subchan_offset(const struct cfg80211_chan_def *ap,
