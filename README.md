@@ -44,6 +44,11 @@ run directly inside a guest with
 QEMU checks do not establish support for a physical laptop's firmware or devices.
 Configs and the verifier are fetched from the executing workflow's commit
 (`github.workflow_sha`), including when testing an unmerged workflow branch.
+Both source and helper checkouts disable persisted credentials, and the workflow
+requests only read access to repository contents. Helpers come from a separate
+sparse checkout of the executing workflow SHA, not a fixed branch or the selected
+kernel ref. Kernel builds still execute source-controlled scripts with network
+access; dispatch only refs you trust, and do not pass secrets to this workflow.
 
 **Triggers:**
 - Manual dispatch (enter a kernel branch, tag, or commit SHA to build)

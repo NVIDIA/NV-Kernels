@@ -14,6 +14,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: ${{ matrix.runs-on == 'ubuntu-latest' && 'x86_64' || 'ARM64' }} - ${{ matrix.config }}
@@ -35,17 +38,30 @@ jobs:
             page_size: 65536
     steps:
       - name: Checkout kernel ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ inputs.build_ref }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Fetch config and boot check files from workflow revision
-        env:
-          WORKFLOW_SHA: ${{ github.workflow_sha }}
+      - name: Checkout config and boot check files from workflow revision
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .workflow-support
+          persist-credentials: false
+          sparse-checkout: |
+            .github/workflows/config_4k
+            .github/workflows/config_64k
+            .github/scripts/verify-kernel-boot.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Copy config and boot check files into kernel tree
         run: |
-          git fetch origin "$WORKFLOW_SHA"
-          git checkout "$WORKFLOW_SHA" -- .github/workflows/config_4k .github/workflows/config_64k .github/scripts/verify-kernel-boot.sh
+          mkdir -p .github/workflows .github/scripts
+          cp .workflow-support/.github/workflows/config_4k .github/workflows/config_4k
+          cp .workflow-support/.github/workflows/config_64k .github/workflows/config_64k
+          cp .workflow-support/.github/scripts/verify-kernel-boot.sh .github/scripts/verify-kernel-boot.sh
 
       - name: Install Dependencies
         run: |
