@@ -4,18 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       build_ref:
-        description: 'Ref to build'
+        description: 'Kernel branch, tag, or commit SHA to build'
         required: true
-        type: choice
-        options:
-          - linux-nvidia-6.6
-          - linux-nvidia-6.12
-          - linux-nvidia-6.18
-          - 24.04_linux-nvidia-7.0-next
+        type: string
   workflow_call:
     inputs:
       build_ref:
-        description: 'Ref to build'
+        description: 'Kernel branch, tag, or commit SHA to build'
         required: true
         type: string
 

@@ -46,11 +46,22 @@ Configs and the verifier are fetched from the executing workflow's commit
 (`github.workflow_sha`), including when testing an unmerged workflow branch.
 
 **Triggers:**
-- Manual dispatch (select branch to build)
+- Manual dispatch (enter a kernel branch, tag, or commit SHA to build)
 - Automatically after successful rebase
 
-Manual dispatch also accepts `24.04_linux-nvidia-7.0-next` to exercise the
-Ubuntu 24.04 NVIDIA kernel tree alongside the stable kernel branches.
+Manual dispatch accepts any kernel branch, tag, or commit SHA in this repository,
+not just a fixed list of Ubuntu 24.04 branches. Examples include
+`linux-nvidia-6.6`, `linux-nvidia-6.12`, `linux-nvidia-6.18`,
+`24.04_linux-nvidia-7.0-next`, `26.04_linux-nvidia`,
+`26.04_linux-nvidia-7.3-next`, and `26.04_linux-nvidia-bos`. Future release
+branches do not require another dropdown update. The ref must exist and contain
+a kernel source tree; the workflow-only `github-actions` branch is not a build
+target.
+
+The guest architecture, page-size, and release comparisons are independent of
+the Ubuntu release name. Existing runner images remain unchanged: runner
+userspace is distinct from the selected kernel source branch. Accepting a ref
+does not certify its build dependencies, kselftests, or hardware compatibility.
 
 ### kernel-boot-tests.yml
 
