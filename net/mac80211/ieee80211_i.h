@@ -35,6 +35,7 @@
 #include "sta_info.h"
 #include "debug.h"
 #include "drop.h"
+#include "mcast.h"
 
 extern const struct cfg80211_ops mac80211_config_ops;
 
@@ -545,7 +546,7 @@ struct ieee80211_if_managed {
 
 	unsigned int flags;
 
-	u16 mcast_seq_last;
+	struct ieee80211_mcast_dup_cache __rcu *mcast_dup_cache;
 
 	bool status_acked;
 	bool status_received;
@@ -2897,6 +2898,9 @@ ieee80211_uhr_cap_ie_to_sta_uhr_cap(struct ieee80211_sub_if_data *sdata,
 #if IS_ENABLED(CONFIG_MAC80211_KUNIT_TEST)
 #define EXPORT_SYMBOL_IF_MAC80211_KUNIT(sym) EXPORT_SYMBOL_IF_KUNIT(sym)
 #define VISIBLE_IF_MAC80211_KUNIT
+bool ieee80211_mcast_dup_check(struct ieee80211_mcast_dup_cache *cache,
+			       const struct ethhdr *ehdr, u16 sn, bool retry,
+			       int link_id, u64 now, u32 timeout);
 ieee80211_rx_result
 ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx);
 int ieee80211_calc_chandef_subchan_offset(const struct cfg80211_chan_def *ap,

@@ -4015,10 +4015,15 @@ static void ieee80211_set_associated(struct ieee80211_sub_if_data *sdata,
 {
 	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_vif_cfg *vif_cfg = &sdata->vif.cfg;
+	struct ieee80211_mcast_dup_cache *mcast_cache = NULL;
 	u64 vif_changed = BSS_CHANGED_ASSOC;
 	unsigned int link_id;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
+
+	if (ieee80211_vif_is_mld(&sdata->vif))
+		mcast_cache = kvzalloc(sizeof(*mcast_cache), GFP_KERNEL);
+	rcu_assign_pointer(sdata->u.mgd.mcast_dup_cache, mcast_cache);
 
 	sdata->u.mgd.associated = true;
 
@@ -4130,6 +4135,7 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_if_managed *ifmgd = &sdata->u.mgd;
 	struct ieee80211_local *local = sdata->local;
 	struct sta_info *ap_sta = sta_info_get(sdata, sdata->vif.cfg.ap_addr);
+	struct ieee80211_mcast_dup_cache *mcast_cache;
 	unsigned int link_id;
 	u64 changed = 0;
 	struct ieee80211_prep_tx_info info = {
@@ -4370,7 +4376,10 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 
 	ieee80211_vif_set_links(sdata, 0, 0);
 
-	ifmgd->mcast_seq_last = IEEE80211_SN_MODULO;
+	mcast_cache = sdata_dereference(ifmgd->mcast_dup_cache, sdata);
+	RCU_INIT_POINTER(ifmgd->mcast_dup_cache, NULL);
+	if (mcast_cache)
+		kvfree_rcu(mcast_cache, rcu_head);
 
 	ifmgd->epcs.enabled = false;
 	ifmgd->epcs.dialog_token = 0;
@@ -9035,7 +9044,7 @@ void ieee80211_sta_setup_sdata(struct ieee80211_sub_if_data *sdata)
 	spin_lock_init(&ifmgd->teardown_lock);
 	ifmgd->teardown_skb = NULL;
 	ifmgd->orig_teardown_skb = NULL;
-	ifmgd->mcast_seq_last = IEEE80211_SN_MODULO;
+	RCU_INIT_POINTER(ifmgd->mcast_dup_cache, NULL);
 }
 
 static void ieee80211_recalc_smps_work(struct wiphy *wiphy,
