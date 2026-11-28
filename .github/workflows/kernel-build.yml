@@ -4,19 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       build_ref:
-        description: 'Ref to build'
+        description: 'Kernel branch, tag, or commit SHA to build'
         required: true
-        type: choice
-        options:
-          - linux-nvidia-6.6
-          - linux-nvidia-6.12
-          - linux-nvidia-6.18
+        type: string
   workflow_call:
     inputs:
       build_ref:
-        description: 'Ref to build'
+        description: 'Kernel branch, tag, or commit SHA to build'
         required: true
         type: string
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -27,21 +26,42 @@ jobs:
         include:
           - runs-on: ubuntu-latest
             config: defconfig
+            arch: x86_64
+            page_size: 4096
           - runs-on: ubuntu-24.04-arm
             config: config_4k
+            arch: aarch64
+            page_size: 4096
           - runs-on: ubuntu-24.04-arm
             config: config_64k
+            arch: aarch64
+            page_size: 65536
     steps:
       - name: Checkout kernel ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ inputs.build_ref }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Fetch config files from github-actions branch
+      - name: Checkout config and boot check files from workflow revision
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .workflow-support
+          persist-credentials: false
+          sparse-checkout: |
+            .github/workflows/config_4k
+            .github/workflows/config_64k
+            .github/scripts/verify-kernel-boot.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Copy config and boot check files into kernel tree
         run: |
-          git fetch origin github-actions
-          git checkout origin/github-actions -- .github/workflows/config_4k .github/workflows/config_64k
+          mkdir -p .github/workflows .github/scripts
+          cp .workflow-support/.github/workflows/config_4k .github/workflows/config_4k
+          cp .workflow-support/.github/workflows/config_64k .github/workflows/config_64k
+          cp .workflow-support/.github/scripts/verify-kernel-boot.sh .github/scripts/verify-kernel-boot.sh
 
       - name: Install Dependencies
         run: |
@@ -86,7 +106,10 @@ jobs:
 
       - name: Boot test
         run: |
-          vng -v -m 4G -- uname -a
+          expected_release=$(cat include/config/kernel.release)
+          : "${expected_release:?Build did not produce a kernel release}"
+          vng -v -m 4G -- bash .github/scripts/verify-kernel-boot.sh \
+            "${{ matrix.arch }}" "${{ matrix.page_size }}" "$expected_release"
 
       - name: Run kselftests
         run: |
